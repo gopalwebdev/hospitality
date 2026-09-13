@@ -7,6 +7,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Date;
@@ -45,6 +46,23 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRequestMemoization();
         $this->configureQueryGuards();
         $this->configureAuthorization();
+        $this->configureDevProcesses();
+    }
+
+    /**
+     * Leave the web server out of `php artisan dev`.
+     *
+     * Herd serves the application at APP_URL and every tenant's subdomain on
+     * ports 80 and 443. The built-in server could only add a second copy on
+     * another port, where no tenant route matches the host.
+     *
+     * except() replaces the list rather than adding to it, so Horizon's own
+     * exclusion of the queue listener is restated: without it `queue:listen`
+     * would run beside Horizon's workers.
+     */
+    protected function configureDevProcesses(): void
+    {
+        DevCommands::except('server', 'queue');
     }
 
     /**

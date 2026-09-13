@@ -21,7 +21,7 @@ Switching language needs two registrations of one controller, because a form mus
 
 `storefront` was the old name for `guest.home`, and `/` is now the tile home screen rather than the menu — a menu lives at `/menus/{menu}`. Because `{tenant}` arrives in the **domain**, Laravel's scoped bindings do not cover `{menu}` or `{tile}`: each controller checks `$model->tenant_id === $tenant->getKey()` by hand, alongside the `is_active` check. Leaving that out is how one tenant reads another's uploads off the same disk.
 
-## Locally, Herd serves the tenant subdomains; artisan serve on 127.0.0.1 cannot
-Tenant routes are bound to `{tenant}.` + `APP_DOMAIN`, so a request to `127.0.0.1:8000` only ever reaches the root-domain routes — the guest app and the tenant panel are unreachable there. Herd already serves `https://hospitality.test` and every `https://{slug}.hospitality.test`; `php artisan serve` is not needed.
+## Locally, Herd is the server; nothing runs artisan serve
+Herd serves `https://hospitality.test` and every `https://{slug}.hospitality.test` on 80 and 443, so the app's URLs carry no port. Tenant routes are bound to `{tenant}.` + `APP_DOMAIN`, which is why `127.0.0.1:8000` only ever reaches the root-domain routes — the guest app and the tenant panel are unreachable there.
 
-`.env` sets `SERVER_HOST="${APP_DOMAIN}"`, which `ServeCommand` reads as its default host, so `php artisan serve` (and the `server` process in `php artisan dev`) prints `http://hospitality.test:8000` and answers `http://{slug}.hospitality.test:8000` too — `.test` resolves to 127.0.0.1 through Herd. The port stays because Herd's nginx owns 80 and 443.
+`php artisan serve` can never print or answer a portless URL, because Herd's nginx owns those ports, so it is not part of the workflow: `AppServiceProvider::configureDevProcesses()` leaves the `server` process out of `php artisan dev` (and so `composer dev`). There is deliberately no `SERVER_HOST` in `.env`; setting it only changes `127.0.0.1:8000` into `hospitality.test:8000`.

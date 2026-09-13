@@ -20,6 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Otp/** | .ai/rules/otp.md |
 | app/Policies/** | .ai/rules/policies.md |
 | app/Providers/Filament/*.php, app/Providers/Filament/TenantPanelProvider.php | .ai/rules/providers-filament.md |
+| app/Providers/AppServiceProvider.php | .ai/rules/providers.md |
 | app/Filament/Tenant/Resources/**/Tables/*.php | .ai/rules/resources-tables.md |
 | app/Filament/Platform/Resources/Tenants/** | .ai/rules/resources-tenants.md |
 | routes/** | .ai/rules/routes.md |
