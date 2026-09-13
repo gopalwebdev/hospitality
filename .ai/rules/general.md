@@ -31,3 +31,8 @@ These are house rules, not preferences to be re-litigated:
 Standing scope decision from the project owner: the staff PWA — its pages, entry, root template, `staff.*` routes, sign-in flow and `lang/en/staff.php` — was deleted outright rather than parked. What remains is the guest app (the one Inertia surface, itself an installable PWA) and the two Filament panels.
 
 The **Staff role** is untouched: it is a Spatie role with a per-tenant limit (`tenants.max_staff`), and accounts still hold it. It simply has no surface of its own until a staff app comes back. A feature described for "the app" means the guest app.
+
+## The menu is generic: never "food" or "dish"
+Standing instruction from the project owner: this is one product for hotels, restaurants and hospitals, and a menu carries things to order and service requests (a pillow, a bedsheet change) side by side. Never write the words "food" or "dish" — not in class, method, variable, column or prop names, labels, comments, tests, seeded names or these rules.
+
+Say **item** (`MenuItem`, "Items"), **add-on** for `menu_item_additions`, **diet** for the veg / egg / non-veg mark (`App\Enums\Diet`, `menu_items.diet`, `DietMark`), and **service request** for `menu_items.is_service`. A price of 0 is **complimentary**. `grep -rniE "food|dish"` over app, database, resources, lang, tests and `.ai/rules` should find nothing but this rule, which has to name the words it forbids.

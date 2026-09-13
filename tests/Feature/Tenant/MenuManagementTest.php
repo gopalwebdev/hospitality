@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\Currency;
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Permission as PermissionEnum;
@@ -158,7 +158,7 @@ it('refuses a menu name the tenant already uses', function (): void {
         ->assertHasActionErrors(['name.'.Locale::English->value]);
 });
 
-it('takes a menu\'s sections and their dishes with it when it is deleted', function (): void {
+it('takes a menu\'s sections and their items with it when it is deleted', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -285,7 +285,7 @@ it('reads a menu as one tree without grouping or ordering on a translated column
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $chicken = MenuCategory::factory()->under($starters)->create(['position' => 0]);
-    $dish = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
+    $menuItem = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -295,20 +295,20 @@ it('reads a menu as one tree without grouping or ordering on a translated column
         ->getTable();
 
     expect($table->getDefaultGroup())->toBeNull()
-        // A section, then its own dishes, then its subdivisions: the order a
+        // A section, then its own items, then its subdivisions: the order a
         // guest reads the menu in.
         ->and(array_keys($table->getRecords()->all()))->toBe([
             'featured',
             'combos',
             'category-'.$starters->getKey(),
-            'item-'.$dish->getKey(),
+            'item-'.$menuItem->getKey(),
             'category-'.$chicken->getKey(),
         ]);
 });
 
 /*
 |--------------------------------------------------------------------------
-| Dishes, and the money they are priced in
+| Items, and the money they are priced in
 |--------------------------------------------------------------------------
 */
 
@@ -325,7 +325,7 @@ it('stores a typed price as an exact integer count of minor units', function ():
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '249.50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -353,7 +353,7 @@ it('round-trips a price through the edit form without drift', function (): void 
         ->callAction(TestAction::make('edit')->table($item), [
             'name' => $item->getTranslations('name'),
             'menu_category_id' => $category->getKey(),
-            'food_type' => $item->food_type->value,
+            'diet' => $item->diet->value,
             'price' => '249.50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -392,7 +392,7 @@ it('formats a price in rupees', function (): void {
     expect($item->formattedPrice())->toBe('₹12.50');
 });
 
-it('offers no grouping control on the dishes page', function (): void {
+it('offers no grouping control on the items page', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
@@ -415,7 +415,7 @@ it('offers no grouping control on the dishes page', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('saves a dish\'s additions in the same save as the dish', function (): void {
+it('saves an item\'s additions in the same save as the item', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['currency' => Currency::IndianRupee]);
     $category = MenuCategory::factory()
@@ -428,7 +428,7 @@ it('saves a dish\'s additions in the same save as the dish', function (): void {
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '249.50',
             'availability' => ItemAvailability::Available->value,
             'additions' => [
@@ -463,7 +463,7 @@ it('saves a dish\'s additions in the same save as the dish', function (): void {
         ->and($free->isFree())->toBeTrue();
 });
 
-it('lets a dish be saved with no additions at all', function (): void {
+it('lets an item be saved with no additions at all', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -471,13 +471,13 @@ it('lets a dish be saved with no additions at all', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // Most dishes have none, so the repeater must not start with a blank row
+    // Most items have none, so the repeater must not start with a blank row
     // that then fails validation.
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Tandoori Roti'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -486,7 +486,7 @@ it('lets a dish be saved with no additions at all', function (): void {
     expect(byEnglishName(MenuItem::class, 'Tandoori Roti')->additions)->toBeEmpty();
 });
 
-it('takes a dish\'s additions with it when it is deleted', function (): void {
+it('takes an item\'s additions with it when it is deleted', function (): void {
     $tenant = Tenant::factory()->create();
     $item = MenuItem::factory()->inCategory(
         MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create(),
@@ -498,7 +498,7 @@ it('takes a dish\'s additions with it when it is deleted', function (): void {
     expect(MenuItemAddition::query()->whereKey($addition->getKey())->exists())->toBeFalse();
 });
 
-it('refuses an addition on another tenant\'s dish, even around the form', function (): void {
+it('refuses an addition on another tenant\'s item, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirItem = MenuItem::factory()->inCategory(
@@ -517,7 +517,7 @@ it('refuses an addition on another tenant\'s dish, even around the form', functi
 |--------------------------------------------------------------------------
 */
 
-it('shows only this tenant\'s dishes', function (): void {
+it('shows only this tenant\'s items', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
 
@@ -550,7 +550,7 @@ it('shows only this tenant\'s menus', function (): void {
         ->assertCanNotSeeTableRecords([$theirMenu]);
 });
 
-it('refuses to file a dish under another tenant\'s section', function (): void {
+it('refuses to file an item under another tenant\'s section', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
 
@@ -568,7 +568,7 @@ it('refuses to file a dish under another tenant\'s section', function (): void {
         ->callAction('create', [
             'name' => [Locale::English->value => 'Smuggled'],
             'menu_category_id' => $theirCategory->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -579,7 +579,7 @@ it('refuses to file a dish under another tenant\'s section', function (): void {
         ->exists())->toBeFalse();
 });
 
-it('refuses a dish in another tenant\'s section, even around the form', function (): void {
+it('refuses an item in another tenant\'s section, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirCategory = MenuCategory::factory()
@@ -587,14 +587,14 @@ it('refuses a dish in another tenant\'s section, even around the form', function
         ->create();
 
     // MenuItemObserver is the guarantee behind the tenant scope: code that goes
-    // around the form still cannot store a dish pointing across tenants.
+    // around the form still cannot store an item pointing across tenants.
     expect(fn () => MenuItem::factory()->create([
         'tenant_id' => $mine->getKey(),
         'menu_category_id' => $theirCategory->getKey(),
     ]))->toThrow(LogicException::class, 'another tenant');
 });
 
-it('takes a section\'s dishes with it when it is deleted', function (): void {
+it('takes a section\'s items with it when it is deleted', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -638,76 +638,76 @@ it('counts an item orderable only when it, its section and its menu are showing'
 
 /*
 |--------------------------------------------------------------------------
-| The dishes a menu leads with
+| The items a menu leads with
 |--------------------------------------------------------------------------
 |
-| Featuring is a flag on the dish, not a table of its own: a dish is either led
+| Featuring is a flag on the item, not a table of its own: an item is either led
 | with or it is not, and it keeps its place under its own section either way.
 |
 */
 
-it('features a dish from its own form', function (): void {
+it('features an item from its own form', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The dish form's Featured toggle is the only place featuring is set. The
+    // The item form's Featured toggle is the only place featuring is set. The
     // menu page's featured row used to carry its own pair of actions for the
     // same flag; two mechanisms for one thing is what that was.
     Livewire::test(ListMenuItems::class)
-        ->callAction(TestAction::make('edit')->table($dish), [
+        ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
-            'name' => $dish->getTranslations('name'),
-            'food_type' => $dish->food_type->value,
+            'name' => $menuItem->getTranslations('name'),
+            'diet' => $menuItem->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
         ])
         ->assertHasNoActionErrors();
 
-    expect($dish->refresh()->is_featured)->toBeTrue();
+    expect($menuItem->refresh()->is_featured)->toBeTrue();
 
-    Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])->assertCanSeeTableRecords([$dish]);
+    Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])->assertCanSeeTableRecords([$menuItem]);
 });
 
-it('takes a dish out of the featured row without taking it off the menu', function (): void {
+it('takes an item out of the featured row without taking it off the menu', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
-        ->callAction(TestAction::make('edit')->table($dish), [
+        ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
-            'name' => $dish->getTranslations('name'),
-            'food_type' => $dish->food_type->value,
+            'name' => $menuItem->getTranslations('name'),
+            'diet' => $menuItem->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => false,
         ])
         ->assertHasNoActionErrors();
 
-    // Unfeaturing takes a dish out of the row it was led with, and nothing
+    // Unfeaturing takes an item out of the row it was led with, and nothing
     // else: it stays on the menu under its own section.
-    expect($dish->refresh()->is_featured)->toBeFalse()
-        ->and($dish->availability)->toBe(ItemAvailability::Available)
-        ->and($dish->menu_category_id)->toBe($category->getKey());
+    expect($menuItem->refresh()->is_featured)->toBeFalse()
+        ->and($menuItem->availability)->toBe(ItemAvailability::Available)
+        ->and($menuItem->menu_category_id)->toBe($category->getKey());
 });
 
-it('offers no way to feature a dish from the menu page itself', function (): void {
+it('offers no way to feature an item from the menu page itself', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The featured row is for putting dishes in order and nothing else, so the
+    // The featured row is for putting items in order and nothing else, so the
     // flag has exactly one home.
     $table = Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])
         ->assertOk()
@@ -719,7 +719,7 @@ it('offers no way to feature a dish from the menu page itself', function (): voi
         ->and($table->isReorderable())->toBeTrue();
 });
 
-it('shows only the featured dishes of this menu', function (): void {
+it('shows only the featured items of this menu', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
@@ -746,7 +746,7 @@ it('shows only the featured dishes of this menu', function (): void {
 | Offers, availability and refiling
 |--------------------------------------------------------------------------
 |
-| A dish carries a price, optionally a higher one struck through beside it, and
+| An item carries a price, optionally a higher one struck through beside it, and
 | a reason it is off the menu when it is.
 |
 */
@@ -763,7 +763,7 @@ it('stores a struck-through price beside the one being charged', function (): vo
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '299',
             'compare_at_price' => '360',
             'availability' => ItemAvailability::Available->value,
@@ -791,7 +791,7 @@ it('refuses a struck-through price that is not above what is charged', function 
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '299',
             'compare_at_price' => '250',
             'availability' => ItemAvailability::Available->value,
@@ -799,7 +799,7 @@ it('refuses a struck-through price that is not above what is charged', function 
         ->assertHasActionErrors(['compare_at_price']);
 });
 
-it('leaves a dish that is not on offer with no compare-at price at all', function (): void {
+it('leaves an item that is not on offer with no compare-at price at all', function (): void {
     $item = MenuItem::factory()->create();
 
     // Null is "not on offer". A zero would be a price of nothing, and the
@@ -810,7 +810,7 @@ it('leaves a dish that is not on offer with no compare-at price at all', functio
         ->and($item->discountMinorUnits())->toBe(0);
 });
 
-it('says why a dish is off the menu rather than only that it is', function (): void {
+it('says why an item is off the menu rather than only that it is', function (): void {
     $soldOut = MenuItem::factory()->unavailable()->create();
     $paused = MenuItem::factory()->unavailable(ItemAvailability::TemporarilyUnavailable)->create();
 
@@ -822,19 +822,19 @@ it('says why a dish is off the menu rather than only that it is', function (): v
         ->and(MenuItem::query()->orderable()->count())->toBe(0);
 });
 
-it('falls back to the tenant GST rate on a dish, and overrides it when told', function (): void {
+it('falls back to the tenant GST rate on an item, and overrides it when told', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['tax_rate_basis_points' => 500]);
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    $food = MenuItem::factory()->inCategory($category)->create();
-    // A sealed bottle sold alongside the food is taxed as goods, not service.
+    $standard = MenuItem::factory()->inCategory($category)->create();
+    // A sealed bottle sold alongside the rest of the menu is taxed as goods, not service.
     $bottle = MenuItem::factory()->inCategory($category)->taxedAt(1800)->create();
 
-    expect($food->taxRateBasisPoints())->toBe(500)
-        ->and($food->overridesTaxRate())->toBeFalse()
+    expect($standard->taxRateBasisPoints())->toBe(500)
+        ->and($standard->overridesTaxRate())->toBeFalse()
         ->and($bottle->taxRateBasisPoints())->toBe(1800)
         ->and($bottle->overridesTaxRate())->toBeTrue();
 });
@@ -854,7 +854,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->callAction('create', [
             'name' => [Locale::English->value => 'Cola'],
             'menu_category_id' => $category->getKey(),
-            'food_type' => FoodType::Vegetarian->value,
+            'diet' => Diet::Vegetarian->value,
             'price' => '60',
             'availability' => ItemAvailability::Available->value,
             'tax_rate_percentage' => '40',
@@ -865,75 +865,165 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->and(PricingFields::toBasisPoints('12.5'))->toBe(1250);
 });
 
-it('taxes an addition at its own rate rather than the dish it sits on', function (): void {
+it('taxes an addition at its own rate rather than the item it sits on', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['tax_rate_basis_points' => 500]);
-    $dish = MenuItem::factory()
+    $menuItem = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu(
             Menu::factory()->create(['tenant_id' => $tenant->getKey()])
         )->create())
         ->taxedAt(1200)
         ->create();
 
-    $following = MenuItemAddition::factory()->onItem($dish)->create();
-    $overriding = MenuItemAddition::factory()->onItem($dish)->taxedAt(1800)->create();
+    $following = MenuItemAddition::factory()->onItem($menuItem)->create();
+    $overriding = MenuItemAddition::factory()->onItem($menuItem)->taxedAt(1800)->create();
 
     // An addition that overrides is overriding because it differs from the
-    // food, so inheriting the dish's 12% would be inheriting the wrong number.
+    // item, so inheriting the item's 12% would be inheriting the wrong number.
     expect($following->taxRateBasisPoints())->toBe(500)
         ->and($overriding->taxRateBasisPoints())->toBe(1800);
 });
 
-it('refiles a dish into a sub-category from the dishes page', function (): void {
+/*
+|--------------------------------------------------------------------------
+| Service requests
+|--------------------------------------------------------------------------
+|
+| An extra pillow sits on the same menu as a bottle of water. Everything that
+| is not a service request carries a diet mark; a service request never does.
+|
+*/
+
+it('saves a service request without a diet mark', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Extra Pillow'],
+            'menu_category_id' => $category->getKey(),
+            'is_service' => true,
+            'price' => '0',
+            'availability' => ItemAvailability::Available->value,
+        ])
+        ->assertHasNoActionErrors();
+
+    $pillow = byEnglishName(MenuItem::class, 'Extra Pillow');
+
+    // A pillow has no diet to declare, and costs a guest nothing.
+    expect($pillow->is_service)->toBeTrue()
+        ->and($pillow->diet)->toBeNull()
+        ->and($pillow->isComplimentary())->toBeTrue();
+});
+
+it('asks for a diet mark on anything that is not a service request', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Water Bottle'],
+            'menu_category_id' => $category->getKey(),
+            'is_service' => false,
+            'diet' => null,
+            'price' => '40',
+            'availability' => ItemAvailability::Available->value,
+        ])
+        ->assertHasActionErrors(['diet' => 'required']);
+
+    expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
+});
+
+it('drops the diet mark of an item that becomes a service request', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian]);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction(TestAction::make('edit')->table($menuItem), [
+            'menu_category_id' => $category->getKey(),
+            'name' => $menuItem->getTranslations('name'),
+            'is_service' => true,
+            'price' => '0',
+            'availability' => ItemAvailability::Available->value,
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($menuItem->refresh()->is_service)->toBeTrue()
+        ->and($menuItem->diet)->toBeNull();
+});
+
+it('refuses an item with no diet mark that is not a service request, even around the form', function (): void {
+    $category = MenuCategory::factory()->create();
+
+    // MenuItemObserver is the backstop the CHECK constraint mirrors: code that
+    // writes around the form still cannot store an item that is neither.
+    expect(fn () => MenuItem::factory()->inCategory($category)->create(['diet' => null]))
+        ->toThrow(LogicException::class);
+});
+
+it('refiles an item into a sub-category from the items page', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $chicken = MenuCategory::factory()->under($category)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // Re-filing is an edit: the dish form's category select offers both levels
+    // Re-filing is an edit: the item form's category select offers both levels
     // of every menu, so there is no second mechanism that has to repeat the
     // same rules.
     Livewire::test(ListMenuItems::class)
-        ->callAction(TestAction::make('edit')->table($dish), [
+        ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $chicken->getKey(),
-            'name' => $dish->getTranslations('name'),
-            'food_type' => $dish->food_type->value,
+            'name' => $menuItem->getTranslations('name'),
+            'diet' => $menuItem->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($dish->refresh()->menu_category_id)->toBe($chicken->getKey());
+    expect($menuItem->refresh()->menu_category_id)->toBe($chicken->getKey());
 });
 
-it('lifts a dish back out of a sub-category to the category itself', function (): void {
+it('lifts an item back out of a sub-category to the category itself', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $chicken = MenuCategory::factory()->under($category)->create();
-    $dish = MenuItem::factory()->inCategory($chicken)->create();
+    $menuItem = MenuItem::factory()->inCategory($chicken)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // Naming the section is how a dish comes back up a level; there is no
+    // Naming the section is how an item comes back up a level; there is no
     // second field to clear.
     Livewire::test(ListMenuItems::class)
-        ->callAction(TestAction::make('edit')->table($dish), [
+        ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
-            'name' => $dish->getTranslations('name'),
-            'food_type' => $dish->food_type->value,
+            'name' => $menuItem->getTranslations('name'),
+            'diet' => $menuItem->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($dish->refresh()->menu_category_id)->toBe($category->getKey());
+    expect($menuItem->refresh()->menu_category_id)->toBe($category->getKey());
 });
 
-it('unfeatures a dish carried to another menu, and keeps one that stays', function (): void {
+it('unfeatures an item carried to another menu, and keeps one that stays', function (): void {
     $tenant = Tenant::factory()->create();
     $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
@@ -951,7 +1041,7 @@ it('unfeatures a dish carried to another menu, and keeps one that stays', functi
         ->callAction(TestAction::make('edit')->table($leaving), [
             'menu_category_id' => $elsewhere->getKey(),
             'name' => $leaving->getTranslations('name'),
-            'food_type' => $leaving->food_type->value,
+            'diet' => $leaving->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
@@ -960,15 +1050,15 @@ it('unfeatures a dish carried to another menu, and keeps one that stays', functi
         ->callAction(TestAction::make('edit')->table($staying), [
             'menu_category_id' => $sibling->getKey(),
             'name' => $staying->getTranslations('name'),
-            'food_type' => $staying->food_type->value,
+            'diet' => $staying->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
         ])
         ->assertHasNoActionErrors();
 
-    // The rule lives on the model, so it holds however the dish is written —
-    // even when the form has just been told is_featured is true. A dish that
+    // The rule lives on the model, so it holds however the item is written —
+    // even when the form has just been told is_featured is true. An item that
     // only moved within its own menu keeps its place in the row.
     expect($leaving->refresh()->is_featured)->toBeFalse()
         ->and($leaving->featured_position)->toBe(0)
@@ -976,7 +1066,7 @@ it('unfeatures a dish carried to another menu, and keeps one that stays', functi
         ->and($staying->featured_position)->toBe(4);
 });
 
-it('refuses to refile a dish under a name the target category already has', function (): void {
+it('refuses to refile an item under a name the target category already has', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $from = MenuCategory::factory()->inMenu($menu)->create();
@@ -988,13 +1078,13 @@ it('refuses to refile a dish under a name the target category already has', func
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The form's uniqueness rule is scoped to the category chosen in it, so
-    // changing that select revalidates the name against where the dish is
+    // changing that select revalidates the name against where the item is
     // going — the only place a duplicate is caught.
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($moving), [
             'menu_category_id' => $to->getKey(),
             'name' => $moving->getTranslations('name'),
-            'food_type' => $moving->food_type->value,
+            'diet' => $moving->diet->value,
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -1014,11 +1104,11 @@ it('rearranges the featured row by dragging it', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // featured_position is its own order, separate from the position that
-    // places a dish inside its section — a dish answers both at once.
+    // places an item inside its section — an item answers both at once.
     Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
     expect($second->refresh()->featured_position)->toBeLessThan($first->refresh()->featured_position)
-        // Dragging the featured row must not disturb where either dish sits
+        // Dragging the featured row must not disturb where either item sits
         // in its own section.
         ->and($first->position)->toBe($second->position);
 });

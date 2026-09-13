@@ -10,7 +10,7 @@ use App\Models\MenuItem;
 class MenuComboItemObserver
 {
     /**
-     * Take the combo's tenant, and refuse a dish from any other.
+     * Take the combo's tenant, and refuse an item from any other.
      */
     public function saving(MenuComboItem $comboItem): void
     {

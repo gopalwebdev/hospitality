@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cookie;
  * Switch the language a visitor reads the guest app or a panel in.
  *
  * A full round trip rather than something React does on its own, and
- * deliberately: half of what a guest reads — the dish names, the sections, the
+ * deliberately: half of what a guest reads — the item names, the sections, the
  * tiles — is translated in the database, so only the server can answer in
  * another language. Redirecting back re-renders the page they were on with
  * everything, chrome and content alike, in the language they picked.

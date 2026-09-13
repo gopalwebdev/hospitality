@@ -62,7 +62,7 @@ export function LanguagesIcon(props: IconProps) {
     );
 }
 
-/** Marks the row of dishes a menu leads with. */
+/** Marks the row of items a menu leads with. */
 export function StarIcon(props: IconProps) {
     return (
         <svg {...base} {...props}>

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -104,7 +105,17 @@ class Menu extends Model
     }
 
     /**
-     * Every dish on this menu, reached through its categories — a dish never carries its menu.
+     * The charges limited to this menu. Charges on every menu are not listed here; see Charge::scopeForMenu().
+     *
+     * @return BelongsToMany<Charge, $this>
+     */
+    public function charges(): BelongsToMany
+    {
+        return $this->belongsToMany(Charge::class)->withTimestamps();
+    }
+
+    /**
+     * Every item on this menu, reached through its categories — an item never carries its menu.
      *
      * @return HasManyThrough<MenuItem, MenuCategory, $this>
      */
@@ -117,7 +128,7 @@ class Menu extends Model
      * The featured rail, the combos rail and the categories, in the order a guest reads them.
      *
      * All three share one number space. Ties break rails first, so a menu nobody
-     * has arranged opens with its featured dishes, then its combos.
+     * has arranged opens with its featured items, then its combos.
      *
      * @param  iterable<MenuCategory>  $categories  this menu's top-level categories, in order
      * @return list<MenuBlock|MenuCategory>

@@ -6,13 +6,13 @@
 |--------------------------------------------------------------------------
 |
 | The parts of the tenant panel that follow the language chosen in
-| its top bar. Deliberately only the menu and storefront surfaces: those are
-| what a tenant works in daily, and what a Tamil-speaking manager needs to
-| read. Roles, permissions and accounts stay in English — they are the product
-| team's vocabulary and code refers to them by name.
+| its top bar. Deliberately only the menu, charges and storefront surfaces:
+| those are what a tenant works in daily, and what a Tamil-speaking manager
+| needs to read. Roles, permissions and accounts stay in English — they are the
+| product team's vocabulary and code refers to them by name.
 |
-| What a tenant typed itself — menu, section, dish, addition and tile names
-| — is not here. That lives in translated database columns; see
+| What a tenant typed itself — menu, section, item, add-on, charge and tile
+| names — is not here. That lives in translated database columns; see
 | .ai/rules/models.md.
 |
 */
@@ -50,7 +50,7 @@ return [
         'available_from' => 'Served from',
         'available_until' => 'Served until',
         'unique' => 'This tenant already has a menu with that name.',
-        'delete_warning' => 'Every section on this menu is deleted with it, and every dish in those sections. Hide it instead to take it off the storefront and keep everything.',
+        'delete_warning' => 'Every section on this menu is deleted with it, and every item in those sections. Hide it instead to take it off the storefront and keep everything.',
     ],
 
     'arrangement' => [
@@ -69,15 +69,15 @@ return [
         'saved' => 'Saved',
         'deleted' => 'Deleted',
         'open_rail' => 'Open',
-        'open_dish' => 'Edit this dish',
-        'open_dishes' => 'Dishes in this category',
-        'dishes_count' => '{0} No dishes|{1} 1 dish|[2,*] :count dishes',
+        'open_item' => 'Edit this item',
+        'open_items' => 'Items in this category',
+        'items_count' => '{0} No items|{1} 1 item|[2,*] :count items',
         'combos_count' => '{0} No combos|{1} 1 combo|[2,*] :count combos',
         'sub_categories_count' => '{0} no sub-categories|{1} 1 sub-category|[2,*] :count sub-categories',
-        'featured_description' => 'The dishes this menu opens with. Turn on Featured when editing a dish to lead with it.',
-        'combos_description' => 'Dishes sold together for one price.',
+        'featured_description' => 'The items this menu opens with. Turn on Featured when editing an item to lead with it.',
+        'combos_description' => 'Items sold together for one price.',
         'empty_heading' => 'Nothing on this menu yet',
-        'empty_description' => 'A menu is read section by section — Starters, Biryani, Desserts. Add the first category, then fill it with dishes.',
+        'empty_description' => 'A menu is read section by section — Starters, Desserts, Housekeeping. Add the first category, then fill it with items.',
     ],
 
     'categories' => [
@@ -86,14 +86,14 @@ return [
         'section' => 'Category',
         'menu' => 'Menu',
         'empty_heading' => 'No categories yet',
-        'empty_description' => 'A menu is read section by section — Starters, Biryani, Desserts. Add the first one to start filling this menu in.',
+        'empty_description' => 'A menu is read section by section — Starters, Desserts, Housekeeping. Add the first one to start filling this menu in.',
         'on_the_menu' => 'On the menu',
         'is_active' => 'Showing on the menu',
-        'items_count' => 'Dishes',
+        'items_count' => 'Items',
         'unique' => 'This menu already has a category with that name.',
-        'delete_warning' => 'Every sub-category and every dish in this category is deleted with it. Hide it instead to take it off the menu and keep everything.',
+        'delete_warning' => 'Every sub-category and every item in this category is deleted with it. Hide it instead to take it off the menu and keep everything.',
         'move' => 'Move to another menu',
-        'move_help' => 'The category keeps its sub-categories, its dishes and its order; only the menu it sits on changes. Dishes it was leading with stop being featured, because the featured row belongs to a menu.',
+        'move_help' => 'The category keeps its sub-categories, its items and its order; only the menu it sits on changes. Items it was leading with stop being featured, because the featured row belongs to a menu.',
         'move_target' => 'Menu to move it to',
         'move_none' => 'This tenant has only one menu, so there is nowhere to move this to.',
         'moved' => 'Moved to another menu',
@@ -105,7 +105,7 @@ return [
         'section' => 'Sub-category',
         'is_active' => 'Showing on the menu',
         'unique' => 'This category already has a sub-category with that name.',
-        'delete_warning' => 'Every dish in this sub-category is deleted with it. Move them up to the category first if you want to keep them.',
+        'delete_warning' => 'Every item in this sub-category is deleted with it. Move them up to the category first if you want to keep them.',
         'needs_a_category' => 'Add a category to this menu first.',
         'empty_heading' => 'No sub-categories yet',
         'empty_description' => 'Most menus never need these. Add one when a category has grown long enough to be worth breaking up.',
@@ -117,25 +117,27 @@ return [
         'section' => 'Combo',
         'unique' => 'This menu already has a combo with that name.',
         'contents' => 'What is in it',
-        'dish' => 'Dish',
+        'item' => 'Item',
         'quantity' => 'How many',
-        'add_dish' => 'Add a dish',
-        'duplicate_dish' => 'That dish is already in this combo. Change its quantity instead of adding it twice.',
-        'delete_warning' => 'The combo is removed from this menu. The dishes in it are left alone.',
+        'add_item' => 'Add an item',
+        'duplicate_item' => 'That item is already in this combo. Change its quantity instead of adding it twice.',
+        'delete_warning' => 'The combo is removed from this menu. The items in it are left alone.',
         'empty_heading' => 'No combos yet',
-        'empty_description' => 'A menu reads fine without these. Add one when you want to sell a few dishes together for less than their separate prices.',
+        'empty_description' => 'A menu reads fine without these. Add one when you want to sell a few items together for less than their separate prices.',
     ],
 
     'items' => [
-        'label' => 'dish',
-        'plural' => 'dishes',
-        'create' => 'New dish',
-        'dish' => 'Dish',
+        'label' => 'item',
+        'plural' => 'items',
+        'create' => 'New item',
+        'item' => 'Item',
         'section' => 'Category',
         'needs_a_section' => 'Add a menu and a section to it first.',
-        'food_type' => 'Food type',
+        'is_service' => 'Service request',
+        'diet' => 'Diet',
         'price_section' => 'Price and availability',
         'price' => 'Price',
+        'complimentary' => 'Complimentary',
         'compare_at_price' => 'Original price',
         'compare_at_price_invalid' => 'The original price has to be higher than the price you charge.',
         'availability' => 'Availability',
@@ -144,21 +146,42 @@ return [
         'tax_rate' => 'GST rate',
         'hsn_code' => 'HSN / SAC code',
         'type' => 'Type',
-        'unique' => 'This category already has a dish with that name.',
-        'delete_warning' => 'The additions on this dish are deleted with it, and it is taken out of any combo listing it.',
+        'unique' => 'This category already has an item with that name.',
+        'delete_warning' => 'The add-ons on this item are deleted with it, and it is taken out of any combo listing it.',
         'is_featured' => 'Featured',
-        'featured_heading' => 'Featured dishes',
+        'featured_heading' => 'Featured items',
         'featured_empty_heading' => 'Nothing featured yet',
-        'featured_empty_description' => 'A menu reads fine without this. Turn on Featured when editing a dish to lead with it here.',
+        'featured_empty_description' => 'A menu reads fine without this. Turn on Featured when editing an item to lead with it here.',
     ],
 
-    'additions' => [
-        'section' => 'Additions',
-        'label' => 'Addition',
-        'add' => 'Add an addition',
+    'add_ons' => [
+        'section' => 'Add-ons',
+        'label' => 'Add-on',
+        'add' => 'Add an add-on',
         'price' => 'Extra charge',
         'is_available' => 'Available',
-        'count' => 'Additions',
+        'count' => 'Add-ons',
+    ],
+
+    'charges' => [
+        'label' => 'charge',
+        'plural' => 'charges',
+        'create' => 'New charge',
+        'section' => 'Charge',
+        'calculation' => 'Worked out as',
+        'rate' => 'Rate',
+        'amount' => 'Amount',
+        'adds' => 'Adds',
+        'where_section' => 'Where it applies',
+        'applies_to_all_menus' => 'On every menu',
+        'menus' => 'Menus',
+        'every_menu' => 'Every menu',
+        'menus_invalid' => 'Pick only this tenant\'s menus.',
+        'is_active' => 'Added to bills',
+        'unique' => 'This tenant already has a charge with that name.',
+        'delete_warning' => 'The charge stops being added to bills. Switch it off instead to keep it for later.',
+        'empty_heading' => 'No charges yet',
+        'empty_description' => 'Nothing is added to a guest\'s bill beyond the price and GST. Add a service charge, a packing charge or a room-service fee here, on every menu or only some.',
     ],
 
     'rows' => [

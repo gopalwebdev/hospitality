@@ -1,7 +1,12 @@
 <?php
 
+use App\Enums\Diet;
 use App\Enums\Role;
+use App\Models\Charge;
 use App\Models\HomeTile;
+use App\Models\Menu;
+use App\Models\MenuCategory;
+use App\Models\MenuItem;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\AdminSeeder;
@@ -36,7 +41,9 @@ it('seeds one tenant for each definition', function (): void {
 });
 
 it('gives every seeded tenant its settings', function (): void {
-    Tenant::query()->get()->each(function (Tenant $tenant): void {
+    // Loaded with the tenants: there is more than one, and strict mode refuses
+    // a lazy load down a list.
+    Tenant::query()->with('settings')->get()->each(function (Tenant $tenant): void {
         expect($tenant->settings)->not->toBeNull();
     });
 });
@@ -96,16 +103,17 @@ it('lists every account and where it signs in', function (): void {
 });
 
 it('opens a way into every menu it seeds', function (): void {
-    Tenant::query()->get()->each(function (Tenant $tenant): void {
+    foreach (TenantSeeder::TENANTS as $definition) {
+        $tenant = Tenant::query()->where('slug', $definition['slug'])->sole();
         $menus = $tenant->menus()->pluck('id');
 
         // A guest only ever reaches a menu through a tile, so a seeded card
         // with no tile is a card nobody at a table can get to. There were three
         // menus and one tile.
-        expect($menus)->toHaveCount(3)
+        expect($menus)->toHaveCount(count($definition['menus']))
             ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->pluck('menu_id')->sort()->values()->all())
             ->toBe($menus->sort()->values()->all());
-    });
+    }
 });
 
 it('can be seeded again without duplicating anything', function (): void {
@@ -118,11 +126,61 @@ it('can be seeded again without duplicating anything', function (): void {
     expect(User::query()->count())->toBe(1 + ($perTenant * count(TenantSeeder::TENANTS)))
         ->and(Tenant::query()->count())->toBe(count(TenantSeeder::TENANTS));
 
-    Tenant::query()->get()->each(function (Tenant $tenant) use ($perTenant): void {
+    foreach (TenantSeeder::TENANTS as $definition) {
+        $tenant = Tenant::query()->where('slug', $definition['slug'])->sole();
+
         expect($tenant->users()->count())->toBe($perTenant)
             ->and($tenant->settings()->count())->toBe(1)
             // Tiles are matched on the menu they open rather than on their
             // label, so a relabelled tile is found rather than seeded again.
-            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->count())->toBe(3);
-    });
+            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->count())->toBe(count($definition['menus']))
+            // Charges are matched on their English name the same way.
+            ->and($tenant->charges()->count())->toBe(count(TenantSeeder::CHARGES[$definition['slug']] ?? []));
+    }
+});
+
+it('seeds a hotel whose room requests share a menu with things to order', function (): void {
+    $hotel = Tenant::query()->where('slug', 'seaview')->sole();
+
+    $pillow = MenuItem::query()
+        ->where('tenant_id', $hotel->getKey())
+        ->where('name->en', 'Extra Pillow')
+        ->sole();
+    $water = MenuItem::query()
+        ->where('tenant_id', $hotel->getKey())
+        ->where('name->en', 'Water Bottle (1 L)')
+        ->sole();
+
+    $menusHoldingThem = MenuCategory::query()
+        ->whereKey([$pillow->menu_category_id, $water->menu_category_id])
+        ->pluck('menu_id')
+        ->unique();
+
+    // One card holds both: a service request with no diet mark and no price,
+    // and something to order with both.
+    expect($menusHoldingThem)->toHaveCount(1)
+        ->and($pillow->is_service)->toBeTrue()
+        ->and($pillow->diet)->toBeNull()
+        ->and($pillow->isComplimentary())->toBeTrue()
+        ->and($water->is_service)->toBeFalse()
+        ->and($water->diet)->toBe(Diet::Vegetarian)
+        ->and($water->isComplimentary())->toBeFalse();
+});
+
+it('limits a seeded charge to the menus it names', function (): void {
+    $hotel = Tenant::query()->where('slug', 'seaview')->sole();
+
+    $inRoomDining = $hotel->menus()->where('name->en', 'In-room Dining')->sole();
+    $roomRequests = $hotel->menus()->where('name->en', 'Room Requests')->sole();
+
+    $chargesOn = fn (Menu $menu): int => Charge::query()
+        ->where('tenant_id', $hotel->getKey())
+        ->active()
+        ->forMenu($menu->getKey())
+        ->count();
+
+    // The room-service fee is added to what is brought to a room, and a pillow
+    // asked for from housekeeping carries no charge at all.
+    expect($chargesOn($inRoomDining))->toBe(1)
+        ->and($chargesOn($roomRequests))->toBe(0);
 });

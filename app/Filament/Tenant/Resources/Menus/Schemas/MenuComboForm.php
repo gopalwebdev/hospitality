@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
  * A bundle: what it is called, what it costs, and what is in it.
  *
  * The contents are a table repeater rather than a stack of cards, for the same
- * reason the additions on a dish are: every line is a dish and a number, and a
+ * reason the add-ons on an item are: every line is an item and a number, and a
  * table shows ten of them in the space three cards would take.
  *
  * A combo's price is typed, never derived from its contents. The point of a
@@ -53,9 +53,8 @@ class MenuComboForm
                             'name',
                             __('panel.shared.name'),
                             maxLength: 120,
-                            // Unique within the menu, matching the expression
-                            // index — a lunch and a dinner card may both offer
-                            // a "Family Feast".
+                            // Unique within the menu — a lunch and a dinner
+                            // card may both offer a "Family Feast".
                             uniqueWithin: fn (): Builder => MenuCombo::query()
                                 ->where('menu_id', $menuId),
                             uniqueMessage: __('panel.combos.unique'),
@@ -83,7 +82,7 @@ class MenuComboForm
     }
 
     /**
-     * The dishes in the bundle, as a table of dish and quantity.
+     * The items in the bundle, as a table of item and quantity.
      *
      * Bound to the relationship, so the contents are written in the same save
      * as the combo. The rule in .ai/rules/filament.md against `->relationship()`
@@ -97,19 +96,19 @@ class MenuComboForm
             ->relationship()
             ->hiddenLabel()
             ->table([
-                TableColumn::make(__('panel.combos.dish'))->markAsRequired(),
+                TableColumn::make(__('panel.combos.item'))->markAsRequired(),
                 TableColumn::make(__('panel.combos.quantity'))->width('9rem'),
             ])
             ->schema([
                 Select::make('menu_item_id')
-                    ->options(fn (): array => self::dishOptions($menuId))
+                    ->options(fn (): array => self::itemOptions($menuId))
                     ->required()
                     ->searchable()
                     ->preload()
-                    // A dish appears in a combo once, with a quantity, and
+                    // An item appears in a combo once, with a quantity, and
                     // nothing but this refuses a second row.
                     ->distinct()
-                    ->validationMessages(['distinct' => __('panel.combos.duplicate_dish')]),
+                    ->validationMessages(['distinct' => __('panel.combos.duplicate_item')]),
 
                 TextInput::make('quantity')
                     ->numeric()
@@ -120,20 +119,20 @@ class MenuComboForm
             ])
             ->orderColumn('position')
             ->defaultItems(0)
-            ->addActionLabel(__('panel.combos.add_dish'))
+            ->addActionLabel(__('panel.combos.add_item'))
             ->reorderable()
             ->columnSpanFull();
     }
 
     /**
-     * The dishes this combo may contain.
+     * The items this combo may contain.
      *
-     * Every dish on the same menu, labelled with the section it sits in so two
-     * dishes of the same name in different sections are told apart.
+     * Every item on the same menu, labelled with the section it sits in so two
+     * items of the same name in different sections are told apart.
      *
      * @return array<int, string>
      */
-    public static function dishOptions(?int $menuId): array
+    public static function itemOptions(?int $menuId): array
     {
         if ($menuId === null) {
             return [];

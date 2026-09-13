@@ -3,15 +3,17 @@
 namespace App\Enums;
 
 /**
- * How a menu item is classified for diet.
+ * The veg / egg / non-veg mark an item carries.
  *
- * India requires packaged and served food to be marked veg or non-veg — the
- * green and brown dots — and guests filter the menu by it before anything else,
- * so it is a required column on every item rather than an optional tag.
+ * India requires anything served or packaged to be eaten to carry this mark —
+ * the green and brown squares — and guests read it before anything else, so
+ * every item that is not a service request has one. A service request (an extra
+ * pillow, a bedsheet change) never does; MenuItemObserver and the
+ * `menu_items_diet_matches_service` constraint hold the two together.
  *
  * @see Role for the note on India being the only market for now
  */
-enum FoodType: string
+enum Diet: string
 {
     case Vegetarian = 'vegetarian';
     case Egg = 'egg';
@@ -40,7 +42,7 @@ enum FoodType: string
     }
 
     /**
-     * Every food type, keyed by stored value, for a select field.
+     * Every diet, keyed by stored value, for a select field.
      *
      * @return array<string, string>
      */
@@ -48,8 +50,8 @@ enum FoodType: string
     {
         return array_reduce(
             self::cases(),
-            static function (array $options, self $foodType): array {
-                $options[$foodType->value] = $foodType->label();
+            static function (array $options, self $diet): array {
+                $options[$diet->value] = $diet->label();
 
                 return $options;
             },

@@ -27,14 +27,14 @@ class MenuComboItemFactory extends Factory
         return [
             'menu_combo_id' => MenuCombo::factory(),
             'tenant_id' => fn (array $attributes): int => $this->combo($attributes)->tenant_id,
-            'menu_item_id' => fn (array $attributes): int => $this->dishOnSameMenu($this->combo($attributes))->getKey(),
+            'menu_item_id' => fn (array $attributes): int => $this->itemOnSameMenu($this->combo($attributes))->getKey(),
             'quantity' => 1,
             'position' => fake()->numberBetween(0, 10),
         ];
     }
 
     /**
-     * Put an existing dish into an existing combo.
+     * Put an existing item into an existing combo.
      *
      * Both must belong to one tenant; MenuComboItemObserver refuses anything
      * else, which is what makes this the only safe way to pair two records a
@@ -50,7 +50,7 @@ class MenuComboItemFactory extends Factory
     }
 
     /**
-     * More than one of the same dish in the bundle.
+     * More than one of the same item in the bundle.
      */
     public function quantity(int $quantity): static
     {
@@ -70,12 +70,12 @@ class MenuComboItemFactory extends Factory
     }
 
     /**
-     * A new dish in a new category of the combo's own menu.
+     * A new item in a new category of the combo's own menu.
      *
      * The menu is fetched rather than read off $combo->menu, which would be a
      * lazy load and throws under Model::shouldBeStrict().
      */
-    private function dishOnSameMenu(MenuCombo $combo): MenuItem
+    private function itemOnSameMenu(MenuCombo $combo): MenuItem
     {
         $menu = Menu::query()->whereKey($combo->menu_id)->firstOrFail();
 

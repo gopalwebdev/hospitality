@@ -48,7 +48,7 @@ function interpolate(line: string, replacements: Replacements): string {
  * The chrome of the app in the language being served.
  *
  * The strings come from lang/en/guest.php as one shared Inertia prop, so
- * a component asks for them rather than being passed them down. The dish names
+ * a component asks for them rather than being passed them down. The item names
  * and section headings are not here — those are the tenant's own words and
  * arrive on the page's own props, already in the right language.
  */

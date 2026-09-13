@@ -30,10 +30,10 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * A whole menu as one list: the two rails, every category, every subdivision
- * and every dish, in the order a guest reads them.
+ * and every item, in the order a guest reads them.
  *
  * This replaced a page of four tables — categories, sub-categories, featured
- * dishes, combos — where the thing an admin most wanted to see, the dishes
+ * items, combos — where the thing an admin most wanted to see, the items
  * under each heading, was on another page entirely, and where the rails could
  * not be moved at all. One table now says what the menu *is*, and one drag says
  * what order it is read in.
@@ -51,10 +51,10 @@ use Illuminate\Support\Facades\Gate;
  *   `reorderable()` call still matters: it renders the handles, and its
  *   condition is what Filament checks before accepting the write.
  *
- * Dishes are listed and dragged here but not edited here. The dish form carries
- * prices, tax and a repeater of additions bound to a relationship, and a
- * repeater needs a real record behind the schema — so every dish row links to
- * the dishes page, which is where a dish has always been edited.
+ * Items are listed and dragged here but not edited here. The item form carries
+ * prices, tax and a repeater of add-ons bound to a relationship, and a
+ * repeater needs a real record behind the schema — so every item row links to
+ * the items page, which is where an item has always been edited.
  */
 class MenuArrangementTable
 {
@@ -64,7 +64,7 @@ class MenuArrangementTable
 
     private const string SUB_CATEGORY = 'sub_category';
 
-    private const string DISH = 'dish';
+    private const string ITEM = 'item';
 
     public static function configure(Table $table, Menu $menu): Table
     {
@@ -78,12 +78,12 @@ class MenuArrangementTable
         return $table
             ->records(fn (): Collection => self::rows($menu))
             // A menu is one screen's worth of structure, and a drag has to be
-            // able to carry a dish at the bottom to the top of the list.
+            // able to carry an item at the bottom to the top of the list.
             ->paginated(false)
             ->columns([
                 TextColumn::make('name')
                     ->label(__('panel.arrangement.name'))
-                    // The indentation is the tree: a dish sits under the
+                    // The indentation is the tree: an item sits under the
                     // heading it belongs to and a subdivision under its
                     // category. Built as HTML so the line under a name is
                     // indented with it rather than flush against the edge.
@@ -131,7 +131,7 @@ class MenuArrangementTable
                     self::renameAction($menu, $mayManage),
                     self::createSubCategoryAction($menu, $mayManage),
                     self::moveCategoryAction($menu, $mayManage),
-                    self::openDishesAction(),
+                    self::openItemsAction(),
                     self::deleteAction($menu, $mayManage),
                 ])
                     ->label(__('panel.arrangement.actions'))
@@ -163,20 +163,21 @@ class MenuArrangementTable
      * Every row of this menu, in reading order and keyed for the table.
      *
      * Three queries whatever the menu holds: its categories at both levels, the
-     * dishes in them, and a count of its combos. The featured count comes from
-     * the dishes already loaded rather than being asked for again.
+     * items in them, and a count of its combos. The featured count comes from
+     * the items already loaded rather than being asked for again.
      *
      * @return Collection<string, array<string, mixed>>
      */
     private static function rows(Menu $menu): Collection
     {
         $currency = PricingFields::currency();
+        $complimentary = (string) __('panel.items.complimentary');
 
         $categories = MenuCategory::query()
             ->select(['id', 'parent_id', 'name', 'position', 'is_active'])
             ->where('menu_id', $menu->getKey())
             ->with(['menuItems' => fn ($items) => $items
-                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'availability', 'is_featured', 'position'])
+                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'is_service', 'availability', 'is_featured', 'position'])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -207,15 +208,15 @@ class MenuArrangementTable
 
             $rows[] = self::categoryRow($block, self::CATEGORY, depth: 0, subCategoryCount: $children->count());
 
-            foreach ($block->menuItems as $dish) {
-                $rows[] = self::dishRow($dish, $currency, depth: 1);
+            foreach ($block->menuItems as $item) {
+                $rows[] = self::itemRow($item, $currency, $complimentary, depth: 1);
             }
 
             foreach ($children as $child) {
                 $rows[] = self::categoryRow($child, self::SUB_CATEGORY, depth: 1, subCategoryCount: 0);
 
-                foreach ($child->menuItems as $dish) {
-                    $rows[] = self::dishRow($dish, $currency, depth: 2);
+                foreach ($child->menuItems as $item) {
+                    $rows[] = self::itemRow($item, $currency, $complimentary, depth: 2);
                 }
             }
         }
@@ -241,7 +242,7 @@ class MenuArrangementTable
             'type' => __('panel.arrangement.rail'),
             'type_color' => 'warning',
             'meta' => $rail === MenuBlock::Featured
-                ? trans_choice('panel.arrangement.dishes_count', $count, ['count' => $count])
+                ? trans_choice('panel.arrangement.items_count', $count, ['count' => $count])
                 : trans_choice('panel.arrangement.combos_count', $count, ['count' => $count]),
             'state' => null,
             'state_color' => null,
@@ -259,8 +260,8 @@ class MenuArrangementTable
      */
     private static function categoryRow(MenuCategory $category, string $kind, int $depth, int $subCategoryCount): array
     {
-        $dishCount = $category->menuItems->count();
-        $dishes = trans_choice('panel.arrangement.dishes_count', $dishCount, ['count' => $dishCount]);
+        $itemCount = $category->menuItems->count();
+        $items = trans_choice('panel.arrangement.items_count', $itemCount, ['count' => $itemCount]);
 
         return [
             '__key' => ApplyMenuArrangement::categoryKey($category->getKey()),
@@ -275,8 +276,8 @@ class MenuArrangementTable
                 : __('panel.sub_categories.section'),
             'type_color' => $kind === self::CATEGORY ? 'primary' : 'info',
             'meta' => $subCategoryCount > 0
-                ? $dishes.' · '.trans_choice('panel.arrangement.sub_categories_count', $subCategoryCount, ['count' => $subCategoryCount])
-                : $dishes,
+                ? $items.' · '.trans_choice('panel.arrangement.sub_categories_count', $subCategoryCount, ['count' => $subCategoryCount])
+                : $items,
             'state' => $category->is_active
                 ? __('panel.shared.showing')
                 : __('panel.arrangement.hidden'),
@@ -286,27 +287,27 @@ class MenuArrangementTable
     }
 
     /**
-     * One dish, under whichever heading it is filed.
+     * One item, under whichever heading it is filed, labelled as an item or a service request.
      *
      * @return array<string, mixed>
      */
-    private static function dishRow(MenuItem $dish, Currency $currency, int $depth): array
+    private static function itemRow(MenuItem $item, Currency $currency, string $complimentary, int $depth): array
     {
         return [
-            '__key' => ApplyMenuArrangement::itemKey($dish->getKey()),
-            'kind' => self::DISH,
-            'id' => $dish->getKey(),
-            'category_id' => $dish->menu_category_id,
+            '__key' => ApplyMenuArrangement::itemKey($item->getKey()),
+            'kind' => self::ITEM,
+            'id' => $item->getKey(),
+            'category_id' => $item->menu_category_id,
             'depth' => $depth,
-            'name' => $dish->name,
-            'detail' => $dish->description,
-            'type' => __('panel.items.dish'),
+            'name' => $item->name,
+            'detail' => $item->description,
+            'type' => $item->is_service ? __('panel.items.is_service') : __('panel.items.item'),
             'type_color' => 'gray',
             // Formatted here rather than in the browser: a panel is server
             // rendered, and the currency is resolved once for the page.
-            'meta' => $dish->formattedPrice($currency),
-            'state' => $dish->availability->label(),
-            'state_color' => $dish->availability->color(),
+            'meta' => $item->isComplimentary() ? $complimentary : $item->formattedPrice($currency),
+            'state' => $item->availability->label(),
+            'state_color' => $item->availability->color(),
             'url' => null,
         ];
     }
@@ -322,7 +323,7 @@ class MenuArrangementTable
     private static function nameHtml(array $record): string
     {
         $indent = ((int) $record['depth']) * 1.25;
-        $isHeading = $record['kind'] !== self::DISH;
+        $isHeading = $record['kind'] !== self::ITEM;
         $detail = filled($record['detail'])
             ? '<div style="font-size:0.75rem;opacity:0.65;margin-top:0.125rem">'.e((string) $record['detail']).'</div>'
             : '';
@@ -390,7 +391,7 @@ class MenuArrangementTable
      * An action rather than a select on the form for the reason in
      * .ai/rules/actions-menus.md: the page a category is renamed on *is* the
      * menu, so there is no "which menu" field to change, and this does one
-     * thing no edit does — it unfeatures every dish in the branch.
+     * thing no edit does — it unfeatures every item in the branch.
      */
     private static function moveCategoryAction(Menu $menu, bool $mayManage): Action
     {
@@ -428,18 +429,18 @@ class MenuArrangementTable
     }
 
     /**
-     * Where a dish is actually edited: its own page, narrowed to this branch.
+     * Where an item is actually edited: its own page, narrowed to this branch.
      */
-    private static function openDishesAction(): Action
+    private static function openItemsAction(): Action
     {
-        return Action::make('openDishes')
-            ->label(fn (array $record): string => (string) ($record['kind'] === self::DISH
-                ? __('panel.arrangement.open_dish')
-                : __('panel.arrangement.open_dishes')))
+        return Action::make('openItems')
+            ->label(fn (array $record): string => (string) ($record['kind'] === self::ITEM
+                ? __('panel.arrangement.open_item')
+                : __('panel.arrangement.open_items')))
             ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
             // `filters`, not `tableFilters`: ListRecords binds the property as
             // `#[Url(as: 'filters')]`, so the other name arrives as an unread
-            // query parameter and the page opens showing every dish there is.
+            // query parameter and the page opens showing every item there is.
             ->url(fn (array $record): string => MenuItemResource::getUrl('index', [
                 'filters' => [
                     'menu_category_id' => ['value' => $record['category_id']],

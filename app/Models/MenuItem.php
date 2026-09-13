@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Models\Concerns\HasTranslatedNames;
 use App\Models\Concerns\IsPricedOnAMenu;
@@ -19,7 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One dish, filed under exactly one category at either level. Prices are integer minor units.
+ * One item on a menu — something to order, or a service request — filed under exactly one category at either level.
+ * Prices are integer minor units; a service request carries no diet mark, and everything else carries one.
  *
  * @property int $id
  * @property int $tenant_id
@@ -31,7 +32,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $compare_at_price_minor_units
  * @property int|null $tax_rate_basis_points
  * @property string|null $hsn_code
- * @property FoodType $food_type
+ * @property bool $is_service
+ * @property Diet|null $diet
  * @property ItemAvailability $availability
  * @property bool $is_featured
  * @property int $featured_position
@@ -47,7 +49,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'compare_at_price_minor_units',
     'tax_rate_basis_points',
     'hsn_code',
-    'food_type',
+    'is_service',
+    'diet',
     'availability',
     'is_featured',
     'featured_position',
@@ -65,9 +68,14 @@ class MenuItem extends Model
     /** @var list<string> */
     public array $translatable = ['name', 'description'];
 
-    /** @var array<string, mixed> */
+    /**
+     * is_service is mirrored here because MenuItemObserver reads it before the row is inserted.
+     *
+     * @var array<string, mixed>
+     */
     protected $attributes = [
         'position' => 0,
+        'is_service' => false,
         'availability' => ItemAvailability::Available->value,
         'is_featured' => false,
         'featured_position' => 0,
@@ -90,6 +98,8 @@ class MenuItem extends Model
     }
 
     /**
+     * The add-ons this item can be ordered with.
+     *
      * @return HasMany<MenuItemAddition, $this>
      */
     public function additions(): HasMany
@@ -118,6 +128,14 @@ class MenuItem extends Model
     public function isOrderable(): bool
     {
         return $this->availability->isOrderable();
+    }
+
+    /**
+     * Whether it costs a guest nothing — an extra pillow, a glass of water.
+     */
+    public function isComplimentary(): bool
+    {
+        return $this->price_minor_units === 0;
     }
 
     /**
@@ -160,7 +178,7 @@ class MenuItem extends Model
     }
 
     /**
-     * The order of the featured rail, separate from a dish's place in its category.
+     * The order of the featured rail, separate from an item's place in its category.
      *
      * @param  Builder<$this>  $query
      */
@@ -178,7 +196,8 @@ class MenuItem extends Model
             'price_minor_units' => 'integer',
             'compare_at_price_minor_units' => 'integer',
             'tax_rate_basis_points' => 'integer',
-            'food_type' => FoodType::class,
+            'is_service' => 'boolean',
+            'diet' => Diet::class,
             'availability' => ItemAvailability::class,
             'is_featured' => 'boolean',
             'featured_position' => 'integer',

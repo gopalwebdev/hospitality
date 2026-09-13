@@ -3,7 +3,7 @@
 namespace App\Filament\Tenant\Resources\MenuItems\Schemas;
 
 use App\Enums\Currency;
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
@@ -41,10 +41,10 @@ class MenuItemForm
             ->components([
                 TranslatedFields::localeSwitcher(),
 
-                Section::make(__('panel.items.dish'))
+                Section::make(__('panel.items.item'))
                     ->icon(Heroicon::OutlinedListBullet)
                     ->schema([
-                        // One select, because a dish is filed under exactly one
+                        // One select, because an item is filed under exactly one
                         // category — a section or one of its subdivisions, both
                         // offered here as "Lunch · Biryani › Chicken". Only this
                         // tenant's are listed, and MenuItemObserver refuses
@@ -57,25 +57,38 @@ class MenuItemForm
                             ->preload()
                             ->prefixIcon(Heroicon::OutlinedRectangleStack),
 
+                        // Live, because it decides whether the diet below is
+                        // asked for at all.
+                        Toggle::make('is_service')
+                            ->label(__('panel.items.is_service'))
+                            ->default(false)
+                            ->inline(false)
+                            ->live(),
+
                         ...self::spanningFull(TranslatedFields::text(
                             'name',
                             __('panel.shared.name'),
                             maxLength: 120,
                             // Unique within the category rather than the whole
-                            // tenant, matching the database index: a lunch
-                            // and a dinner menu may both list a "Paneer Tikka",
-                            // and so may two sub-categories of one category.
+                            // tenant: a lunch and a dinner menu may both list a
+                            // "Paneer Tikka", and so may two sub-categories of
+                            // one category.
                             uniqueWithin: fn (Get $get): Builder => MenuItem::query()
                                 ->where('menu_category_id', $get('menu_category_id')),
                             uniqueMessage: __('panel.items.unique'),
                         )),
 
-                        Select::make('food_type')
-                            ->label(__('panel.items.food_type'))
-                            ->options(FoodType::options())
-                            ->required()
-                            ->default(FoodType::Vegetarian->value)
-                            ->native(false),
+                        // Everything but a service request carries the veg /
+                        // egg / non-veg mark. A hidden field is not saved, and
+                        // MenuItemObserver clears the diet of an item that has
+                        // just become a service request.
+                        Select::make('diet')
+                            ->label(__('panel.items.diet'))
+                            ->options(Diet::options())
+                            ->default(Diet::Vegetarian->value)
+                            ->native(false)
+                            ->visible(fn (Get $get): bool => ! (bool) $get('is_service'))
+                            ->required(fn (Get $get): bool => ! (bool) $get('is_service')),
 
                         ...self::spanningFull(TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 500, rows: 3)),
                     ])
@@ -87,12 +100,14 @@ class MenuItemForm
                         // Typed and shown in major units, stored as an integer
                         // count of minor units — PricingFields does the
                         // conversion in one place for this form and the combo
-                        // one, so no float ever reaches the database.
+                        // one, so no float ever reaches the database. Zero is
+                        // a real price, and the guest app reads it as
+                        // complimentary.
                         PricingFields::price($currency),
                         PricingFields::compareAtPrice($currency),
                         PricingFields::availability(),
 
-                        // Featuring puts a dish in the row above the sections
+                        // Featuring puts an item in the row above the sections
                         // on the guest's menu screen. The order those are read
                         // in is dragged on the menu's own page, not typed here.
                         Toggle::make('is_featured')
@@ -109,12 +124,12 @@ class MenuItemForm
                         PricingFields::hsnCode(),
                     ])
                     ->columns(2)
-                    // Almost every dish is taxed at the tenant's own rate
+                    // Almost every item is taxed at the tenant's own rate
                     // and carries no code, so this opens closed and is expanded
-                    // by the dishes that genuinely differ.
+                    // by the items that genuinely differ.
                     ->collapsed(fn (?MenuItem $record): bool => blank($record?->tax_rate_basis_points) && blank($record?->hsn_code)),
 
-                Section::make(__('panel.additions.section'))
+                Section::make(__('panel.add_ons.section'))
                     ->icon(Heroicon::OutlinedPlusCircle)
                     ->schema([
                         self::additions($currency),
@@ -142,21 +157,21 @@ class MenuItemForm
     }
 
     /**
-     * The extras a dish can be ordered with, as a table.
+     * The add-ons an item can be ordered with, as a table.
      *
-     * A table rather than a stack of collapsible cards: every addition is a
+     * A table rather than a stack of collapsible cards: every add-on is a
      * name, a price and two small settings, so a row says everything a card
-     * did in a fraction of the height — a dish with eight extras used to be a
+     * did in a fraction of the height — an item with eight add-ons used to be a
      * page of accordions. Reordering and the per-row delete are unchanged.
      *
-     * A repeater bound to the relationship, so additions are written in the
-     * same save as the dish they belong to. The rule in .ai/rules/filament.md
+     * A repeater bound to the relationship, so add-ons are written in the
+     * same save as the item they belong to. The rule in .ai/rules/filament.md
      * against `->relationship()` is about Spatie roles and permissions, whose
      * cache is only flushed by syncRoles()/syncPermissions(); this is a plain
      * hasMany with no cache behind it, and the rule does not apply.
      *
-     * Additions cannot be dragged from one dish to another: they are edited
-     * inside the dish that owns them.
+     * Add-ons cannot be dragged from one item to another: they are edited
+     * inside the item that owns them.
      */
     private static function additions(Currency $currency): Repeater
     {
@@ -164,19 +179,19 @@ class MenuItemForm
             ->relationship()
             ->hiddenLabel()
             ->table([
-                TableColumn::make(__('panel.additions.label'))->markAsRequired(),
-                TableColumn::make(__('panel.additions.price'))->width('10rem'),
+                TableColumn::make(__('panel.add_ons.label'))->markAsRequired(),
+                TableColumn::make(__('panel.add_ons.price'))->width('10rem'),
                 TableColumn::make(__('panel.items.tax_rate'))->width('9rem'),
-                TableColumn::make(__('panel.additions.is_available'))->width('7rem')->alignment(Alignment::Center),
+                TableColumn::make(__('panel.add_ons.is_available'))->width('7rem')->alignment(Alignment::Center),
             ])
             ->schema([
                 // Only the switched-to language is on screen, exactly as
-                // everywhere else — an addition's name is guest-facing text and
-                // is translated like the dish above it.
-                ...TranslatedFields::text('name', __('panel.additions.label'), maxLength: 64),
+                // everywhere else — an add-on's name is guest-facing text and
+                // is translated like the item above it.
+                ...TranslatedFields::text('name', __('panel.add_ons.label'), maxLength: 64),
 
                 TextInput::make('price')
-                    ->label(__('panel.additions.price'))
+                    ->label(__('panel.add_ons.price'))
                     ->required()
                     ->numeric()
                     ->minValue(0)
@@ -195,17 +210,17 @@ class MenuItemForm
                     ->placeholder(PricingFields::formatRate(PricingFields::tenantTaxRateBasisPoints())),
 
                 Toggle::make('is_available')
-                    ->label(__('panel.additions.is_available'))
+                    ->label(__('panel.add_ons.is_available'))
                     ->default(true),
             ])
             ->orderColumn('position')
-            // Most dishes have none, and a blank row waiting to be filled in
+            // Most items have none, and a blank row waiting to be filled in
             // would make every save fail validation until it was deleted.
             ->defaultItems(0)
-            ->addActionLabel(__('panel.additions.add'))
+            ->addActionLabel(__('panel.add_ons.add'))
             ->reorderable()
             ->columnSpanFull()
-            // The repeater edits a major-unit price the same way the dish above
+            // The repeater edits a major-unit price the same way the item above
             // does, and each row is converted on its own way in and out.
             ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::storeAddition($data, $currency))
             ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::storeAddition($data, $currency))
@@ -213,9 +228,9 @@ class MenuItemForm
     }
 
     /**
-     * Turn an addition's typed price and rate into what gets stored.
+     * Turn an add-on's typed price and rate into what gets stored.
      *
-     * An addition has no compare-at price — it is a delta on the dish, and
+     * An add-on has no compare-at price — it is a delta on the item, and
      * "was +₹40, now +₹30" is not something a menu says — so this is its own
      * small conversion rather than PricingFields::store().
      *
@@ -236,7 +251,7 @@ class MenuItemForm
     }
 
     /**
-     * Turn a stored addition back into the values the form edits.
+     * Turn a stored add-on back into the values the form edits.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -253,7 +268,7 @@ class MenuItemForm
     }
 
     /**
-     * Put every language back into the form when a dish is edited.
+     * Put every language back into the form when an item is edited.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

@@ -5,9 +5,9 @@
 | Guest App
 |--------------------------------------------------------------------------
 |
-| Every word of chrome in the app a diner reads at the table. The dish names,
-| sections and tile labels are not here — those are the tenant's own words
-| and live in translated database columns.
+| Every word of chrome in the app a guest reads at the table or in the room.
+| The item names, sections, charge names and tile labels are not here — those
+| are the tenant's own words and live in translated database columns.
 |
 | The whole file is sent to the browser as one Inertia prop, so keep it to what
 | the guest app actually renders.
@@ -29,14 +29,15 @@ return [
         'combo_contains' => 'You get',
         'was' => 'Was :price',
         'save' => 'Save :amount',
-        'additions' => 'Add to this',
+        'add_ons' => 'Add-ons',
         'free' => 'Free',
+        'complimentary' => 'Complimentary',
         'served_between' => 'Served :from to :until',
         'not_being_served' => 'Not being served right now',
         'tax_included' => 'Prices include GST at :rate.',
         'tax_excluded' => 'Prices exclude GST, charged at :rate.',
-        'service_charge' => 'A service charge of :rate is added to the bill.',
-        'parcel_charge' => 'Takeaway orders are packed for :amount.',
+        'charge_rate' => ':name of :rate is added to the bill.',
+        'charge_amount' => ':name of :amount is added to the bill.',
     ],
 
     'document' => [

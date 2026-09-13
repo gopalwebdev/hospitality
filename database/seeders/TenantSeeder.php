@@ -2,15 +2,17 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ChargeCalculation;
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Enums\HomeRowLayout;
 use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Role;
 use App\Enums\TenantType;
+use App\Models\Charge;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
@@ -28,7 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 
 /**
- * One tenant, its settings, and the one administrator who runs it.
+ * The seeded tenants, their settings, the people who run them, their menus and their charges.
  *
  * The owner address uses plus-addressing so every tenant gets a distinct
  * account while the sign-in codes all land in the same real inbox.
@@ -40,7 +42,11 @@ class TenantSeeder extends Seeder
     /**
      * The tenants to seed, keyed by the slug that becomes their subdomain.
      *
-     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string}>
+     * `menus` names the cards in CARDS each one gets, in the order its guests
+     * read them: a restaurant and a hotel serve different things, and the
+     * hotel is what shows items and service requests sharing one menu.
+     *
+     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string, menus: list<string>}>
      */
     public const array TENANTS = [
         [
@@ -55,11 +61,80 @@ class TenantSeeder extends Seeder
             'owner_email' => 'gopalwebdev+spice@gmail.com',
             'staff_name' => 'Spice Garden Staff',
             'staff_email' => 'gopalwebdev+spice-staff@gmail.com',
+            'menus' => ['main', 'drinks', 'breakfast'],
+        ],
+        [
+            'slug' => 'seaview',
+            'type' => TenantType::Hotel,
+            'name' => 'Seaview Residency',
+            'address' => '4 Beach Road, Puducherry',
+            'pincode' => '605001',
+            'email' => 'hello@seaview.example.com',
+            'phone' => '9876501234',
+            'owner_name' => 'Seaview Residency Owner',
+            'owner_email' => 'gopalwebdev+seaview@gmail.com',
+            'staff_name' => 'Seaview Residency Staff',
+            'staff_email' => 'gopalwebdev+seaview-staff@gmail.com',
+            'menus' => ['in_room_dining', 'breakfast', 'room_requests'],
         ],
     ];
 
     /**
-     * The name of the one menu every seeded tenant gets, in both languages.
+     * Every card a tenant can be seeded with, keyed by the name TENANTS uses.
+     *
+     * Each is a menu's name in both languages, its sections, whether the combos
+     * are seeded onto it, and an optional service window.
+     *
+     * @var array<string, array{name: array<string, string>, sections: list<array<string, mixed>>, combos?: bool, available_from?: string, available_until?: string}>
+     */
+    public const array CARDS = [
+        'main' => ['name' => self::MENU_NAME, 'sections' => self::MENU, 'combos' => true],
+        'in_room_dining' => ['name' => self::IN_ROOM_DINING_MENU_NAME, 'sections' => self::MENU, 'combos' => true],
+        'drinks' => ['name' => self::DRINKS_MENU_NAME, 'sections' => self::DRINKS],
+        'breakfast' => [
+            'name' => self::BREAKFAST_MENU_NAME,
+            'sections' => self::BREAKFAST,
+            'available_from' => self::BREAKFAST_FROM,
+            'available_until' => self::BREAKFAST_UNTIL,
+        ],
+        'room_requests' => ['name' => self::ROOM_REQUESTS_MENU_NAME, 'sections' => self::ROOM_REQUESTS],
+    ];
+
+    /**
+     * What each tenant adds to a bill, keyed by the slug in TENANTS.
+     *
+     * A charge with a rate is a share of the bill and one with an amount is a
+     * fixed sum. `menus` names the cards in CARDS it is limited to; without it
+     * the charge is on every menu. The restaurant's service charge is on
+     * everything and its packing charge only on the main card; the hotel's
+     * room-service fee is on what is brought to a room, and its room requests
+     * carry nothing at all.
+     *
+     * @var array<string, list<array{name: array<string, string>, rate_basis_points?: int, amount_minor_units?: int, menus?: list<string>}>>
+     */
+    public const array CHARGES = [
+        'spice' => [
+            [
+                'name' => ['en' => 'Service Charge', 'ta' => 'சேவைக் கட்டணம்'],
+                'rate_basis_points' => 1000,
+            ],
+            [
+                'name' => ['en' => 'Packing Charge', 'ta' => 'பொதியிடல் கட்டணம்'],
+                'amount_minor_units' => 2000,
+                'menus' => ['main'],
+            ],
+        ],
+        'seaview' => [
+            [
+                'name' => ['en' => 'Room Service Fee', 'ta' => 'அறை சேவைக் கட்டணம்'],
+                'amount_minor_units' => 5000,
+                'menus' => ['in_room_dining', 'breakfast'],
+            ],
+        ],
+    ];
+
+    /**
+     * The restaurant's main card, in both languages.
      *
      * Seeded copy is bilingual on purpose: it is the only way to see that the
      * language toggle in the guest app really does anything without
@@ -70,7 +145,14 @@ class TenantSeeder extends Seeder
     public const array MENU_NAME = ['en' => 'Main Menu', 'ta' => 'முதன்மை மெனு'];
 
     /**
-     * The second menu every seeded tenant gets.
+     * The same card under the name a hotel gives it.
+     *
+     * @var array<string, string>
+     */
+    public const array IN_ROOM_DINING_MENU_NAME = ['en' => 'In-room Dining', 'ta' => 'அறை உணவு'];
+
+    /**
+     * The restaurant's second card.
      *
      * One menu was enough to read a storefront but not enough to work the
      * panel: moving a category to another menu, and filing one under the right
@@ -81,7 +163,7 @@ class TenantSeeder extends Seeder
     public const array DRINKS_MENU_NAME = ['en' => 'Drinks', 'ta' => 'பானங்கள்'];
 
     /**
-     * A third menu, served only between two times of day.
+     * A card served only between two times of day, which both tenants get.
      *
      * It exists to make the two things that need somewhere to go actually
      * testable: a menu with a service window, and a third card to move a
@@ -90,6 +172,82 @@ class TenantSeeder extends Seeder
      * @var array<string, string>
      */
     public const array BREAKFAST_MENU_NAME = ['en' => 'Breakfast', 'ta' => 'காலை உணவு'];
+
+    /**
+     * The hotel's card of things asked for from the room.
+     *
+     * @var array<string, string>
+     */
+    public const array ROOM_REQUESTS_MENU_NAME = ['en' => 'Room Requests', 'ta' => 'அறை கோரிக்கைகள்'];
+
+    /**
+     * What a hotel guest asks for from the room: housekeeping, and a few things
+     * to drink beside it.
+     *
+     * Most of it is a service request and most of that is complimentary, which
+     * is what the card is for — it shows a pillow and a bottle of water on one
+     * menu, one with no diet mark and no price, the other with both.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public const array ROOM_REQUESTS = [
+        [
+            'name' => ['en' => 'Housekeeping', 'ta' => 'வீட்டு பராமரிப்பு'],
+            'items' => [
+                [
+                    'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
+                    'is_service' => true,
+                    'price_minor_units' => 0,
+                    'is_featured' => true,
+                    'featured_position' => 1,
+                    'additions' => [
+                        ['name' => ['en' => 'Feather', 'ta' => 'இறகு'], 'price_minor_units' => 0],
+                        ['name' => ['en' => 'Memory foam', 'ta' => 'மெமரி ஃபோம்'], 'price_minor_units' => 0],
+                    ],
+                ],
+                [
+                    'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
+                    'is_service' => true,
+                    'price_minor_units' => 0,
+                ],
+                [
+                    'name' => ['en' => 'Bedsheet Change', 'ta' => 'படுக்கை விரிப்பு மாற்றம்'],
+                    'is_service' => true,
+                    'price_minor_units' => 0,
+                ],
+                [
+                    'name' => ['en' => 'Towel Set', 'ta' => 'துண்டு தொகுப்பு'],
+                    'is_service' => true,
+                    'price_minor_units' => 0,
+                ],
+                [
+                    // A service request that is charged for, at the rate services pay.
+                    'name' => ['en' => 'Laundry Pickup', 'ta' => 'சலவை சேகரிப்பு'],
+                    'is_service' => true,
+                    'price_minor_units' => 15000,
+                    'tax_rate_basis_points' => 1800,
+                ],
+            ],
+        ],
+        [
+            'name' => ['en' => 'Bathroom and Drinks', 'ta' => 'குளியலறை மற்றும் பானங்கள்'],
+            'items' => [
+                [
+                    'name' => ['en' => 'Toiletry Kit', 'ta' => 'கழிப்பறை பொருட்கள் தொகுப்பு'],
+                    'is_service' => true,
+                    'price_minor_units' => 0,
+                ],
+                [
+                    // Something to order on the same card as the pillows: a
+                    // bottle of water carries its diet mark and a price.
+                    'name' => ['en' => 'Water Bottle (1 L)', 'ta' => 'தண்ணீர் பாட்டில் (1 லி)'],
+                    'price_minor_units' => 4000,
+                    'diet' => Diet::Vegetarian,
+                    'tax_rate_basis_points' => 1800,
+                ],
+            ],
+        ],
+    ];
 
     /**
      * What the breakfast card is served between, as HH:MM.
@@ -113,7 +271,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Masala Dosa', 'ta' => 'மசாலா தோசை'],
                             'price_minor_units' => 11000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'is_featured' => true,
                             'featured_position' => 1,
                             'additions' => [
@@ -124,7 +282,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Ghee Roast', 'ta' => 'நெய் ரோஸ்ட்'],
                             'price_minor_units' => 13000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -134,38 +292,38 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Idli Plate', 'ta' => 'இட்லி பிளேட்'],
                             'price_minor_units' => 8000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                         [
                             'name' => ['en' => 'Medu Vada', 'ta' => 'மெது வடை'],
                             'price_minor_units' => 7000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
             ],
         ],
         [
-            'name' => ['en' => 'Egg Dishes', 'ta' => 'முட்டை உணவுகள்'],
+            'name' => ['en' => 'Egg Specials', 'ta' => 'முட்டை ஸ்பெஷல்'],
             'items' => [
                 [
                     'name' => ['en' => 'Egg Bhurji', 'ta' => 'முட்டை பூர்ஜி'],
                     'price_minor_units' => 12000,
-                    'food_type' => FoodType::Egg,
+                    'diet' => Diet::Egg,
                 ],
                 [
                     'name' => ['en' => 'Omelette', 'ta' => 'ஆம்லெட்'],
                     'price_minor_units' => 9000,
-                    'food_type' => FoodType::Egg,
+                    'diet' => Diet::Egg,
                 ],
             ],
         ],
     ];
 
     /**
-     * The bundles the main menu leads with, beside its featured dishes.
+     * The bundles the main menu leads with, beside its featured items.
      *
-     * Priced below what the dishes come to separately, which is the whole
+     * Priced below what the items come to separately, which is the whole
      * point of a combo — the contents are named so a guest can see what they
      * are getting, never to be added up.
      *
@@ -243,7 +401,7 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Filter Coffee', 'ta' => 'ஃபில்டர் காபி'],
                     'price_minor_units' => 5000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                     'is_featured' => true,
                     'featured_position' => 1,
                     'additions' => [
@@ -254,12 +412,12 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Masala Chai', 'ta' => 'மசாலா டீ'],
                     'price_minor_units' => 4000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
                     'name' => ['en' => 'Badam Milk', 'ta' => 'பாதாம் பால்'],
                     'price_minor_units' => 7000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
             ],
         ],
@@ -272,7 +430,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Fresh Lime Soda', 'ta' => 'ஃபிரெஷ் லைம் சோடா'],
                             'price_minor_units' => 8000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'additions' => [
                                 ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0],
                                 ['name' => ['en' => 'Salted', 'ta' => 'உப்பு'], 'price_minor_units' => 0],
@@ -281,7 +439,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Watermelon Juice', 'ta' => 'தர்பூசணி ஜூஸ்'],
                             'price_minor_units' => 9000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -292,14 +450,14 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Mango Lassi', 'ta' => 'மாம்பழ லஸ்ஸி'],
                             'price_minor_units' => 11000,
                             'compare_at_price_minor_units' => 13000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'is_featured' => true,
                             'featured_position' => 2,
                         ],
                         [
                             'name' => ['en' => 'Cold Coffee', 'ta' => 'கோல்ட் காபி'],
                             'price_minor_units' => 12000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -307,17 +465,17 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Bottled', 'ta' => 'பாட்டில்'],
                     'items' => [
                         [
-                            // Sealed goods rather than food service, and
-                            // an aerated drink at that — 40% under GST 2.0.
+                            // Sealed goods rather than a served drink, and an
+                            // aerated one at that — 40% under GST 2.0.
                             'name' => ['en' => 'Cola', 'ta' => 'கோலா'],
                             'price_minor_units' => 6000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'tax_rate_basis_points' => 4000,
                         ],
                         [
                             'name' => ['en' => 'Mineral Water', 'ta' => 'மினரல் வாட்டர்'],
                             'price_minor_units' => 2000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'tax_rate_basis_points' => 1800,
                         ],
                     ],
@@ -336,7 +494,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Paneer Tikka', 'ta' => 'பன்னீர் டிக்கா'],
                             'price_minor_units' => 24950,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'is_featured' => true,
                             'featured_position' => 1,
                             'additions' => [
@@ -348,7 +506,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Gobi Manchurian', 'ta' => 'கோபி மஞ்சூரியன்'],
                             'price_minor_units' => 21000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'additions' => [
                                 ['name' => ['en' => 'Make it dry', 'ta' => 'உலர்ந்ததாக'], 'price_minor_units' => 0],
                                 ['name' => ['en' => 'Extra gravy', 'ta' => 'கூடுதல் கிரேவி'], 'price_minor_units' => 3000],
@@ -357,7 +515,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mushroom 65', 'ta' => 'காளான் 65'],
                             'price_minor_units' => 23000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -368,7 +526,7 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Chicken 65', 'ta' => 'சிக்கன் 65'],
                             'price_minor_units' => 29900,
                             'compare_at_price_minor_units' => 34900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'is_featured' => true,
                             'featured_position' => 2,
                             'additions' => [
@@ -379,18 +537,18 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Apollo Fish', 'ta' => 'அப்பல்லோ மீன்'],
                             'price_minor_units' => 34900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                         ],
                         [
                             'name' => ['en' => 'Prawn Koliwada', 'ta' => 'இறால் கோலிவாடா'],
                             'price_minor_units' => 39900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'availability' => ItemAvailability::OutOfStock,
                         ],
                         [
                             'name' => ['en' => 'Egg Pepper Fry', 'ta' => 'முட்டை மிளகு வறுவல்'],
                             'price_minor_units' => 19900,
-                            'food_type' => FoodType::Egg,
+                            'diet' => Diet::Egg,
                         ],
                     ],
                 ],
@@ -402,12 +560,12 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Sweet Corn Soup', 'ta' => 'ஸ்வீட் கார்ன் சூப்'],
                     'price_minor_units' => 14900,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
                     'name' => ['en' => 'Hot and Sour Soup', 'ta' => 'ஹாட் அண்ட் சார் சூப்'],
                     'price_minor_units' => 15900,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                     'additions' => [
                         ['name' => ['en' => 'Add chicken', 'ta' => 'சிக்கன் சேர்க்க'], 'price_minor_units' => 5000],
                     ],
@@ -415,19 +573,19 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Mutton Paya Soup', 'ta' => 'மட்டன் பாயா சூப்'],
                     'price_minor_units' => 21900,
-                    'food_type' => FoodType::NonVegetarian,
+                    'diet' => Diet::NonVegetarian,
                 ],
             ],
         ],
         [
             // The category that shows what subdivisions are for: three of them,
-            // each with dishes, plus one dish filed straight under the section.
+            // each with items, plus one item filed straight under the section.
             'name' => ['en' => 'Biryani', 'ta' => 'பிரியாணி'],
             'items' => [
                 [
                     'name' => ['en' => 'Egg Biryani', 'ta' => 'முட்டை பிரியாணி'],
                     'price_minor_units' => 27500,
-                    'food_type' => FoodType::Egg,
+                    'diet' => Diet::Egg,
                 ],
             ],
             'sub_categories' => [
@@ -438,7 +596,7 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Hyderabadi Chicken Biryani', 'ta' => 'ஹைதராபாதி சிக்கன் பிரியாணி'],
                             'price_minor_units' => 38000,
                             'compare_at_price_minor_units' => 45000,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'is_featured' => true,
                             'featured_position' => 3,
                             'additions' => [
@@ -451,7 +609,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Chicken 65 Biryani', 'ta' => 'சிக்கன் 65 பிரியாணி'],
                             'price_minor_units' => 41000,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                         ],
                     ],
                 ],
@@ -461,7 +619,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mutton Dum Biryani', 'ta' => 'மட்டன் தம் பிரியாணி'],
                             'price_minor_units' => 46000,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'additions' => [
                                 ['name' => ['en' => 'Extra mutton', 'ta' => 'கூடுதல் மட்டன்'], 'price_minor_units' => 12000],
                             ],
@@ -469,7 +627,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mutton Keema Biryani', 'ta' => 'மட்டன் கீமா பிரியாணி'],
                             'price_minor_units' => 44000,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'availability' => ItemAvailability::TemporarilyUnavailable,
                         ],
                     ],
@@ -480,12 +638,12 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Vegetable Dum Biryani', 'ta' => 'வெஜிடபிள் தம் பிரியாணி'],
                             'price_minor_units' => 30000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                         [
                             'name' => ['en' => 'Paneer Biryani', 'ta' => 'பன்னீர் பிரியாணி'],
                             'price_minor_units' => 33000,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -500,7 +658,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Paneer Butter Masala', 'ta' => 'பன்னீர் பட்டர் மசாலா'],
                             'price_minor_units' => 28900,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                             'additions' => [
                                 ['name' => ['en' => 'Extra butter', 'ta' => 'கூடுதல் வெண்ணெய்'], 'price_minor_units' => 2000],
                             ],
@@ -508,7 +666,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Dal Tadka', 'ta' => 'தால் தட்கா'],
                             'price_minor_units' => 21900,
-                            'food_type' => FoodType::Vegetarian,
+                            'diet' => Diet::Vegetarian,
                         ],
                     ],
                 ],
@@ -518,19 +676,19 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Butter Chicken', 'ta' => 'பட்டர் சிக்கன்'],
                             'price_minor_units' => 36900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                             'is_featured' => true,
                             'featured_position' => 4,
                         ],
                         [
                             'name' => ['en' => 'Chettinad Chicken', 'ta' => 'செட்டிநாடு சிக்கன்'],
                             'price_minor_units' => 35900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                         ],
                         [
                             'name' => ['en' => 'Mutton Rogan Josh', 'ta' => 'மட்டன் ரோகன் ஜோஷ்'],
                             'price_minor_units' => 44900,
-                            'food_type' => FoodType::NonVegetarian,
+                            'diet' => Diet::NonVegetarian,
                         ],
                     ],
                 ],
@@ -542,7 +700,7 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Butter Naan', 'ta' => 'பட்டர் நான்'],
                     'price_minor_units' => 8000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                     'additions' => [
                         ['name' => ['en' => 'Extra butter', 'ta' => 'கூடுதல் வெண்ணெய்'], 'price_minor_units' => 2000],
                         ['name' => ['en' => 'Add garlic', 'ta' => 'பூண்டு சேர்க்க'], 'price_minor_units' => 2500],
@@ -551,17 +709,17 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Tandoori Roti', 'ta' => 'தந்தூரி ரொட்டி'],
                     'price_minor_units' => 5000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
                     'name' => ['en' => 'Laccha Paratha', 'ta' => 'லச்சா பராத்தா'],
                     'price_minor_units' => 7000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
                     'name' => ['en' => 'Kerala Parotta', 'ta' => 'கேரள பரோட்டா'],
                     'price_minor_units' => 4500,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
             ],
         ],
@@ -571,27 +729,27 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Gulab Jamun', 'ta' => 'குலாப் ஜாமூன்'],
                     'price_minor_units' => 12000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
                     'name' => ['en' => 'Rasmalai', 'ta' => 'ரஸ்மலாய்'],
                     'price_minor_units' => 14000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                     'is_featured' => true,
                     'featured_position' => 5,
                 ],
                 [
                     'name' => ['en' => 'Double Ka Meetha', 'ta' => 'டபுள் கா மீதா'],
                     'price_minor_units' => 13000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                 ],
                 [
-                    // Sold as a sealed tub rather than as food service,
-                    // so it carries a rate of its own — 18%, not the 5% the
-                    // rest of the card follows.
+                    // Sold as a sealed tub rather than served, so it carries a
+                    // rate of its own — 18%, not the 5% the rest of the card
+                    // follows.
                     'name' => ['en' => 'Ice Cream Tub', 'ta' => 'ஐஸ்கிரீம் டப்'],
                     'price_minor_units' => 18000,
-                    'food_type' => FoodType::Vegetarian,
+                    'diet' => Diet::Vegetarian,
                     'tax_rate_basis_points' => 1800,
                 ],
             ],
@@ -599,7 +757,7 @@ class TenantSeeder extends Seeder
     ];
 
     /**
-     * Seed every tenant, its people, and the menus they serve.
+     * Seed every tenant, its people, the menus it serves and what it adds to a bill.
      */
     public function run(): void
     {
@@ -648,64 +806,102 @@ class TenantSeeder extends Seeder
             $staff->syncRoles([Role::Staff->value]);
             $tenant->users()->syncWithoutDetaching([$staff->getKey()]);
 
-            $this->seedMenu($tenant);
+            $menus = $this->seedMenus($tenant, $definition['menus']);
+
+            $this->seedCharges($tenant, self::CHARGES[$definition['slug']], $menus);
         }
     }
 
     /**
-     * A small bilingual menu, so a fresh install has something to look at.
+     * A tenant's bilingual cards, so a fresh install has something to look at.
      *
      * Prices are in the minor unit, as the column is: 24950 is ₹249.50.
      *
      * Every lookup matches on the English name rather than the whole translated
      * column, because a JSON document only compares equal when every language
      * in it does — which would make this seeder duplicate its own menu the
-     * first time a tenant translated one dish.
+     * first time a tenant translated one item.
+     *
+     * @param  list<string>  $cards  keys of CARDS, in the order a guest reads them
+     * @return array<string, Menu> the seeded menus, keyed by card
      */
-    private function seedMenu(Tenant $tenant): void
+    private function seedMenus(Tenant $tenant, array $cards): array
     {
-        $menu = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $tenant->getKey()),
-            self::MENU_NAME,
-            fn (): Menu => new Menu(['position' => 0, 'is_active' => true]),
-            ['tenant_id' => $tenant->getKey()],
-        );
+        $menus = [];
 
-        $this->seedCard($tenant, $menu, self::MENU);
+        foreach ($cards as $position => $key) {
+            $card = self::CARDS[$key];
 
-        $drinks = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $tenant->getKey()),
-            self::DRINKS_MENU_NAME,
-            fn (): Menu => new Menu(['position' => 1, 'is_active' => true]),
-            ['tenant_id' => $tenant->getKey()],
-        );
+            $menu = $this->firstOrCreateByEnglishName(
+                Menu::query()->where('tenant_id', $tenant->getKey()),
+                $card['name'],
+                fn (): Menu => new Menu([
+                    'position' => $position,
+                    'is_active' => true,
+                    'available_from' => $card['available_from'] ?? null,
+                    'available_until' => $card['available_until'] ?? null,
+                ]),
+                ['tenant_id' => $tenant->getKey()],
+            );
 
-        $this->seedCard($tenant, $drinks, self::DRINKS);
+            $this->seedCard($tenant, $menu, $card['sections']);
 
-        $breakfast = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $tenant->getKey()),
-            self::BREAKFAST_MENU_NAME,
-            fn (): Menu => new Menu([
-                'position' => 2,
-                'is_active' => true,
-                'available_from' => self::BREAKFAST_FROM,
-                'available_until' => self::BREAKFAST_UNTIL,
-            ]),
-            ['tenant_id' => $tenant->getKey()],
-        );
+            // After the card, because a combo names items that have to exist.
+            if ($card['combos'] ?? false) {
+                $this->seedCombos($tenant, $menu);
+            }
 
-        $this->seedCard($tenant, $breakfast, self::BREAKFAST);
-
-        // After the cards, because a combo names dishes that have to exist.
-        $this->seedCombos($tenant, $menu);
+            $menus[$key] = $menu;
+        }
 
         // Every menu gets a way in. A card a guest cannot reach is a card that
         // may as well not be there.
-        $this->seedHomeScreen($tenant, [$menu, $drinks, $breakfast]);
+        $this->seedHomeScreen($tenant, array_values($menus));
+
+        return $menus;
     }
 
     /**
-     * One menu's categories, their dishes, and each dish's additions.
+     * What one tenant adds to a bill, each charge limited to the menus it names.
+     *
+     * Matched on the English name, like everything else here, so seeding again
+     * finds a charge rather than adding a second one. The menus are synced
+     * straight onto the pivot rather than through SetChargeMenus: this seeder
+     * runs without model events, and every menu here is the tenant's own.
+     *
+     * @param  list<array{name: array<string, string>, rate_basis_points?: int, amount_minor_units?: int, menus?: list<string>}>  $charges
+     * @param  array<string, Menu>  $menus  this tenant's menus, keyed by card
+     */
+    private function seedCharges(Tenant $tenant, array $charges, array $menus): void
+    {
+        foreach ($charges as $position => $definition) {
+            $limitedTo = $definition['menus'] ?? [];
+
+            $charge = $this->firstOrCreateByEnglishName(
+                Charge::query()->where('tenant_id', $tenant->getKey()),
+                $definition['name'],
+                fn (): Charge => new Charge([
+                    'calculation' => isset($definition['rate_basis_points'])
+                        ? ChargeCalculation::Percentage
+                        : ChargeCalculation::FixedAmount,
+                    'rate_basis_points' => $definition['rate_basis_points'] ?? null,
+                    'amount_minor_units' => $definition['amount_minor_units'] ?? null,
+                    'applies_to_all_menus' => $limitedTo === [],
+                    'is_active' => true,
+                    'position' => $position,
+                ]),
+                ['tenant_id' => $tenant->getKey()],
+            );
+
+            $charge->menus()->sync(array_values(array_map(
+                static fn (string $card): int => $menus[$card]->getKey(),
+                array_filter($limitedTo, static fn (string $card): bool => isset($menus[$card])),
+            )));
+        }
+    }
+
+    /**
+     * One menu's categories, their items, and each item's add-ons.
      *
      * @param  list<array<string, mixed>>  $card
      */
@@ -715,7 +911,7 @@ class TenantSeeder extends Seeder
             $category = $this->seedCategory($tenant, $menu, $section['name'], $position);
 
             foreach ($section['items'] ?? [] as $itemPosition => $item) {
-                $this->seedDish($tenant, $category, $item, $itemPosition);
+                $this->seedItem($tenant, $category, $item, $itemPosition);
             }
 
             // Subdivisions are rows of the same table with a parent, so they
@@ -724,7 +920,7 @@ class TenantSeeder extends Seeder
                 $subCategory = $this->seedCategory($tenant, $menu, $subSection['name'], $subPosition, $category);
 
                 foreach ($subSection['items'] as $itemPosition => $item) {
-                    $this->seedDish($tenant, $subCategory, $item, $itemPosition);
+                    $this->seedItem($tenant, $subCategory, $item, $itemPosition);
                 }
             }
         }
@@ -766,28 +962,30 @@ class TenantSeeder extends Seeder
     }
 
     /**
-     * One dish, its offer if it has one, and its additions.
+     * One item, its offer if it has one, and its add-ons.
      *
-     * The category may be a section or one of its subdivisions; a dish is filed
-     * under exactly one either way.
+     * The category may be a section or one of its subdivisions; an item is filed
+     * under exactly one either way. An item is something to order unless its card
+     * marks it a service request, and only a service request goes without a diet.
      *
      * @param  array<string, mixed>  $item
      */
-    private function seedDish(
+    private function seedItem(
         Tenant $tenant,
         MenuCategory $category,
         array $item,
         int $position,
     ): void {
-        $dish = $this->firstOrCreateByEnglishName(
+        $menuItem = $this->firstOrCreateByEnglishName(
             MenuItem::query()->where('menu_category_id', $category->getKey()),
             $item['name'],
             fn (): MenuItem => new MenuItem([
                 'price_minor_units' => $item['price_minor_units'],
-                // Null on almost every dish: not on offer. A zero would be a
+                // Null on almost every item: not on offer. A zero would be a
                 // price of nothing.
                 'compare_at_price_minor_units' => $item['compare_at_price_minor_units'] ?? null,
-                'food_type' => $item['food_type'],
+                'is_service' => $item['is_service'] ?? false,
+                'diet' => $item['diet'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 'is_featured' => $item['is_featured'] ?? false,
                 'featured_position' => $item['featured_position'] ?? 0,
@@ -802,14 +1000,14 @@ class TenantSeeder extends Seeder
 
         foreach ($item['additions'] ?? [] as $additionPosition => $addition) {
             $this->firstOrCreateByEnglishName(
-                MenuItemAddition::query()->where('menu_item_id', $dish->getKey()),
+                MenuItemAddition::query()->where('menu_item_id', $menuItem->getKey()),
                 $addition['name'],
                 fn (): MenuItemAddition => new MenuItemAddition([
                     'price_minor_units' => $addition['price_minor_units'],
                     'is_available' => true,
                     'position' => $additionPosition,
                 ]),
-                ['tenant_id' => $tenant->getKey(), 'menu_item_id' => $dish->getKey()],
+                ['tenant_id' => $tenant->getKey(), 'menu_item_id' => $menuItem->getKey()],
             );
         }
     }
@@ -817,7 +1015,7 @@ class TenantSeeder extends Seeder
     /**
      * The bundles one menu leads with, and what is in each.
      *
-     * A combo's contents are looked up by the English name of a dish already
+     * A combo's contents are looked up by the English name of an item already
      * seeded onto this menu. A name that finds nothing is skipped rather than
      * failing the seed: the combo is still a working combo one line shorter,
      * and a half-seeded database is worse than a slightly smaller one.
@@ -839,18 +1037,18 @@ class TenantSeeder extends Seeder
             );
 
             foreach ($definition['contents'] as $contentPosition => $content) {
-                $dish = MenuItem::query()
+                $item = MenuItem::query()
                     ->where('tenant_id', $tenant->getKey())
                     ->onMenu($menu->getKey())
                     ->where('name->'.Locale::English->value, $content['name'][Locale::English->value])
                     ->first();
 
-                if (! $dish instanceof MenuItem) {
+                if (! $item instanceof MenuItem) {
                     continue;
                 }
 
                 MenuComboItem::query()->firstOrCreate(
-                    ['menu_combo_id' => $combo->getKey(), 'menu_item_id' => $dish->getKey()],
+                    ['menu_combo_id' => $combo->getKey(), 'menu_item_id' => $item->getKey()],
                     [
                         'tenant_id' => $tenant->getKey(),
                         'quantity' => $content['quantity'],
@@ -914,7 +1112,7 @@ class TenantSeeder extends Seeder
     /**
      * Find a record by the English half of a translated column, or make it.
      *
-     * @template TModel of Menu|MenuCategory|MenuItem|MenuItemAddition|MenuCombo|HomeTile
+     * @template TModel of Menu|MenuCategory|MenuItem|MenuItemAddition|MenuCombo|HomeTile|Charge
      *
      * @param  Builder<TModel>  $query  already narrowed to the right parent
      * @param  array<string, string>  $translations  the name in every language

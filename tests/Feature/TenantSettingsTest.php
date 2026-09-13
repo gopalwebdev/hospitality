@@ -9,6 +9,7 @@ use App\Models\TenantSetting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -146,16 +147,16 @@ it('is open to an admin supporting a tenant', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Tax and charges
+| Tax
 |--------------------------------------------------------------------------
 |
-| The GST every price on the menu is read against, plus the two optional
-| charges. Each charge is a switch and an amount rather than an amount alone,
-| so "we do not levy one" is something a tenant can say.
+| The GST every price on the menu is read against. What is added on top of a
+| bill is not a setting any more: charges have their own page, and their tests
+| are in tests/Feature/Tenant/ChargeManagementTest.php.
 |
 */
 
-it('starts a tenant on the standalone food-service slab, tax added at the bill', function (): void {
+it('starts a tenant on the default GST slab, tax added at the bill', function (): void {
     $tenant = Tenant::factory()->create();
 
     // The default in $attributes and TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS have to agree; a
@@ -163,9 +164,21 @@ it('starts a tenant on the standalone food-service slab, tax added at the bill',
     // keeps the two in step.
     expect($tenant->settings->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
         ->and($tenant->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
-        ->and($tenant->settings->prices_include_tax)->toBeFalse()
-        ->and($tenant->settings->service_charge_enabled)->toBeFalse()
-        ->and($tenant->settings->parcel_charge_enabled)->toBeFalse();
+        ->and($tenant->settings->prices_include_tax)->toBeFalse();
+});
+
+it('keeps no charges among the settings', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Owner);
+
+    // Two fixed switches could say a service charge and a packing charge and
+    // nothing else, and could not say which menus either belonged on.
+    Livewire::test(Settings::class)
+        ->assertFormFieldDoesNotExist('service_charge_percentage')
+        ->assertFormFieldDoesNotExist('parcel_charge');
+
+    expect(Schema::hasColumn('tenant_settings', 'service_charge_basis_points'))->toBeFalse()
+        ->and(Schema::hasColumn('tenant_settings', 'parcel_charge_minor_units'))->toBeFalse();
 });
 
 it('saves the GST rate and whether prices already include it', function (): void {
@@ -188,65 +201,6 @@ it('saves the GST rate and whether prices already include it', function (): void
     expect($settings->gstin)->toBe('29ABCDE1234F1Z5')
         ->and($settings->taxRateBasisPoints())->toBe(1800)
         ->and($settings->prices_include_tax)->toBeTrue();
-});
-
-it('types a service charge as a percentage and stores it as basis points', function (): void {
-    $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Owner);
-
-    Livewire::test(Settings::class)
-        ->fillForm([
-            'service_charge_enabled' => true,
-            'service_charge_percentage' => '10',
-        ])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    $settings = $tenant->refresh()->settings;
-
-    // Basis points, like a tax rate, so the arithmetic behind a bill stays in
-    // integers: 10% of ₹500.00 is exactly ₹50.00.
-    expect($settings->service_charge_basis_points)->toBe(1000)
-        ->and($settings->serviceChargeOn(50000))->toBe(5000);
-});
-
-it('types a parcel charge as money and stores it in minor units', function (): void {
-    $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Owner);
-
-    Livewire::test(Settings::class)
-        ->fillForm([
-            'parcel_charge_enabled' => true,
-            'parcel_charge' => '20.50',
-        ])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    $settings = $tenant->refresh()->settings;
-
-    expect($settings->parcel_charge_minor_units)->toBe(2050)
-        ->and($settings->parcel_charge_minor_units)->toBeInt()
-        ->and($settings->parcelCharge())->toBe(2050);
-});
-
-it('charges nothing while a charge is switched off, whatever its amount says', function (): void {
-    // TenantFactory already gives every tenant its one settings row.
-    $tenant = Tenant::factory()->create();
-    $settings = $tenant->settings;
-
-    $settings->update([
-        'service_charge_enabled' => false,
-        'service_charge_basis_points' => 1000,
-        'parcel_charge_enabled' => false,
-        'parcel_charge_minor_units' => 2000,
-    ]);
-
-    // The switch is what decides, not the number beside it — turning a charge
-    // off must not mean losing the rate a tenant had set.
-    expect($settings->serviceChargeOn(50000))->toBe(0)
-        ->and($settings->parcelCharge())->toBe(0)
-        ->and($settings->service_charge_basis_points)->toBe(1000)
-        ->and($settings->parcel_charge_minor_units)->toBe(2000);
 });
 
 it('accepts a GST rate no fixed list of slabs would have held', function (): void {
@@ -276,18 +230,4 @@ it('round-trips the GST rate through the form without drift', function (): void 
         ->assertHasNoFormErrors();
 
     expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
-});
-
-it('round-trips a service charge through the form without drift', function (): void {
-    $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['service_charge_enabled' => true, 'service_charge_basis_points' => 250]);
-
-    enterTenantPanel($tenant, Role::Owner);
-
-    Livewire::test(Settings::class)
-        ->assertFormSet(['service_charge_percentage' => 2.5])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    expect($tenant->refresh()->settings->service_charge_basis_points)->toBe(250);
 });

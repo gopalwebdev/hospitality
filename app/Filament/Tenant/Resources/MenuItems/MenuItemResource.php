@@ -57,7 +57,7 @@ class MenuItemResource extends Resource
      * The top bar's search looks in the language the panel is showing.
      *
      * Left to the title attribute, it matched `name` as raw JSON text — Tamil
-     * never matched and "en" matched every dish.
+     * never matched and "en" matched every item.
      *
      * @return list<string>
      */

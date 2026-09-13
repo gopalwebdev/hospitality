@@ -12,10 +12,10 @@ use LogicException;
 
 /**
  * Move a top-level category onto another of the same tenant's menus, with its
- * sub-categories and every dish under both.
+ * sub-categories and every item under both.
  *
- * Dishes follow on their own because they hang off a category; sub-categories
- * carry menu_id, so they are moved with it. Dishes that were featured stop
+ * Items follow on their own because they hang off a category; sub-categories
+ * carry menu_id, so they are moved with it. Items that were featured stop
  * being featured, because the featured row belongs to a menu.
  *
  * The guards are backstops: MenuArrangementTable states the same rules as

@@ -24,8 +24,8 @@ use Filament\Tables\Table;
  * The menus this tenant serves: Lunch, Dinner, Drinks.
  *
  * The top of the hierarchy the panel edits. One menu opens on its arrangement:
- * its categories, their subdivisions, the dishes in each and the two rails it
- * leads with, all in one list and all dragged into order there. Dishes are
+ * its categories, their subdivisions, the items in each and the two rails it
+ * leads with, all in one list and all dragged into order there. Items are
  * still their own page — there are far more of them, and they are the thing a
  * tenant edits daily.
  *
@@ -95,13 +95,13 @@ class MenuResource extends Resource
      * one page.
      *
      * Arrangement comes first because it is what a menu mostly *is*: every
-     * category, every subdivision and every dish in the order a guest reads
+     * category, every subdivision and every item in the order a guest reads
      * them, with the featured and combo rails sitting among them. The three
      * that follow are the details behind it — what the menu is called and when
-     * it is served, which dishes it leads with, and the combos it sells.
+     * it is served, which items it leads with, and the combos it sells.
      *
      * Categories and sub-categories were two of those tabs and are neither any
-     * more: both are rows of the arrangement, where the dishes under them are
+     * more: both are rows of the arrangement, where the items under them are
      * finally visible in the same list.
      *
      * @return array<int, NavigationItem>

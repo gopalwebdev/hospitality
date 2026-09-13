@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Guest;
 use App\Enums\ItemAvailability;
 use App\Enums\MenuBlock;
 use App\Http\Controllers\Controller;
+use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
@@ -19,28 +20,29 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * One of a tenant's menus, read at the table.
+ * One of a tenant's menus, read at the table or in the room.
  *
  * The whole menu comes down together — the sections, their subdivisions, the
- * dishes in each and every dish's additions, plus the combos the menu leads
- * with — because that is one screen a guest scrolls, and fetching it in layers
- * would be a round trip per layer for one page. Both levels of section are rows
- * of menu_categories, so the subdivisions are simply the `children` of a
- * top-level one. Each query names the columns it
+ * items in each and every item's add-ons, the combos the menu leads with and
+ * the charges a bill from it carries — because that is one screen a guest
+ * scrolls, and fetching it in layers would be a round trip per layer for one
+ * page. Both levels of section are rows of menu_categories, so the subdivisions
+ * are simply the `children` of a top-level one. Each query names the columns it
  * needs, so a long menu does not carry timestamps and foreign keys nobody
  * renders.
  *
  * Only what is actually orderable is sent: a hidden category, a hidden
- * sub-category, a sold-out dish and an addition that has run out are all absent
+ * sub-category, a sold-out item and an add-on that has run out are all absent
  * rather than greyed out, because a guest reading a menu on a phone should not
- * be scrolling past things they cannot have. The *reason* a dish is off never
- * reaches the guest either — App\Enums\ItemAvailability is for the kitchen, and
- * "temporarily unavailable" beside a dish is a worse read than the dish simply
+ * be scrolling past things they cannot have. The *reason* an item is off never
+ * reaches the guest either — App\Enums\ItemAvailability is for the tenant, and
+ * "temporarily unavailable" beside an item is a worse read than the item simply
  * not being listed.
  *
  * Prices go out as integers. Turning 24950 into ₹249.50 happens in the browser
  * — see resources/js/lib/money.ts — so the server never builds a string per row
- * and the result follows the guest's own language.
+ * and the result follows the guest's own language. A zero goes out as a zero,
+ * and the app names it complimentary.
  */
 class MenuController extends Controller
 {
@@ -60,7 +62,7 @@ class MenuController extends Controller
             ->available()
             ->inMenuOrder();
 
-        $dishes = fn ($items) => $items
+        $items = fn ($items) => $items
             ->select($this->itemColumns())
             ->whereIn('availability', $orderable)
             ->with(['additions' => $additions])
@@ -74,23 +76,23 @@ class MenuController extends Controller
             ->topLevel()
             ->where('is_active', true)
             ->with([
-                // The dishes filed straight under the section, which are read
+                // The items filed straight under the section, which are read
                 // above its subdivisions: the general before the specific.
-                'menuItems' => $dishes,
+                'menuItems' => $items,
 
                 'children' => fn ($children) => $children
                     ->select(['id', 'parent_id', 'name'])
                     ->where('is_active', true)
-                    ->with(['menuItems' => $dishes])
+                    ->with(['menuItems' => $items])
                     ->inMenuOrder(),
             ])
             ->inMenuOrder()
             ->get()
             ->filter(fn (MenuCategory $category): bool => $this->hasAnythingToRead($category));
 
-        // The dishes this menu leads with, above its sections. A separate query
+        // The items this menu leads with, above its sections. A separate query
         // rather than a flag read off the sections above: featuring has its own
-        // order, and the same dish appears again under its section — a guest
+        // order, and the same item appears again under its section — a guest
         // scrolling down should find it where they expect it.
         $featured = MenuItem::query()
             ->select($this->itemColumns())
@@ -108,7 +110,7 @@ class MenuController extends Controller
             ->whereIn('availability', $orderable)
             ->with(['comboItems' => fn ($comboItems) => $comboItems
                 ->select(['id', 'menu_combo_id', 'menu_item_id', 'quantity'])
-                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'food_type'])])
+                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service', 'diet'])])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -136,7 +138,8 @@ class MenuController extends Controller
                 'contents' => $combo->comboItems->map(fn (MenuComboItem $comboItem): array => [
                     'id' => $comboItem->getKey(),
                     'name' => $comboItem->menuItem->name,
-                    'foodType' => $comboItem->menuItem->food_type->value,
+                    'isService' => $comboItem->menuItem->is_service,
+                    'diet' => $comboItem->menuItem->diet?->value,
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
             ])->values()->all(),
@@ -167,19 +170,20 @@ class MenuController extends Controller
                         )->values()->all(),
                     ])->values()->all(),
             ])->values()->all(),
-            'charges' => $this->charges($tenant),
+            'tax' => $this->tax($tenant),
+            'charges' => $this->charges($tenant, $menu),
             'acceptingOrders' => $tenant->isAcceptingOrders(),
             'homeUrl' => route('guest.home', ['tenant' => $tenant->slug]),
         ]);
     }
 
     /**
-     * Give each featured dish the additions its section has already loaded.
+     * Give each featured item the add-ons its section has already loaded.
      *
-     * A featured dish is nearly always also listed under its own section, where
-     * its additions have just been read, so reading them again for the rail was
-     * the same query twice. Only a featured dish that no section being shown
-     * lists has its additions fetched here.
+     * A featured item is nearly always also listed under its own section, where
+     * its add-ons have just been read, so reading them again for the rail was
+     * the same query twice. Only a featured item that no section being shown
+     * lists has its add-ons fetched here.
      *
      * @param  EloquentCollection<int, MenuItem>  $featured
      * @param  EloquentCollection<int, MenuCategory>  $sections
@@ -209,9 +213,9 @@ class MenuController extends Controller
     }
 
     /**
-     * What every dish on this page is read from.
+     * What every item on this page is read from.
      *
-     * menu_category_id is here because Eloquent needs it to attach a dish to
+     * menu_category_id is here because Eloquent needs it to attach an item to
      * the category that loaded it; dropping it would silently return empty
      * sections.
      *
@@ -226,14 +230,15 @@ class MenuController extends Controller
             'description',
             'price_minor_units',
             'compare_at_price_minor_units',
-            'food_type',
+            'is_service',
+            'diet',
         ];
     }
 
     /**
      * Whether a category has anything a guest can actually read.
      *
-     * A category with no dishes of its own and no subdivision holding any is an
+     * A category with no items of its own and no subdivision holding any is an
      * empty heading, so it is left out entirely rather than rendered blank.
      */
     private function hasAnythingToRead(MenuCategory $category): bool
@@ -245,48 +250,57 @@ class MenuController extends Controller
     }
 
     /**
-     * What is added to what a guest orders, and whether the prices already
-     * include it.
+     * The GST every price here is read against, and whether prices already include it.
      *
      * The rate rather than a computed amount: nothing has been ordered yet, so
      * there is nothing to compute — this is the line at the bottom of a menu
      * that says "prices exclude GST", which a guest is entitled to know before
      * they order rather than at the bill.
      *
-     * A charge that is switched off is sent as null rather than zero, so the
-     * app has nothing to decide: it renders what it is given.
-     *
-     * @return array<string, mixed>
+     * @return array{rateBasisPoints: int, pricesIncludeTax: bool}
      */
-    private function charges(Tenant $tenant): array
+    private function tax(Tenant $tenant): array
     {
         // The row the guest middleware has already read for the currency, not
         // a second query for the same tenant.
         $settings = $tenant->resolvedSettings();
 
-        if (! $settings instanceof TenantSetting) {
-            return [
-                'taxRateBasisPoints' => $tenant->taxRateBasisPoints(),
-                'pricesIncludeTax' => false,
-                'serviceChargeBasisPoints' => null,
-                'parcelChargeMinorUnits' => null,
-            ];
-        }
-
         return [
-            'taxRateBasisPoints' => $settings->taxRateBasisPoints(),
-            'pricesIncludeTax' => $settings->prices_include_tax,
-            'serviceChargeBasisPoints' => $settings->service_charge_enabled
-                ? $settings->service_charge_basis_points
-                : null,
-            'parcelChargeMinorUnits' => $settings->parcel_charge_enabled
-                ? $settings->parcel_charge_minor_units
-                : null,
+            'rateBasisPoints' => $tenant->taxRateBasisPoints(),
+            'pricesIncludeTax' => $settings instanceof TenantSetting && $settings->prices_include_tax,
         ];
     }
 
     /**
-     * One dish and the extras it can be ordered with.
+     * What a bill from this menu has added to it, in the order the tenant arranged.
+     *
+     * A share of the bill arrives as basis points and a fixed amount as minor
+     * units, with the other null, so the app has nothing to work out but the
+     * wording. A charge that is switched off, or limited to other menus, is not
+     * sent at all.
+     *
+     * @return list<array{id: int, name: string, rateBasisPoints: int|null, amountMinorUnits: int|null}>
+     */
+    private function charges(Tenant $tenant, Menu $menu): array
+    {
+        return array_values(Charge::query()
+            ->select(['id', 'name', 'rate_basis_points', 'amount_minor_units'])
+            ->where('tenant_id', $tenant->getKey())
+            ->active()
+            ->forMenu($menu->getKey())
+            ->inMenuOrder()
+            ->get()
+            ->map(fn (Charge $charge): array => [
+                'id' => $charge->getKey(),
+                'name' => $charge->name,
+                'rateBasisPoints' => $charge->rate_basis_points,
+                'amountMinorUnits' => $charge->amount_minor_units,
+            ])
+            ->all());
+    }
+
+    /**
+     * One item and the add-ons it can be ordered with.
      *
      * @return array<string, mixed>
      */
@@ -301,7 +315,9 @@ class MenuController extends Controller
             // refuses one at or below the price being charged, so the app never
             // has to decide whether what it was handed is believable.
             'compareAtPriceMinorUnits' => $item->hasComparePrice() ? $item->compare_at_price_minor_units : null,
-            'foodType' => $item->food_type->value,
+            'isService' => $item->is_service,
+            // Null for a service request, which carries no diet mark.
+            'diet' => $item->diet?->value,
             'additions' => $item->additions->map(fn (MenuItemAddition $addition): array => [
                 'id' => $addition->getKey(),
                 'name' => $addition->name,

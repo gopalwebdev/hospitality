@@ -40,9 +40,9 @@ function combosOf(Menu $menu): Testable
 }
 
 /**
- * A dish on the given menu, in a category of its own.
+ * An item on the given menu, in a category of its own.
  */
-function dishOn(Menu $menu): MenuItem
+function itemOn(Menu $menu): MenuItem
 {
     return MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
@@ -55,15 +55,15 @@ function dishOn(Menu $menu): MenuItem
 |--------------------------------------------------------------------------
 |
 | A bundle sold at one price, arranged in a row of its own beside the featured
-| dishes. Its price is its own, never derived from what is inside it.
+| items. Its price is its own, never derived from what is inside it.
 |
 */
 
-it('creates a combo on the menu with the dishes it contains', function (): void {
+it('creates a combo on the menu with the items it contains', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $burger = dishOn($menu);
-    $fries = dishOn($menu);
+    $burger = itemOn($menu);
+    $fries = itemOn($menu);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -145,47 +145,47 @@ it('refuses a combo name the same menu already uses', function (): void {
         ->assertHasActionErrors(['name.'.Locale::English->value]);
 });
 
-it('offers only this menu\'s dishes as combo contents', function (): void {
+it('offers only this menu\'s items as combo contents', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $mine = dishOn($menu);
-    $elsewhere = dishOn($otherMenu);
+    $mine = itemOn($menu);
+    $elsewhere = itemOn($otherMenu);
 
     $theirs = Tenant::factory()->create();
-    $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
+    $theirItem = itemOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The same call the select inside the repeater makes. A combo may only
-    // contain dishes from the menu it is offered on.
-    $offered = array_keys(MenuComboForm::dishOptions($menu->getKey()));
+    // contain items from the menu it is offered on.
+    $offered = array_keys(MenuComboForm::itemOptions($menu->getKey()));
 
     expect($offered)->toContain($mine->getKey())
         ->and($offered)->not->toContain($elsewhere->getKey())
-        ->and($offered)->not->toContain($theirDish->getKey());
+        ->and($offered)->not->toContain($theirItem->getKey());
 });
 
-it('refuses a combo containing another tenant\'s dish, even around the form', function (): void {
+it('refuses a combo containing another tenant\'s item, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $combo = MenuCombo::factory()->onMenu(Menu::factory()->create(['tenant_id' => $mine->getKey()]))->create();
 
     $theirs = Tenant::factory()->create();
-    $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
+    $theirItem = itemOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
-    expect(fn () => MenuComboItem::factory()->pairing($combo, $theirDish)->create())
+    expect(fn () => MenuComboItem::factory()->pairing($combo, $theirItem)->create())
         ->toThrow(LogicException::class, 'another tenant');
 });
 
-it('refuses the same dish twice in one combo', function (): void {
+it('refuses the same item twice in one combo', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $dish = dishOn($menu);
+    $menuItem = itemOn($menu);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // A dish appears once, with a quantity — two rows would show as a
+    // An item appears once, with a quantity — two rows would show as a
     // duplicate line to the guest. No unique index stands behind the form.
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -193,8 +193,8 @@ it('refuses the same dish twice in one combo', function (): void {
             'price' => '199',
             'availability' => ItemAvailability::Available->value,
             'comboItems' => [
-                ['menu_item_id' => $dish->getKey(), 'quantity' => 1],
-                ['menu_item_id' => $dish->getKey(), 'quantity' => 1],
+                ['menu_item_id' => $menuItem->getKey(), 'quantity' => 1],
+                ['menu_item_id' => $menuItem->getKey(), 'quantity' => 1],
             ],
         ])
         ->assertHasActionErrors();
@@ -213,9 +213,9 @@ it('prices a combo on its own rather than from its contents', function (): void 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 29900]);
 
-    $burger = dishOn($menu);
+    $burger = itemOn($menu);
     $burger->update(['price_minor_units' => 18000]);
-    $fries = dishOn($menu);
+    $fries = itemOn($menu);
     $fries->update(['price_minor_units' => 9000]);
 
     MenuComboItem::factory()->pairing($combo, $burger)->create();
@@ -291,31 +291,31 @@ it('shows only this menu\'s combos', function (): void {
         ->assertCanNotSeeTableRecords([$elsewhere]);
 });
 
-it('leaves the dishes alone when a combo is deleted', function (): void {
+it('leaves the items alone when a combo is deleted', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
-    $dish = dishOn($menu);
+    $menuItem = itemOn($menu);
 
-    MenuComboItem::factory()->pairing($combo, $dish)->create();
+    MenuComboItem::factory()->pairing($combo, $menuItem)->create();
 
     $combo->delete();
 
-    expect(MenuItem::query()->withoutGlobalScopes()->find($dish->getKey()))->not->toBeNull()
+    expect(MenuItem::query()->withoutGlobalScopes()->find($menuItem->getKey()))->not->toBeNull()
         ->and(MenuComboItem::query()->count())->toBe(0);
 });
 
-it('takes a dish out of every combo when it is deleted', function (): void {
+it('takes an item out of every combo when it is deleted', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
-    $dish = dishOn($menu);
+    $menuItem = itemOn($menu);
 
-    MenuComboItem::factory()->pairing($combo, $dish)->create();
+    MenuComboItem::factory()->pairing($combo, $menuItem)->create();
 
-    $dish->delete();
+    $menuItem->delete();
 
-    // A combo still advertising a dish that no longer exists is worse than one
+    // A combo still advertising an item that no longer exists is worse than one
     // that is a line shorter.
     expect(MenuComboItem::query()->count())->toBe(0)
         ->and(MenuCombo::query()->withoutGlobalScopes()->find($combo->getKey()))->not->toBeNull();

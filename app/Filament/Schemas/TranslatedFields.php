@@ -92,7 +92,7 @@ final class TranslatedFields
      * A single-line input, showing whichever language is switched to.
      *
      * `uniqueWithin` narrows the query the name is checked against — the menu a
-     * section sits on, the section a dish sits in — and is only ever applied to
+     * section sits on, the section an item sits in — and is only ever applied to
      * the fallback language, because that is the one value a name is unique on.
      *
      * `editing` names the row being edited when the form is not bound to one.

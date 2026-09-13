@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Models\MenuCategory;
@@ -32,19 +32,20 @@ class MenuItemFactory extends Factory
             'name' => [$english => ucfirst(fake()->unique()->word()).' '.fake()->unique()->numberBetween(1, 9999)],
             'description' => [$english => fake()->sentence()],
             'price_minor_units' => fake()->numberBetween(5000, 90000),
-            // Most dishes carry neither: no offer, and the tenant's own
+            // Most items carry neither: no offer, and the tenant's own
             // GST slab. Both are set by a state when a test is about them.
             'compare_at_price_minor_units' => null,
             'tax_rate_basis_points' => null,
             'hsn_code' => null,
-            'food_type' => fake()->randomElement(FoodType::cases()),
+            'is_service' => false,
+            'diet' => fake()->randomElement(Diet::cases()),
             'availability' => ItemAvailability::Available,
             'position' => fake()->numberBetween(0, 20),
         ];
     }
 
     /**
-     * Put this dish under an existing category, at either level, and its
+     * Put this item under an existing category, at either level, and its
      * tenant with it.
      */
     public function inCategory(MenuCategory $category): static
@@ -56,7 +57,19 @@ class MenuItemFactory extends Factory
     }
 
     /**
-     * A dish advertised with a higher price struck through beside it.
+     * A service request: no diet mark, and complimentary.
+     */
+    public function service(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'is_service' => true,
+            'diet' => null,
+            'price_minor_units' => 0,
+        ]);
+    }
+
+    /**
+     * An item advertised with a higher price struck through beside it.
      */
     public function discounted(?int $compareAtMinorUnits = null): static
     {
@@ -66,7 +79,7 @@ class MenuItemFactory extends Factory
     }
 
     /**
-     * A dish taxed at a rate of its own rather than the tenant's default.
+     * An item taxed at a rate of its own rather than the tenant's default.
      *
      * Basis points, as stored: 1800 is 18%.
      */
@@ -78,24 +91,24 @@ class MenuItemFactory extends Factory
     }
 
     /**
-     * A dish with every language filled in.
+     * An item with every language filled in.
      */
     public function translated(): static
     {
         return $this->state(fn (array $attributes): array => [
             'name' => [
                 Locale::English->value => $attributes['name'][Locale::English->value],
-                Locale::Tamil->value => 'உணவு '.fake()->unique()->numberBetween(1, 9999),
+                Locale::Tamil->value => 'பொருள் '.fake()->unique()->numberBetween(1, 9999),
             ],
             'description' => [
                 Locale::English->value => $attributes['description'][Locale::English->value],
-                Locale::Tamil->value => 'சுவையான உணவு.',
+                Locale::Tamil->value => 'ஒரு நல்ல தேர்வு.',
             ],
         ]);
     }
 
     /**
-     * A dish with no description, which is allowed and common.
+     * An item with no description, which is allowed and common.
      */
     public function withoutDescription(): static
     {

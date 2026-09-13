@@ -7,7 +7,7 @@ namespace App\Enums;
  *
  * A boolean answered "can a guest have this" and nothing else, so a kitchen
  * that had run out of prawns and one that had stopped serving biryani after
- * three o'clock looked identical on the menu — and both looked like the dish
+ * three o'clock looked identical on the menu — and both looked like the item
  * had been taken off. The reason is worth carrying: a guest reads "sold out"
  * differently from "not available right now", and the kitchen reads the two
  * differently when putting the menu back.

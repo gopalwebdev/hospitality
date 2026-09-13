@@ -31,7 +31,7 @@ use LogicException;
  * sits among the menu's categories is dragged on the arrangement page instead.
  *
  * Unlike the featured rail, records really are created and deleted here: a
- * combo is a thing in its own right, not a flag on a dish.
+ * combo is a thing in its own right, not a flag on an item.
  */
 class ManageMenuCombos extends ManageRelatedRecords
 {

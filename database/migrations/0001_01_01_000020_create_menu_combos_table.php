@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('menu_id')->constrained()->cascadeOnDelete();
             $table->jsonb('name');
             $table->jsonb('description')->nullable();
-            // Its own price, never the sum of its dishes.
+            // Its own price, never the sum of its items.
             $table->integer('price_minor_units');
             $table->integer('compare_at_price_minor_units')->nullable();
             $table->smallInteger('tax_rate_basis_points')->nullable();

@@ -80,7 +80,7 @@ class MenuCategory extends Model
     }
 
     /**
-     * The dishes filed under this category itself, not under its subdivisions.
+     * The items filed under this category itself, not under its subdivisions.
      *
      * @return HasMany<MenuItem, $this>
      */

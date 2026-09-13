@@ -2,7 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\MenuItems\Tables;
 
-use App\Enums\FoodType;
+use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
@@ -29,9 +29,10 @@ class MenuItemsTable
     public static function configure(Table $table): Table
     {
         $currency = PricingFields::currency();
-        // Both resolved once for the page rather than per row: every dish here
+        // Both resolved once for the page rather than per row: every item here
         // belongs to the same tenant and shares its answers.
         $tenantTaxRate = PricingFields::tenantTaxRateBasisPoints();
+        $complimentary = (string) __('panel.items.complimentary');
 
         return $table
             ->columns([
@@ -58,11 +59,20 @@ class MenuItemsTable
                     ->color('gray')
                     ->toggleable(),
 
-                TextColumn::make('food_type')
-                    ->label(__('panel.items.type'))
+                IconColumn::make('is_service')
+                    ->label(__('panel.items.is_service'))
+                    ->boolean()
+                    ->trueIcon(Heroicon::OutlinedSparkles)
+                    ->falseIcon(Heroicon::OutlinedMinusSmall)
+                    ->sortable(),
+
+                // Empty for a service request, which carries no diet mark.
+                TextColumn::make('diet')
+                    ->label(__('panel.items.diet'))
                     ->badge()
-                    ->formatStateUsing(fn (FoodType $state): string => $state->label())
-                    ->color(fn (FoodType $state): string => $state->color()),
+                    ->formatStateUsing(fn (?Diet $state): string => $state?->label() ?? '')
+                    ->color(fn (?Diet $state): string => $state?->color() ?? 'gray')
+                    ->placeholder('—'),
 
                 // Stored in minor units, shown as money in the tenant's own
                 // currency. Sorting works on the integer, which is the point of
@@ -73,10 +83,12 @@ class MenuItemsTable
                 // is resolved once for the page rather than per row.
                 TextColumn::make('price_minor_units')
                     ->label(__('panel.items.price'))
-                    ->formatStateUsing(fn (MenuItem $record): string => $record->formattedPrice($currency))
+                    ->formatStateUsing(fn (MenuItem $record): string => $record->isComplimentary()
+                        ? $complimentary
+                        : $record->formattedPrice($currency))
                     // The struck-through price rides under the real one rather
                     // than taking a column of its own, which would be empty for
-                    // every dish that is not on offer — most of them.
+                    // every item that is not on offer — most of them.
                     ->description(fn (MenuItem $record): ?string => $record->formattedComparePrice($currency))
                     ->sortable()
                     ->alignEnd(),
@@ -86,7 +98,7 @@ class MenuItemsTable
                     ->formatStateUsing(fn (MenuItem $record): string => PricingFields::formatRate(
                         $record->taxRateBasisPoints($tenantTaxRate),
                     ))
-                    // A dish following the tenant's rate is shown in grey
+                    // An item following the tenant's rate is shown in grey
                     // and one that overrides it in colour, so the exceptions
                     // stand out down a long list.
                     ->badge()
@@ -94,7 +106,7 @@ class MenuItemsTable
                     ->toggleable(),
 
                 TextColumn::make('additions_count')
-                    ->label(__('panel.additions.count'))
+                    ->label(__('panel.add_ons.count'))
                     ->icon(Heroicon::OutlinedPlusCircle)
                     ->counts('additions')
                     ->sortable()
@@ -115,7 +127,7 @@ class MenuItemsTable
                     ->sortable(),
             ])
             ->filters([
-                // A dish reaches its menu through its category, so this filters
+                // An item reaches its menu through its category, so this filters
                 // on the relationship rather than on a column of its own.
                 SelectFilter::make('menu')
                     ->label(__('panel.categories.menu'))
@@ -136,9 +148,11 @@ class MenuItemsTable
                     // than two lists that repeat each other.
                     ->options(fn (HasTable $livewire): array => self::sectionOptions($livewire)),
 
-                SelectFilter::make('food_type')
-                    ->label(__('panel.items.food_type'))
-                    ->options(FoodType::options()),
+                TernaryFilter::make('is_service')->label(__('panel.items.is_service')),
+
+                SelectFilter::make('diet')
+                    ->label(__('panel.items.diet'))
+                    ->options(Diet::options()),
 
                 SelectFilter::make('availability')
                     ->label(__('panel.items.availability'))
@@ -171,15 +185,15 @@ class MenuItemsTable
                     DeleteBulkAction::make(),
                 ]),
             ])
-            // Dishes are not dragged here. This page is a flat list of every
-            // dish on every menu, and a dish's position is only ever read
+            // Items are not dragged here. This page is a flat list of every
+            // item on every menu, and an item's position is only ever read
             // within its own category — so a drag here would rewrite a number
-            // that meant nothing where it landed. Dishes are put in order on
+            // that meant nothing where it landed. Items are put in order on
             // the menu's arrangement page, under the heading they belong to,
             // which is the only place the order is legible anyway.
             //
             // Menu, then section, then the order the tenant dragged the
-            // dishes into. Filament's grouping used to imply this; with the
+            // items into. Filament's grouping used to imply this; with the
             // group gone the query has to say it.
             ->defaultSort(fn (Builder $query): Builder => self::inMenuOrder($query))
             // The category, its parent and its menu are all read per row for
@@ -208,14 +222,14 @@ class MenuItemsTable
     /**
      * Read the list the way a guest reads the menu.
      *
-     * Menu, then the section a dish sits under, then a section's own dishes
+     * Menu, then the section an item sits under, then a section's own items
      * before its subdivisions', then the order they were dragged into. Grouping
      * used to imply most of this; with the group gone the query says it.
      *
      * Raw because each rank is a correlated subquery over menu_categories,
-     * which appears twice — once as the dish's own category and once as that
-     * category's parent. Every rank is COALESCEd rather than left null, so a
-     * dish filed straight under a category and one inside a subdivision rank
+     * which appears twice — once as the item's own category and once as that
+     * category's parent. Every rank is COALESCEd rather than left null, so an
+     * item filed straight under a category and one inside a subdivision rank
      * against each other by value rather than by where Postgres puts a null.
      *
      * @param  Builder<MenuItem>  $query

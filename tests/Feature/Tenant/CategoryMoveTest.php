@@ -25,13 +25,13 @@ beforeEach(function (): void {
 |
 */
 
-it('moves a category onto another menu, dishes and all', function (): void {
+it('moves a category onto another menu, items and all', function (): void {
     $tenant = Tenant::factory()->create();
     $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $category = MenuCategory::factory()->inMenu($lunch)->create(['name' => [Locale::English->value => 'Starters']]);
-    $dish = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -39,11 +39,11 @@ it('moves a category onto another menu, dishes and all', function (): void {
         ->callAction(TestAction::make('moveToMenu')->table('category-'.$category->getKey()), ['menu_id' => $dinner->getKey()])
         ->assertHasNoActionErrors();
 
-    // The dishes hang off the category, not off the menu, so they follow
+    // The items hang off the category, not off the menu, so they follow
     // without being rewritten.
     expect($category->refresh()->menu_id)->toBe($dinner->getKey())
-        ->and($dish->refresh()->menu_category_id)->toBe($category->getKey())
-        ->and($dish->tenant_id)->toBe($tenant->getKey());
+        ->and($menuItem->refresh()->menu_category_id)->toBe($category->getKey())
+        ->and($menuItem->tenant_id)->toBe($tenant->getKey());
 });
 
 it('refuses a move onto a menu that already has that name', function (): void {

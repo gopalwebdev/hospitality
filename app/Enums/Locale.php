@@ -10,8 +10,8 @@ namespace App\Enums;
  * and every translated column stores one key per case. Adding a language is a
  * case and nothing else.
  *
- * What is translated is what a **tenant wrote** — menu, category, dish,
- * addition and tile names, all of them database columns. What this application
+ * What is translated is what a **tenant wrote** — menu, category, item,
+ * add-on and tile names, all of them database columns. What this application
  * writes is English and stays English: `lang/en` is the only directory in
  * `lang/`, so switching language changes the menu a guest reads without
  * changing the words around it. A `lang/ta` existed and was deliberately

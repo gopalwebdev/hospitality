@@ -13,7 +13,7 @@ use Filament\Forms\Components\TextInput;
 /**
  * The inputs behind a price: what it costs, what it used to, and its GST rate.
  *
- * A dish and a combo are priced identically, so the fields and — more
+ * An item and a combo are priced identically, so the fields and — more
  * importantly — the conversions in and out of storage live here once.
  *
  * Two conversions, both happening only here so each rounds exactly once:
@@ -22,7 +22,7 @@ use Filament\Forms\Components\TextInput;
  * float price nor a float rate ever reaches the database.
  *
  * No helper text on any of these. The labels say what the fields are, and a
- * paragraph under every input is what made the dish form a page and a half of
+ * paragraph under every input is what made the item form a page and a half of
  * prose to fill in one line of prices.
  */
 final class PricingFields
@@ -48,7 +48,7 @@ final class PricingFields
      * Validated to be above the real price rather than merely different: a
      * price at or below what is charged advertises a discount that does not
      * exist, which is the one way this field can mislead a guest. Left blank
-     * when the dish is not on offer — a zero would be a price of nothing.
+     * when the item is not on offer — a zero would be a price of nothing.
      */
     public static function compareAtPrice(Currency $currency): TextInput
     {

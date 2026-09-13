@@ -1,14 +1,14 @@
 import { Head } from '@inertiajs/react';
 
 import { AppBar } from '@/components/app-bar';
-import { FoodTypeDot, type FoodType } from '@/components/food-type-dot';
+import { DietMark, type Diet } from '@/components/diet-mark';
 import { StarIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 
-export interface Addition {
+export interface AddOn {
     id: number;
     name: string;
     /** An integer count of the currency's minor unit; 0 means free. */
@@ -19,17 +19,22 @@ export interface MenuItem {
     id: number;
     name: string;
     description: string | null;
+    /** An integer count of the currency's minor unit; 0 means complimentary. */
     priceMinorUnits: number;
     /** A higher price to show struck through, or null when not on offer. */
     compareAtPriceMinorUnits: number | null;
-    foodType: FoodType;
-    additions: Addition[];
+    /** A service request — an extra pillow — rather than something to order. */
+    isService: boolean;
+    /** Null for a service request, which carries no diet mark. */
+    diet: Diet | null;
+    additions: AddOn[];
 }
 
 interface ComboContent {
     id: number;
     name: string;
-    foodType: FoodType;
+    isService: boolean;
+    diet: Diet | null;
     quantity: number;
 }
 
@@ -51,18 +56,29 @@ interface SubSection {
 export interface Section {
     id: number;
     name: string;
-    /** Dishes filed straight under the category, above its subdivisions. */
+    /** Items filed straight under the category, above its subdivisions. */
     items: MenuItem[];
     subSections: SubSection[];
 }
 
-export interface Charges {
+export interface Tax {
     /** Basis points: 500 is 5%. */
-    taxRateBasisPoints: number;
+    rateBasisPoints: number;
     pricesIncludeTax: boolean;
-    /** Null when the tenant does not levy one. */
-    serviceChargeBasisPoints: number | null;
-    parcelChargeMinorUnits: number | null;
+}
+
+/**
+ * Something added to a bill from this menu: a share of it, or a fixed amount.
+ *
+ * Exactly one of the two numbers is set.
+ */
+export interface Charge {
+    id: number;
+    name: string;
+    /** Basis points: 1000 is 10%. */
+    rateBasisPoints: number | null;
+    /** An integer count of the currency's minor unit. */
+    amountMinorUnits: number | null;
 }
 
 interface MenuProps {
@@ -75,7 +91,7 @@ interface MenuProps {
         servedUntil: string | null;
         isBeingServed: boolean;
     };
-    /** The dishes this menu leads with. */
+    /** The items this menu leads with. */
     featured: MenuItem[];
     combos: Combo[];
     sections: Section[];
@@ -84,12 +100,14 @@ interface MenuProps {
      * a section by its id.
      *
      * The tenant drags all three against each other in the panel, so where
-     * the featured dishes and the combos sit is its decision rather than this
+     * the featured items and the combos sit is its decision rather than this
      * page's — which is why the order is decided on the server and sent, not
      * assembled here.
      */
     order: (number | 'featured' | 'combos')[];
-    charges: Charges;
+    tax: Tax;
+    /** Only the charges this menu carries, switched on, in the tenant's order. */
+    charges: Charge[];
     acceptingOrders: boolean;
     homeUrl: string;
 }
@@ -107,10 +125,10 @@ function percentage(basisPoints: number): string {
 }
 
 /**
- * One of a tenant's menus, read at the table.
+ * One of a tenant's menus, read at the table or in the room.
  *
  * One narrow column, thumb-sized rows, no hover anywhere: a guest is holding a
- * phone in one hand. Only orderable dishes arrive here, so there is nothing
+ * phone in one hand. Only orderable items arrive here, so there is nothing
  * greyed out to scroll past — and the back arrow returns to the tiles they came
  * in through.
  *
@@ -126,6 +144,7 @@ export default function Menu({
     combos,
     sections,
     order,
+    tax,
     charges,
     acceptingOrders,
     homeUrl,
@@ -206,16 +225,16 @@ export default function Menu({
                     })
                 )}
 
-                {!isEmpty && <ChargesNote charges={charges} />}
+                {!isEmpty && <ChargesNote tax={tax} charges={charges} />}
             </main>
         </>
     );
 }
 
 /**
- * The dishes the menu leads with.
+ * The items the menu leads with.
  *
- * A rail rather than a list: these are the dishes the tenant wants seen
+ * A rail rather than a list: these are the items the tenant wants seen
  * first, and a guest should meet them before scrolling rather than instead of
  * the sections, where each one also appears.
  */
@@ -235,7 +254,7 @@ function FeaturedRail({ items }: { items: MenuItem[] }) {
                         key={item.id}
                         className="bg-card w-64 shrink-0 snap-start rounded-xl border"
                     >
-                        <Dish item={item} />
+                        <Item item={item} />
                     </li>
                 ))}
             </ul>
@@ -273,10 +292,10 @@ function CombosRail({ combos }: { combos: Combo[] }) {
 }
 
 /**
- * One section of the menu: its own dishes, then its subdivisions.
+ * One section of the menu: its own items, then its subdivisions.
  *
  * Headings are nested for real — the section is an h2, a subdivision an h3, and
- * a dish inside one an h4 — so someone navigating by headings is reading the
+ * an item inside one an h4 — so someone navigating by headings is reading the
  * menu's actual structure.
  */
 function SectionBlock({ section }: { section: Section }) {
@@ -291,7 +310,7 @@ function SectionBlock({ section }: { section: Section }) {
                     {section.items.map((item, index) => (
                         <li key={item.id}>
                             {index > 0 && <Separator className="ml-5" />}
-                            <Dish item={item} />
+                            <Item item={item} />
                         </li>
                     ))}
                 </ul>
@@ -310,7 +329,7 @@ function SectionBlock({ section }: { section: Section }) {
                         {subSection.items.map((item, index) => (
                             <li key={item.id}>
                                 {index > 0 && <Separator className="ml-5" />}
-                                <Dish item={item} headingLevel={4} />
+                                <Item item={item} headingLevel={4} />
                             </li>
                         ))}
                     </ul>
@@ -321,36 +340,39 @@ function SectionBlock({ section }: { section: Section }) {
 }
 
 /**
- * What a price does and does not include.
+ * What a price does and does not include, and what a bill has added to it.
  *
  * The small print at the bottom of a menu. It is the one place a guest is told
  * what the bill will add before they order rather than after, so it is plain
- * text rather than something to be tapped open.
+ * text rather than something to be tapped open. Only the charges this menu
+ * carries arrive here: a card of housekeeping requests may carry none.
  */
-function ChargesNote({ charges }: { charges: Charges }) {
+function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
     const { t } = useTranslations();
     const money = useMoney();
 
-    const rate = percentage(charges.taxRateBasisPoints);
-
-    const lines = [
-        charges.pricesIncludeTax
-            ? t('menu.tax_included', { rate })
-            : t('menu.tax_excluded', { rate }),
-        charges.serviceChargeBasisPoints !== null &&
-            t('menu.service_charge', {
-                rate: percentage(charges.serviceChargeBasisPoints),
-            }),
-        charges.parcelChargeMinorUnits !== null &&
-            t('menu.parcel_charge', {
-                amount: money(charges.parcelChargeMinorUnits),
-            }),
-    ].filter((line): line is string => typeof line === 'string');
+    const rate = percentage(tax.rateBasisPoints);
 
     return (
         <footer className="text-muted-foreground mt-8 space-y-1 px-5 text-xs leading-relaxed">
-            {lines.map((line) => (
-                <p key={line}>{line}</p>
+            <p>
+                {tax.pricesIncludeTax
+                    ? t('menu.tax_included', { rate })
+                    : t('menu.tax_excluded', { rate })}
+            </p>
+
+            {charges.map((charge) => (
+                <p key={charge.id}>
+                    {charge.rateBasisPoints !== null
+                        ? t('menu.charge_rate', {
+                              name: charge.name,
+                              rate: percentage(charge.rateBasisPoints),
+                          })
+                        : t('menu.charge_amount', {
+                              name: charge.name,
+                              amount: money(charge.amountMinorUnits ?? 0),
+                          })}
+                </p>
             ))}
         </footer>
     );
@@ -384,7 +406,7 @@ function ComboCard({ combo }: { combo: Combo }) {
                                 key={content.id}
                                 className="text-muted-foreground flex items-center gap-2 text-sm"
                             >
-                                <FoodTypeDot type={content.foodType} />
+                                <DietMark diet={content.diet} />
                                 <span>
                                     {content.quantity > 1 &&
                                         `${String(content.quantity)} × `}
@@ -412,6 +434,9 @@ function ComboCard({ combo }: { combo: Combo }) {
  * context for the number a guest is being asked to pay, not a second number
  * competing with it. The server only ever sends a compare-at price that is higher
  * than what is charged, so there is no case here for one that is not.
+ *
+ * Zero is a real price — an extra pillow, a glass of water — and "₹0.00"
+ * reads as a mistake, so it is named instead, with nothing struck through.
  */
 function Price({
     priceMinorUnits,
@@ -422,7 +447,18 @@ function Price({
     compareAtPriceMinorUnits: number | null;
     className?: string;
 }) {
+    const { t } = useTranslations();
     const money = useMoney();
+
+    if (priceMinorUnits === 0) {
+        return (
+            <p className={`flex items-baseline gap-1.5 ${className}`}>
+                <span className="text-primary font-semibold">
+                    {t('menu.complimentary')}
+                </span>
+            </p>
+        );
+    }
 
     return (
         <p className={`flex items-baseline gap-1.5 tabular-nums ${className}`}>
@@ -439,15 +475,15 @@ function Price({
 }
 
 /**
- * One dish and the extras it can be ordered with.
+ * One item and the add-ons it can be ordered with.
  *
- * The heading level is a prop because the same dish is rendered at two depths:
+ * The heading level is a prop because the same item is rendered at two depths:
  * straight under a category it is an h3, and inside one of that category's
  * subdivisions — which is itself an h3 — it is an h4. Hard-coding one would
  * either put two different things at the same level or skip one, and a guest
  * reading the menu with a screen reader navigates by exactly this structure.
  */
-function Dish({
+function Item({
     item,
     headingLevel = 3,
 }: {
@@ -460,7 +496,7 @@ function Dish({
 
     return (
         <article className="flex items-start gap-3 px-5 py-4">
-            <FoodTypeDot type={item.foodType} className="mt-1" />
+            <DietMark diet={item.diet} className="mt-1" />
 
             <div className="min-w-0 flex-1">
                 <Heading className="leading-snug font-medium">
@@ -476,20 +512,20 @@ function Dish({
                 {item.additions.length > 0 && (
                     <div className="mt-2">
                         <p className="text-muted-foreground text-xs font-medium">
-                            {t('menu.additions')}
+                            {t('menu.add_ons')}
                         </p>
 
                         <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            {item.additions.map((addition) => (
+                            {item.additions.map((addOn) => (
                                 <li
-                                    key={addition.id}
+                                    key={addOn.id}
                                     className="text-muted-foreground text-sm"
                                 >
-                                    {addition.name}{' '}
+                                    {addOn.name}{' '}
                                     <span className="text-foreground/70 tabular-nums">
-                                        {addition.priceMinorUnits === 0
+                                        {addOn.priceMinorUnits === 0
                                             ? t('menu.free')
-                                            : `+ ${money(addition.priceMinorUnits)}`}
+                                            : `+ ${money(addOn.priceMinorUnits)}`}
                                     </span>
                                 </li>
                             ))}
@@ -499,7 +535,7 @@ function Dish({
             </div>
 
             {/* Stacked rather than side by side: a struck-through price beside
-                the real one on a phone pushes a long dish name into a third
+                the real one on a phone pushes a long item name into a third
                 line, and the price column is the narrowest thing here. */}
             <Price
                 priceMinorUnits={item.priceMinorUnits}

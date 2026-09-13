@@ -62,8 +62,8 @@ class MenusTable
                 DeleteAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedTrash)
-                    // Deleting a menu takes its sections, their dishes and
-                    // those dishes' additions with it, by the cascades on the
+                    // Deleting a menu takes its sections, their items and
+                    // those items' add-ons with it, by the cascades on the
                     // foreign keys. Say so before it happens.
                     ->modalDescription(__('panel.menus.delete_warning')),
             ])

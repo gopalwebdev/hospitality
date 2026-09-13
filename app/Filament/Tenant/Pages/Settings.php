@@ -20,7 +20,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use LogicException;
 
@@ -30,6 +29,10 @@ use LogicException;
  * The tenant comes from the panel's tenant, which is the subdomain being
  * served, so this page can only ever read or write the settings of the
  * tenant the visitor is already inside.
+ *
+ * What is added on top of a bill is not here: charges have their own page, so a
+ * tenant can keep as many as it levies and limit each to the menus it belongs
+ * on. See App\Filament\Tenant\Resources\Charges\ChargeResource.
  *
  * @property-read Schema $form
  */
@@ -53,14 +56,14 @@ class Settings extends Page
 
     public function mount(): void
     {
-        $this->form->fill($this->readableCharges($this->settings()->attributesToArray()));
+        $this->form->fill($this->readableRates($this->settings()->attributesToArray()));
     }
 
     public function save(): void
     {
         $settings = $this->settings();
 
-        $settings->fill($this->storableCharges($this->form->getState()))->save();
+        $settings->fill($this->storableRates($this->form->getState()))->save();
 
         Notification::make()
             ->title('Settings saved')
@@ -128,43 +131,6 @@ class Settings extends Page
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
-
-                Section::make('Charges')
-                    ->schema([
-                        // A switch rather than a rate that happens to be zero:
-                        // a service charge is voluntary under the CCPA's 2022
-                        // guidelines, so "we do not levy one" has to be sayable.
-                        Toggle::make('service_charge_enabled')
-                            ->label('Levy a service charge')
-                            ->live()
-                            ->inline(false),
-
-                        TextInput::make('service_charge_percentage')
-                            ->label('Service charge')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->step(0.01)
-                            ->suffix('%')
-                            ->required(fn (Get $get): bool => (bool) $get('service_charge_enabled'))
-                            ->visible(fn (Get $get): bool => (bool) $get('service_charge_enabled')),
-
-                        Toggle::make('parcel_charge_enabled')
-                            ->label('Charge for packing a takeaway')
-                            ->live()
-                            ->inline(false),
-
-                        TextInput::make('parcel_charge')
-                            ->label('Parcel charge')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(99999)
-                            ->step(0.01)
-                            ->prefix(fn (): string => PricingFields::currency()->symbol())
-                            ->required(fn (Get $get): bool => (bool) $get('parcel_charge_enabled'))
-                            ->visible(fn (Get $get): bool => (bool) $get('parcel_charge_enabled')),
-                    ])
-                    ->columns(2),
             ]);
     }
 
@@ -208,52 +174,36 @@ class Settings extends Page
     }
 
     /**
-     * Turn the stored rates and charges into the values the form edits.
+     * Turn the stored GST rate into the value the form edits.
      *
-     * Each is stored the way the rest of the application stores its kind — the
-     * two rates in basis points, the parcel charge in minor units like every
-     * other amount of money — and each is typed here the way a person says it:
-     * "5" percent, "10" percent and "20" rupees.
+     * Stored in basis points the way every rate is, and typed here the way an
+     * accountant says it: "5" percent.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function readableCharges(array $data): array
+    private function readableRates(array $data): array
     {
         $data['tax_rate_percentage'] = PricingFields::toPercentage(
             (int) ($data['tax_rate_basis_points'] ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS),
         );
 
-        $data['service_charge_percentage'] = PricingFields::toPercentage(
-            (int) ($data['service_charge_basis_points'] ?? 0),
-        );
-
-        $data['parcel_charge'] = PricingFields::currency()
-            ->toMajorUnits((int) ($data['parcel_charge_minor_units'] ?? 0));
-
         return $data;
     }
 
     /**
-     * Turn the typed rates and charges back into what gets stored.
+     * Turn the typed GST rate back into what gets stored.
      *
      * The rounding happens here, once, so nothing downstream ever sees a float.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function storableCharges(array $data): array
+    private function storableRates(array $data): array
     {
         $data['tax_rate_basis_points'] = PricingFields::toBasisPoints($data['tax_rate_percentage'] ?? 0);
 
-        $data['service_charge_basis_points'] = PricingFields::toBasisPoints(
-            $data['service_charge_percentage'] ?? 0,
-        );
-
-        $data['parcel_charge_minor_units'] = PricingFields::currency()
-            ->toMinorUnits($data['parcel_charge'] ?? 0);
-
-        unset($data['tax_rate_percentage'], $data['service_charge_percentage'], $data['parcel_charge']);
+        unset($data['tax_rate_percentage']);
 
         return $data;
     }
@@ -265,8 +215,8 @@ class Settings extends Page
     {
         $tenant = $this->tenant();
 
-        // Remembered on the tenant, so filling the form, formatting a charge
-        // and saving all read the one row once.
+        // Remembered on the tenant, so filling the form and saving both read
+        // the one row once.
         $settings = $tenant->resolvedSettings() ?? $tenant->settings()->create([]);
 
         $tenant->setRelation('settings', $settings);

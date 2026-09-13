@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An extra a dish can be ordered with. The price is what it adds; zero is a real price.
+ * An add-on an item can be ordered with. The price is what it adds; zero is a real price.
  *
  * @property int $id
  * @property int $tenant_id
@@ -68,7 +68,7 @@ class MenuItemAddition extends Model
     }
 
     /**
-     * Its own rate, else the tenant's — never the dish's. Pass $tenantRate when rendering a list.
+     * Its own rate, else the tenant's — never the item's. Pass $tenantRate when rendering a list.
      */
     public function taxRateBasisPoints(?int $tenantRate = null): int
     {

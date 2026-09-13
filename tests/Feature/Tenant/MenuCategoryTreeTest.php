@@ -35,7 +35,7 @@ function categoryNamed(string $name): MenuCategory
 /**
  * Open the one table a menu is arranged on.
  *
- * Both levels of category, the dishes in each and the two rails are rows of
+ * Both levels of category, the items in each and the two rails are rows of
  * this single table now — see MenuArrangementTable.
  */
 function arrangementOf(Menu $menu): Testable
@@ -52,11 +52,11 @@ function categoryRow(MenuCategory $category): string
 }
 
 /**
- * The key the arrangement table gives a dish's row.
+ * The key the arrangement table gives an item's row.
  */
-function dishRow(MenuItem $dish): string
+function itemRow(MenuItem $menuItem): string
 {
-    return 'item-'.$dish->getKey();
+    return 'item-'.$menuItem->getKey();
 }
 
 /*
@@ -65,7 +65,7 @@ function dishRow(MenuItem $dish): string
 |--------------------------------------------------------------------------
 |
 | A category with no parent is a section of the menu; one with a parent is a
-| subdivision of that section. A dish names exactly one of them.
+| subdivision of that section. An item names exactly one of them.
 |
 */
 
@@ -178,17 +178,17 @@ it('deletes a category from the arrangement, its branch with it', function (): v
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
-    $dish = MenuItem::factory()->inCategory($subCategory)->create();
+    $menuItem = MenuItem::factory()->inCategory($subCategory)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     arrangementOf($menu)->callAction(TestAction::make('delete')->table(categoryRow($category)));
 
-    // The subdivisions and the dishes go with it, by the cascades on the
+    // The subdivisions and the items go with it, by the cascades on the
     // foreign keys rather than by anything this action does.
     expect(MenuCategory::query()->withoutGlobalScopes()->whereKey($category->getKey())->exists())->toBeFalse()
         ->and(MenuCategory::query()->withoutGlobalScopes()->whereKey($subCategory->getKey())->exists())->toBeFalse()
-        ->and(MenuItem::query()->withoutGlobalScopes()->whereKey($dish->getKey())->exists())->toBeFalse();
+        ->and(MenuItem::query()->withoutGlobalScopes()->whereKey($menuItem->getKey())->exists())->toBeFalse();
 });
 
 it('keeps the arrangement\'s own actions away from someone who may only read the menu', function (): void {
@@ -302,11 +302,11 @@ it('refuses a subdivision of a category on another menu, even around the form', 
 
 /*
 |--------------------------------------------------------------------------
-| Filing dishes
+| Filing items
 |--------------------------------------------------------------------------
 */
 
-it('files a dish under exactly one category, at either level', function (): void {
+it('files an item under exactly one category, at either level', function (): void {
     $menu = Menu::factory()->create();
     $section = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($section)->create();
@@ -322,7 +322,7 @@ it('files a dish under exactly one category, at either level', function (): void
         ->and($subCategory->menuItems()->pluck('id')->all())->toBe([$nested->getKey()]);
 });
 
-it('reads a dish under the branch it sits on', function (): void {
+it('reads an item under the branch it sits on', function (): void {
     $menu = Menu::factory()->create();
     $section = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Biryani']]);
     $subCategory = MenuCategory::factory()->under($section)->create(['name' => [Locale::English->value => 'Chicken']]);
@@ -331,7 +331,7 @@ it('reads a dish under the branch it sits on', function (): void {
         ->and($subCategory->load('parent')->path())->toBe('Biryani › Chicken');
 });
 
-it('names the branch a dish sits on, at either level', function (): void {
+it('names the branch an item sits on, at either level', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Biryani']]);
@@ -343,7 +343,7 @@ it('names the branch a dish sits on, at either level', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The list is flat now that grouping is gone, so the column has to say
-    // where a dish sits — and a subdivision on its own says nothing about
+    // where an item sits — and a subdivision on its own says nothing about
     // which section it belongs to.
     Livewire::test(ListMenuItems::class)
         ->assertOk()
@@ -354,7 +354,7 @@ it('names the branch a dish sits on, at either level', function (): void {
         ->and($direct->fresh()->load('menuCategory.parent')->menuCategory->path())->toBe('Biryani');
 });
 
-it('filters dishes by menu, and by a category within it', function (): void {
+it('filters items by menu, and by a category within it', function (): void {
     $tenant = Tenant::factory()->create();
     $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $drinks = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
@@ -369,7 +369,7 @@ it('filters dishes by menu, and by a category within it', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // A dish reaches its menu through its category, so the menu filter is a
+    // An item reaches its menu through its category, so the menu filter is a
     // relationship rather than a column of its own.
     Livewire::test(ListMenuItems::class)
         ->filterTable('menu', $lunch->getKey())
@@ -408,7 +408,7 @@ it('offers only the chosen menu\'s categories once a menu is filtered', function
         ->not->toContain($hot->getKey());
 });
 
-it('reads the dishes list menu by menu, section by section', function (): void {
+it('reads the items list menu by menu, section by section', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'position' => 0]);
 
@@ -422,13 +422,13 @@ it('reads the dishes list menu by menu, section by section', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // A section's own dishes come before its subdivisions', and the next
+    // A section's own items come before its subdivisions', and the next
     // section follows — the order grouping used to imply.
     Livewire::test(ListMenuItems::class)
         ->assertCanSeeTableRecords([$inFirst, $inNested, $inSecond], inOrder: true);
 });
 
-it('orders the dishes list without touching a translated json column', function (): void {
+it('orders the items list without touching a translated json column', function (): void {
     // Ordering by a translated column orders whole JSON documents rather than
     // names, and while the column was plain json Postgres had no ordering
     // operator for it at all and 500'd. Inspecting the compiled SQL catches both.
@@ -461,7 +461,7 @@ it('orders the dishes list without touching a translated json column', function 
 |--------------------------------------------------------------------------
 */
 
-it('moves a sub-category under another section, dishes and all', function (): void {
+it('moves a sub-category under another section, items and all', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $from = MenuCategory::factory()->inMenu($menu)->create();
@@ -481,7 +481,7 @@ it('moves a sub-category under another section, dishes and all', function (): vo
         ])
         ->assertHasNoActionErrors();
 
-    // One write. The dishes are untouched because they name the subdivision,
+    // One write. The items are untouched because they name the subdivision,
     // never its parent — which is exactly what merging the tables bought.
     expect($chicken->refresh()->parent_id)->toBe($to->getKey())
         ->and($moving->refresh()->menu_category_id)->toBe($chicken->getKey())
@@ -573,16 +573,16 @@ it('carries a section\'s subdivisions onto another menu with it', function (): v
 
     $section = MenuCategory::factory()->inMenu($lunch)->create();
     $chicken = MenuCategory::factory()->under($section)->create();
-    $dish = MenuItem::factory()->inCategory($chicken)->create();
+    $menuItem = MenuItem::factory()->inCategory($chicken)->create();
 
     app(MoveCategoryToMenu::class)($section, $dinner);
 
     // The subdivision follows by the ON UPDATE CASCADE on (parent_id, menu_id);
-    // the dish follows because it names the subdivision.
+    // the item follows because it names the subdivision.
     expect($section->refresh()->menu_id)->toBe($dinner->getKey())
         ->and($chicken->refresh()->menu_id)->toBe($dinner->getKey())
         ->and($chicken->parent_id)->toBe($section->getKey())
-        ->and($dish->refresh()->menu_category_id)->toBe($chicken->getKey());
+        ->and($menuItem->refresh()->menu_category_id)->toBe($chicken->getKey());
 });
 
 it('unfeatures the whole branch when a section changes menus', function (): void {
@@ -598,7 +598,7 @@ it('unfeatures the whole branch when a section changes menus', function (): void
 
     app(MoveCategoryToMenu::class)($section, $dinner);
 
-    // The subdivision's dishes left the menu just as surely as the section's
+    // The subdivision's items left the menu just as surely as the section's
     // own did, so both stop being led with.
     expect($inSection->refresh()->is_featured)->toBeFalse()
         ->and($inSub->refresh()->is_featured)->toBeFalse();
@@ -610,7 +610,7 @@ it('unfeatures the whole branch when a section changes menus', function (): void
 |--------------------------------------------------------------------------
 */
 
-it('takes a hidden subdivision\'s dishes off the menu, and nothing else\'s', function (): void {
+it('takes a hidden subdivision\'s items off the menu, and nothing else\'s', function (): void {
     $menu = Menu::factory()->create();
     $section = MenuCategory::factory()->inMenu($menu)->create();
     $hidden = MenuCategory::factory()->under($section)->hidden()->create();
@@ -632,23 +632,23 @@ it('takes a hidden section\'s subdivisions off the menu too', function (): void 
     $section = MenuCategory::factory()->inMenu($menu)->hidden()->create();
     $showing = MenuCategory::factory()->under($section)->create();
 
-    $dish = MenuItem::factory()->inCategory($showing)->create();
+    $menuItem = MenuItem::factory()->inCategory($showing)->create();
 
     // The subdivision is showing, but nothing under a hidden section is.
-    expect(MenuItem::query()->orderable()->pluck('id')->all())->not->toContain($dish->getKey())
+    expect(MenuItem::query()->orderable()->pluck('id')->all())->not->toContain($menuItem->getKey())
         ->and(MenuCategory::query()->active()->pluck('id')->all())->not->toContain($showing->getKey());
 });
 
-it('takes a section\'s subdivisions and their dishes when it is deleted', function (): void {
+it('takes a section\'s subdivisions and their items when it is deleted', function (): void {
     $menu = Menu::factory()->create();
     $section = MenuCategory::factory()->inMenu($menu)->create();
     $chicken = MenuCategory::factory()->under($section)->create();
-    $dish = MenuItem::factory()->inCategory($chicken)->create();
+    $menuItem = MenuItem::factory()->inCategory($chicken)->create();
 
     $section->delete();
 
     expect(MenuCategory::query()->withoutGlobalScopes()->find($chicken->getKey()))->toBeNull()
-        ->and(MenuItem::query()->withoutGlobalScopes()->find($dish->getKey()))->toBeNull();
+        ->and(MenuItem::query()->withoutGlobalScopes()->find($menuItem->getKey()))->toBeNull();
 });
 
 /*
@@ -676,7 +676,7 @@ it('puts a drag handle on every kind of row', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -689,7 +689,7 @@ it('puts a drag handle on every kind of row', function (): void {
         ->toContain('x-sortable-item="combos"')
         ->toContain('x-sortable-item="'.categoryRow($category).'"')
         ->toContain('x-sortable-item="'.categoryRow($subCategory).'"')
-        ->toContain('x-sortable-item="'.dishRow($dish).'"');
+        ->toContain('x-sortable-item="'.itemRow($menuItem).'"');
 });
 
 it('drags the two rails in among the categories', function (): void {
@@ -701,7 +701,7 @@ it('drags the two rails in among the categories', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The featured dishes and the combos are rows of this table like any
+    // The featured items and the combos are rows of this table like any
     // category, which is the whole reason they can be moved at all: they share
     // one number space, kept on the menu itself.
     arrangementOf($menu)->call('reorderTable', [
@@ -777,16 +777,16 @@ it('shows both levels of this menu and nothing from another tenant', function ()
 
 /*
 |--------------------------------------------------------------------------
-| Rearranging dishes, which is per category
+| Rearranging items, which is per category
 |--------------------------------------------------------------------------
 |
-| A dish's position is only ever read within its own category, so it is dragged
+| An item's position is only ever read within its own category, so it is dragged
 | where that is legible: under its own heading, on the menu's arrangement. The
-| dishes page is a flat list spanning every menu and does not drag at all.
+| items page is a flat list spanning every menu and does not drag at all.
 |
 */
 
-it('links a category to its own dishes, narrowed to it', function (): void {
+it('links a category to its own items, narrowed to it', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
@@ -797,20 +797,20 @@ it('links a category to its own dishes, narrowed to it', function (): void {
     $url = arrangementOf($menu)
         ->instance()
         ->getTable()
-        ->getAction('openDishes')
+        ->getAction('openItems')
         ->record(['kind' => 'category', 'category_id' => $starters->getKey()])
         ->getUrl();
 
     // The query key is `filters`, not `tableFilters`: ListRecords binds the
     // property as `#[Url(as: 'filters')]`, and the wrong name is not an error —
-    // it silently opens the page showing every dish on every menu.
+    // it silently opens the page showing every item on every menu.
     expect($url)->toContain('filters%5Bmenu_category_id%5D%5Bvalue%5D='.$starters->getKey());
 
     expect((string) $this->get($url)->assertOk()->getContent())
         ->toContain('menu_category_id&quot;:[{&quot;value&quot;:&quot;'.$starters->getKey().'&quot;}');
 });
 
-it('does not offer dragging on the dishes page at all', function (): void {
+it('does not offer dragging on the items page at all', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
@@ -833,7 +833,7 @@ it('does not offer dragging on the dishes page at all', function (): void {
         ->and($second->refresh()->position)->toBe(1);
 });
 
-it('rearranges the dishes of a category on the arrangement', function (): void {
+it('rearranges the items of a category on the arrangement', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
@@ -847,19 +847,19 @@ it('rearranges the dishes of a category on the arrangement', function (): void {
 
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($starters),
-        dishRow($second),
-        dishRow($first),
+        itemRow($second),
+        itemRow($first),
         categoryRow($desserts),
-        dishRow($untouched),
+        itemRow($untouched),
     ]);
 
-    // Only the dishes that moved against each other are renumbered: every list
+    // Only the items that moved against each other are renumbered: every list
     // on the menu is ordered within itself.
     expect($second->refresh()->position)->toBeLessThan($first->refresh()->position)
         ->and($untouched->refresh()->position)->toBe(0);
 });
 
-it('rearranges dishes inside a sub-category the same way', function (): void {
+it('rearranges items inside a sub-category the same way', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create();
@@ -873,40 +873,40 @@ it('rearranges dishes inside a sub-category the same way', function (): void {
 
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($section),
-        dishRow($inParent),
+        itemRow($inParent),
         categoryRow($chicken),
-        dishRow($second),
-        dishRow($first),
+        itemRow($second),
+        itemRow($first),
     ]);
 
     expect($second->refresh()->position)->toBeLessThan($first->refresh()->position)
         ->and($inParent->refresh()->position)->toBe(0);
 });
 
-it('leaves a dish under the heading it belongs to when it is dropped elsewhere', function (): void {
+it('leaves an item under the heading it belongs to when it is dropped elsewhere', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
     $desserts = MenuCategory::factory()->inMenu($menu)->create();
 
-    $dish = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
+    $menuItem = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Dragging orders a row among its own siblings and nothing else. Re-filing
-    // a dish is an edit on its own form, where the parent is a select and the
+    // an item is an edit on its own form, where the parent is a select and the
     // name is revalidated against where it is going — see
     // .ai/rules/actions-menus.md.
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($desserts),
-        dishRow($dish),
+        itemRow($menuItem),
         categoryRow($starters),
     ]);
 
-    expect($dish->refresh()->menu_category_id)->toBe($starters->getKey());
+    expect($menuItem->refresh()->menu_category_id)->toBe($starters->getKey());
 });
 
-it('keeps rearranging dishes away from someone who may only read the menu', function (): void {
+it('keeps rearranging items away from someone who may only read the menu', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -919,7 +919,7 @@ it('keeps rearranging dishes away from someone who may only read the menu', func
     // The arrangement can be read by anyone who may read the menu, so the
     // reorder() policy is the only thing standing between them and a drag —
     // and reorderTable() short-circuits on exactly that call.
-    arrangementOf($menu)->call('reorderTable', [dishRow($second), dishRow($first)]);
+    arrangementOf($menu)->call('reorderTable', [itemRow($second), itemRow($first)]);
 
     expect($first->refresh()->position)->toBe(0)
         ->and($second->refresh()->position)->toBe(1);

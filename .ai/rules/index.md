@@ -6,6 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Actions/Menus/** | .ai/rules/actions-menus.md |
 | app/** | .ai/rules/app.md |
+| app/Filament/Tenant/Resources/Charges/** | .ai/rules/charges.md |
 | config/**, config/tenants.php | .ai/rules/config.md |
 | app/Enums/**, app/Enums/Role.php, app/Enums/TenantType.php | .ai/rules/enums.md |
 | app/Filament/** | .ai/rules/filament.md |

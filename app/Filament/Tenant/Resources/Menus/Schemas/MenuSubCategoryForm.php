@@ -121,8 +121,8 @@ class MenuSubCategoryForm
     /**
      * Every category on one menu, at both levels, labelled by its branch.
      *
-     * For the dishes filter once a menu has been picked: "Biryani" and
-     * "Biryani › Chicken" are both places a dish can sit, and the menu is
+     * For the items filter once a menu has been picked: "Biryani" and
+     * "Biryani › Chicken" are both places an item can sit, and the menu is
      * already named by the filter beside it.
      *
      * @return array<int, string>
@@ -143,15 +143,15 @@ class MenuSubCategoryForm
     /**
      * Every category this tenant has, labelled with its menu.
      *
-     * For the places that are not inside one menu — the dish form, which may
-     * file a dish anywhere. Two menus may each have a "Starters", so the menu
+     * For the places that are not inside one menu — the item form, which may
+     * file an item anywhere. Two menus may each have a "Starters", so the menu
      * has to be part of the label or the select offers the same word twice.
      *
      * @return array<int, string>
      */
     public static function categoryOptionsForTenant(?int $tenantId): array
     {
-        // Both levels, because a dish may be filed at either — labelled with
+        // Both levels, because an item may be filed at either — labelled with
         // the menu and, for a subdivision, the section it sits under, so
         // "Lunch · Biryani › Chicken" reads as one place. Only the columns a
         // label needs are read from the menu and the parent.

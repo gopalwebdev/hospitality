@@ -20,7 +20,7 @@ class ListMenuItems extends ListRecords
             CreateAction::make()
                 ->label(__('panel.items.create'))
                 ->icon(Heroicon::OutlinedPlus)
-                // A dish has to go in a section, and a section on a menu, so
+                // An item has to go in a section, and a section on a menu, so
                 // there is nothing useful to do until one exists. Saying so
                 // beats an empty select.
                 ->disabled(fn (): bool => ! $this->hasAnyCategory())
@@ -43,7 +43,7 @@ class ListMenuItems extends ListRecords
     }
 
     /**
-     * Whether this tenant has anywhere to put a dish yet.
+     * Whether this tenant has anywhere to put an item yet.
      */
     private function hasAnyCategory(): bool
     {

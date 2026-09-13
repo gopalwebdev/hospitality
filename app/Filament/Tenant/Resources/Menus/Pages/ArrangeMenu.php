@@ -23,7 +23,7 @@ use LogicException;
  * A menu used to be edited across four tables that each showed one layer of it,
  * and the order of the featured and combo rails could not be changed at all.
  * This page is one list of the whole menu — both rails, every category, every
- * subdivision and every dish — and one drag puts any of them somewhere else.
+ * subdivision and every item — and one drag puts any of them somewhere else.
  *
  * The table is built on custom data because those rows are three models and two
  * rails; see MenuArrangementTable for what that costs. What it means here is

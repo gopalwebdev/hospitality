@@ -24,7 +24,7 @@ use Filament\Tables\Table;
  *
  * Its own navigation group rather than sitting under Menu: this is the shop
  * window, and a tile may open a PDF or leave for Instagram, neither of which
- * has anything to do with food.
+ * is a menu.
  *
  * Scoping is Filament's: the panel has a tenant, so every query here is limited
  * to the tenant in the subdomain. Who may use the page is HomeRowPolicy's

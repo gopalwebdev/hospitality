@@ -7,7 +7,7 @@ use App\Models\Menu;
 /**
  * The two things on a menu that are not a category.
  *
- * A menu is read as a sequence of blocks: the dishes it leads with, the combos
+ * A menu is read as a sequence of blocks: the items it leads with, the combos
  * it sells together, and its categories. The categories carry their own
  * `position`; these two carry theirs on the menu itself, in the same number
  * space, so all three can be dragged into one order on the arrangement screen.
@@ -18,7 +18,7 @@ use App\Models\Menu;
  */
 enum MenuBlock: string
 {
-    /** The dishes a menu opens with — menu_items.is_featured, in featured_position order. */
+    /** The items a menu opens with — menu_items.is_featured, in featured_position order. */
     case Featured = 'featured';
 
     /** The bundles sold at one price — menu_combos. */

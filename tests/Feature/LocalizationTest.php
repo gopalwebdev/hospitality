@@ -23,7 +23,7 @@ beforeEach(function (): void {
 });
 
 /**
- * A tenant with one bilingual dish on one bilingual menu.
+ * A tenant with one bilingual item on one bilingual menu.
  *
  * @return array{Tenant, Menu, MenuCategory, MenuItem, MenuItemAddition}
  */
@@ -258,7 +258,7 @@ it('searches a table in the language it is showing, and in English', function ()
         ->assertCanSeeTableRecords([$paneer])
         ->assertCanNotSeeTableRecords([$coffee]);
 
-    // ...and an untranslated dish is on screen in English, so that works too.
+    // ...and an untranslated item is on screen in English, so that works too.
     Livewire::test(ListMenuItems::class)
         ->searchTable('Coffee')
         ->assertCanSeeTableRecords([$coffee])

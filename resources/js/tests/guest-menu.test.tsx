@@ -15,28 +15,27 @@ const menu = {
     isBeingServed: true,
 };
 
-/** The common case: 5% GST added at the bill, and neither charge levied. */
-const charges = {
-    taxRateBasisPoints: 500,
+/** The common case: 5% GST added at the bill. */
+const tax = {
+    rateBasisPoints: 500,
     pricesIncludeTax: false,
-    serviceChargeBasisPoints: null,
-    parcelChargeMinorUnits: null,
 };
 
 /**
- * A dish with only what a test cares about spelled out.
+ * An item with only what a test cares about spelled out.
  *
  * Every field the page needs has a default here, so a test about combos does
  * not have to describe a price and a diet mark to get one on screen.
  */
-function dish(overrides: Partial<MenuItem> = {}): MenuItem {
+function item(overrides: Partial<MenuItem> = {}): MenuItem {
     return {
         id: 10,
         name: 'Paneer Tikka',
         description: null,
         priceMinorUnits: 24950,
         compareAtPriceMinorUnits: null,
-        foodType: 'vegetarian' as const,
+        isService: false,
+        diet: 'vegetarian',
         additions: [],
         ...overrides,
     };
@@ -64,7 +63,8 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
                 'combos',
                 ...sections.map((section) => section.id),
             ]}
-            charges={charges}
+            tax={tax}
+            charges={[]}
             acceptingOrders
             homeUrl={homeUrl}
             {...overrides}
@@ -92,13 +92,13 @@ describe('guest menu', () => {
         );
     });
 
-    it('lists each dish with its price and diet mark', () => {
+    it('lists each item with its price and diet mark', () => {
         renderMenu({
             sections: [
                 {
                     id: 1,
                     name: 'Starters',
-                    items: [dish({ description: 'Charred in the tandoor.' })],
+                    items: [item({ description: 'Charred in the tandoor.' })],
                     subSections: [],
                 },
             ],
@@ -109,19 +109,49 @@ describe('guest menu', () => {
         // The price arrives as the integer 24950 and is turned into money
         // here, in the guest's own language.
         expect(screen.getByText(/249\.50/)).toBeInTheDocument();
-        // The veg/non-veg mark is a regulatory one, so it carries a label
-        // rather than being colour alone.
+        // The diet mark is a regulatory one, so it carries a label rather
+        // than being colour alone.
         expect(screen.getByLabelText('Vegetarian')).toBeInTheDocument();
     });
 
-    it("lists a dish's additions, and names the free ones rather than pricing them", () => {
+    it('lists a service request without a diet mark, and names a zero price rather than pricing it', () => {
+        renderMenu({
+            sections: [
+                {
+                    id: 1,
+                    name: 'Housekeeping',
+                    items: [
+                        item({
+                            id: 20,
+                            name: 'Extra Pillow',
+                            isService: true,
+                            diet: null,
+                            priceMinorUnits: 0,
+                        }),
+                    ],
+                    subSections: [],
+                },
+            ],
+        });
+
+        expect(screen.getByText('Extra Pillow')).toBeInTheDocument();
+        // A pillow has no diet to declare.
+        expect(
+            screen.queryByLabelText(/vegetarian|egg/i),
+        ).not.toBeInTheDocument();
+        // "₹0.00" beside a pillow reads as a mistake.
+        expect(screen.getByText('Complimentary')).toBeInTheDocument();
+        expect(screen.queryByText(/0\.00/)).not.toBeInTheDocument();
+    });
+
+    it("lists an item's add-ons, and names the free ones rather than pricing them", () => {
         renderMenu({
             sections: [
                 {
                     id: 1,
                     name: 'Starters',
                     items: [
-                        dish({
+                        item({
                             additions: [
                                 {
                                     id: 100,
@@ -141,7 +171,7 @@ describe('guest menu', () => {
             ],
         });
 
-        expect(screen.getByText('Add to this')).toBeInTheDocument();
+        expect(screen.getByText('Add-ons')).toBeInTheDocument();
         expect(screen.getByText(/\+\s*₹?50\.00/)).toBeInTheDocument();
         // "₹0.00" beside a choice that simply costs nothing reads as a mistake.
         expect(screen.getByText('Free')).toBeInTheDocument();
@@ -154,17 +184,17 @@ describe('guest menu', () => {
                 {
                     id: 1,
                     name: 'Biryani',
-                    items: [dish({ id: 10, name: 'Plain Biryani' })],
+                    items: [item({ id: 10, name: 'Plain Biryani' })],
                     subSections: [
                         {
                             id: 5,
                             name: 'Chicken',
-                            items: [dish({ id: 11, name: 'Chicken Biryani' })],
+                            items: [item({ id: 11, name: 'Chicken Biryani' })],
                         },
                         {
                             id: 6,
                             name: 'Mutton',
-                            items: [dish({ id: 12, name: 'Mutton Biryani' })],
+                            items: [item({ id: 12, name: 'Mutton Biryani' })],
                         },
                     ],
                 },
@@ -175,7 +205,7 @@ describe('guest menu', () => {
         expect(screen.getByText('Chicken')).toBeInTheDocument();
         expect(screen.getByText('Mutton')).toBeInTheDocument();
 
-        // The dish filed straight under the category comes before the
+        // The item filed straight under the category comes before the
         // subdivisions, which is the order the server sends and the order a
         // guest reads.
         const names = screen
@@ -184,7 +214,7 @@ describe('guest menu', () => {
 
         expect(names).toEqual(['Plain Biryani', 'Chicken', 'Mutton']);
 
-        // A dish inside a subdivision is a level deeper than one filed
+        // An item inside a subdivision is a level deeper than one filed
         // straight under the category, so the nesting survives for anyone
         // navigating by headings.
         expect(
@@ -196,7 +226,7 @@ describe('guest menu', () => {
 
     it('reads the blocks in the order the tenant arranged them', () => {
         renderMenu({
-            featured: [dish({ id: 10, name: 'Paneer Tikka' })],
+            featured: [item({ id: 10, name: 'Paneer Tikka' })],
             combos: [
                 {
                     id: 1,
@@ -231,7 +261,7 @@ describe('guest menu', () => {
                     id: 1,
                     name: 'Starters',
                     items: [
-                        dish({
+                        item({
                             priceMinorUnits: 29900,
                             compareAtPriceMinorUnits: 36000,
                         }),
@@ -258,13 +288,15 @@ describe('guest menu', () => {
                         {
                             id: 30,
                             name: 'Chicken Biryani',
-                            foodType: 'non-vegetarian',
+                            isService: false,
+                            diet: 'non-vegetarian',
                             quantity: 2,
                         },
                         {
                             id: 31,
                             name: 'Raita',
-                            foodType: 'vegetarian',
+                            isService: false,
+                            diet: 'vegetarian',
                             quantity: 1,
                         },
                     ],
@@ -281,51 +313,58 @@ describe('guest menu', () => {
         expect(screen.getByText(/1,?200\.00/)).toHaveClass('line-through');
     });
 
-    it('says what the prices do not include before a guest orders', () => {
+    it('says what the bill adds before a guest orders, one line per charge', () => {
         renderMenu({
             sections: [
                 {
                     id: 1,
                     name: 'Starters',
-                    items: [dish()],
+                    items: [item()],
                     subSections: [],
                 },
             ],
-            charges: {
-                taxRateBasisPoints: 500,
-                pricesIncludeTax: false,
-                serviceChargeBasisPoints: 1000,
-                parcelChargeMinorUnits: 2000,
-            },
+            charges: [
+                {
+                    id: 1,
+                    name: 'Service Charge',
+                    rateBasisPoints: 1000,
+                    amountMinorUnits: null,
+                },
+                {
+                    id: 2,
+                    name: 'Packing Charge',
+                    rateBasisPoints: null,
+                    amountMinorUnits: 2000,
+                },
+            ],
         });
 
         expect(
             screen.getByText('Prices exclude GST, charged at 5%.'),
         ).toBeInTheDocument();
+        // A share of the bill reads as a percentage, a fixed amount as money.
         expect(
-            screen.getByText('A service charge of 10% is added to the bill.'),
+            screen.getByText('Service Charge of 10% is added to the bill.'),
         ).toBeInTheDocument();
-        expect(screen.getByText(/packed for ₹?20\.00/)).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Packing Charge of ₹?20\.00 is added to the bill\./,
+            ),
+        ).toBeInTheDocument();
     });
 
-    it('leaves out a charge the tenant does not levy', () => {
+    it('mentions no charge a menu does not carry', () => {
         renderMenu({
             sections: [
-                { id: 1, name: 'Starters', items: [dish()], subSections: [] },
+                { id: 1, name: 'Starters', items: [item()], subSections: [] },
             ],
-            charges: {
-                taxRateBasisPoints: 500,
-                pricesIncludeTax: true,
-                serviceChargeBasisPoints: null,
-                parcelChargeMinorUnits: null,
-            },
+            tax: { rateBasisPoints: 500, pricesIncludeTax: true },
         });
 
         expect(
             screen.getByText('Prices include GST at 5%.'),
         ).toBeInTheDocument();
-        expect(screen.queryByText(/service charge/i)).not.toBeInTheDocument();
-        expect(screen.queryByText(/packed for/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/added to the bill/)).not.toBeInTheDocument();
     });
 
     it('says when a timed menu is not being served right now', () => {

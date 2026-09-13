@@ -1,8 +1,10 @@
 <?php
 
 use App\Enums\Appearance;
+use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
@@ -29,11 +31,11 @@ function guestMenuUrl(Tenant $tenant, Menu $menu): string
 }
 
 /**
- * A menu with one section holding one dish, for the tenant given.
+ * A menu with one section holding one item, for the tenant given.
  *
  * @return array{Menu, MenuCategory, MenuItem}
  */
-function seedOneDish(Tenant $tenant): array
+function seedOneItem(Tenant $tenant): array
 {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -50,7 +52,7 @@ function seedOneDish(Tenant $tenant): array
 
 it('serves the menu with no sign-in', function (): void {
     $tenant = Tenant::factory()->create();
-    [$menu, $category, $item] = seedOneDish($tenant);
+    [$menu, $category, $item] = seedOneItem($tenant);
 
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
@@ -83,7 +85,7 @@ it('leaves out what a guest cannot order', function (): void {
         ->assertDontSee($runOut->name);
 });
 
-it('takes a whole hidden menu down, sections and dishes with it', function (): void {
+it('takes a whole hidden menu down, sections and items with it', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
     MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
@@ -95,8 +97,8 @@ it('shows only this tenant\'s menu', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
 
-    [$myMenu, , $mineItem] = seedOneDish($mine);
-    [$theirMenu, , $theirsItem] = seedOneDish($theirs);
+    [$myMenu, , $mineItem] = seedOneItem($mine);
+    [$theirMenu, , $theirsItem] = seedOneItem($theirs);
 
     $this->get(guestMenuUrl($mine, $myMenu))
         ->assertOk()
@@ -110,7 +112,7 @@ it('shows only this tenant\'s menu', function (): void {
 
 it('hides a tenant that is switched off', function (): void {
     $tenant = Tenant::factory()->create(['is_active' => false]);
-    [$menu] = seedOneDish($tenant);
+    [$menu] = seedOneItem($tenant);
 
     $this->get(guestUrl($tenant))->assertNotFound();
     $this->get(guestMenuUrl($tenant, $menu))->assertNotFound();
@@ -237,7 +239,7 @@ it('does not make a switched-off tenant installable', function (): void {
     $this->get(route('guest.service-worker', ['tenant' => $tenant->slug]))->assertNotFound();
 });
 
-it('leads a menu with the dishes the tenant featured', function (): void {
+it('leads a menu with the items the tenant featured', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -261,7 +263,7 @@ it('leads a menu with the dishes the tenant featured', function (): void {
             ->where('featured.0.id', $first->getKey())
             ->where('featured.0.name', 'Paneer Tikka')
             ->where('featured.1.id', $second->getKey())
-            // A featured dish still appears under its own section, so a guest
+            // A featured item still appears under its own section, so a guest
             // scrolling down finds it where they expect it.
             ->has('sections.0.items', 3),
         );
@@ -305,7 +307,7 @@ it('reads a menu in the order the tenant arranged, rails and all', function (): 
     MenuItem::factory()->inCategory($starters)->create();
     MenuItem::factory()->inCategory($desserts)->create();
 
-    // Untouched, a menu opens with its featured dishes and its combos. This one
+    // Untouched, a menu opens with its featured items and its combos. This one
     // has been dragged: the combos sit between the two sections and the
     // featured rail closes the menu.
     $menu->update(['combos_position' => 1, 'featured_position' => 3]);
@@ -323,7 +325,7 @@ it('reads a menu in the order the tenant arranged, rails and all', function (): 
         );
 });
 
-it('opens a menu nobody has arranged with its featured dishes and its combos', function (): void {
+it('opens a menu nobody has arranged with its featured items and its combos', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -341,7 +343,7 @@ it('opens a menu nobody has arranged with its featured dishes and its combos', f
         );
 });
 
-it('leaves a sold-out dish out of the featured row', function (): void {
+it('leaves a sold-out item out of the featured row', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -366,11 +368,11 @@ it('leaves a sold-out dish out of the featured row', function (): void {
 |--------------------------------------------------------------------------
 |
 | The whole menu comes down in one response: categories, their subdivisions,
-| the dishes in each, and the combos the menu leads with.
+| the items in each, and the combos the menu leads with.
 |
 */
 
-it('nests a category\'s subdivisions under it, its own dishes first', function (): void {
+it('nests a category\'s subdivisions under it, its own items first', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Biryani']]);
@@ -393,7 +395,7 @@ it('nests a category\'s subdivisions under it, its own dishes first', function (
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('sections', 1)
             ->where('sections.0.name', 'Biryani')
-            // The dishes filed straight under the category, and only those.
+            // The items filed straight under the category, and only those.
             ->has('sections.0.items', 1)
             ->where('sections.0.items.0.id', $direct->getKey())
             ->has('sections.0.subSections', 2)
@@ -412,7 +414,7 @@ it('leaves out a hidden sub-category and an empty category entirely', function (
     $hidden = MenuCategory::factory()->under($category)->hidden()->create();
     MenuItem::factory()->inCategory($hidden)->create();
 
-    // A category whose only dishes are in a hidden subdivision has nothing
+    // A category whose only items are in a hidden subdivision has nothing
     // left to read, so it is not sent as an empty heading.
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
@@ -450,7 +452,7 @@ it('sends the combos a menu leads with, in the order they were arranged', functi
             ->where('combos.1.id', $second->getKey()),
         )
         // A combo that cannot be ordered is absent rather than greyed out,
-        // exactly as a sold-out dish is — and there are only two here, so the
+        // exactly as a sold-out item is — and there are only two here, so the
         // count above already says the third was left out.
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('combos.0.id', $first->getKey())
@@ -491,10 +493,6 @@ it('tells a guest what the prices do not include before they order', function ()
     $tenant->settings->update([
         'tax_rate_basis_points' => 500,
         'prices_include_tax' => false,
-        'service_charge_enabled' => true,
-        'service_charge_basis_points' => 1000,
-        'parcel_charge_enabled' => false,
-        'parcel_charge_minor_units' => 2000,
     ]);
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
@@ -502,12 +500,71 @@ it('tells a guest what the prices do not include before they order', function ()
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('charges.taxRateBasisPoints', 500)
-            ->where('charges.pricesIncludeTax', false)
-            ->where('charges.serviceChargeBasisPoints', 1000)
-            // A charge that is switched off arrives as null rather than its
-            // amount, so the app has nothing to decide.
-            ->where('charges.parcelChargeMinorUnits', null),
+            ->where('tax.rateBasisPoints', 500)
+            ->where('tax.pricesIncludeTax', false)
+            // A tenant that levies nothing sends nothing to say.
+            ->where('charges', []),
+        );
+});
+
+it('sends only the charges a menu carries, switched on, in the order arranged', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    $service = Charge::factory()->ofTenant($tenant)->percentage(1000)->create([
+        'name' => [Locale::English->value => 'Service Charge'],
+        'position' => 0,
+    ]);
+    $packing = Charge::factory()->fixedAmount(2000)->onMenus($menu)->create([
+        'name' => [Locale::English->value => 'Packing Charge'],
+        'position' => 1,
+    ]);
+
+    // Limited to another menu, switched off, and another tenant's: none of
+    // these belongs on this bill.
+    Charge::factory()->fixedAmount(5000)->onMenus($otherMenu)->create();
+    Charge::factory()->ofTenant($tenant)->inactive()->create();
+    Charge::factory()->create();
+
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->has('charges', 2)
+            ->where('charges.0.id', $service->getKey())
+            ->where('charges.0.name', 'Service Charge')
+            // A share of the bill arrives as basis points, with no amount...
+            ->where('charges.0.rateBasisPoints', 1000)
+            ->where('charges.0.amountMinorUnits', null)
+            // ...and a fixed sum as minor units, with no rate.
+            ->where('charges.1.id', $packing->getKey())
+            ->where('charges.1.rateBasisPoints', null)
+            ->where('charges.1.amountMinorUnits', 2000),
+        );
+});
+
+it('sends a service request with no diet mark, beside something to order', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+
+    $pillow = MenuItem::factory()->inCategory($category)->service()->create(['position' => 0]);
+    $water = MenuItem::factory()->inCategory($category)->create([
+        'position' => 1,
+        'diet' => Diet::Vegetarian,
+    ]);
+
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('sections.0.items.0.id', $pillow->getKey())
+            ->where('sections.0.items.0.isService', true)
+            ->where('sections.0.items.0.diet', null)
+            // Zero goes out as zero; the app names it complimentary.
+            ->where('sections.0.items.0.priceMinorUnits', 0)
+            ->where('sections.0.items.1.id', $water->getKey())
+            ->where('sections.0.items.1.isService', false)
+            ->where('sections.0.items.1.diet', Diet::Vegetarian->value),
         );
 });
 
@@ -574,19 +631,19 @@ it('sends the menu in the order the tenant dragged it into', function (): void {
         'position' => 0,
     ]);
 
-    $dishSecond = MenuItem::factory()->inCategory($first)->create([
-        'name' => [Locale::English->value => 'A Dish Second'],
+    $itemSecond = MenuItem::factory()->inCategory($first)->create([
+        'name' => [Locale::English->value => 'A Second Item'],
         'position' => 1,
     ]);
-    $dishFirst = MenuItem::factory()->inCategory($first)->create([
-        'name' => [Locale::English->value => 'Z Dish First'],
+    $itemFirst = MenuItem::factory()->inCategory($first)->create([
+        'name' => [Locale::English->value => 'Z First Item'],
         'position' => 0,
     ]);
 
     MenuItem::factory()->inCategory($subFirst)->create();
     MenuItem::factory()->inCategory($subSecond)->create();
     // A section with nothing in it is left out as an empty heading, so the
-    // second one needs a dish to be in the payload at all.
+    // second one needs an item to be in the payload at all.
     MenuItem::factory()->inCategory($second)->create();
 
     $this->get(guestMenuUrl($tenant, $menu))
@@ -595,31 +652,31 @@ it('sends the menu in the order the tenant dragged it into', function (): void {
             // Sections in their dragged order.
             ->where('sections.0.name', 'Z First')
             ->where('sections.1.name', 'A Second')
-            // A section's own dishes in theirs.
-            ->where('sections.0.items.0.id', $dishFirst->getKey())
-            ->where('sections.0.items.1.id', $dishSecond->getKey())
+            // A section's own items in theirs.
+            ->where('sections.0.items.0.id', $itemFirst->getKey())
+            ->where('sections.0.items.1.id', $itemSecond->getKey())
             // And its subdivisions in theirs.
             ->where('sections.0.subSections.0.name', 'Z Sub First')
             ->where('sections.0.subSections.1.name', 'A Sub Second'),
         );
 });
 
-it('sends a dish\'s additions in the order they were dragged into', function (): void {
+it('sends an item\'s additions in the order they were dragged into', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $dish = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
-    $second = MenuItemAddition::factory()->onItem($dish)->create([
+    $second = MenuItemAddition::factory()->onItem($menuItem)->create([
         'name' => [Locale::English->value => 'A Second'],
         'position' => 1,
     ]);
-    $first = MenuItemAddition::factory()->onItem($dish)->create([
+    $first = MenuItemAddition::factory()->onItem($menuItem)->create([
         'name' => [Locale::English->value => 'Z First'],
         'position' => 0,
     ]);
 
-    // Additions are dragged inside the dish that owns them, and a guest reads
+    // Additions are dragged inside the item that owns them, and a guest reads
     // them in that order — the same rule as every other list on the menu.
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()

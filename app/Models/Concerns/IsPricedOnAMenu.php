@@ -7,7 +7,7 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 
 /**
- * Something a guest can buy off a menu: a dish, or a combo of them.
+ * Something a guest can have off a menu: an item, or a combo of them.
  *
  * Both carry the same four things — a price in minor units, an optional higher
  * price shown struck through beside it, an optional GST rate of their own, and
@@ -19,7 +19,7 @@ use App\Models\TenantSetting;
  *
  * Every reader takes an optional override, and lists should pass one.
  * Resolving the currency or the tax rate per row is a query per row that
- * answers the same thing for every one of them — every dish on a menu shares
+ * answers the same thing for every one of them — every item on a menu shares
  * one tenant. See .ai/rules/models.md.
  */
 trait IsPricedOnAMenu
@@ -29,7 +29,7 @@ trait IsPricedOnAMenu
      *
      * Deliberately never reaches through $this->tenant: that is a lazy
      * load, which Model::shouldBeStrict() turns into an exception outside
-     * production and which is an N+1 down a list of dishes inside it.
+     * production and which is an N+1 down a list of items inside it.
      */
     public function currency(): Currency
     {
@@ -54,7 +54,7 @@ trait IsPricedOnAMenu
      *
      * A row of its own overrides, and null means "whatever the tenant
      * charges" — the answer for almost everything on a menu, so the rate is set
-     * once in settings rather than on every dish.
+     * once in settings rather than on every item.
      *
      * Pass $tenantRate when rendering a list; every row shares it.
      */
@@ -87,7 +87,7 @@ trait IsPricedOnAMenu
      * Whether this sets its own rate rather than following the tenant's.
      *
      * What the panel colours a badge on, so the exceptions stand out down a
-     * long list of dishes that all follow the default.
+     * long list of items that all follow the default.
      */
     public function overridesTaxRate(): bool
     {

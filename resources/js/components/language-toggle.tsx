@@ -10,7 +10,7 @@ import type { TenantSharedProps } from '@/types';
  * One button, English or Tamil.
  *
  * A real form rather than something the browser does on its own, and
- * deliberately: half of what a guest reads — the dish names, the sections, the
+ * deliberately: half of what a guest reads — the item names, the sections, the
  * tile labels — is translated in the database, so only the server can answer in
  * another language. Submitting records the choice in a cookie and sends them
  * back to the page they were on, re-rendered in the language they picked.

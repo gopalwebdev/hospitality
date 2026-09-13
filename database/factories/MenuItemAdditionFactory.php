@@ -17,7 +17,7 @@ class MenuItemAdditionFactory extends Factory
      */
     public function definition(): array
     {
-        // The dish brings the tenant with it, for the same reason
+        // The item brings the tenant with it, for the same reason
         // MenuItemFactory takes its tenant from the category.
         $item = MenuItem::factory();
 
@@ -40,7 +40,7 @@ class MenuItemAdditionFactory extends Factory
     }
 
     /**
-     * Put this addition on an existing dish, and its tenant with it.
+     * Put this add-on on an existing item, and its tenant with it.
      */
     public function onItem(MenuItem $item): static
     {

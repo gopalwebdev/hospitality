@@ -10,9 +10,9 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
 
 /**
- * One menu, and the dishes it leads with.
+ * One menu, and the items it leads with.
  *
- * A page rather than a modal, because the featured dishes relation manager
+ * A page rather than a modal, because the featured items relation manager
  * hangs under the form — naming a menu and choosing what it opens with are the
  * same sitting.
  */

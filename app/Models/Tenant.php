@@ -89,6 +89,14 @@ class Tenant extends Model
     }
 
     /**
+     * @return HasMany<Charge, $this>
+     */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(Charge::class);
+    }
+
+    /**
      * @param  Builder<$this>  $query
      */
     public function scopeActive(Builder $query): void

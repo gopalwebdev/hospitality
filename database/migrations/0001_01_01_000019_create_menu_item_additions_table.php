@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('menu_item_id')->constrained()->cascadeOnDelete();
             $table->jsonb('name');
-            // What the addition adds to the dish; zero is a real price.
+            // What the add-on adds to the item's price; zero is a real price.
             $table->integer('price_minor_units')->default(0);
             $table->smallInteger('tax_rate_basis_points')->nullable();
             $table->boolean('is_available')->default(true);

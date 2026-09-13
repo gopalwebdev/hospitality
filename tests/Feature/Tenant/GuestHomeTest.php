@@ -41,7 +41,7 @@ it('shows the tiles in the order the tenant arranged them', function (): void {
         'position' => 2,
     ]);
     $first = HomeTile::factory()->openingMenu($menu)->inRow($row)->create([
-        'label' => [Locale::English->value => 'Food'],
+        'label' => [Locale::English->value => 'Room Service'],
         'position' => 1,
     ]);
 
@@ -52,7 +52,7 @@ it('shows the tiles in the order the tenant arranged them', function (): void {
             ->has('rows', 1)
             ->has('rows.0.tiles', 2)
             ->where('rows.0.tiles.0.id', $first->getKey())
-            ->where('rows.0.tiles.0.label', 'Food')
+            ->where('rows.0.tiles.0.label', 'Room Service')
             ->where('rows.0.tiles.1.id', $second->getKey()),
         );
 });

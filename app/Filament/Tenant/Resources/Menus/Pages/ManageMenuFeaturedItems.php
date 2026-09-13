@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\Menus\Pages;
 
-use App\Enums\FoodType;
 use App\Filament\Tables\Reordering;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Filament\Tenant\Resources\Menus\MenuResource;
@@ -18,18 +17,18 @@ use Illuminate\Database\Eloquent\Builder;
 use LogicException;
 
 /**
- * The dishes this menu leads with, in the order a guest reads them.
+ * The items this menu leads with, in the order a guest reads them.
  *
- * Featuring is a flag on the dish rather than a table of its own, so nothing is
+ * Featuring is a flag on the item rather than a table of its own, so nothing is
  * created, deleted or featured here — this page exists to put the rail **in
- * order**, which is the one thing a dish's own form cannot do. Whether a dish
+ * order**, which is the one thing an item's own form cannot do. Whether an item
  * is featured at all is the `is_featured` toggle on that form; a second pair of
  * actions here setting the same flag was two mechanisms for one thing.
  *
  * Where the rail *sits* on the menu is a different question again, and it is
  * answered by dragging its row on the arrangement page.
  *
- * The relationship is Menu::menuItems(), which reaches dishes through their
+ * The relationship is Menu::menuItems(), which reaches items through their
  * categories because that is the only path there is; the featured filter is
  * applied to the table's own query.
  */
@@ -84,7 +83,7 @@ class ManageMenuFeaturedItems extends ManageRelatedRecords
         MenuItem::query()
             ->whereIn('menu_items.id', array_values($order))
             // The tenant boundary the joined query gave for free, restated:
-            // only dishes in this menu's own categories move.
+            // only items in this menu's own categories move.
             ->whereIn('menu_category_id', MenuCategory::query()
                 ->select('id')
                 ->where('menu_id', $this->menu()->getKey()))
@@ -113,15 +112,19 @@ class ManageMenuFeaturedItems extends ManageRelatedRecords
                     ->badge()
                     ->color('gray'),
 
-                TextColumn::make('food_type')
+                // Built on the service flag, which every item has: an item
+                // shows its diet mark, and a service request says that it is one.
+                TextColumn::make('is_service')
                     ->label(__('panel.items.type'))
                     ->badge()
-                    ->formatStateUsing(fn (FoodType $state): string => $state->label())
-                    ->color(fn (FoodType $state): string => $state->color()),
+                    ->formatStateUsing(fn (MenuItem $record): string => $record->diet?->label() ?? (string) __('panel.items.is_service'))
+                    ->color(fn (MenuItem $record): string => $record->diet?->color() ?? 'info'),
 
                 TextColumn::make('price_minor_units')
                     ->label(__('panel.items.price'))
-                    ->formatStateUsing(fn (MenuItem $record): string => $record->formattedPrice(MenuItemForm::currency()))
+                    ->formatStateUsing(fn (MenuItem $record): string => $record->isComplimentary()
+                        ? (string) __('panel.items.complimentary')
+                        : $record->formattedPrice(MenuItemForm::currency()))
                     ->alignEnd(),
             ])
             ->reorderable('featured_position')
@@ -141,6 +144,6 @@ class ManageMenuFeaturedItems extends ManageRelatedRecords
     {
         $menu = $this->getOwnerRecord();
 
-        return $menu instanceof Menu ? $menu : throw new LogicException('The featured dishes page requires a menu.');
+        return $menu instanceof Menu ? $menu : throw new LogicException('The featured items page requires a menu.');
     }
 }

@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * How one tenant is configured: contact details, the GST every price is read
- * against, and two optional charges, each a switch plus an amount.
+ * How one tenant is configured: contact details, trading hours and the GST every
+ * price is read against. What is added on top of a bill lives in charges.
  *
  * @property int $id
  * @property int $tenant_id
@@ -22,10 +22,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $gstin
  * @property int $tax_rate_basis_points
  * @property bool $prices_include_tax
- * @property bool $service_charge_enabled
- * @property int $service_charge_basis_points
- * @property bool $parcel_charge_enabled
- * @property int $parcel_charge_minor_units
  * @property bool $accepts_orders
  * @property string|null $opens_at
  * @property string|null $closes_at
@@ -39,10 +35,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'gstin',
     'tax_rate_basis_points',
     'prices_include_tax',
-    'service_charge_enabled',
-    'service_charge_basis_points',
-    'parcel_charge_enabled',
-    'parcel_charge_minor_units',
     'accepts_orders',
     'opens_at',
     'closes_at',
@@ -67,10 +59,6 @@ class TenantSetting extends Model
         'currency' => Currency::IndianRupee->value,
         'tax_rate_basis_points' => self::DEFAULT_TAX_RATE_BASIS_POINTS,
         'prices_include_tax' => false,
-        'service_charge_enabled' => false,
-        'service_charge_basis_points' => 0,
-        'parcel_charge_enabled' => false,
-        'parcel_charge_minor_units' => 0,
         'accepts_orders' => true,
     ];
 
@@ -88,23 +76,6 @@ class TenantSetting extends Model
     }
 
     /**
-     * The service charge on an amount in minor units, or zero when it is switched off.
-     */
-    public function serviceChargeOn(int $minorUnits): int
-    {
-        if (! $this->service_charge_enabled || $this->service_charge_basis_points === 0) {
-            return 0;
-        }
-
-        return (int) round($minorUnits * $this->service_charge_basis_points / self::BASIS_POINTS_PER_WHOLE);
-    }
-
-    public function parcelCharge(): int
-    {
-        return $this->parcel_charge_enabled ? $this->parcel_charge_minor_units : 0;
-    }
-
-    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -113,10 +84,6 @@ class TenantSetting extends Model
             'currency' => Currency::class,
             'tax_rate_basis_points' => 'integer',
             'prices_include_tax' => 'boolean',
-            'service_charge_enabled' => 'boolean',
-            'service_charge_basis_points' => 'integer',
-            'parcel_charge_enabled' => 'boolean',
-            'parcel_charge_minor_units' => 'integer',
             'accepts_orders' => 'boolean',
         ];
     }

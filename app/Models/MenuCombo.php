@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Dishes sold together at one price, on a menu rather than in a category. Its price is its own.
+ * Items sold together at one price, on a menu rather than in a category. Its price is its own.
  *
  * @property int $id
  * @property int $tenant_id
@@ -97,7 +97,7 @@ class MenuCombo extends Model
     }
 
     /**
-     * What the dishes inside cost bought separately — shown beside the price, never used as it.
+     * What the items inside cost bought separately — shown beside the price, never used as it.
      */
     public function contentsPriceMinorUnits(): int
     {

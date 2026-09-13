@@ -25,14 +25,10 @@ class TenantSettingFactory extends Factory
             'contact_phone' => fake()->numerify('+91 ##### #####'),
             'currency' => Currency::IndianRupee,
             'gstin' => null,
-            // The tenant rate, prices quoted before tax, and neither
-            // charge levied — which is how a tenant starts out.
+            // The tenant rate and prices quoted before tax, which is how a
+            // tenant starts out.
             'tax_rate_basis_points' => TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS,
             'prices_include_tax' => false,
-            'service_charge_enabled' => false,
-            'service_charge_basis_points' => 0,
-            'parcel_charge_enabled' => false,
-            'parcel_charge_minor_units' => 0,
             'accepts_orders' => true,
             'opens_at' => '09:00:00',
             'closes_at' => '23:00:00',
@@ -46,28 +42,6 @@ class TenantSettingFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'prices_include_tax' => true,
-        ]);
-    }
-
-    /**
-     * A tenant levying a service charge, as a percentage in basis points.
-     */
-    public function withServiceCharge(int $basisPoints = 1000): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'service_charge_enabled' => true,
-            'service_charge_basis_points' => $basisPoints,
-        ]);
-    }
-
-    /**
-     * A tenant charging a flat amount to pack an order to take away.
-     */
-    public function withParcelCharge(int $minorUnits = 2000): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'parcel_charge_enabled' => true,
-            'parcel_charge_minor_units' => $minorUnits,
         ]);
     }
 
