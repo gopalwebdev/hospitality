@@ -12,13 +12,13 @@ namespace App\Enums;
  */
 enum HomeTileAction: string
 {
-    /** Opens one of this restaurant's menus. */
+    /** Opens one of this tenant's menus. */
     case Menu = 'menu';
 
     /** Renders an uploaded PDF inside the app, with a back arrow out of it. */
     case Pdf = 'pdf';
 
-    /** Leaves the app for somewhere the restaurant is also found. */
+    /** Leaves the app for somewhere the tenant is also found. */
     case Link = 'link';
 
     public function label(): string

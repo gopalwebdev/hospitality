@@ -7,12 +7,12 @@ use App\Models\Menu;
 use App\Models\User;
 
 /**
- * Who may shape a restaurant's menus.
+ * Who may shape a tenant's menus.
  *
  * The same split as MenuCategoryPolicy and MenuItemPolicy, because it is the
  * same job at a different level: reading is menu.view, which staff hold too;
- * changing anything is menu.manage, which only a restaurant admin has. Which
- * restaurant's menus are in front of you is not this policy's business —
+ * changing anything is menu.manage, which only a tenant admin has. Which
+ * tenant's menus are in front of you is not this policy's business —
  * Filament scopes the resource to the panel's tenant, and the composite foreign
  * keys underneath make crossing that boundary a database error.
  */

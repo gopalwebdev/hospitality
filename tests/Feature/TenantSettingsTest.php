@@ -3,9 +3,9 @@
 use App\Enums\Currency;
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
-use App\Filament\Restaurant\Pages\Settings;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Filament\Tenant\Pages\Settings;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -21,12 +21,12 @@ beforeEach(function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('shows the settings of the restaurant whose panel it is', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings()->update([
+it('shows the settings of the tenant whose panel it is', function (): void {
+    $tenant = Tenant::factory()->create();
+    $tenant->settings()->update([
         'contact_email' => 'hello@spice.example.com',
     ]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->assertFormSet([
@@ -34,27 +34,27 @@ it('shows the settings of the restaurant whose panel it is', function (): void {
         ]);
 });
 
-it('never shows another restaurant settings', function (): void {
-    $own = Restaurant::factory()->create();
+it('never shows another tenant settings', function (): void {
+    $own = Tenant::factory()->create();
     $own->settings()->update(['contact_email' => 'ours@example.com']);
 
-    $other = Restaurant::factory()->create();
+    $other = Tenant::factory()->create();
     $other->settings()->update(['contact_email' => 'theirs@example.com']);
 
-    enterRestaurantPanel($own, Role::Admin);
+    enterTenantPanel($own, Role::Admin);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['contact_email' => 'ours@example.com']);
 });
 
-it('creates settings on first view if a restaurant somehow has none', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings()->delete();
-    enterRestaurantPanel($restaurant, Role::Admin);
+it('creates settings on first view if a tenant somehow has none', function (): void {
+    $tenant = Tenant::factory()->create();
+    $tenant->settings()->delete();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)->assertOk();
 
-    expect($restaurant->refresh()->settings)->not->toBeNull();
+    expect($tenant->refresh()->settings)->not->toBeNull();
 });
 
 /*
@@ -63,9 +63,9 @@ it('creates settings on first view if a restaurant somehow has none', function (
 |--------------------------------------------------------------------------
 */
 
-it('saves changes against the restaurant in the panel', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+it('saves changes against the tenant in the panel', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -76,18 +76,18 @@ it('saves changes against the restaurant in the panel', function (): void {
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $settings = $restaurant->refresh()->settings;
+    $settings = $tenant->refresh()->settings;
 
     expect($settings->contact_email)->toBe('new@example.com')
         ->and($settings->accepts_orders)->toBeFalse();
 });
 
-it('leaves other restaurants settings alone when saving', function (): void {
-    $own = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('leaves other tenants settings alone when saving', function (): void {
+    $own = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
     $other->settings()->update(['contact_email' => 'theirs@example.com']);
 
-    enterRestaurantPanel($own, Role::Admin);
+    enterTenantPanel($own, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm(['contact_email' => 'ours@example.com'])
@@ -97,17 +97,17 @@ it('leaves other restaurants settings alone when saving', function (): void {
 });
 
 it('always prices in rupees, with no currency to choose', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)->assertFormFieldDoesNotExist('currency');
 
-    expect($restaurant->currency())->toBe(Currency::IndianRupee);
+    expect($tenant->currency())->toBe(Currency::IndianRupee);
 });
 
 it('rejects an address that is not an email', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm(['contact_email' => 'not-an-email'])
@@ -121,25 +121,25 @@ it('rejects an address that is not an email', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('is open to the restaurant admin', function (): void {
-    enterRestaurantPanel(Restaurant::factory()->create(), Role::Admin);
+it('is open to the tenant admin', function (): void {
+    enterTenantPanel(Tenant::factory()->create(), Role::Admin);
 
     expect(Settings::canAccess())->toBeTrue();
 });
 
 it('is closed to floor staff', function (): void {
-    enterRestaurantPanel(Restaurant::factory()->create(), Role::Staff);
+    enterTenantPanel(Tenant::factory()->create(), Role::Staff);
 
     expect(Settings::canAccess())->toBeFalse();
 });
 
-it('is open to a super admin supporting a restaurant', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('is open to a super admin supporting a tenant', function (): void {
+    $tenant = Tenant::factory()->create();
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
-    Filament::setTenant($restaurant);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
+    Filament::setTenant($tenant);
 
     expect(Settings::canAccess())->toBeTrue();
 });
@@ -151,26 +151,26 @@ it('is open to a super admin supporting a restaurant', function (): void {
 |
 | The GST every price on the menu is read against, plus the two optional
 | charges. Each charge is a switch and an amount rather than an amount alone,
-| so "we do not levy one" is something a restaurant can say.
+| so "we do not levy one" is something a tenant can say.
 |
 */
 
-it('starts a restaurant on the standalone restaurant slab, tax added at the bill', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('starts a tenant on the standalone restaurant slab, tax added at the bill', function (): void {
+    $tenant = Tenant::factory()->create();
 
-    // The default in $attributes and RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS have to agree; a
+    // The default in $attributes and TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS have to agree; a
     // property initialiser cannot call the static method, so this is what
     // keeps the two in step.
-    expect($restaurant->settings->taxRateBasisPoints())->toBe(RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
-        ->and($restaurant->taxRateBasisPoints())->toBe(RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
-        ->and($restaurant->settings->prices_include_tax)->toBeFalse()
-        ->and($restaurant->settings->service_charge_enabled)->toBeFalse()
-        ->and($restaurant->settings->parcel_charge_enabled)->toBeFalse();
+    expect($tenant->settings->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
+        ->and($tenant->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
+        ->and($tenant->settings->prices_include_tax)->toBeFalse()
+        ->and($tenant->settings->service_charge_enabled)->toBeFalse()
+        ->and($tenant->settings->parcel_charge_enabled)->toBeFalse();
 });
 
 it('saves the GST rate and whether prices already include it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -183,7 +183,7 @@ it('saves the GST rate and whether prices already include it', function (): void
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $settings = $restaurant->refresh()->settings;
+    $settings = $tenant->refresh()->settings;
 
     expect($settings->gstin)->toBe('29ABCDE1234F1Z5')
         ->and($settings->taxRateBasisPoints())->toBe(1800)
@@ -191,8 +191,8 @@ it('saves the GST rate and whether prices already include it', function (): void
 });
 
 it('types a service charge as a percentage and stores it as basis points', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -202,7 +202,7 @@ it('types a service charge as a percentage and stores it as basis points', funct
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $settings = $restaurant->refresh()->settings;
+    $settings = $tenant->refresh()->settings;
 
     // Basis points, like a tax rate, so the arithmetic behind a bill stays in
     // integers: 10% of ₹500.00 is exactly ₹50.00.
@@ -211,8 +211,8 @@ it('types a service charge as a percentage and stores it as basis points', funct
 });
 
 it('types a parcel charge as money and stores it in minor units', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -222,7 +222,7 @@ it('types a parcel charge as money and stores it in minor units', function (): v
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $settings = $restaurant->refresh()->settings;
+    $settings = $tenant->refresh()->settings;
 
     expect($settings->parcel_charge_minor_units)->toBe(2050)
         ->and($settings->parcel_charge_minor_units)->toBeInt()
@@ -230,9 +230,9 @@ it('types a parcel charge as money and stores it in minor units', function (): v
 });
 
 it('charges nothing while a charge is switched off, whatever its amount says', function (): void {
-    // RestaurantFactory already gives every restaurant its one settings row.
-    $restaurant = Restaurant::factory()->create();
-    $settings = $restaurant->settings;
+    // TenantFactory already gives every tenant its one settings row.
+    $tenant = Tenant::factory()->create();
+    $settings = $tenant->settings;
 
     $settings->update([
         'service_charge_enabled' => false,
@@ -242,7 +242,7 @@ it('charges nothing while a charge is switched off, whatever its amount says', f
     ]);
 
     // The switch is what decides, not the number beside it — turning a charge
-    // off must not mean losing the rate a restaurant had set.
+    // off must not mean losing the rate a tenant had set.
     expect($settings->serviceChargeOn(50000))->toBe(0)
         ->and($settings->parcelCharge())->toBe(0)
         ->and($settings->service_charge_basis_points)->toBe(1000)
@@ -250,8 +250,8 @@ it('charges nothing while a charge is switched off, whatever its amount says', f
 });
 
 it('accepts a GST rate no fixed list of slabs would have held', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     // India's GST 2.0 reform of September 2025 restructured the slabs; a rate
     // is typed rather than picked so the next notification is a number, not a
@@ -261,33 +261,33 @@ it('accepts a GST rate no fixed list of slabs would have held', function (): voi
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($restaurant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
+    expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
 });
 
 it('round-trips the GST rate through the form without drift', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings->update(['tax_rate_basis_points' => 1250]);
+    $tenant = Tenant::factory()->create();
+    $tenant->settings->update(['tax_rate_basis_points' => 1250]);
 
-    enterRestaurantPanel($restaurant, Role::Admin);
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['tax_rate_percentage' => 12.5])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($restaurant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
+    expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
 });
 
 it('round-trips a service charge through the form without drift', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings->update(['service_charge_enabled' => true, 'service_charge_basis_points' => 250]);
+    $tenant = Tenant::factory()->create();
+    $tenant->settings->update(['service_charge_enabled' => true, 'service_charge_basis_points' => 250]);
 
-    enterRestaurantPanel($restaurant, Role::Admin);
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['service_charge_percentage' => 2.5])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($restaurant->refresh()->settings->service_charge_basis_points)->toBe(250);
+    expect($tenant->refresh()->settings->service_charge_basis_points)->toBe(250);
 });

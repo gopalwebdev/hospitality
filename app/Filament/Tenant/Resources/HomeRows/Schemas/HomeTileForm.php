@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows\Schemas;
+namespace App\Filament\Tenant\Resources\HomeRows\Schemas;
 
+use App\Filament\Tenant\CurrentTenant;
 use App\Enums\HomeTileAction;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuCategoryForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\HomeTile;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
@@ -48,8 +49,8 @@ class HomeTileForm
                             ->image()
                             ->imageEditor()
                             // Kept on the private disk and served through a
-                            // route that checks the restaurant in the domain,
-                            // so one restaurant's uploads are never reachable
+                            // route that checks the tenant in the domain,
+                            // so one tenant's uploads are never reachable
                             // from another's subdomain.
                             ->disk('local')
                             ->directory(fn (): string => self::uploadDirectory())
@@ -87,7 +88,7 @@ class HomeTileForm
                             ->prefixIcon(Heroicon::OutlinedBookOpen)
                             ->visible(fn (Get $get): bool => self::actionIs($get, HomeTileAction::Menu))
                             ->required(fn (Get $get): bool => self::actionIs($get, HomeTileAction::Menu))
-                            ->helperText(__('panel.tiles.menu_to_open_help')),
+                            ->helperText(__('panel.tiles.menu_to_open_help', ['type' => CurrentTenant::noun()])),
 
                         TextInput::make('url')
                             ->label(__('panel.tiles.link'))
@@ -163,15 +164,15 @@ class HomeTileForm
     }
 
     /**
-     * Where this restaurant's tile uploads live.
+     * Where this tenant's tile uploads live.
      *
-     * A directory per restaurant, so one restaurant's files are separated from
+     * A directory per tenant, so one tenant's files are separated from
      * another's on the disk as well as by the route that serves them.
      */
     private static function uploadDirectory(): string
     {
         $tenant = Filament::getTenant();
 
-        return 'home-tiles/'.($tenant instanceof Restaurant ? $tenant->getKey() : 'shared');
+        return 'home-tiles/'.($tenant instanceof Tenant ? $tenant->getKey() : 'shared');
     }
 }

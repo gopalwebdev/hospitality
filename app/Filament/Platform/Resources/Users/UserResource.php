@@ -23,15 +23,15 @@ use UnitEnum;
  * Every account on the platform, from the product team panel.
  *
  * This is the unscoped view of users: no tenant relationship is named, so
- * unlike the restaurant panel's own users resource it lists the product team and
- * every restaurant's roster alike, and it is the only place an account is
+ * unlike the tenant panel's own users resource it lists the product team and
+ * every tenant's roster alike, and it is the only place an account is
  * created with a tenant, made the product team, or deleted outright.
  *
  * Two guards live here rather than in UserPolicy. AppServiceProvider's
  * Gate::before answers true for a super admin before any policy method runs, so
  * a policy is the wrong place for a rule that has to bind the product team too:
  *
- * - the page is the product team only, whatever user.manage a restaurant role carries
+ * - the page is the product team only, whatever user.manage a tenant role carries
  * - nobody deletes their own account, which is the one delete with no way back
  */
 class UserResource extends Resource
@@ -64,8 +64,8 @@ class UserResource extends Resource
     /**
      * The product team only, including the navigation item.
      *
-     * user.manage is held by restaurant roles, so leaning on the policy alone
-     * would offer this page to a restaurant admin the moment they could reach
+     * user.manage is held by tenant roles, so leaning on the policy alone
+     * would offer this page to a tenant admin the moment they could reach
      * the panel at all.
      */
     public static function canAccess(): bool

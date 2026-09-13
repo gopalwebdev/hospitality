@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Pages;
+namespace App\Filament\Tenant\Resources\Menus\Pages;
 
 use App\Actions\Menus\ApplyMenuArrangement;
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
-use App\Filament\Restaurant\Resources\Menus\Tables\MenuArrangementTable;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\Tables\MenuArrangementTable;
 use App\Models\Menu;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -37,7 +37,7 @@ class ArrangeMenu extends Page implements HasTable
 
     protected static string $resource = MenuResource::class;
 
-    protected string $view = 'filament.restaurant.resources.menus.pages.arrange-menu';
+    protected string $view = 'filament.tenant.resources.menus.pages.arrange-menu';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsUpDown;
 

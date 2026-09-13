@@ -4,8 +4,8 @@ use App\Enums\FilamentPanel;
 use App\Enums\Role;
 use App\Filament\Auth\OtpLogin;
 use App\Filament\Platform\Auth\Login as PlatformLogin;
-use App\Filament\Restaurant\Auth\Login as RestaurantLogin;
-use App\Models\Restaurant;
+use App\Filament\Tenant\Auth\Login as TenantLogin;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -25,13 +25,13 @@ function superAdmin(): User
 }
 
 /**
- * A restaurant administrator, who may use only their own tenant panel.
+ * A tenant administrator, who may use only their own tenant panel.
  */
-function restaurantAdmin(Restaurant $restaurant): User
+function tenantAdmin(Tenant $tenant): User
 {
     $user = User::factory()->create();
     $user->assignRole(Role::Admin->value);
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
 
     return $user;
 }
@@ -46,11 +46,11 @@ dataset('sign-in pages', [
         PlatformLogin::class,
         tap(superAdmin(), fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Platform->value)),
     ]],
-    'restaurant panel' => [fn (): array => [
-        RestaurantLogin::class,
+    'tenant panel' => [fn (): array => [
+        TenantLogin::class,
         tap(
-            restaurantAdmin(Restaurant::factory()->create(['slug' => 't1'])),
-            fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Restaurant->value),
+            tenantAdmin(Tenant::factory()->create(['slug' => 't1'])),
+            fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Tenant->value),
         ),
     ]],
 ]);
@@ -154,7 +154,7 @@ it('turns down an address that is not an email at all', function (): void {
 
 it('issues no code to a user who cannot reach the panel', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = restaurantAdmin(Restaurant::factory()->create(['slug' => 't1']));
+    $user = tenantAdmin(Tenant::factory()->create(['slug' => 't1']));
 
     // A real account, but not one that can use this panel. It is refused in
     // exactly the same words as an address nobody owns.
@@ -317,12 +317,12 @@ it('signs a super admin in with the code that was issued', function (): void {
     $this->assertAuthenticatedAs($user);
 });
 
-it('signs a restaurant admin into their own tenant panel', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
-    $user = restaurantAdmin($restaurant);
+it('signs a tenant admin into their own tenant panel', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
+    $user = tenantAdmin($tenant);
 
-    $component = Livewire::test(RestaurantLogin::class)
+    $component = Livewire::test(TenantLogin::class)
         ->fillForm(['email' => $user->email])
         ->call('requestCode');
 
@@ -334,19 +334,19 @@ it('signs a restaurant admin into their own tenant panel', function (): void {
     $this->assertAuthenticatedAs($user);
 });
 
-it('signs the product team in on a restaurant subdomain they staff no part of', function (): void {
+it('signs the product team in on a tenant subdomain they staff no part of', function (): void {
     // The users resource in the tenant panel puts a tenancy global scope on
     // User, and sign-in looks accounts up by address. The product team are on no
-    // restaurant's roster, so were that scope to reach the lookup they would
+    // tenant's roster, so were that scope to reach the lookup they would
     // be told their own account does not exist. Booting the panel is what
     // registers the scope, so this signs in with it in place.
     $user = superAdmin();
 
-    Restaurant::factory()->create(['slug' => 't1']);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
+    Tenant::factory()->create(['slug' => 't1']);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
     Filament::bootCurrentPanel();
 
-    $component = Livewire::test(RestaurantLogin::class)
+    $component = Livewire::test(TenantLogin::class)
         ->fillForm(['email' => $user->email])
         ->call('requestCode')
         ->assertHasNoFormErrors();
@@ -359,11 +359,11 @@ it('signs the product team in on a restaurant subdomain they staff no part of', 
     $this->assertAuthenticatedAs($user);
 });
 
-it('identifies no restaurant until someone has signed in', function (): void {
+it('identifies no tenant until someone has signed in', function (): void {
     // Why the scope above cannot reach sign-in: Filament resolves the tenant
     // from the authenticated user, so a visitor at the login page has none,
     // and the scope leaves every query alone while that is true.
-    Restaurant::factory()->create(['slug' => 't1']);
+    Tenant::factory()->create(['slug' => 't1']);
 
     $this->get('http://t1.restaurant-app.test/dashboard/login')->assertOk();
 
@@ -371,11 +371,11 @@ it('identifies no restaurant until someone has signed in', function (): void {
 });
 
 it('still refuses a code to an address with no account at all', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
+    Tenant::factory()->create(['slug' => 't1']);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
     Filament::bootCurrentPanel();
 
-    Livewire::test(RestaurantLogin::class)
+    Livewire::test(TenantLogin::class)
         ->fillForm(['email' => 'nobody@example.com'])
         ->call('requestCode')
         ->assertHasFormErrors(['email']);

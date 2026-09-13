@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Schemas;
+namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
+use App\Filament\Tenant\CurrentTenant;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use Filament\Forms\Components\TimePicker;
@@ -37,10 +38,10 @@ class MenuForm
                         __('panel.shared.name'),
                         maxLength: 64,
                         // Scoped to the tenant by Filament's global scope, so
-                        // two restaurants may both have a "Dinner" and one
-                        // restaurant may not have it twice.
+                        // two tenants may both have a "Dinner" and one
+                        // tenant may not have it twice.
                         uniqueWithin: fn (): Builder => Menu::query(),
-                        uniqueMessage: __('panel.menus.unique'),
+                        uniqueMessage: __('panel.menus.unique', ['type' => CurrentTenant::noun()]),
                     )),
 
                 Section::make(__('panel.menus.description_section'))

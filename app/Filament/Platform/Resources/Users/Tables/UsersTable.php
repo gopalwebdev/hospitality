@@ -36,7 +36,7 @@ class UsersTable
                 // where the account belongs, not what it may do — the badge
                 // beside it answers that.
                 TextColumn::make('tenant.name')
-                    ->label('Restaurant')
+                    ->label('Tenant')
                     ->icon(Heroicon::OutlinedBuildingStorefront)
                     ->badge()
                     ->color('gray')
@@ -49,7 +49,7 @@ class UsersTable
                     ->trueIcon(Heroicon::OutlinedShieldCheck)
                     ->falseIcon(Heroicon::OutlinedMinusSmall)
                     ->sortable()
-                    ->tooltip('The product team hold every permission on every restaurant.'),
+                    ->tooltip('The product team hold every permission on every tenant.'),
 
                 TextColumn::make('roles.name')
                     ->label('Roles')
@@ -65,23 +65,23 @@ class UsersTable
             ->filters([
                 // Where an account belongs, which is the tenant column alone —
                 // not what it may do. An ordinary account waiting to be put on
-                // a roster has no restaurant either, so this reads "belongs to
+                // a roster has no tenant either, so this reads "belongs to
                 // the platform", and the product team filter below is the
                 // separate question of what someone holds.
                 SelectFilter::make('belongs_to')
                     ->label('Belongs to')
                     ->options([
-                        'restaurant' => 'A restaurant',
+                        'tenant' => 'A tenant',
                         'product_team' => 'The product team',
                     ])
                     ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
-                        'restaurant' => $query->whereNotNull('tenant_id'),
+                        'tenant' => $query->whereNotNull('tenant_id'),
                         'product_team' => $query->whereNull('tenant_id'),
                         default => $query,
                     }),
 
                 SelectFilter::make('tenant_id')
-                    ->label('Restaurant')
+                    ->label('Tenant')
                     ->relationship('tenant', 'name')
                     ->searchable()
                     ->preload(),
@@ -112,7 +112,7 @@ class UsersTable
                     ->icon(Heroicon::OutlinedTrash)
                     ->visible(fn (User $record): bool => UserResource::canDelete($record)),
             ])
-            // No bulk delete: an account may be the last way into a restaurant,
+            // No bulk delete: an account may be the last way into a tenant,
             // and that is a per-record question.
             ->defaultSort('name');
     }

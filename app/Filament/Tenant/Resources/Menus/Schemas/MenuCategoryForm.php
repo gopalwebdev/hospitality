@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Schemas;
+namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
@@ -47,7 +47,7 @@ class MenuCategoryForm
                         'name',
                         __('panel.shared.name'),
                         maxLength: 64,
-                        // Unique within the menu rather than the restaurant, so
+                        // Unique within the menu rather than the tenant, so
                         // a lunch card and a dinner card may both have a
                         // "Starters". Matches the expression index exactly.
                         // Per level, matching the expression index: a menu may
@@ -84,7 +84,7 @@ class MenuCategoryForm
     }
 
     /**
-     * This restaurant's menus, in the order it arranged them.
+     * This tenant's menus, in the order it arranged them.
      *
      * Read as models rather than plucked, because the label is a translated
      * column: `pluck('name->en')` comes back keyed by the path itself, and

@@ -37,7 +37,7 @@ it('lets the product team manage roles', function (): void {
         ->and($user->can('delete', $role))->toBeTrue();
 });
 
-it('refuses role management to every restaurant role', function (RoleEnum $roleEnum): void {
+it('refuses role management to every tenant role', function (RoleEnum $roleEnum): void {
     $user = User::factory()->create();
     $user->assignRole($roleEnum->value);
     $role = Role::factory()->create();
@@ -48,7 +48,7 @@ it('refuses role management to every restaurant role', function (RoleEnum $roleE
         ->and($user->can('delete', $role))->toBeFalse();
 })->with(RoleEnum::cases());
 
-it('keeps a restaurant admin off the roles page', function (): void {
+it('keeps a tenant admin off the roles page', function (): void {
     $user = User::factory()->create();
     $user->assignRole(RoleEnum::Admin->value);
 
@@ -404,7 +404,7 @@ it('clears a category when everything in it is unticked', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('ships exactly the roles a restaurant needs', function (): void {
+it('ships exactly the roles a tenant needs', function (): void {
     // Four kinds of account in the application: the product team, who are the
     // is_super_admin column rather than a role, and these three.
     expect(RoleEnum::values())->toBe(['admin', 'staff', 'guest'])
@@ -440,15 +440,15 @@ it('seeds staff who work orders but do not change the menu', function (): void {
         ->and($staff->hasPermissionTo(PermissionEnum::UserManage->value))->toBeFalse();
 });
 
-it('gives a restaurant admin everything but the product team\'s own powers', function (): void {
+it('gives a tenant admin everything but the product team\'s own powers', function (): void {
     $admin = Role::findByName(RoleEnum::Admin->value);
 
     expect($admin->permissions->pluck('name')->all())
         ->toEqualCanonicalizing(array_diff(PermissionEnum::values(), PermissionEnum::productTeamOnlyValues()));
 });
 
-it('offers the guest role to restaurants', function (): void {
-    expect(Role::query()->assignableWithinRestaurant()->pluck('name')->all())
+it('offers the guest role to tenants', function (): void {
+    expect(Role::query()->assignableWithinTenant()->pluck('name')->all())
         ->toContain(RoleEnum::Guest->value);
 });
 
@@ -640,23 +640,23 @@ it('refuses to delete a built-in role from anywhere', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Which roles a restaurant may hand out
+| Which roles a tenant may hand out
 |--------------------------------------------------------------------------
 */
 
-it('withholds any role carrying a product team permission from restaurants', function (): void {
+it('withholds any role carrying a product team permission from tenants', function (): void {
     $platformRole = Role::factory()->create();
-    $platformRole->givePermissionTo(PermissionEnum::RestaurantManage->value);
+    $platformRole->givePermissionTo(PermissionEnum::TenantManage->value);
 
-    $assignable = Role::query()->assignableWithinRestaurant()->pluck('name')->all();
+    $assignable = Role::query()->assignableWithinTenant()->pluck('name')->all();
 
     expect($assignable)->not->toContain($platformRole->name)
         ->and($assignable)->toContain(RoleEnum::Admin->value)
         ->and($assignable)->toContain(RoleEnum::Staff->value);
 });
 
-it('offers every built-in role to restaurants', function (RoleEnum $roleEnum): void {
-    $assignable = Role::query()->assignableWithinRestaurant()->pluck('name')->all();
+it('offers every built-in role to tenants', function (RoleEnum $roleEnum): void {
+    $assignable = Role::query()->assignableWithinTenant()->pluck('name')->all();
 
     expect($assignable)->toContain($roleEnum->value);
 })->with(RoleEnum::cases());

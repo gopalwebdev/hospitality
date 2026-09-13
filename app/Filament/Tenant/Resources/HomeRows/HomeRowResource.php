@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows;
+namespace App\Filament\Tenant\Resources\HomeRows;
 
-use App\Filament\Restaurant\Resources\HomeRows\Pages\EditHomeRow;
-use App\Filament\Restaurant\Resources\HomeRows\Pages\ListHomeRows;
-use App\Filament\Restaurant\Resources\HomeRows\RelationManagers\TilesRelationManager;
-use App\Filament\Restaurant\Resources\HomeRows\Schemas\HomeRowForm;
-use App\Filament\Restaurant\Resources\HomeRows\Tables\HomeRowsTable;
+use App\Filament\Tenant\Resources\HomeRows\Pages\EditHomeRow;
+use App\Filament\Tenant\Resources\HomeRows\Pages\ListHomeRows;
+use App\Filament\Tenant\Resources\HomeRows\RelationManagers\TilesRelationManager;
+use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
+use App\Filament\Tenant\Resources\HomeRows\Tables\HomeRowsTable;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\HomeRow;
 use BackedEnum;
@@ -27,7 +27,7 @@ use Filament\Tables\Table;
  * has anything to do with food.
  *
  * Scoping is Filament's: the panel has a tenant, so every query here is limited
- * to the restaurant in the subdomain. Who may use the page is HomeRowPolicy's
+ * to the tenant in the subdomain. Who may use the page is HomeRowPolicy's
  * business, through storefront.view and storefront.manage.
  */
 class HomeRowResource extends Resource
@@ -39,8 +39,6 @@ class HomeRowResource extends Resource
     protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'title';
-
-    protected static ?string $tenantOwnershipRelationshipName = 'restaurant';
 
     /**
      * Labels are methods rather than static properties because a property is

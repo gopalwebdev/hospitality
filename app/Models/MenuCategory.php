@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
- * A section of one of a restaurant's menus, at either of its two levels.
+ * A section of one of a tenant's menus, at either of its two levels.
  *
  * A top-level category is Starters, Biryani, Desserts. A category with a
  * `parent_id` is a subdivision of one — Biryani → Chicken, Mutton, Vegetable —
@@ -30,12 +30,12 @@ use LogicException;
  * that distinction, and booted() refuses a parent that is itself nested.
  *
  * Categories are ordered by hand rather than alphabetically, because a menu is
- * read in the order the restaurant means it to be read. `position` orders a row
+ * read in the order the tenant means it to be read. `position` orders a row
  * among its **siblings** — top-level categories against each other, and the
  * subdivisions of one category against each other.
  *
  * menu_id is carried alongside tenant_id and the pair is a composite foreign
- * key into menus, so a section can never end up under another restaurant's
+ * key into menus, so a section can never end up under another tenant's
  * menu; (parent_id, menu_id) is a second composite key into this table, so a
  * subdivision can never end up under a category on a different menu. The name
  * is translated — see HasTranslatedNames.
@@ -77,9 +77,9 @@ class MenuCategory extends Model
     ];
 
     /**
-     * Take the restaurant from the menu this sits on, and refuse a third level.
+     * Take the tenant from the menu this sits on, and refuse a third level.
      *
-     * The restaurant is the same one by definition — the composite foreign key
+     * The tenant is the same one by definition — the composite foreign key
      * insists on it — so nothing that creates a category has to remember.
      * Filament's tenancy stamps the model a *resource* is saving, and categories
      * are not edited through one: they are created by the relation managers on
@@ -127,13 +127,13 @@ class MenuCategory extends Model
     }
 
     /**
-     * The restaurant whose menu this belongs to.
+     * The tenant whose menu this belongs to.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -159,7 +159,7 @@ class MenuCategory extends Model
     /**
      * The subdivisions of this category, when it has any.
      *
-     * Most categories have none. A restaurant subdivides "Biryani" into
+     * Most categories have none. A tenant subdivides "Biryani" into
      * Chicken, Mutton and Vegetable only when the category is long enough to be
      * worth breaking up.
      *
@@ -252,7 +252,7 @@ class MenuCategory extends Model
     }
 
     /**
-     * Order the way the restaurant arranged its menu, name only to break ties.
+     * Order the way the tenant arranged its menu, name only to break ties.
      *
      * @param  Builder<$this>  $query
      */

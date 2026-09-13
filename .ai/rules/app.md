@@ -30,38 +30,38 @@ A duplicate is the same SQL with the same bindings twice inside one HTTP request
 
 The fixes, in order of preference: read the answer once and hand it down; eager load what a loop asks for and name the columns (an eager load of `menu:id,name` never collides with a table's own `select *`); and where Filament evaluates the same closure several times while building one page — select options, a `disabled()` beside a `helperText()`, a rule on every language's input — memoize it with `once()`. `configureRequestMemoization()` flushes `Once` on every `RouteMatched`, so `once()` means once per request rather than once per process; without it a test that makes several requests reads a stale option list.
 
-`Restaurant::resolvedSettings()` is the pattern for a per-request lookup on a model: loaded once and kept as the `settings` relation, never a lazy load. `currency()`, `taxRateBasisPoints()` and `isAcceptingOrders()` all read it, as do the guest menu's charges and the Settings page.
+`Tenant::resolvedSettings()` is the pattern for a per-request lookup on a model: loaded once and kept as the `settings` relation, never a lazy load. `currency()`, `taxRateBasisPoints()` and `isAcceptingOrders()` all read it, as do the guest menu's charges and the Settings page.
 
 ## India is the only market for now
 Defaults are Indian: CountryCallingCode has one case (+91) and mobile numbers validate as ten digits, and addresses take a pincode. This is a "for now", not a permanent assumption, so keep this shape multi-country: values that vary by country belong in an enum with a case per country rather than hardcoded in a form or a rule. Add the country to the enum rather than branching on it at the call site.
 
-Currency and timezone are a harder line than that, by product decision, not just a default: `App\Enums\Currency` has exactly one case (`IndianRupee`) and `restaurant_settings` carries no timezone column at all — the application timezone comes from `APP_TIMEZONE`/`config('app.timezone')` alone (`.ai/rules/config.md`), never a per-restaurant choice. Re-adding either a currency picker or a per-restaurant timezone needs a product decision first, not just an enum case — this project has explicitly decided against them "for now," which is a stronger statement than the multi-country shape above.
+Currency and timezone are a harder line than that, by product decision, not just a default: `App\Enums\Currency` has exactly one case (`IndianRupee`) and `tenant_settings` carries no timezone column at all — the application timezone comes from `APP_TIMEZONE`/`config('app.timezone')` alone (`.ai/rules/config.md`), never a per-tenant choice. Re-adding either a currency picker or a per-tenant timezone needs a product decision first, not just an enum case — this project has explicitly decided against them "for now," which is a stronger statement than the multi-country shape above.
 
-## A restaurant caps its own admins and staff
-`restaurants.max_admins` and `restaurants.max_staff` (default from `config('restaurants.php')`, editable per restaurant by a super admin on RestaurantForm) bound how many accounts may hold the Admin or Staff role on that restaurant's roster at once — one admin and five staff out of the box. `Restaurant::roleLimit()` and `Restaurant::roleHolderCount()` answer "how many, and how many allowed"; `App\Actions\Restaurants\EnsureRoleFitsWithinLimit` is the single place every role grant is checked against it, called from `SetRestaurantUserRoles` (tenant panel) and `SetUserRoles` (product team panel) — never bypass either action to write a role directly.
+## A tenant caps its own admins and staff
+`tenants.max_admins` and `tenants.max_staff` (default from `config('tenants.php')`, editable per tenant by a super admin on TenantForm) bound how many accounts may hold the Admin or Staff role on that tenant's roster at once — one admin and five staff out of the box. `Tenant::roleLimit()` and `Tenant::roleHolderCount()` answer "how many, and how many allowed"; `App\Actions\Tenants\EnsureRoleFitsWithinLimit` is the single place every role grant is checked against it, called from `SetTenantUserRoles` (tenant panel) and `SetUserRoles` (product team panel) — never bypass either action to write a role directly.
 
-Lowering a limit below the restaurant's current roster is refused at the form field (`RestaurantForm::notBelowCurrentHolders()`), naming how many to remove first, rather than silently locking the extra accounts out of a role they still hold.
+Lowering a limit below the tenant's current roster is refused at the form field (`TenantForm::notBelowCurrentHolders()`), naming how many to remove first, rather than silently locking the extra accounts out of a role they still hold.
 
 ## Say "product team", not "platform staff"
 The people who run the whole product are the **product team** — that is the vocabulary in class names, method names, comments and UI copy: `isProductTeamOnly()`, `productTeamOnlyValues()`, `belongsToProductTeam()`, `enterProductTeamPanel()`, and "Product team" wherever a null tenant is rendered.
 
-"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every restaurant on the platform", and the platform panel's brand name "Restaurant Platform". The distinction is people versus product — do not rename those back.
+"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every tenant on the platform", and the platform panel's brand name "Hotel & Restaurant Platform". The distinction is people versus product — do not rename those back.
 
 ## Three surfaces: two Filament panels and the guest app
 Settled architecture, one surface per audience:
 
-1. **Product team** — Filament platform panel, root domain, `/dashboard` (entered at `/login`). Restaurants, roles, permissions, accounts.
-2. **Restaurant** — Filament restaurant panel, tenant subdomain, `/dashboard` (entered at `/login`), for a restaurant's admins and staff alike. Menu, settings, reports, receipt printing.
-3. **Guest** — React + Inertia, phone-first, installable as a PWA; arrives by QR and lands on a home screen the restaurant arranges out of rows of tiles (`home_rows` → `home_tiles`), walking from there into a menu, a PDF, or off to a link.
+1. **Product team** — Filament platform panel, root domain, `/dashboard` (entered at `/login`). Tenants, roles, permissions, accounts.
+2. **Tenant** — Filament tenant panel, tenant subdomain, `/dashboard` (entered at `/login`), for a tenant's admins and staff alike. Menu, settings, reports, receipt printing.
+3. **Guest** — React + Inertia, phone-first, installable as a PWA; arrives by QR and lands on a home screen the tenant arranges out of rows of tiles (`home_rows` → `home_tiles`), walking from there into a menu, a PDF, or off to a link.
 
-Both panels live under `/dashboard` and are told apart by host, and `/login` on either host is the way in — `.ai/rules/filament.md` explains why that depends on provider order. They were once `/super-admin` and `/admin`, in folders named for roles; they are named for whose they are now, because a restaurant's panel serves its staff as much as its admins.
+Both panels live under `/dashboard` and are told apart by host, and `/login` on either host is the way in — `.ai/rules/filament.md` explains why that depends on provider order. They were once `/super-admin` and `/admin`, in folders named for roles; they are named for whose they are now, because a tenant's panel serves its staff as much as its admins.
 
 A staff app (React, phone-first) existed and was removed on the project owner's instruction. When staff get a surface again it is React rather than a third panel, for the reason it was before: they are on phones, and `.ai/rules/filament.md` reserves panels for laptop-and-larger. The guest app does not work offline — there is no offline requirement, and Inertia needs the server for every page.
 
 Keeping the guest app the only Inertia surface on a subdomain is what keeps its bundle free of Filament assets. Do not import Filament into it, and do not add a Filament panel for a phone audience.
 
 ## The menu is four levels, one of which nests once, and a guest lands on tiles
-`menus` → `menu_categories` → `menu_items` → `menu_item_additions`, where `menu_categories` holds **both** levels of section: a row with no `parent_id` is a section of the menu, and one with a parent is a subdivision of that section. A restaurant that serves one card all day simply keeps one menu; one that serves a different card at lunch has two.
+`menus` → `menu_categories` → `menu_items` → `menu_item_additions`, where `menu_categories` holds **both** levels of section: a row with no `parent_id` is a section of the menu, and one with a parent is a subdivision of that section. A tenant that serves one card all day simply keeps one menu; one that serves a different card at lunch has two.
 
 Subdividing is optional, and the depth is capped at two. A dish names exactly one category whichever level it sits on, so there is no (category, sub-category) pair to keep consistent — that is the whole reason the two levels share a table. A separate `menu_sub_categories` table was built first and replaced; see `.ai/rules/models.md` for what the merge bought.
 
@@ -75,7 +75,7 @@ What a guest sees first is `home_rows`, each holding its own `home_tiles`. The *
 
 "Row" and not "section": the panel already calls `menu_categories` sections, and one word for two different things is how a reader ends up on the wrong page.
 
-A menu carries two **rails** as well as its categories: the dishes the restaurant leads with (`menu_items.is_featured`, ordered by `featured_position`) and its combos. Where they sit among the categories is the restaurant's own decision — `menus.featured_position` and `menus.combos_position` put them in the same number space as `menu_categories.position`, and `Menu::readingOrder()` merges the three. A menu nobody has arranged still opens with its featured dishes and then its combos, which is what those two columns default to. A featured dish still appears under its own category further down, so a guest scrolling finds it where they expect it.
+A menu carries two **rails** as well as its categories: the dishes the tenant leads with (`menu_items.is_featured`, ordered by `featured_position`) and its combos. Where they sit among the categories is the tenant's own decision — `menus.featured_position` and `menus.combos_position` put them in the same number space as `menu_categories.position`, and `Menu::readingOrder()` merges the three. A menu nobody has arranged still opens with its featured dishes and then its combos, which is what those two columns default to. A featured dish still appears under its own category further down, so a guest scrolling finds it where they expect it.
 
 Every list a guest reads is ordered by `position` within its own parent — the blocks of a menu, subdivisions within a category, dishes within a category, additions within a dish — and each is dragged into that order in the panel, on one screen: the menu's arrangement (`.ai/rules/menus.md`). Nothing is ordered alphabetically, and nothing is ordered across parents.
 
@@ -83,13 +83,13 @@ Featuring belongs to **one menu**, so a dish that leaves a menu stops being feat
 
 Prices carry an optional `compare_at_price_minor_units` — the higher "was" price shown struck through — which is null on almost every row, because null is how a dish says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option.
 
-`menu_items`, `menu_item_additions` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `restaurant_settings.tax_rate_basis_points`, so a restaurant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as restaurant service — override it. See the settings page for the global rate, `prices_include_tax`, and the two optional charges.
+`menu_items`, `menu_item_additions` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as restaurant service — override it. See the settings page for the global rate, `prices_include_tax`, and the two optional charges.
 
-## Two languages a restaurant writes in; the application itself is English
-`App\Enums\Locale` has one case per language a restaurant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.
+## Two languages a tenant writes in; the application itself is English
+`App\Enums\Locale` has one case per language a tenant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.
 
 **The application's own words are not part of that.** `lang/en` is the only language directory; a `lang/ta` mirroring every string existed and was deleted on the project owner's instruction — the codebase is written in English and translation lives at the database level only. So switching language changes the menu a guest reads and leaves the words around it alone. Do not reintroduce a second language directory; adding a language is a case and nothing else. See `.ai/rules/lang.md`.
 
 Like the India assumption above, the pair of languages is a "for now". The one thing that does not scale for free is the expression unique indexes, which are built on English — see `.ai/rules/migrations.md`.
 
-All three surfaces switch language: the guest app through its toggle, and both Filament panels through a switcher in the top bar. What that switch reaches is the restaurant's own words — menu, category, dish, addition and tile names. Roles and permissions stay English too, and for a second reason: code refers to those names.
+All three surfaces switch language: the guest app through its toggle, and both Filament panels through a switcher in the top bar. What that switch reaches is the tenant's own words — menu, category, dish, addition and tile names. Roles and permissions stay English too, and for a second reason: code refers to those names.

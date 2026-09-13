@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus;
+namespace App\Filament\Tenant\Resources\Menus;
 
-use App\Filament\Restaurant\Resources\Menus\Pages\ArrangeMenu;
-use App\Filament\Restaurant\Resources\Menus\Pages\EditMenu;
-use App\Filament\Restaurant\Resources\Menus\Pages\ListMenus;
-use App\Filament\Restaurant\Resources\Menus\Pages\ManageMenuCombos;
-use App\Filament\Restaurant\Resources\Menus\Pages\ManageMenuFeaturedItems;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuForm;
-use App\Filament\Restaurant\Resources\Menus\Tables\MenusTable;
+use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
+use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
+use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
+use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuCombos;
+use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuFeaturedItems;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuForm;
+use App\Filament\Tenant\Resources\Menus\Tables\MenusTable;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use BackedEnum;
@@ -21,18 +21,18 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 /**
- * The menus this restaurant serves: Lunch, Dinner, Drinks.
+ * The menus this tenant serves: Lunch, Dinner, Drinks.
  *
  * The top of the hierarchy the panel edits. One menu opens on its arrangement:
  * its categories, their subdivisions, the dishes in each and the two rails it
  * leads with, all in one list and all dragged into order there. Dishes are
  * still their own page — there are far more of them, and they are the thing a
- * restaurant edits daily.
+ * tenant edits daily.
  *
- * A restaurant that serves one card all day simply keeps one menu.
+ * A tenant that serves one card all day simply keeps one menu.
  *
  * Scoping is Filament's: the panel has a tenant, so every query here is limited
- * to the restaurant in the subdomain and new rows are stamped with it. Who may
+ * to the tenant in the subdomain and new rows are stamped with it. Who may
  * use the page is MenuPolicy's business, through menu.view and menu.manage.
  */
 class MenuResource extends Resource
@@ -47,8 +47,6 @@ class MenuResource extends Resource
      * First in the group, because it is the level everything else hangs off.
      */
     protected static ?int $navigationSort = 5;
-
-    protected static ?string $tenantOwnershipRelationshipName = 'restaurant';
 
     /**
      * Labels are methods rather than static properties because a property is

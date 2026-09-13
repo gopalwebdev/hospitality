@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows\Tables;
+namespace App\Filament\Tenant\Resources\HomeRows\Tables;
 
 use App\Enums\HomeRowLayout;
-use App\Filament\Restaurant\Resources\HomeRows\Schemas\HomeRowForm;
+use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tables\Reordering;
 use App\Models\HomeRow;

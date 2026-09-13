@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import Home from '@/pages/guest/home';
 
-const restaurant = { name: 'Spice Garden', slug: 'spice' };
+const tenant = { name: 'Spice Garden', slug: 'spice', typeNoun: 'hotel' };
 
 type HomeProps = Parameters<typeof Home>[0];
 type RowProp = HomeProps['rows'][number];
@@ -20,7 +20,7 @@ function tile(overrides: Partial<TileProp> = {}): TileProp {
     };
 }
 
-/** A banner row, which is what a restaurant leads with. */
+/** A banner row, which is what a tenant leads with. */
 function row(overrides: Partial<RowProp> = {}): RowProp {
     return {
         id: 1,
@@ -35,18 +35,18 @@ function row(overrides: Partial<RowProp> = {}): RowProp {
 }
 
 describe('guest home', () => {
-    it('names the restaurant at the top', () => {
-        render(<Home restaurant={restaurant} rows={[row()]} />);
+    it('names the tenant at the top', () => {
+        render(<Home tenant={tenant} rows={[row()]} />);
 
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
             'Spice Garden',
         );
     });
 
-    it('draws the tiles in the order the restaurant arranged them', () => {
+    it('draws the tiles in the order the tenant arranged them', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({
                         tiles: [
@@ -68,10 +68,10 @@ describe('guest home', () => {
         expect(links[2]).toHaveTextContent('Offers');
     });
 
-    it('draws the rows in the order the restaurant arranged them', () => {
+    it('draws the rows in the order the tenant arranged them', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({ id: 1, title: 'Eat', tiles: [tile({ id: 1 })] }),
                     row({ id: 2, title: 'Offers', tiles: [tile({ id: 2 })] }),
@@ -87,7 +87,7 @@ describe('guest home', () => {
     });
 
     it('draws no heading over a row that has none', () => {
-        render(<Home restaurant={restaurant} rows={[row({ title: null })]} />);
+        render(<Home tenant={tenant} rows={[row({ title: null })]} />);
 
         expect(
             screen.queryByRole('heading', { level: 2 }),
@@ -97,7 +97,7 @@ describe('guest home', () => {
     it('sends each tile where the server said it goes', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({
                         tiles: [
@@ -121,7 +121,7 @@ describe('guest home', () => {
     it('leaves the app through a plain anchor for a link tile', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({
                         layout: 'links',
@@ -150,7 +150,7 @@ describe('guest home', () => {
     it('labels a circular tile underneath, where there is room for it', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({
                         layout: 'links',
@@ -169,7 +169,7 @@ describe('guest home', () => {
     it("labels a tile's picture for a screen reader", () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[row({ tiles: [tile({ label: 'Menu' })] })]}
             />,
         );
@@ -180,7 +180,7 @@ describe('guest home', () => {
     it('draws a tile with no picture as its label rather than an empty box', () => {
         render(
             <Home
-                restaurant={restaurant}
+                tenant={tenant}
                 rows={[
                     row({ tiles: [tile({ label: 'Drinks', imageUrl: null })] }),
                 ]}
@@ -191,10 +191,13 @@ describe('guest home', () => {
         expect(screen.getByText('Drinks')).toBeInTheDocument();
     });
 
-    it('says so plainly when the restaurant has arranged nothing yet', () => {
-        render(<Home restaurant={restaurant} rows={[]} />);
+    it('says so plainly when the tenant has arranged nothing yet', () => {
+        render(<Home tenant={tenant} rows={[]} />);
 
-        expect(screen.getByText(/no home screen yet/i)).toBeInTheDocument();
+        // The stub's `:type` is filled with the tenant's own noun.
+        expect(
+            screen.getByText('No home screen at this hotel yet.'),
+        ).toBeInTheDocument();
         expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
 });

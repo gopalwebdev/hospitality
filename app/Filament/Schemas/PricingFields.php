@@ -4,8 +4,8 @@ namespace App\Filament\Schemas;
 
 use App\Enums\Currency;
 use App\Enums\ItemAvailability;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -70,10 +70,10 @@ final class PricingFields
      * of September 2025 restructured the slabs, and the next notification may
      * do so again — a hardcoded list is one notification from being wrong.
      *
-     * The placeholder is the restaurant's own rate, so leaving it empty visibly
+     * The placeholder is the tenant's own rate, so leaving it empty visibly
      * means "whatever settings says" without a sentence explaining it.
      */
-    public static function taxRatePercentage(int $restaurantRateBasisPoints): TextInput
+    public static function taxRatePercentage(int $tenantRateBasisPoints): TextInput
     {
         return TextInput::make('tax_rate_percentage')
             ->label(__('panel.items.tax_rate'))
@@ -82,7 +82,7 @@ final class PricingFields
             ->maxValue(100)
             ->step(0.01)
             ->suffix('%')
-            ->placeholder(self::formatRate($restaurantRateBasisPoints));
+            ->placeholder(self::formatRate($tenantRateBasisPoints));
     }
 
     /**
@@ -112,7 +112,7 @@ final class PricingFields
      * Turn the typed values into what gets stored.
      *
      * A blank compare-at price and a blank rate are both stored as null rather
-     * than zero: null means "not on offer" and "follow the restaurant", where a
+     * than zero: null means "not on offer" and "follow the tenant", where a
      * zero would mean a price of nothing and a tax rate of nothing.
      *
      * @param  array<string, mixed>  $data
@@ -169,7 +169,7 @@ final class PricingFields
      */
     public static function toBasisPoints(float|int|string $percentage): int
     {
-        return (int) round(((float) $percentage) * (RestaurantSetting::BASIS_POINTS_PER_WHOLE / 100));
+        return (int) round(((float) $percentage) * (TenantSetting::BASIS_POINTS_PER_WHOLE / 100));
     }
 
     /**
@@ -177,7 +177,7 @@ final class PricingFields
      */
     public static function toPercentage(int $basisPoints): float
     {
-        return $basisPoints / (RestaurantSetting::BASIS_POINTS_PER_WHOLE / 100);
+        return $basisPoints / (TenantSetting::BASIS_POINTS_PER_WHOLE / 100);
     }
 
     /**
@@ -191,24 +191,24 @@ final class PricingFields
     }
 
     /**
-     * The currency the restaurant in this panel prices in.
+     * The currency the tenant in this panel prices in.
      */
     public static function currency(): Currency
     {
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Restaurant ? $tenant->currency() : Currency::IndianRupee;
+        return $tenant instanceof Tenant ? $tenant->currency() : Currency::IndianRupee;
     }
 
     /**
-     * The GST rate the restaurant in this panel charges by default.
+     * The GST rate the tenant in this panel charges by default.
      */
-    public static function restaurantTaxRateBasisPoints(): int
+    public static function tenantTaxRateBasisPoints(): int
     {
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Restaurant
+        return $tenant instanceof Tenant
             ? $tenant->taxRateBasisPoints()
-            : RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+            : TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 }

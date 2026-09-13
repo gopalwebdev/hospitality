@@ -2,7 +2,7 @@
 
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,23 +70,23 @@ function captureIssuedCodes(): Closure
 }
 
 /**
- * Sign in as a user of the given restaurant and put the panel in that
- * restaurant's context, the way a request to its subdomain would.
+ * Sign in as a user of the given tenant and put the panel in that
+ * tenant's context, the way a request to its subdomain would.
  */
-function enterRestaurantPanel(Restaurant $restaurant, Role $role): User
+function enterTenantPanel(Tenant $tenant, Role $role): User
 {
     $user = User::factory()->create();
     $user->assignRole($role->value);
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
 
     test()->actingAs($user);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
 
     // Booting is what registers the tenancy global scopes, which a request
     // gets from Filament's middleware. Without it a Livewire test would see
-    // every restaurant's records and prove nothing about tenant isolation.
+    // every tenant's records and prove nothing about tenant isolation.
     Filament::bootCurrentPanel();
-    Filament::setTenant($restaurant);
+    Filament::setTenant($tenant);
 
     return $user;
 }

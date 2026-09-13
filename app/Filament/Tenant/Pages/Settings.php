@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Filament\Restaurant\Pages;
+namespace App\Filament\Tenant\Pages;
 
 use App\Enums\Permission;
 use App\Filament\Schemas\PricingFields;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -25,17 +25,17 @@ use Filament\Schemas\Schema;
 use LogicException;
 
 /**
- * Configuration for the one restaurant whose panel this is.
+ * Configuration for the one tenant whose panel this is.
  *
- * The restaurant comes from the panel's tenant, which is the subdomain being
+ * The tenant comes from the panel's tenant, which is the subdomain being
  * served, so this page can only ever read or write the settings of the
- * restaurant the visitor is already inside.
+ * tenant the visitor is already inside.
  *
  * @property-read Schema $form
  */
 class Settings extends Page
 {
-    protected string $view = 'filament.restaurant.pages.settings';
+    protected string $view = 'filament.tenant.pages.settings';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
@@ -192,7 +192,7 @@ class Settings extends Page
 
     public function getSubheading(): string
     {
-        return sprintf('Configuration for %s.', $this->restaurant()->name);
+        return sprintf('Configuration for %s.', $this->tenant()->name);
     }
 
     /**
@@ -221,7 +221,7 @@ class Settings extends Page
     private function readableCharges(array $data): array
     {
         $data['tax_rate_percentage'] = PricingFields::toPercentage(
-            (int) ($data['tax_rate_basis_points'] ?? RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS),
+            (int) ($data['tax_rate_basis_points'] ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS),
         );
 
         $data['service_charge_percentage'] = PricingFields::toPercentage(
@@ -259,29 +259,29 @@ class Settings extends Page
     }
 
     /**
-     * The settings of the restaurant whose panel this is, created on first view.
+     * The settings of the tenant whose panel this is, created on first view.
      */
-    private function settings(): RestaurantSetting
+    private function settings(): TenantSetting
     {
-        $restaurant = $this->restaurant();
+        $tenant = $this->tenant();
 
         // Remembered on the tenant, so filling the form, formatting a charge
         // and saving all read the one row once.
-        $settings = $restaurant->resolvedSettings() ?? $restaurant->settings()->create([]);
+        $settings = $tenant->resolvedSettings() ?? $tenant->settings()->create([]);
 
-        $restaurant->setRelation('settings', $settings);
+        $tenant->setRelation('settings', $settings);
 
         return $settings;
     }
 
     /**
-     * The restaurant the panel is currently serving.
+     * The tenant the panel is currently serving.
      */
-    private function restaurant(): Restaurant
+    private function tenant(): Tenant
     {
         $tenant = Filament::getTenant();
 
-        throw_unless($tenant instanceof Restaurant, LogicException::class, 'The restaurant settings page requires a restaurant tenant.');
+        throw_unless($tenant instanceof Tenant, LogicException::class, 'The tenant settings page requires a tenant.');
 
         return $tenant;
     }

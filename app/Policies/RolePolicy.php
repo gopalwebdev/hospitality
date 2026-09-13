@@ -7,7 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 
 /**
- * Who may define the roles restaurants assign from.
+ * Who may define the roles tenants assign from.
  *
  * role.manage is a product team permission granted to no role, so only a super
  * admin passes. Whether a *particular* role may be edited is a separate

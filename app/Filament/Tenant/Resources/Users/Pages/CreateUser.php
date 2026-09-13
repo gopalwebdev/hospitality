@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users\Pages;
+namespace App\Filament\Tenant\Resources\Users\Pages;
 
-use App\Actions\Restaurants\AddUserToRestaurant;
-use App\Filament\Restaurant\Resources\Users\UserResource;
-use App\Models\Restaurant;
+use App\Actions\Tenants\AddUserToTenant;
+use App\Filament\Tenant\Resources\Users\UserResource;
+use App\Models\Tenant;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -15,18 +15,18 @@ class CreateUser extends CreateRecord
     protected static string $resource = UserResource::class;
 
     /**
-     * Join this restaurant, on an existing account where there is one.
+     * Join this tenant, on an existing account where there is one.
      *
      * @param  array<string, mixed>  $data
      */
     protected function handleRecordCreation(array $data): Model
     {
-        $restaurant = Filament::getTenant();
+        $tenant = Filament::getTenant();
 
-        throw_unless($restaurant instanceof Restaurant, LogicException::class, 'Adding a user requires a restaurant tenant.');
+        throw_unless($tenant instanceof Tenant, LogicException::class, 'Adding a user requires a tenant.');
 
-        return app(AddUserToRestaurant::class)(
-            $restaurant,
+        return app(AddUserToTenant::class)(
+            $tenant,
             (string) $data['name'],
             (string) $data['email'],
             array_values((array) ($data['roles'] ?? [])),

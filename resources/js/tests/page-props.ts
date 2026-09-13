@@ -3,7 +3,7 @@ import type { TenantSharedProps, Translations } from '@/types';
 /**
  * The shared Inertia props a page sees, for tests that render one on its own.
  *
- * The guest app reads the restaurant, the language and the chrome strings from
+ * The guest app reads the tenant, the language and the chrome strings from
  * usePage(), which only exists inside createInertiaApp. setup.ts mocks that to
  * read from here instead.
  *
@@ -14,7 +14,7 @@ import type { TenantSharedProps, Translations } from '@/types';
  */
 
 const DEFAULT_TRANSLATIONS: Translations = {
-    home: { title: 'Welcome', empty: 'No home screen yet.' },
+    home: { title: 'Welcome', empty: 'No home screen at this :type yet.' },
     menu: {
         title: 'Menu',
         empty: 'This menu is not ready yet.',
@@ -44,7 +44,7 @@ const DEFAULT_TRANSLATIONS: Translations = {
 };
 
 const DEFAULTS: TenantSharedProps = {
-    restaurant: { name: 'Spice Garden', slug: 'spice' },
+    tenant: { name: 'Spice Garden', slug: 'spice', typeNoun: 'restaurant' },
     locale: {
         current: 'en',
         next: 'ta',

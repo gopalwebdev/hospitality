@@ -56,7 +56,7 @@ it('gives a super admin every permission without holding a role', function (): v
     }
 });
 
-it('gives a restaurant admin everything except product team management', function (): void {
+it('gives a tenant admin everything except product team management', function (): void {
     $user = User::factory()->create();
     $user->assignRole(Role::Admin->value);
 
@@ -65,7 +65,7 @@ it('gives a restaurant admin everything except product team management', functio
     }
 });
 
-it('withholds every product team permission from every restaurant role', function (Role $role): void {
+it('withholds every product team permission from every tenant role', function (Role $role): void {
     $user = User::factory()->create();
     $user->assignRole($role->value);
 
@@ -74,9 +74,9 @@ it('withholds every product team permission from every restaurant role', functio
     }
 })->with(Role::cases());
 
-it('counts managing restaurants, roles and permissions as product team only', function (): void {
+it('counts managing tenants, roles and permissions as product team only', function (): void {
     expect(Permission::productTeamOnlyValues())->toEqualCanonicalizing([
-        Permission::RestaurantManage->value,
+        Permission::TenantManage->value,
         Permission::RoleManage->value,
         Permission::PermissionManage->value,
     ]);

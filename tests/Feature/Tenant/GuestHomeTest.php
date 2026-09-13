@@ -5,7 +5,7 @@ use App\Enums\Locale;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -15,14 +15,14 @@ beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
 
-function homeUrl(Restaurant $restaurant): string
+function homeUrl(Tenant $tenant): string
 {
-    return 'http://'.$restaurant->slug.'.restaurant-app.test/';
+    return 'http://'.$tenant->slug.'.restaurant-app.test/';
 }
 
-function tileUrl(Restaurant $restaurant, HomeTile $tile, string $suffix = ''): string
+function tileUrl(Tenant $tenant, HomeTile $tile, string $suffix = ''): string
 {
-    return 'http://'.$restaurant->slug.'.restaurant-app.test/tiles/'.$tile->getKey().$suffix;
+    return 'http://'.$tenant->slug.'.restaurant-app.test/tiles/'.$tile->getKey().$suffix;
 }
 
 /*
@@ -31,10 +31,10 @@ function tileUrl(Restaurant $restaurant, HomeTile $tile, string $suffix = ''): s
 |--------------------------------------------------------------------------
 */
 
-it('shows the tiles in the order the restaurant arranged them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+it('shows the tiles in the order the tenant arranged them', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     $second = HomeTile::factory()->openingMenu($menu)->inRow($row)->create([
         'label' => [Locale::English->value => 'Drinks'],
@@ -45,7 +45,7 @@ it('shows the tiles in the order the restaurant arranged them', function (): voi
         'position' => 1,
     ]);
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->component('home')
@@ -57,17 +57,17 @@ it('shows the tiles in the order the restaurant arranged them', function (): voi
         );
 });
 
-it('shows the rows in the order the restaurant arranged them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+it('shows the rows in the order the tenant arranged them', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $second = HomeRow::factory()->ofRestaurant($restaurant)->titled('Offers')->create(['position' => 2]);
-    $first = HomeRow::factory()->ofRestaurant($restaurant)->create(['position' => 1]);
+    $second = HomeRow::factory()->ofTenant($tenant)->titled('Offers')->create(['position' => 2]);
+    $first = HomeRow::factory()->ofTenant($tenant)->create(['position' => 1]);
 
     HomeTile::factory()->openingMenu($menu)->inRow($second)->create();
     HomeTile::factory()->openingMenu($menu)->inRow($first)->create();
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('rows', 2)
@@ -79,15 +79,15 @@ it('shows the rows in the order the restaurant arranged them', function (): void
 });
 
 it('sends each row the shape its layout is drawn at', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->layout(HomeRowLayout::Links)->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->layout(HomeRowLayout::Links)->create();
 
     HomeTile::factory()->linkingTo('https://instagram.com/spice')->inRow($row)->create();
 
     // Decided server side so the layout stored is the layout rendered, and
     // there is no second list in React to keep in step.
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('rows.0.layout', HomeRowLayout::Links->value)
@@ -100,61 +100,61 @@ it('sends each row the shape its layout is drawn at', function (): void {
 });
 
 it('leaves a hidden row off the home screen', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $showing = HomeRow::factory()->ofRestaurant($restaurant)->create();
-    $hidden = HomeRow::factory()->ofRestaurant($restaurant)->hidden()->create();
+    $showing = HomeRow::factory()->ofTenant($tenant)->create();
+    $hidden = HomeRow::factory()->ofTenant($tenant)->hidden()->create();
 
     HomeTile::factory()->openingMenu($menu)->inRow($showing)->create(['label' => [Locale::English->value => 'Showing']]);
     HomeTile::factory()->openingMenu($menu)->inRow($hidden)->create(['label' => [Locale::English->value => 'Hidden']]);
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertSee('Showing')
         ->assertDontSee('Hidden');
 });
 
 it('drops a row once every tile in it leads nowhere', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $hiddenMenu = Menu::factory()->hidden()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $hiddenMenu = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     // An empty band is worse than no band: it reads as something that failed
-    // to load rather than as a row the restaurant has not filled in.
+    // to load rather than as a row the tenant has not filled in.
     HomeTile::factory()->openingMenu($hiddenMenu)->inRow($row)->create();
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->has('rows', 0));
 });
 
 it('leaves a hidden tile off the home screen', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     HomeTile::factory()->openingMenu($menu)->inRow($row)->create(['label' => [Locale::English->value => 'Showing']]);
     HomeTile::factory()->openingMenu($menu)->inRow($row)->hidden()->create(['label' => [Locale::English->value => 'Hidden']]);
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertSee('Showing')
         ->assertDontSee('Hidden');
 });
 
 it('drops a tile whose menu has been taken down', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $hiddenMenu = Menu::factory()->hidden()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $hiddenMenu = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     // The record is still there and the foreign key is satisfied, so nothing is
-    // broken — but tapping it would open a menu the restaurant took down.
+    // broken — but tapping it would open a menu the tenant took down.
     HomeTile::factory()->openingMenu($hiddenMenu)->inRow($row)->create();
     $survivor = HomeTile::factory()->openingMenu($menu)->inRow($row)->create();
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('rows.0.tiles', 1)
@@ -163,44 +163,44 @@ it('drops a tile whose menu has been taken down', function (): void {
 });
 
 it('sends a menu tile to that menu and a PDF tile to its own page', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
     $menuTile = HomeTile::factory()->openingMenu($menu)->inRow($row)->create(['position' => 0]);
     $pdfTile = HomeTile::factory()->showingPdf()->inRow($row)->create(['position' => 1]);
 
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('rows.0.tiles.0.id', $menuTile->getKey())
-            ->where('rows.0.tiles.0.href', route('guest.menus.show', ['restaurant' => $restaurant->slug, 'menu' => $menu->getKey()]))
+            ->where('rows.0.tiles.0.href', route('guest.menus.show', ['tenant' => $tenant->slug, 'menu' => $menu->getKey()]))
             ->where('rows.0.tiles.0.isExternal', false)
             ->where('rows.0.tiles.1.id', $pdfTile->getKey())
-            ->where('rows.0.tiles.1.href', route('guest.tiles.show', ['restaurant' => $restaurant->slug, 'tile' => $pdfTile->getKey()])),
+            ->where('rows.0.tiles.1.href', route('guest.tiles.show', ['tenant' => $tenant->slug, 'tile' => $pdfTile->getKey()])),
         );
 });
 
 it('sends no image url for a tile with no picture yet', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     HomeTile::factory()
         ->openingMenu($menu)
-        ->inRow(HomeRow::factory()->ofRestaurant($restaurant)->create())
+        ->inRow(HomeRow::factory()->ofTenant($tenant)->create())
         ->withoutImage()
         ->create();
 
     // A tile without a picture is not broken: the guest app draws its label on
     // the brand colour instead.
-    $this->get(homeUrl($restaurant))
+    $this->get(homeUrl($tenant))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->where('rows.0.tiles.0.imageUrl', null));
 });
 
-it('shows only this restaurant\'s tiles', function (): void {
-    $mine = Restaurant::factory()->create();
-    $theirs = Restaurant::factory()->create();
+it('shows only this tenant\'s tiles', function (): void {
+    $mine = Tenant::factory()->create();
+    $theirs = Tenant::factory()->create();
 
     HomeTile::factory()
         ->openingMenu(Menu::factory()->create(['tenant_id' => $mine->getKey()]))
@@ -223,21 +223,21 @@ it('shows only this restaurant\'s tiles', function (): void {
 */
 
 it('shows a PDF tile inside the app, with the file behind its own route', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $tile = HomeTile::factory()->showingPdf()->create([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'label' => [Locale::English->value => 'Wine list'],
     ]);
 
     // Embedded rather than opened in the browser's own viewer, so the app keeps
     // its header and the guest has a back arrow out of it.
-    $this->get(tileUrl($restaurant, $tile))
+    $this->get(tileUrl($tenant, $tile))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->component('document')
             ->where('title', 'Wine list')
             ->where('documentUrl', route('guest.tiles.document.show', [
-                'restaurant' => $restaurant->slug,
+                'tenant' => $tenant->slug,
                 'tile' => $tile->getKey(),
             ])),
         );
@@ -246,15 +246,15 @@ it('shows a PDF tile inside the app, with the file behind its own route', functi
 it('serves a tile\'s PDF inline off the private disk', function (): void {
     Storage::fake('local');
 
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $path = Storage::disk('local')->putFile(
-        'home-tiles/'.$restaurant->getKey(),
+        'home-tiles/'.$tenant->getKey(),
         UploadedFile::fake()->create('wine.pdf', 8, 'application/pdf'),
     );
 
-    $tile = HomeTile::factory()->showingPdf($path)->create(['tenant_id' => $restaurant->getKey()]);
+    $tile = HomeTile::factory()->showingPdf($path)->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->get(tileUrl($restaurant, $tile, '/document'))
+    $this->get(tileUrl($tenant, $tile, '/document'))
         ->assertOk()
         ->assertHeader('Content-Disposition', 'inline');
 });
@@ -262,34 +262,34 @@ it('serves a tile\'s PDF inline off the private disk', function (): void {
 it('serves a tile\'s picture off the private disk', function (): void {
     Storage::fake('local');
 
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $path = Storage::disk('local')->putFile(
-        'home-tiles/'.$restaurant->getKey(),
+        'home-tiles/'.$tenant->getKey(),
         UploadedFile::fake()->image('tile.jpg'),
     );
 
     $tile = HomeTile::factory()->openingMenu($menu)->create(['image_path' => $path]);
 
-    $this->get(tileUrl($restaurant, $tile, '/image'))->assertOk();
+    $this->get(tileUrl($tenant, $tile, '/image'))->assertOk();
 });
 
 it('404s a file whose upload has gone missing', function (): void {
     Storage::fake('local');
 
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $tile = HomeTile::factory()->showingPdf('home-tiles/1/vanished.pdf')->create([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
     ]);
 
-    $this->get(tileUrl($restaurant, $tile, '/document'))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile, '/document'))->assertNotFound();
 });
 
-it('refuses a tile that is not this restaurant\'s', function (): void {
+it('refuses a tile that is not this tenant\'s', function (): void {
     Storage::fake('local');
 
-    $mine = Restaurant::factory()->create();
-    $theirs = Restaurant::factory()->create();
+    $mine = Tenant::factory()->create();
+    $theirs = Tenant::factory()->create();
 
     $path = Storage::disk('local')->putFile(
         'home-tiles/'.$theirs->getKey(),
@@ -298,35 +298,35 @@ it('refuses a tile that is not this restaurant\'s', function (): void {
 
     $theirTile = HomeTile::factory()->showingPdf($path)->create(['tenant_id' => $theirs->getKey()]);
 
-    // The restaurant arrives in the domain rather than the path, so scoped
+    // The tenant arrives in the domain rather than the path, so scoped
     // bindings do not cover it: editing the id in the URL would otherwise read
-    // another restaurant's files off the same disk.
+    // another tenant's files off the same disk.
     $this->get(tileUrl($mine, $theirTile))->assertNotFound();
     $this->get(tileUrl($mine, $theirTile, '/document'))->assertNotFound();
     $this->get(tileUrl($mine, $theirTile, '/image'))->assertNotFound();
 });
 
 it('refuses a hidden tile\'s page and files', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $tile = HomeTile::factory()->showingPdf()->hidden()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $tile = HomeTile::factory()->showingPdf()->hidden()->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->get(tileUrl($restaurant, $tile))->assertNotFound();
-    $this->get(tileUrl($restaurant, $tile, '/document'))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile, '/document'))->assertNotFound();
 });
 
 it('refuses a menu tile\'s document page, which it has none of', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $tile = HomeTile::factory()->openingMenu($menu)->create();
 
-    $this->get(tileUrl($restaurant, $tile))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile))->assertNotFound();
 });
 
-it('takes a restaurant\'s whole storefront offline when it is switched off', function (): void {
-    $restaurant = Restaurant::factory()->create(['is_active' => false]);
-    $tile = HomeTile::factory()->showingPdf()->create(['tenant_id' => $restaurant->getKey()]);
+it('takes a tenant\'s whole storefront offline when it is switched off', function (): void {
+    $tenant = Tenant::factory()->create(['is_active' => false]);
+    $tile = HomeTile::factory()->showingPdf()->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->get(homeUrl($restaurant))->assertNotFound();
-    $this->get(tileUrl($restaurant, $tile))->assertNotFound();
-    $this->get(tileUrl($restaurant, $tile, '/document'))->assertNotFound();
+    $this->get(homeUrl($tenant))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile))->assertNotFound();
+    $this->get(tileUrl($tenant, $tile, '/document'))->assertNotFound();
 });

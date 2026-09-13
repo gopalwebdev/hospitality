@@ -148,15 +148,15 @@ class Role extends SpatieRole
     }
 
     /**
-     * Limit the query to roles a restaurant may hand out.
+     * Limit the query to roles a tenant may hand out.
      *
-     * A role carrying any product team permission is withheld: restaurant panels
-     * assign roles, and assigning one of these would let a restaurant admin
+     * A role carrying any product team permission is withheld: tenant panels
+     * assign roles, and assigning one of these would let a tenant admin
      * mint the product team.
      *
      * @param  Builder<$this>  $query
      */
-    public function scopeAssignableWithinRestaurant(Builder $query): void
+    public function scopeAssignableWithinTenant(Builder $query): void
     {
         $query->whereDoesntHave(
             'permissions',

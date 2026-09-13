@@ -19,7 +19,7 @@ class MenuItemFactory extends Factory
      */
     public function definition(): array
     {
-        // The category brings the restaurant with it. Letting the two be
+        // The category brings the tenant with it. Letting the two be
         // chosen independently would trip the composite foreign key, which is
         // exactly the mistake that key exists to catch.
         $category = MenuCategory::factory();
@@ -33,7 +33,7 @@ class MenuItemFactory extends Factory
             'name' => [$english => ucfirst(fake()->unique()->word()).' '.fake()->unique()->numberBetween(1, 9999)],
             'description' => [$english => fake()->sentence()],
             'price_minor_units' => fake()->numberBetween(5000, 90000),
-            // Most dishes carry neither: no offer, and the restaurant's own
+            // Most dishes carry neither: no offer, and the tenant's own
             // GST slab. Both are set by a state when a test is about them.
             'compare_at_price_minor_units' => null,
             'tax_rate_basis_points' => null,
@@ -46,7 +46,7 @@ class MenuItemFactory extends Factory
 
     /**
      * Put this dish under an existing category, at either level, and its
-     * restaurant with it.
+     * tenant with it.
      */
     public function inCategory(MenuCategory $category): static
     {
@@ -67,7 +67,7 @@ class MenuItemFactory extends Factory
     }
 
     /**
-     * A dish taxed at a rate of its own rather than the restaurant's default.
+     * A dish taxed at a rate of its own rather than the tenant's default.
      *
      * Basis points, as stored: 1800 is 18%.
      */

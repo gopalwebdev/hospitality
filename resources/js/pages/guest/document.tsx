@@ -23,7 +23,7 @@ interface DocumentProps {
  * should be able to say so.
  */
 export default function Document({ title, documentUrl }: DocumentProps) {
-    const { restaurant } = usePage<TenantSharedProps>().props;
+    const { tenant } = usePage<TenantSharedProps>().props;
     const { t } = useTranslations();
 
     return (
@@ -32,10 +32,8 @@ export default function Document({ title, documentUrl }: DocumentProps) {
 
             <AppBar
                 title={title}
-                eyebrow={restaurant?.name}
-                backHref={
-                    restaurant === null ? undefined : home.url(restaurant.slug)
-                }
+                eyebrow={tenant?.name}
+                backHref={tenant === null ? undefined : home.url(tenant.slug)}
             />
 
             <main className="flex flex-1 flex-col">

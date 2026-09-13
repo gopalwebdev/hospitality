@@ -1,7 +1,7 @@
 ---
 paths:
   - 'config/**'
-  - config/restaurants.php
+  - config/tenants.php
 ---
 
 # Config
@@ -25,5 +25,5 @@ The trap: it has to be the named zone, not an offset. Laravel issues `SET TIME Z
 
 Never hardcode a zone or an offset in code; both come from the environment.
 
-## config/restaurants.php holds only the default role limits
-default_max_admins and default_max_staff seed a newly created restaurant's max_admins/max_staff columns (see .ai/rules/app.md's "A restaurant caps its own admins and staff"). They are not read anywhere after a restaurant is created — RestaurantForm's create-form default() reads them, and the migration's column default() does too, but every existing restaurant's actual limit lives on its own row, edited from RestaurantForm. Do not add a runtime read of this config expecting it to reflect an existing restaurant's current limit.
+## config/tenants.php holds only the default role limits
+default_max_admins and default_max_staff seed a newly created tenant's max_admins/max_staff columns (see .ai/rules/app.md's "A tenant caps its own admins and staff"). They are not read anywhere after a tenant is created — TenantForm's create-form default() reads them, and the migration's column default() does too, but every existing tenant's actual limit lives on its own row, edited from TenantForm. Do not add a runtime read of this config expecting it to reflect an existing tenant's current limit.

@@ -1,22 +1,22 @@
 <?php
 
-namespace App\Actions\Restaurants;
+namespace App\Actions\Tenants;
 
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 
 /**
- * Take someone off a restaurant's roster.
+ * Take someone off a tenant's roster.
  *
  * The account itself is left alone: it is platform-wide, may staff other
- * restaurants, and a restaurant panel has no business deleting it. Someone
- * detached from their last restaurant keeps their account and simply has no
- * panel to enter, because User::canAccessPanel() finds no restaurant.
+ * tenants, and a tenant panel has no business deleting it. Someone
+ * detached from their last tenant keeps their account and simply has no
+ * panel to enter, because User::canAccessPanel() finds no tenant.
  */
-class RemoveUserFromRestaurant
+class RemoveUserFromTenant
 {
-    public function __invoke(Restaurant $restaurant, User $user): void
+    public function __invoke(Tenant $tenant, User $user): void
     {
-        $restaurant->users()->detach($user->getKey());
+        $tenant->users()->detach($user->getKey());
     }
 }

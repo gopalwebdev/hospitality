@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users\Pages;
+namespace App\Filament\Tenant\Resources\Users\Pages;
 
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Resources\Users\UserResource;
-use App\Models\Restaurant;
+use App\Filament\Tenant\Resources\Users\UserResource;
+use App\Models\Tenant;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ListRecords;
@@ -15,23 +15,23 @@ class ListUsers extends ListRecords
     protected static string $resource = UserResource::class;
 
     /**
-     * How much room is left under this restaurant's admin and staff limits,
+     * How much room is left under this tenant's admin and staff limits,
      * so nobody has to open the create form to find out it will be refused.
      */
     public function getSubheading(): ?string
     {
-        $restaurant = Filament::getTenant();
+        $tenant = Filament::getTenant();
 
-        if (! $restaurant instanceof Restaurant) {
+        if (! $tenant instanceof Tenant) {
             return null;
         }
 
         return sprintf(
             '%d of %d admins · %d of %d staff',
-            $restaurant->roleHolderCount(RoleEnum::Admin),
-            $restaurant->max_admins,
-            $restaurant->roleHolderCount(RoleEnum::Staff),
-            $restaurant->max_staff,
+            $tenant->roleHolderCount(RoleEnum::Admin),
+            $tenant->max_admins,
+            $tenant->roleHolderCount(RoleEnum::Staff),
+            $tenant->max_staff,
         );
     }
 

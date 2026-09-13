@@ -14,23 +14,23 @@ use Illuminate\Support\Facades\Route;
 | Tenant Routes
 |--------------------------------------------------------------------------
 |
-| Everything here is served from a restaurant's own subdomain, so the
-| {restaurant} parameter resolves by slug into the tenant for the request.
+| Everything here is served from a tenant's own subdomain, so the
+| {tenant} parameter resolves by slug into the tenant for the request.
 | These are registered before the root-domain routes so a subdomain never
 | falls through to the marketing site.
 |
 | The guest app is the one Inertia app on a subdomain. Its own root template
 | loads its own entry and its own page chunk, and never any of Filament, which
-| the restaurant's panel serves from its own compiled assets.
+| the tenant's panel serves from its own compiled assets.
 |
 */
 
-Route::domain('{restaurant}.'.config('app.domain'))->group(function (): void {
+Route::domain('{tenant}.'.config('app.domain'))->group(function (): void {
     /*
      * The guest app: what a diner reads at the table, reached by QR code, and
      * installable so a guest who comes back keeps it on their home screen.
      *
-     * A guest lands on the tiles the restaurant arranged, and walks from there
+     * A guest lands on the tiles the tenant arranged, and walks from there
      * into a menu or a PDF.
      */
     Route::name('guest.')->middleware(HandleGuestAppRequests::class)->group(function (): void {
@@ -46,7 +46,7 @@ Route::domain('{restaurant}.'.config('app.domain'))->group(function (): void {
     /*
      * A tile's picture and its PDF. Served outside the Inertia middleware
      * because neither is a page, and out of the private disk rather than a
-     * public link so both stay checked against the restaurant in the domain.
+     * public link so both stay checked against the tenant in the domain.
      */
     Route::name('guest.tiles.')->group(function (): void {
         Route::get('tiles/{tile}/image', [TileController::class, 'image'])->name('image.show');
@@ -64,14 +64,14 @@ Route::domain('{restaurant}.'.config('app.domain'))->group(function (): void {
     });
 
     /*
-     * The way into this restaurant's panel, for its admins and staff alike. The
+     * The way into this tenant's panel, for its admins and staff alike. The
      * panel lives under /dashboard; this sends someone to its sign-in page, or
      * to the dashboard when they are already signed in.
      */
-    Route::get('login', [PanelSignInController::class, 'restaurant'])->name('restaurant.login');
+    Route::get('login', [PanelSignInController::class, 'tenant'])->name('tenant.login');
 
     /*
-     * Switching language, from the guest app and from the restaurant's panel.
+     * Switching language, from the guest app and from the tenant's panel.
      * It renders nothing: it records the choice and sends the visitor back to
      * the page they were on, which is then re-rendered in that language.
      */

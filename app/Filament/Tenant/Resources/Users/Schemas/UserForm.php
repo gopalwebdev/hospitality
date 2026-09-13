@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users\Schemas;
+namespace App\Filament\Tenant\Resources\Users\Schemas;
 
+use App\Filament\Tenant\CurrentTenant;
 use App\Models\Role;
 use App\Models\User;
 use Filament\Forms\Components\CheckboxList;
@@ -19,42 +20,44 @@ class UserForm
                     ->maxLength(255),
 
                 // Deliberately not unique: an address that already has an
-                // account joins this restaurant on that account rather than
-                // being refused. AddUserToRestaurant does the joining.
+                // account joins this tenant on that account rather than
+                // being refused. AddUserToTenant does the joining.
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
                     ->required()
                     ->maxLength(255)
-                    ->helperText('Sign-in codes go here. Someone who already has an account keeps it and simply joins this restaurant.'),
+                    ->helperText(fn (): string => 'Sign-in codes go here. Someone who already has an account keeps it and simply joins this '.CurrentTenant::noun().'.'),
 
                 // Roles are not bound to the relationship: they go through
-                // SetRestaurantUserRoles, which is what keeps a restaurant from
+                // SetTenantUserRoles, which is what keeps a tenant from
                 // handing out product team access or reaching into another
-                // restaurant's staff.
+                // tenant's staff.
                 CheckboxList::make('roles')
                     ->options(fn (): array => once(fn (): array => Role::query()
-                        ->assignableWithinRestaurant()
+                        ->assignableWithinTenant()
                         ->orderBy('name')
                         ->pluck('name', 'name')
                         ->all()))
                     ->columns(2)
                     ->columnSpanFull()
-                    ->disabled(fn (?User $record): bool => self::staffsSeveralRestaurants($record))
-                    ->helperText(fn (?User $record): string => self::staffsSeveralRestaurants($record)
-                        ? 'This person staffs more than one restaurant, so only the product team can change their roles.'
+                    ->disabled(fn (?User $record): bool => self::staffsSeveralTenants($record))
+                    // Not "more than one hotel": the other roster may be a
+                    // tenant of another type, so this names none.
+                    ->helperText(fn (?User $record): string => self::staffsSeveralTenants($record)
+                        ? 'This person also works somewhere else on the platform, so only the product team can change their roles.'
                         : 'Roles carrying product team permissions are never offered here.'),
             ]);
     }
 
     /**
-     * Whether this account is on more than one restaurant's roster.
+     * Whether this account is on more than one tenant's roster.
      *
      * Asked twice while the form renders — to disable the roles and to say why
      * — so it is remembered for the request.
      */
-    private static function staffsSeveralRestaurants(?User $record): bool
+    private static function staffsSeveralTenants(?User $record): bool
     {
-        return $record instanceof User && $record->staffsSeveralRestaurants();
+        return $record instanceof User && $record->staffsSeveralTenants();
     }
 }

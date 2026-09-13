@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Enums\Role;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -23,7 +23,7 @@ class ListAccountsCommand extends Command
     {
         $rows = [
             ...$this->productTeamRows(),
-            ...$this->restaurantRows(),
+            ...$this->tenantRows(),
         ];
 
         if ($rows === []) {
@@ -60,29 +60,29 @@ class ListAccountsCommand extends Command
     }
 
     /**
-     * Everyone who runs a restaurant, and where they sign in.
+     * Everyone who runs a tenant, and where they sign in.
      *
-     * An admin runs the restaurant from its panel on a laptop. Staff have no
+     * An admin runs the tenant from its panel on a laptop. Staff have no
      * surface of their own, so only admins are listed.
      *
      * @return list<array{string, string, string}>
      */
-    private function restaurantRows(): array
+    private function tenantRows(): array
     {
-        $restaurants = Restaurant::query()
+        $tenants = Tenant::query()
             ->with(['users' => fn ($query) => $query->with('roles')])
             ->orderBy('name')
             ->get();
 
         $rows = [];
 
-        foreach ($restaurants as $restaurant) {
-            foreach ($restaurant->users as $user) {
+        foreach ($tenants as $tenant) {
+            foreach ($tenant->users as $user) {
                 if ($user->hasRole(Role::Admin->value)) {
                     $rows[] = [
-                        $restaurant->name.' admin',
+                        $tenant->name.' admin',
                         $user->email,
-                        $restaurant->signInUrl(),
+                        $tenant->signInUrl(),
                     ];
                 }
             }

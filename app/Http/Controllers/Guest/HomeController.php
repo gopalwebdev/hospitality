@@ -7,14 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * The screen a guest lands on after scanning the QR code at their table.
  *
- * What is on it is the restaurant's arrangement, not ours: it chooses the rows,
+ * What is on it is the tenant's arrangement, not ours: it chooses the rows,
  * what each one looks like, the tiles inside them and where each one goes. This
  * reads that arrangement and hands it over; the guest app draws whatever it is
  * given, one renderer per layout.
@@ -25,13 +25,13 @@ use Inertia\Response;
  */
 class HomeController extends Controller
 {
-    public function __invoke(Restaurant $restaurant): Response
+    public function __invoke(Tenant $tenant): Response
     {
-        abort_unless($restaurant->is_active, 404);
+        abort_unless($tenant->is_active, 404);
 
         $rows = HomeRow::query()
             ->select(['id', 'title', 'layout'])
-            ->where('tenant_id', $restaurant->getKey())
+            ->where('tenant_id', $tenant->getKey())
             ->active()
             // A menu tile pointing at a hidden menu would open an empty screen,
             // so the menu comes along and the ones that lead nowhere are
@@ -46,7 +46,7 @@ class HomeController extends Controller
 
         return Inertia::render('home', [
             'rows' => $rows
-                ->map(fn (HomeRow $row): array => $this->presentRow($row, $restaurant))
+                ->map(fn (HomeRow $row): array => $this->presentRow($row, $tenant))
                 ->filter(fn (array $row): bool => $row['tiles'] !== [])
                 ->values()
                 ->all(),
@@ -58,7 +58,7 @@ class HomeController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function presentRow(HomeRow $row, Restaurant $restaurant): array
+    private function presentRow(HomeRow $row, Tenant $tenant): array
     {
         return [
             'id' => $row->getKey(),
@@ -79,9 +79,9 @@ class HomeController extends Controller
                     'id' => $tile->getKey(),
                     'label' => $tile->label,
                     'imageUrl' => $tile->hasImage()
-                        ? route('guest.tiles.image.show', ['restaurant' => $restaurant->slug, 'tile' => $tile->getKey()])
+                        ? route('guest.tiles.image.show', ['tenant' => $tenant->slug, 'tile' => $tile->getKey()])
                         : null,
-                    'href' => $this->destinationOf($tile, $restaurant),
+                    'href' => $this->destinationOf($tile, $tenant),
                     // A link leaves the app, so the browser is told to treat it
                     // as one rather than as another screen of this one.
                     'isExternal' => $tile->action === HomeTileAction::Link,
@@ -96,7 +96,7 @@ class HomeController extends Controller
      *
      * A menu tile whose menu has been hidden is the case that matters: the
      * menu row still exists, so the foreign key is satisfied and nothing is
-     * broken, but a guest tapping it would be shown a menu the restaurant has
+     * broken, but a guest tapping it would be shown a menu the tenant has
      * deliberately taken down.
      */
     private function leadsSomewhere(HomeTile $tile): bool
@@ -116,18 +116,18 @@ class HomeController extends Controller
      * Where this tile takes the guest.
      *
      * Built here rather than on the model because every URL on a tenant domain
-     * needs the restaurant's slug, and reaching for it through the tile would
+     * needs the tenant's slug, and reaching for it through the tile would
      * be a lazy load per row.
      */
-    private function destinationOf(HomeTile $tile, Restaurant $restaurant): string
+    private function destinationOf(HomeTile $tile, Tenant $tenant): string
     {
         return match ($tile->action) {
             HomeTileAction::Menu => route('guest.menus.show', [
-                'restaurant' => $restaurant->slug,
+                'tenant' => $tenant->slug,
                 'menu' => $tile->menu_id,
             ]),
             HomeTileAction::Pdf => route('guest.tiles.show', [
-                'restaurant' => $restaurant->slug,
+                'tenant' => $tenant->slug,
                 'tile' => $tile->getKey(),
             ]),
             HomeTileAction::Link => (string) $tile->url,

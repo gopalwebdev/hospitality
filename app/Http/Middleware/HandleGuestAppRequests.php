@@ -5,7 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\Appearance;
 use App\Enums\Currency;
 use App\Enums\Locale;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
@@ -15,7 +15,7 @@ use Inertia\Middleware;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The guest app, served at the root of a restaurant's subdomain.
+ * The guest app, served at the root of a tenant's subdomain.
  *
  * Its own root template, so a guest downloads the guest entry and one page
  * chunk and never a byte of Filament, which the panels serve from their own
@@ -38,13 +38,13 @@ class HandleGuestAppRequests extends Middleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $restaurant = $this->restaurant($request);
+        $tenant = $this->tenant($request);
 
-        View::share('theme', $this->themeFor($restaurant, $request));
+        View::share('theme', $this->themeFor($tenant, $request));
 
-        // Every tenant route carries {restaurant} in its domain, so the root
+        // Every tenant route carries {tenant} in its domain, so the root
         // template's manifest and service worker URLs need the slug.
-        View::share('tenantSlug', $restaurant?->slug);
+        View::share('tenantSlug', $tenant?->slug);
 
         return parent::handle($request, $next);
     }
@@ -52,9 +52,9 @@ class HandleGuestAppRequests extends Middleware
     /**
      * The props shared with every page of the guest app.
      *
-     * The restaurant, its currency and the app's own strings are once props:
+     * The tenant, its currency and the app's own strings are once props:
      * none of them changes while a guest walks between the screens of one
-     * restaurant, so each is sent on the first visit, remembered by the client,
+     * tenant, so each is sent on the first visit, remembered by the client,
      * and left out of every visit after it — which is most of a page's payload
      * on a phone. The language and the shade are not, because the guest can
      * change both.
@@ -63,19 +63,22 @@ class HandleGuestAppRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $restaurant = $this->restaurant($request);
+        $tenant = $this->tenant($request);
         $locale = Locale::fromRequestValue(app()->getLocale());
 
         return [
             ...parent::share($request),
-            'restaurant' => Inertia::once(fn (): ?array => $restaurant instanceof Restaurant ? [
-                'name' => $restaurant->name,
-                'slug' => $restaurant->slug,
+            'tenant' => Inertia::once(fn (): ?array => $tenant instanceof Tenant ? [
+                'name' => $tenant->name,
+                'slug' => $tenant->slug,
+                // What the chrome calls this tenant in a sentence — "This
+                // hotel has not set up its home screen yet".
+                'typeNoun' => $tenant->type->noun(),
             ] : null),
             // A code and a scale rather than a formatted string, because prices
             // are formatted in the browser — see resources/js/lib/money.ts.
-            'currency' => Inertia::once(function () use ($restaurant): ?array {
-                $currency = $restaurant?->currency();
+            'currency' => Inertia::once(function () use ($tenant): ?array {
+                $currency = $tenant?->currency();
 
                 return $currency instanceof Currency ? [
                     'code' => $currency->value,
@@ -107,7 +110,7 @@ class HandleGuestAppRequests extends Middleware
     /**
      * The guest app's chrome, which is written in English and stays that way.
      *
-     * `lang/en` is the only language directory. What a restaurant *wrote* is
+     * `lang/en` is the only language directory. What a tenant *wrote* is
      * translated in the database (`.ai/rules/models.md`), so switching language
      * changes the menu a guest reads without changing the words around it.
      *
@@ -126,10 +129,10 @@ class HandleGuestAppRequests extends Middleware
      *
      * @return array<string, string>
      */
-    private function themeFor(?Restaurant $restaurant, Request $request): array
+    private function themeFor(?Tenant $tenant, Request $request): array
     {
         return [
-            'name' => $restaurant->name ?? config('app.name'),
+            'name' => $tenant->name ?? config('app.name'),
             'appearance' => $this->appearanceFor($request)->value,
         ];
     }
@@ -149,12 +152,12 @@ class HandleGuestAppRequests extends Middleware
     }
 
     /**
-     * The restaurant this request is being served for.
+     * The tenant this request is being served for.
      */
-    private function restaurant(Request $request): ?Restaurant
+    private function tenant(Request $request): ?Tenant
     {
-        $restaurant = $request->route('restaurant');
+        $tenant = $request->route('tenant');
 
-        return $restaurant instanceof Restaurant ? $restaurant : null;
+        return $tenant instanceof Tenant ? $tenant : null;
     }
 }

@@ -17,8 +17,8 @@ class MenuItemAdditionFactory extends Factory
      */
     public function definition(): array
     {
-        // The dish brings the restaurant with it, for the same reason
-        // MenuItemFactory takes its restaurant from the category: the two
+        // The dish brings the tenant with it, for the same reason
+        // MenuItemFactory takes its tenant from the category: the two
         // halves of a composite key must never be chosen independently.
         $item = MenuItem::factory();
 
@@ -41,7 +41,7 @@ class MenuItemAdditionFactory extends Factory
     }
 
     /**
-     * Put this addition on an existing dish, and its restaurant with it.
+     * Put this addition on an existing dish, and its tenant with it.
      */
     public function onItem(MenuItem $item): static
     {
@@ -75,7 +75,7 @@ class MenuItemAdditionFactory extends Factory
     }
 
     /**
-     * An addition taxed at a rate of its own rather than the restaurant's.
+     * An addition taxed at a rate of its own rather than the tenant's.
      *
      * Basis points, as stored: 1800 is 18%.
      */

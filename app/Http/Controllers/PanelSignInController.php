@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\FilamentPanel;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * /login, on the root domain and on every restaurant's subdomain.
+ * /login, on the root domain and on every tenant's subdomain.
  *
  * The one address to give anyone who uses a panel, whatever they do there.
  * Filament keeps a panel's sign-in page under the panel's own path
@@ -28,11 +28,11 @@ class PanelSignInController extends Controller
     }
 
     /**
-     * A restaurant's way in, for its admins and staff alike, on its subdomain.
+     * A tenant's way in, for its admins and staff alike, on its subdomain.
      */
-    public function restaurant(Restaurant $restaurant): RedirectResponse
+    public function tenant(Tenant $tenant): RedirectResponse
     {
-        return $this->enter(Filament::getPanel(FilamentPanel::Restaurant->value), ['tenant' => $restaurant]);
+        return $this->enter(Filament::getPanel(FilamentPanel::Tenant->value), ['tenant' => $tenant]);
     }
 
     /**

@@ -19,11 +19,11 @@ return new class extends Migration
     {
         Schema::table('restaurants', function (Blueprint $table): void {
             $table->unsignedSmallInteger('max_admins')
-                ->default(config('restaurants.default_max_admins'))
+                ->default(config('tenants.default_max_admins'))
                 ->after('is_active');
 
             $table->unsignedSmallInteger('max_staff')
-                ->default(config('restaurants.default_max_staff'))
+                ->default(config('tenants.default_max_staff'))
                 ->after('max_admins');
         });
     }

@@ -4,7 +4,7 @@ namespace App\Filament\Platform\Resources\Users\Pages;
 
 use App\Actions\Users\SetUserRoles;
 use App\Filament\Platform\Resources\Users\UserResource;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -83,9 +83,9 @@ class EditUser extends EditRecord
     }
 
     /**
-     * Put the account on the roster of the restaurant it now belongs to.
+     * Put the account on the roster of the tenant it now belongs to.
      *
-     * Only the new tenant is attached; any other restaurant they staff is left
+     * Only the new tenant is attached; any other tenant they staff is left
      * alone, because belonging to one is not the same as being taken off the
      * others. Moving to the platform detaches nothing for the same reason.
      */
@@ -95,10 +95,10 @@ class EditUser extends EditRecord
             return;
         }
 
-        $restaurant = Restaurant::query()->find($user->tenant_id);
+        $tenant = Tenant::query()->find($user->tenant_id);
 
-        if ($restaurant instanceof Restaurant) {
-            $user->restaurants()->syncWithoutDetaching([$restaurant->getKey()]);
+        if ($tenant instanceof Tenant) {
+            $user->tenants()->syncWithoutDetaching([$tenant->getKey()]);
         }
     }
 }

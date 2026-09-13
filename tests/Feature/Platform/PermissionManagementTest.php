@@ -33,7 +33,7 @@ it('lets the product team manage permissions', function (): void {
         ->and($user->can('delete', $permission))->toBeTrue();
 });
 
-it('refuses permission management to every restaurant role', function (RoleEnum $roleEnum): void {
+it('refuses permission management to every tenant role', function (RoleEnum $roleEnum): void {
     $user = User::factory()->create();
     $user->assignRole($roleEnum->value);
     $permission = Permission::factory()->create();
@@ -44,7 +44,7 @@ it('refuses permission management to every restaurant role', function (RoleEnum 
         ->and($user->can('delete', $permission))->toBeFalse();
 })->with(RoleEnum::cases());
 
-it('keeps a restaurant admin off the permissions page', function (): void {
+it('keeps a tenant admin off the permissions page', function (): void {
     $user = User::factory()->create();
     $user->assignRole(RoleEnum::Admin->value);
 
@@ -215,8 +215,8 @@ it('files a permission by the subject half of its name', function (string $name,
     'menu' => ['menu.view', PermissionGroup::Menu],
     'order' => ['order.manage', PermissionGroup::Orders],
     'user' => ['user.manage', PermissionGroup::People],
-    'settings' => ['settings.manage', PermissionGroup::Restaurant],
-    'restaurant' => ['restaurant.manage', PermissionGroup::ProductTeam],
+    'settings' => ['settings.manage', PermissionGroup::Tenant],
+    'tenant' => ['tenant.manage', PermissionGroup::ProductTeam],
     'role' => ['role.manage', PermissionGroup::ProductTeam],
     'permission' => ['permission.manage', PermissionGroup::ProductTeam],
     'unknown subject' => ['kitchen.expedite', PermissionGroup::Other],
@@ -224,7 +224,7 @@ it('files a permission by the subject half of its name', function (string $name,
 
 it('keeps the product team category and the product-team-only list in step', function (): void {
     // Two ways of asking the same question — the group a permission is shown
-    // under, and whether a restaurant may be offered a role holding it. If
+    // under, and whether a tenant may be offered a role holding it. If
     // they drift, the panel files something as harmless that is not.
     $byGroup = array_map(
         fn (PermissionEnum $permission): string => $permission->value,

@@ -5,12 +5,12 @@ paths:
 
 # Actions Menus
 
-## A category can move between a restaurant's menus, everything under it and all
+## A category can move between a tenant's menus, everything under it and all
 `MoveCategoryToMenu` rewrites `menu_categories.menu_id`, and then unfeatures the dishes under it. Its sub-categories and dishes follow untouched because they carry `menu_category_id`, not `menu_id` — a category is the only thing that knows which menu it is on.
 
 The unfeaturing is the one thing it does beyond the move: the featured row belongs to a menu, so dishes that have just left one must not appear at the top of the one they arrived on. `MenuItem::booted()` applies the same rule to a single dish, and has to, because moving a category changes no dish's own columns.
 
-Both of its guards are backstops, thrown as LogicException: the target menu must belong to the same restaurant (the composite `(menu_id, tenant_id)` foreign key would refuse anyway, but as a 500), and the English name must be free on the target (uniqueness is per menu, so the expression index would reject the update after the form had passed). `MenuArrangementTable`'s `moveToMenu` action states both as validation, which is what an admin actually sees — the action is what stops code going around the panel.
+Both of its guards are backstops, thrown as LogicException: the target menu must belong to the same tenant (the composite `(menu_id, tenant_id)` foreign key would refuse anyway, but as a 500), and the English name must be free on the target (uniqueness is per menu, so the expression index would reject the update after the form had passed). `MenuArrangementTable`'s `moveToMenu` action states both as validation, which is what an admin actually sees — the action is what stops code going around the panel.
 
 ## One drag renumbers the menu, and never re-parents anything
 `ApplyMenuArrangement` takes the flat order Filament hands back from the arrangement table — every row of the menu, rails, categories, subdivisions and dishes together — and turns it into the four kinds of `position` a menu stores: the two columns on `menus`, and `position` on `menu_categories` and `menu_items`.
@@ -25,7 +25,7 @@ Row keys (`featured`, `combos`, `category-<id>`, `item-<id>`) are formatted by t
 A record's parent is chosen on its own form. There is no `MoveSubCategoryToParent` and no `MoveItemToCategory`; both existed, both were deleted, and the reason is worth keeping: each was a second mechanism that had to repeat rules the form already enforces.
 
 - A **sub-category** is re-parented by editing it and picking another category. The form offers only this menu's top-level categories, so "same menu" and "no third level" are enforced by the options rather than by a guard, and the uniqueness rule is scoped to the chosen parent so changing it revalidates the name against where it is going.
-- A **dish** is re-filed by editing it and picking another category. That select offers both levels of every menu in the restaurant, so a dish can cross menus; its uniqueness rule is scoped to the chosen category the same way.
+- A **dish** is re-filed by editing it and picking another category. That select offers both levels of every menu in the tenant, so a dish can cross menus; its uniqueness rule is scoped to the chosen category the same way.
 - An **addition** cannot move at all. It is edited in a repeater inside the dish that owns it, and the composite `(menu_item_id, tenant_id)` key makes that structural rather than a convention.
 - A **combo's contents** likewise: a repeater inside one combo, never dragged to another.
 

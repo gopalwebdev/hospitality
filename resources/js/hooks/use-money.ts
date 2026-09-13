@@ -4,10 +4,10 @@ import { type CurrencyProp, formatMoney } from '@/lib/money';
 import type { TenantSharedProps } from '@/types';
 
 /**
- * Format prices in the restaurant's currency and the guest's language.
+ * Format prices in the tenant's currency and the guest's language.
  *
  * Both halves come from the shared props, so a page hands this an integer and
- * nothing else has to know which currency the restaurant prices in.
+ * nothing else has to know which currency the tenant prices in.
  */
 export function useMoney(): (minorUnits: number) => string {
     const { currency, locale } = usePage<TenantSharedProps>().props;

@@ -1,7 +1,7 @@
 <?php
 
 use App\Filament\Schemas\PricingFields;
-use App\Models\RestaurantSetting;
+use App\Models\TenantSetting;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,6 +49,6 @@ it('reads a stored rate the way a menu prints it', function (): void {
 });
 
 it('agrees with the unit every stored rate is counted in', function (): void {
-    expect(PricingFields::toBasisPoints('100'))->toBe(RestaurantSetting::BASIS_POINTS_PER_WHOLE)
-        ->and(PricingFields::formatRate(RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS))->toBe('5%');
+    expect(PricingFields::toBasisPoints('100'))->toBe(TenantSetting::BASIS_POINTS_PER_WHOLE)
+        ->and(PricingFields::formatRate(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS))->toBe('5%');
 });

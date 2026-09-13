@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Pages;
+namespace App\Filament\Tenant\Resources\Menus\Pages;
 
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Icons\Heroicon;

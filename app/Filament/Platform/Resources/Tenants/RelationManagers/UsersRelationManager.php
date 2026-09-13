@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Platform\Resources\Restaurants\RelationManagers;
+namespace App\Filament\Platform\Resources\Tenants\RelationManagers;
 
 use App\Filament\Platform\Resources\Users\UserResource;
 use App\Models\User;
@@ -14,13 +14,13 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 /**
- * Who staffs this restaurant, shown under its own record.
+ * Who staffs this tenant, shown under its own record.
  *
  * Read-only on purpose. An account is platform-wide, so creating, moving and
  * deleting one all belong to the Users resource, which is the only place that
  * knows about the product team as well; this is the roster answering "who is
- * at this restaurant", with a way through to each account. Roster membership
- * itself is a restaurant's own business and is changed from its panel.
+ * at this tenant", with a way through to each account. Roster membership
+ * itself is a tenant's own business and is changed from its panel.
  */
 class UsersRelationManager extends RelationManager
 {
@@ -35,7 +35,7 @@ class UsersRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->heading('Users')
-            ->description('Every account on this restaurant’s roster.')
+            ->description('Every account on this tenant’s roster.')
             ->columns([
                 TextColumn::make('name')
                     ->icon(Heroicon::OutlinedUser)
@@ -54,13 +54,13 @@ class UsersRelationManager extends RelationManager
                     ->placeholder('None'),
 
                 // Belonging here and being rostered here are two facts, and
-                // they can disagree: someone who staffs two restaurants belongs
+                // they can disagree: someone who staffs two tenants belongs
                 // to one of them. Saying so beats quietly showing them twice.
                 IconColumn::make('tenant_id')
                     ->label('Belongs here')
                     ->boolean()
                     ->state(fn (User $record): bool => $record->tenant_id === $this->getOwnerRecord()->getKey())
-                    ->tooltip('Off means they staff this restaurant but belong to another.'),
+                    ->tooltip('Off means they staff this tenant but belong to another.'),
 
                 TextColumn::make('created_at')
                     ->label('Account created')
@@ -78,7 +78,7 @@ class UsersRelationManager extends RelationManager
             ->headerActions([
                 // Accounts are created in the Users resource, which holds the
                 // one-time code confirmation that authorises it. This carries
-                // the restaurant through so the form opens already filled in.
+                // the tenant through so the form opens already filled in.
                 CreateAction::make()
                     ->label('Add an account')
                     ->icon(Heroicon::OutlinedUserPlus)
@@ -94,7 +94,7 @@ class UsersRelationManager extends RelationManager
                     ->url(fn (User $record): string => UserResource::getUrl('edit', ['record' => $record])),
             ])
             ->emptyStateHeading('Nobody works here yet')
-            ->emptyStateDescription('A restaurant needs an admin before anyone can sign in to run it.')
+            ->emptyStateDescription('A tenant needs an admin before anyone can sign in to run it.')
             ->emptyStateIcon(Heroicon::OutlinedUsers)
             ->defaultSort('name');
     }

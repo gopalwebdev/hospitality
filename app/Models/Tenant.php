@@ -5,8 +5,9 @@ namespace App\Models;
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
 use App\Enums\Role as RoleEnum;
+use App\Enums\TenantType;
 use Carbon\CarbonImmutable;
-use Database\Factories\RestaurantFactory;
+use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,19 +17,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * A single restaurant, which is also the tenant boundary.
+ * One business on the platform, and the tenant boundary everything it owns is
+ * scoped to. `type` says whether it is a hotel or a restaurant: the panel and
+ * the guest app are the same for both, and the type decides what they call it.
  *
  * The slug doubles as the subdomain, so `t1` is served at
  * t1.restaurant-app.com and administered at t1.restaurant-app.com/dashboard.
  *
  * The address and contact details are the platform's record of the business,
- * entered by a super admin when the restaurant is onboarded. What guests see
- * on the storefront lives in RestaurantSetting instead, and the restaurant
+ * entered by a super admin when the tenant is onboarded. What guests see
+ * on the storefront lives in TenantSetting instead, and the tenant
  * edits that itself.
  *
  * @property int $id
  * @property string $slug
  * @property string $name
+ * @property TenantType $type
  * @property string $address
  * @property string $pincode
  * @property string|null $email
@@ -42,14 +46,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['slug', 'name', 'address', 'pincode', 'email', 'phone_country_code', 'phone', 'secondary_phone_country_code', 'secondary_phone', 'is_active', 'max_admins', 'max_staff'])]
-class Restaurant extends Model
+#[Fillable(['slug', 'name', 'type', 'address', 'pincode', 'email', 'phone_country_code', 'phone', 'secondary_phone_country_code', 'secondary_phone', 'is_active', 'max_admins', 'max_staff'])]
+class Tenant extends Model
 {
-    /** @use HasFactory<RestaurantFactory> */
+    /** @use HasFactory<TenantFactory> */
     use HasFactory;
 
     /**
-     * Bind restaurants by slug so route and tenant resolution share one key.
+     * Bind tenants by slug so route and tenant resolution share one key.
      */
     public function getRouteKeyName(): string
     {
@@ -57,38 +61,33 @@ class Restaurant extends Model
     }
 
     /**
-     * The staff and administrators attached to this restaurant.
+     * The staff and administrators attached to this tenant.
      *
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany
     {
-        // Every foreign key to a restaurant is named tenant_id rather than the
-        // restaurant_id Laravel would infer from this model, so each of these
-        // relationships names its own key. One word for the tenant boundary,
-        // whichever table is carrying it — see .ai/rules/models.md.
-        return $this->belongsToMany(User::class, 'restaurant_user', 'tenant_id', 'user_id')
-            ->withTimestamps();
+        return $this->belongsToMany(User::class)->withTimestamps();
     }
 
     /**
-     * How this restaurant is configured.
+     * How this tenant is configured.
      *
-     * @return HasOne<RestaurantSetting, $this>
+     * @return HasOne<TenantSetting, $this>
      */
     public function settings(): HasOne
     {
-        return $this->hasOne(RestaurantSetting::class, 'tenant_id');
+        return $this->hasOne(TenantSetting::class);
     }
 
     /**
-     * The menus this restaurant serves.
+     * The menus this tenant serves.
      *
      * @return HasMany<Menu, $this>
      */
     public function menus(): HasMany
     {
-        return $this->hasMany(Menu::class, 'tenant_id');
+        return $this->hasMany(Menu::class);
     }
 
     /**
@@ -99,21 +98,21 @@ class Restaurant extends Model
      */
     public function homeRows(): HasMany
     {
-        return $this->hasMany(HomeRow::class, 'tenant_id');
+        return $this->hasMany(HomeRow::class);
     }
 
     /**
-     * Every tile on this restaurant's home screen, across all of its rows.
+     * Every tile on this tenant's home screen, across all of its rows.
      *
      * @return HasMany<HomeTile, $this>
      */
     public function homeTiles(): HasMany
     {
-        return $this->hasMany(HomeTile::class, 'tenant_id');
+        return $this->hasMany(HomeTile::class);
     }
 
     /**
-     * Limit the query to restaurants that are open for business.
+     * Limit the query to tenants that are open for business.
      *
      * @param  Builder<$this>  $query
      */
@@ -123,12 +122,12 @@ class Restaurant extends Model
     }
 
     /**
-     * How many accounts may hold this role on this restaurant's roster.
+     * How many accounts may hold this role on this tenant's roster.
      *
-     * Null for a role this restaurant does not cap — only Admin and Staff are
-     * bounded for now. A super admin sets both limits per restaurant from
-     * RestaurantForm; config/restaurants.php only supplies what a newly
-     * created restaurant starts with.
+     * Null for a role this tenant does not cap — only Admin and Staff are
+     * bounded for now. A super admin sets both limits per tenant from
+     * TenantForm; config/tenants.php only supplies what a newly
+     * created tenant starts with.
      */
     public function roleLimit(RoleEnum $role): ?int
     {
@@ -140,13 +139,13 @@ class Restaurant extends Model
     }
 
     /**
-     * How many accounts holding this role are on this restaurant's roster
+     * How many accounts holding this role are on this tenant's roster
      * right now.
      *
-     * Roles are held per account, not per restaurant (see
-     * .ai/rules/restaurants.md), so this counts roster members who happen to
-     * hold the role — someone staffing this restaurant and another still
-     * counts once here, against this restaurant's own limit. Pass the account
+     * Roles are held per account, not per tenant (see
+     * .ai/rules/tenants.md), so this counts roster members who happen to
+     * hold the role — someone staffing this tenant and another still
+     * counts once here, against this tenant's own limit. Pass the account
      * a grant is being considered for as $excluding so it never counts
      * against its own limit.
      */
@@ -169,7 +168,7 @@ class Restaurant extends Model
     }
 
     /**
-     * This restaurant's settings, read once and remembered on the model.
+     * This tenant's settings, read once and remembered on the model.
      *
      * Currency, tax and whether orders are open are each asked for several
      * times while one page renders — by the guest middleware, a controller, and
@@ -179,22 +178,22 @@ class Restaurant extends Model
      * eager loaded `settings` pays nothing. It is never a lazy load, so it is
      * safe on a model that came out of a collection.
      */
-    public function resolvedSettings(): ?RestaurantSetting
+    public function resolvedSettings(): ?TenantSetting
     {
         if (! $this->relationLoaded('settings')) {
             $this->setRelation(
                 'settings',
-                RestaurantSetting::query()->where('tenant_id', $this->getKey())->first(),
+                TenantSetting::query()->where('tenant_id', $this->getKey())->first(),
             );
         }
 
         $settings = $this->getRelation('settings');
 
-        return $settings instanceof RestaurantSetting ? $settings : null;
+        return $settings instanceof TenantSetting ? $settings : null;
     }
 
     /**
-     * The currency this restaurant prices in.
+     * The currency this tenant prices in.
      *
      * Every price on a menu shares one, so resolve it once and pass it down
      * rather than asking per dish.
@@ -205,16 +204,16 @@ class Restaurant extends Model
     }
 
     /**
-     * The GST rate this restaurant charges on anything that names no rate.
+     * The GST rate this tenant charges on anything that names no rate.
      */
     public function taxRateBasisPoints(): int
     {
         return $this->resolvedSettings()?->taxRateBasisPoints()
-            ?? RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+            ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 
     /**
-     * Whether this restaurant is taking new orders right now.
+     * Whether this tenant is taking new orders right now.
      */
     public function isAcceptingOrders(): bool
     {
@@ -222,14 +221,14 @@ class Restaurant extends Model
     }
 
     /**
-     * Where this restaurant's admins and staff sign in: /login on its subdomain.
+     * Where this tenant's admins and staff sign in: /login on its subdomain.
      *
      * That address sends someone signed out to the panel's sign-in page and
      * someone signed in to /dashboard — see PanelSignInController.
      */
     public function signInUrl(): string
     {
-        return route('restaurant.login', ['restaurant' => $this->slug]);
+        return route('tenant.login', ['tenant' => $this->slug]);
     }
 
     /**
@@ -261,6 +260,7 @@ class Restaurant extends Model
     protected function casts(): array
     {
         return [
+            'type' => TenantType::class,
             'phone_country_code' => CountryCallingCode::class,
             'secondary_phone_country_code' => CountryCallingCode::class,
             'is_active' => 'boolean',

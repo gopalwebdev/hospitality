@@ -3,17 +3,18 @@
 namespace Database\Factories;
 
 use App\Enums\CountryCallingCode;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Enums\TenantType;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends Factory<Restaurant>
+ * @extends Factory<Tenant>
  */
-class RestaurantFactory extends Factory
+class TenantFactory extends Factory
 {
-    protected $model = Restaurant::class;
+    protected $model = Tenant::class;
 
     /**
      * @return array<string, mixed>
@@ -25,6 +26,7 @@ class RestaurantFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 99999),
+            'type' => TenantType::Restaurant,
             'address' => fake()->streetAddress().', '.fake()->city(),
             'pincode' => (string) fake()->numberBetween(100000, 999999),
             'email' => fake()->unique()->companyEmail(),
@@ -37,27 +39,37 @@ class RestaurantFactory extends Factory
     }
 
     /**
-     * Every restaurant has settings, so one is made alongside it.
+     * Every tenant has settings, so one is made alongside it.
      *
      * The id is passed straight through rather than nesting a factory, which
-     * would otherwise create a second restaurant to hang the settings off.
+     * would otherwise create a second tenant to hang the settings off.
      */
     public function configure(): static
     {
-        return $this->afterCreating(function (Restaurant $restaurant): void {
-            RestaurantSetting::factory()->create([
-                'tenant_id' => $restaurant->getKey(),
+        return $this->afterCreating(function (Tenant $tenant): void {
+            TenantSetting::factory()->create([
+                'tenant_id' => $tenant->getKey(),
             ]);
         });
     }
 
     /**
-     * Indicate that the restaurant is closed and should not serve its storefront.
+     * Indicate that the tenant is closed and should not serve its storefront.
      */
     public function inactive(): static
     {
         return $this->state(fn (array $attributes): array => [
             'is_active' => false,
+        ]);
+    }
+
+    /**
+     * A hotel rather than a restaurant.
+     */
+    public function hotel(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'type' => TenantType::Hotel,
         ]);
     }
 }

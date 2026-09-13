@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 /**
- * The roles every restaurant assigns from, on the product team panel.
+ * The roles every tenant assigns from, on the product team panel.
  *
  * Access is RolePolicy's business. What this class adds is the one rule a
  * policy cannot express: whether a *particular* role may be deleted. A built-in

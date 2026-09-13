@@ -25,7 +25,7 @@ const LABEL: Record<FoodType, string> = {
  *
  * Deliberately not themed: this is a regulatory mark that guests read at a
  * glance, and its colours mean a fixed thing. It must not follow the
- * restaurant's brand colour.
+ * tenant's brand colour.
  */
 export function FoodTypeDot({
     type,

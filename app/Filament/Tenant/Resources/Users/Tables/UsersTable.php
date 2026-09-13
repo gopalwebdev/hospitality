@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users\Tables;
+namespace App\Filament\Tenant\Resources\Users\Tables;
 
-use App\Actions\Restaurants\RemoveUserFromRestaurant;
-use App\Models\Restaurant;
+use App\Actions\Tenants\RemoveUserFromTenant;
+use App\Filament\Tenant\CurrentTenant;
+use App\Models\Tenant;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -45,25 +46,25 @@ class UsersTable
                     ->icon(Heroicon::OutlinedPencilSquare),
 
                 // Not a delete: the account is platform-wide and may staff
-                // other restaurants, so this only takes them off this roster.
-                Action::make('removeFromRestaurant')
+                // other tenants, so this only takes them off this roster.
+                Action::make('removeFromTenant')
                     ->label('Remove')
                     ->iconButton()
                     ->icon(Heroicon::OutlinedUserMinus)
                     ->color('danger')
-                    ->authorize('removeFromRestaurant')
+                    ->authorize('removeFromTenant')
                     ->requiresConfirmation()
-                    ->modalHeading('Remove from this restaurant')
-                    ->modalDescription('Their account stays, and they lose access to this restaurant.')
+                    ->modalHeading(fn (): string => 'Remove from this '.CurrentTenant::noun())
+                    ->modalDescription(fn (): string => 'Their account stays, and they lose access to this '.CurrentTenant::noun().'.')
                     ->action(function (User $record): void {
-                        $restaurant = Filament::getTenant();
+                        $tenant = Filament::getTenant();
 
-                        throw_unless($restaurant instanceof Restaurant, LogicException::class, 'Removing a user requires a restaurant tenant.');
+                        throw_unless($tenant instanceof Tenant, LogicException::class, 'Removing a user requires a tenant.');
 
-                        app(RemoveUserFromRestaurant::class)($restaurant, $record);
+                        app(RemoveUserFromTenant::class)($tenant, $record);
 
                         Notification::make()
-                            ->title('Removed from this restaurant')
+                            ->title('Removed from this '.$tenant->type->noun())
                             ->success()
                             ->send();
                     }),

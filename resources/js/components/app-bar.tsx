@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from '@/hooks/use-translations';
 
 interface AppBarProps {
-    /** The main line: a restaurant's name, a menu's name, a document's title. */
+    /** The main line: a tenant's name, a menu's name, a document's title. */
     title: string;
-    /** A quieter line above it — who is signed in, which restaurant. */
+    /** A quieter line above it — who is signed in, which tenant. */
     eyebrow?: string;
     /** Where the back arrow goes. Omitted on a screen nobody arrived at from elsewhere. */
     backHref?: string;
@@ -24,9 +24,9 @@ interface AppBarProps {
  * dark, and the language — because on a phone there is nowhere else to put
  * them: no sidebar, no settings screen worth the taps.
  *
- * There is deliberately no logo. A restaurant's name is set and its brand
+ * There is deliberately no logo. A tenant's name is set and its brand
  * colour is already carried by every button and price on the screen; a logo
- * slot would be an empty box on every restaurant that has not uploaded one.
+ * slot would be an empty box on every tenant that has not uploaded one.
  */
 export function AppBar({ title, eyebrow, backHref, children }: AppBarProps) {
     const { t } = useTranslations();

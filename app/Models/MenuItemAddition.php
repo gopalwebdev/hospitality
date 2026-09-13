@@ -57,9 +57,9 @@ class MenuItemAddition extends Model
     ];
 
     /**
-     * Take the restaurant from the dish this belongs to.
+     * Take the tenant from the dish this belongs to.
      *
-     * It is the same restaurant by definition — the composite foreign key
+     * It is the same tenant by definition — the composite foreign key
      * insists on it — so deriving it here means nothing that creates an
      * addition has to remember. That includes the repeater on the dish form:
      * Filament's tenancy stamps the dish it is saving, but not the related rows
@@ -75,7 +75,7 @@ class MenuItemAddition extends Model
             $menuItemId = $addition->menu_item_id;
 
             // A repeater saves every addition of one dish in the same request,
-            // and they all belong to the same restaurant.
+            // and they all belong to the same tenant.
             $addition->tenant_id = once(fn (): mixed => MenuItem::query()
                 ->withoutGlobalScopes()
                 ->whereKey($menuItemId)
@@ -84,13 +84,13 @@ class MenuItemAddition extends Model
     }
 
     /**
-     * The restaurant selling this.
+     * The tenant selling this.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -117,7 +117,7 @@ class MenuItemAddition extends Model
     /**
      * The GST rate this addition is taxed at, in basis points.
      *
-     * Its own rate when it has one, and otherwise the restaurant's default —
+     * Its own rate when it has one, and otherwise the tenant's default —
      * the same fallback MenuItem uses, and for the same reason: an addition is
      * usually taxed exactly like the dish it goes on, and only a genuinely
      * different line (a sealed bottle taxed as goods) needs saying.
@@ -126,24 +126,24 @@ class MenuItemAddition extends Model
      * overriding because it differs from the food, so inheriting from the dish
      * would be inheriting the wrong number.
      *
-     * Pass $restaurantRate when rendering a list; every row shares it.
+     * Pass $tenantRate when rendering a list; every row shares it.
      */
-    public function taxRateBasisPoints(?int $restaurantRate = null): int
+    public function taxRateBasisPoints(?int $tenantRate = null): int
     {
         if ($this->tax_rate_basis_points !== null) {
             return $this->tax_rate_basis_points;
         }
 
-        if ($restaurantRate !== null) {
-            return $restaurantRate;
+        if ($tenantRate !== null) {
+            return $tenantRate;
         }
 
-        $stored = RestaurantSetting::query()
+        $stored = TenantSetting::query()
             ->where('tenant_id', $this->tenant_id)
             ->value('tax_rate_basis_points');
 
         return $stored === null
-            ? RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS
+            ? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS
             : (int) $stored;
     }
 
@@ -158,7 +158,7 @@ class MenuItemAddition extends Model
     }
 
     /**
-     * Order the way the restaurant arranged them, name only to break ties.
+     * Order the way the tenant arranged them, name only to break ties.
      *
      * @param  Builder<$this>  $query
      */

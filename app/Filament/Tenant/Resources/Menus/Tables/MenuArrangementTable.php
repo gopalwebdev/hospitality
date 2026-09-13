@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Tables;
+namespace App\Filament\Tenant\Resources\Menus\Tables;
 
 use App\Actions\Menus\ApplyMenuArrangement;
 use App\Actions\Menus\MoveCategoryToMenu;
 use App\Enums\Currency;
 use App\Enums\MenuBlock;
-use App\Filament\Restaurant\Resources\MenuItems\MenuItemResource;
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuCategoryForm;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuSubCategoryForm;
+use App\Filament\Tenant\Resources\MenuItems\MenuItemResource;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Tables\Reordering;
 use App\Models\Menu;
@@ -385,7 +385,7 @@ class MenuArrangementTable
     }
 
     /**
-     * Carrying a whole section onto another of this restaurant's menus.
+     * Carrying a whole section onto another of this tenant's menus.
      *
      * An action rather than a select on the form for the reason in
      * .ai/rules/actions-menus.md: the page a category is renamed on *is* the
@@ -525,7 +525,7 @@ class MenuArrangementTable
     }
 
     /**
-     * The menus a category could be moved onto: this restaurant's, minus this one.
+     * The menus a category could be moved onto: this tenant's, minus this one.
      *
      * @return array<int, string>
      */

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\MenuItems\Tables;
+namespace App\Filament\Tenant\Resources\MenuItems\Tables;
 
 use App\Enums\FoodType;
 use App\Enums\ItemAvailability;
-use App\Filament\Restaurant\Resources\MenuItems\Schemas\MenuItemForm;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuCategoryForm;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuSubCategoryForm;
+use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuItem;
@@ -30,8 +30,8 @@ class MenuItemsTable
     {
         $currency = PricingFields::currency();
         // Both resolved once for the page rather than per row: every dish here
-        // belongs to the same restaurant and shares its answers.
-        $restaurantTaxRate = PricingFields::restaurantTaxRateBasisPoints();
+        // belongs to the same tenant and shares its answers.
+        $tenantTaxRate = PricingFields::tenantTaxRateBasisPoints();
 
         return $table
             ->columns([
@@ -64,7 +64,7 @@ class MenuItemsTable
                     ->formatStateUsing(fn (FoodType $state): string => $state->label())
                     ->color(fn (FoodType $state): string => $state->color()),
 
-                // Stored in minor units, shown as money in the restaurant's own
+                // Stored in minor units, shown as money in the tenant's own
                 // currency. Sorting works on the integer, which is the point of
                 // storing it that way.
                 //
@@ -84,9 +84,9 @@ class MenuItemsTable
                 TextColumn::make('tax_rate_basis_points')
                     ->label(__('panel.items.tax_rate'))
                     ->formatStateUsing(fn (MenuItem $record): string => PricingFields::formatRate(
-                        $record->taxRateBasisPoints($restaurantTaxRate),
+                        $record->taxRateBasisPoints($tenantTaxRate),
                     ))
-                    // A dish following the restaurant's rate is shown in grey
+                    // A dish following the tenant's rate is shown in grey
                     // and one that overrides it in colour, so the exceptions
                     // stand out down a long list.
                     ->badge()
@@ -178,7 +178,7 @@ class MenuItemsTable
             // the menu's arrangement page, under the heading they belong to,
             // which is the only place the order is legible anyway.
             //
-            // Menu, then section, then the order the restaurant dragged the
+            // Menu, then section, then the order the tenant dragged the
             // dishes into. Filament's grouping used to imply this; with the
             // group gone the query has to say it.
             ->defaultSort(fn (Builder $query): Builder => self::inMenuOrder($query))
@@ -190,7 +190,7 @@ class MenuItemsTable
     /**
      * The categories the section filter offers.
      *
-     * Every category in the restaurant, at both levels, unless a menu has been
+     * Every category in the tenant, at both levels, unless a menu has been
      * picked — then only that menu's, because offering the rest would be
      * offering rows the menu filter has already excluded.
      *

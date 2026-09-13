@@ -15,10 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
- * One of a restaurant's menus: Lunch, Dinner, Drinks.
+ * One of a tenant's menus: Lunch, Dinner, Drinks.
  *
  * The top of the hierarchy a guest reads down: a menu lists categories, a
- * category lists dishes, and a dish may offer additions. A restaurant that
+ * category lists dishes, and a dish may offer additions. A tenant that
  * serves one card all day simply has one menu.
  *
  * The name and description are translated columns — one value per
@@ -69,13 +69,13 @@ class Menu extends Model
     ];
 
     /**
-     * The restaurant this menu belongs to.
+     * The tenant this menu belongs to.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -138,7 +138,7 @@ class Menu extends Model
      * Every dish on this menu, whichever section it sits in.
      *
      * Reached through the sections because that is the only path there is —
-     * a dish carries its section and its restaurant, never its menu. The
+     * a dish carries its section and its tenant, never its menu. The
      * featured row on the guest's menu screen and the panel's own reordering
      * of it both read this.
      *
@@ -192,7 +192,7 @@ class Menu extends Model
      * Whether this menu is only served between certain hours.
      *
      * The pair is all-or-nothing, so asking about one answers for both. A menu
-     * with no window is served whenever the restaurant is open, which is what
+     * with no window is served whenever the tenant is open, which is what
      * most menus do.
      */
     public function hasServiceWindow(): bool
@@ -208,7 +208,7 @@ class Menu extends Model
      * than being empty, which is why this is a comparison of two cases and not
      * a single between().
      *
-     * The zone is the application's, from APP_TIMEZONE: a restaurant has no
+     * The zone is the application's, from APP_TIMEZONE: a tenant has no
      * timezone of its own here, deliberately (.ai/rules/app.md).
      */
     public function isBeingServedAt(?CarbonImmutable $moment = null): bool
@@ -287,7 +287,7 @@ class Menu extends Model
      * Deliberately not filtered by the service window: a breakfast menu that
      * has finished is still shown, marked as served 07:00 to 11:00, because a
      * guest looking for it at noon should find it rather than conclude the
-     * restaurant has none. isBeingServedAt() is what decides how it reads.
+     * tenant has none. isBeingServedAt() is what decides how it reads.
      *
      * @param  Builder<$this>  $query
      */
@@ -297,7 +297,7 @@ class Menu extends Model
     }
 
     /**
-     * Order the way the restaurant arranged them, name only to break ties.
+     * Order the way the tenant arranged them, name only to break ties.
      *
      * @param  Builder<$this>  $query
      */

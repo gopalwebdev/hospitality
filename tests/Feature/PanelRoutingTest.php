@@ -2,7 +2,7 @@
 
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -18,14 +18,14 @@ beforeEach(function (): void {
 |
 | Both panels live under /dashboard and are told apart only by host, so these tests
 | pin the behaviour that the root domain reaches the product team panel and a
-| restaurant subdomain reaches that restaurant's panel.
+| tenant subdomain reaches that tenant's panel.
 |
 */
 
 it('serves the product team panel on the root domain', function (): void {
     $this->get('http://restaurant-app.test/dashboard/login')
         ->assertOk()
-        ->assertSee('Restaurant Platform');
+        ->assertSee('Hotel & Restaurant Platform');
 });
 
 it('serves each panel from the path its enum declares', function (FilamentPanel $panel): void {
@@ -33,44 +33,44 @@ it('serves each panel from the path its enum declares', function (FilamentPanel 
 })->with(FilamentPanel::cases());
 
 it('sends a guest on the product team panel to its own sign-in', function (): void {
-    $this->get('http://restaurant-app.test/dashboard/restaurants')
+    $this->get('http://restaurant-app.test/dashboard/tenants')
         ->assertRedirect('http://restaurant-app.test/dashboard/login');
 });
 
-it('does not serve the product team panel from a restaurant subdomain', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
+it('does not serve the product team panel from a tenant subdomain', function (): void {
+    Tenant::factory()->create(['slug' => 't1']);
 
-    // Same path, other host: /dashboard on a subdomain is that restaurant's panel,
+    // Same path, other host: /dashboard on a subdomain is that tenant's panel,
     // and the product team's pages are not part of it.
     $this->get('http://t1.restaurant-app.test/dashboard/login')
         ->assertOk()
-        ->assertDontSee('Restaurant Platform');
+        ->assertDontSee('Hotel & Restaurant Platform');
 
-    $this->get('http://t1.restaurant-app.test/dashboard/restaurants')->assertNotFound();
+    $this->get('http://t1.restaurant-app.test/dashboard/tenants')->assertNotFound();
 });
 
-it('serves the restaurant panel on a restaurant subdomain', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
+it('serves the tenant panel on a tenant subdomain', function (): void {
+    Tenant::factory()->create(['slug' => 't1']);
 
     $this->get('http://t1.restaurant-app.test/dashboard/login')
         ->assertOk()
-        ->assertDontSee('Restaurant Platform');
+        ->assertDontSee('Hotel & Restaurant Platform');
 });
 
 it('serves both panels under /dashboard, told apart by host', function (): void {
-    $restaurant = Restaurant::factory()->make(['slug' => 't1']);
+    $tenant = Tenant::factory()->make(['slug' => 't1']);
 
-    // The restaurant panel's own sign-in route carries no domain — nobody has
+    // The tenant panel's own sign-in route carries no domain — nobody has
     // a tenant before signing in — so the root domain's /dashboard/login is the
-    // product team's, and a restaurant's link is its subdomain's /login.
+    // product team's, and a tenant's link is its subdomain's /login.
     expect(route('filament.platform.auth.login'))
         ->toBe('http://restaurant-app.test/dashboard/login')
-        ->and($restaurant->signInUrl())
+        ->and($tenant->signInUrl())
         ->toBe('http://t1.restaurant-app.test/login');
 });
 
 it('sends someone signed out from /login to the sign-in page of the panel on that host', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
+    Tenant::factory()->create(['slug' => 't1']);
 
     $this->get('http://restaurant-app.test/login')
         ->assertRedirect('http://restaurant-app.test/dashboard/login');
@@ -80,15 +80,15 @@ it('sends someone signed out from /login to the sign-in page of the panel on tha
 });
 
 it('sends someone already signed in from /login straight to /dashboard', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
     $productTeam = User::factory()->superAdmin()->create();
 
     // Every account is made before the first request: a request into the
-    // restaurant panel boots its tenancy, which attaches any user created after
-    // it to that restaurant (.ai/rules/models.md).
-    $members = array_map(function (Role $role) use ($restaurant): User {
+    // tenant panel boots its tenancy, which attaches any user created after
+    // it to that tenant (.ai/rules/models.md).
+    $members = array_map(function (Role $role) use ($tenant): User {
         $member = User::factory()->create();
-        $member->restaurants()->attach($restaurant);
+        $member->tenants()->attach($tenant);
         $member->assignRole($role->value);
 
         return $member;
@@ -98,7 +98,7 @@ it('sends someone already signed in from /login straight to /dashboard', functio
         ->get('http://restaurant-app.test/login')
         ->assertRedirect('http://restaurant-app.test/dashboard');
 
-    // The restaurant panel is one door for everyone who works there: staff
+    // The tenant panel is one door for everyone who works there: staff
     // arrive exactly where admins do.
     foreach ($members as $member) {
         $this->actingAs($member)
@@ -128,7 +128,7 @@ it('lets a super admin into the product team panel', function (): void {
 it('gates the product team panel on the is_super_admin column alone', function (): void {
     $user = User::factory()->create();
 
-    // Every restaurant role there is, and still no way in.
+    // Every tenant role there is, and still no way in.
     foreach (Role::cases() as $role) {
         $user->assignRole($role->value);
     }
@@ -144,10 +144,10 @@ it('gates the product team panel on the is_super_admin column alone', function (
         ->assertOk();
 });
 
-it('keeps a restaurant admin out of the product team panel', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
+it('keeps a tenant admin out of the product team panel', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
     $user = User::factory()->create();
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
@@ -155,10 +155,10 @@ it('keeps a restaurant admin out of the product team panel', function (): void {
         ->assertForbidden();
 });
 
-it('lets a restaurant admin into their own restaurant panel', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
+it('lets a tenant admin into their own tenant panel', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
     $user = User::factory()->create();
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
@@ -166,12 +166,12 @@ it('lets a restaurant admin into their own restaurant panel', function (): void 
         ->assertOk();
 });
 
-it('stops a restaurant admin reaching another restaurant by changing the subdomain', function (): void {
-    $own = Restaurant::factory()->create(['slug' => 't1']);
-    Restaurant::factory()->create(['slug' => 't2']);
+it('stops a tenant admin reaching another tenant by changing the subdomain', function (): void {
+    $own = Tenant::factory()->create(['slug' => 't1']);
+    Tenant::factory()->create(['slug' => 't2']);
 
     $user = User::factory()->create();
-    $user->restaurants()->attach($own);
+    $user->tenants()->attach($own);
     $user->assignRole(Role::Admin->value);
 
     // Filament answers 404 rather than 403 here on purpose: a stranger must not
@@ -181,8 +181,8 @@ it('stops a restaurant admin reaching another restaurant by changing the subdoma
         ->assertNotFound();
 });
 
-it('lets a super admin support any restaurant panel', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
+it('lets a super admin support any tenant panel', function (): void {
+    Tenant::factory()->create(['slug' => 't1']);
 
     $user = User::factory()->superAdmin()->create();
 
@@ -191,8 +191,8 @@ it('lets a super admin support any restaurant panel', function (): void {
         ->assertOk();
 });
 
-it('redirects a guest on a restaurant panel to that restaurant login', function (): void {
-    Restaurant::factory()->create(['slug' => 't1']);
+it('redirects a guest on a tenant panel to that tenant login', function (): void {
+    Tenant::factory()->create(['slug' => 't1']);
 
     $this->get('http://t1.restaurant-app.test/dashboard')
         ->assertRedirect('http://t1.restaurant-app.test/dashboard/login');
@@ -203,14 +203,14 @@ it('redirects a guest on a restaurant panel to that restaurant login', function 
 | Branding
 |--------------------------------------------------------------------------
 |
-| A restaurant's own name replaces the generic panel name once someone is
-| signed in and a tenant is known — see RestaurantPanelProvider::brandName(). The
+| A tenant's own name replaces the generic panel name once someone is
+| signed in and a tenant is known — see TenantPanelProvider::brandName(). The
 | tenant menu is off (.ai/rules/filament.md), so there is nowhere for another
-| restaurant's name to leak into this page at all.
+| tenant's name to leak into this page at all.
 */
 
 it('shows the generic panel name before anyone signs in', function (): void {
-    Restaurant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
+    Tenant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
 
     $this->get('http://t1.restaurant-app.test/dashboard/login')
         ->assertOk()
@@ -218,10 +218,10 @@ it('shows the generic panel name before anyone signs in', function (): void {
         ->assertDontSee('Spice Garden');
 });
 
-it("shows the restaurant's own name once someone is signed in", function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
+it("shows the tenant's own name once someone is signed in", function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
     $user = User::factory()->create();
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
@@ -231,9 +231,9 @@ it("shows the restaurant's own name once someone is signed in", function (): voi
         ->assertDontSee(config('app.name'));
 });
 
-it('gives a super admin no tenant menu to switch restaurants from', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
-    $other = Restaurant::factory()->create(['name' => 'Other Place']);
+it('gives a super admin no tenant menu to switch tenants from', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
+    $other = Tenant::factory()->create(['name' => 'Other Place']);
 
     $user = User::factory()->superAdmin()->create();
 

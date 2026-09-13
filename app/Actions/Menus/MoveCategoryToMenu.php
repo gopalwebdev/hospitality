@@ -11,9 +11,9 @@ use LogicException;
 
 /**
  * Move a category, and everything in it, onto another of the same
- * restaurant's menus.
+ * tenant's menus.
  *
- * A restaurant that splits one card into a lunch and a dinner menu wants to
+ * A tenant that splits one card into a lunch and a dinner menu wants to
  * carry a whole section across rather than retype it. Its subdivisions follow
  * by the ON UPDATE CASCADE on the (parent_id, menu_id) key, and the dishes
  * follow because they hang off a category rather than off a menu.
@@ -23,7 +23,7 @@ use LogicException;
  *
  * Two guards, both backstops: MenuArrangementTable states the same rules as
  * validation, so the panel never reaches these. The target menu has to belong
- * to the same restaurant — the composite foreign key would refuse otherwise,
+ * to the same tenant — the composite foreign key would refuse otherwise,
  * but only as a 500 — and the name has to be free on the target, because
  * uniqueness is per menu and the expression index would reject the update
  * after the form had already passed.
@@ -32,7 +32,7 @@ class MoveCategoryToMenu
 {
     /**
      * @throws LogicException when the target menu belongs to another
-     *                        restaurant, or already has this name on it
+     *                        tenant, or already has this name on it
      */
     public function __invoke(MenuCategory $category, Menu $target): void
     {
@@ -43,7 +43,7 @@ class MoveCategoryToMenu
         throw_if(
             $target->tenant_id !== $category->tenant_id,
             LogicException::class,
-            'A category may only move to a menu of its own restaurant.',
+            'A category may only move to a menu of its own tenant.',
         );
 
         throw_if(

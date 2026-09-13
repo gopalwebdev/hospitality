@@ -5,13 +5,13 @@
 | Admin Panel
 |--------------------------------------------------------------------------
 |
-| The parts of the restaurant panel that follow the language chosen in
+| The parts of the tenant panel that follow the language chosen in
 | its top bar. Deliberately only the menu and storefront surfaces: those are
-| what a restaurant works in daily, and what a Tamil-speaking manager needs to
+| what a tenant works in daily, and what a Tamil-speaking manager needs to
 | read. Roles, permissions and accounts stay in English — they are the product
 | team's vocabulary and code refers to them by name.
 |
-| What a restaurant typed itself — menu, section, dish, addition and tile names
+| What a tenant typed itself — menu, section, dish, addition and tile names
 | — is not here. That lives in translated database columns; see
 | .ai/rules/models.md.
 |
@@ -49,7 +49,7 @@ return [
         'service_window' => 'Hours served',
         'available_from' => 'Served from',
         'available_until' => 'Served until',
-        'unique' => 'This restaurant already has a menu with that name.',
+        'unique' => 'This :type already has a menu with that name.',
         'delete_warning' => 'Every section on this menu is deleted with it, and every dish in those sections. Hide it instead to take it off the storefront and keep everything.',
     ],
 
@@ -95,7 +95,7 @@ return [
         'move' => 'Move to another menu',
         'move_help' => 'The category keeps its sub-categories, its dishes and its order; only the menu it sits on changes. Dishes it was leading with stop being featured, because the featured row belongs to a menu.',
         'move_target' => 'Menu to move it to',
-        'move_none' => 'This restaurant has only one menu, so there is nowhere to move this to.',
+        'move_none' => 'This :type has only one menu, so there is nowhere to move this to.',
         'moved' => 'Moved to another menu',
     ],
 
@@ -178,7 +178,7 @@ return [
         'placement' => 'In this row',
         'is_active' => 'Showing to guests',
         'empty_heading' => 'No rows yet',
-        'empty_description' => 'Guests scanning a table\'s QR code see nothing until there is at least one row here. Most restaurants start with a banner row that opens their menu.',
+        'empty_description' => 'Guests scanning a table\'s QR code see nothing until there is at least one row here. Start with a banner row that opens your menu.',
         'delete_warning' => 'Every tile in this row is deleted with it. Anything those tiles pointed at — a menu, say — is left alone.',
         'manage_tiles' => 'Tiles',
         'manage_tiles_help' => 'The tiles in this row, in the order a guest reads them.',
@@ -199,7 +199,7 @@ return [
         'on_tap' => 'On tap',
         'goes_to' => 'Goes to',
         'menu_to_open' => 'Menu to open',
-        'menu_to_open_help' => 'Only this restaurant\'s menus. A tile pointing at a hidden menu stops being shown.',
+        'menu_to_open_help' => 'Only this :type\'s menus. A tile pointing at a hidden menu stops being shown.',
         'document' => 'PDF to show',
         'document_help' => 'Up to 10 MB. Shown inside the app, with a back arrow out of it.',
         'an_uploaded_pdf' => 'An uploaded PDF',
@@ -210,7 +210,7 @@ return [
         'a_link' => 'A link',
         'is_active' => 'Showing to guests',
         'empty_heading' => 'No tiles yet',
-        'empty_description' => 'Guests scanning a table\'s QR code see nothing until there is at least one tile here. Most restaurants start with one that opens their menu.',
+        'empty_description' => 'Guests scanning a table\'s QR code see nothing until there is at least one tile here. Start with one that opens your menu.',
         'delete_warning' => 'The tile is removed from the home screen. Anything it pointed at — a menu, say — is left alone.',
     ],
 

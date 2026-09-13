@@ -18,7 +18,7 @@ Route::get('login', [PanelSignInController::class, 'platform'])->name('platform.
 
 /*
  * Switching language from the product team's panel, which is the one surface
- * not served from a restaurant's subdomain. Same controller as the tenant
+ * not served from a tenant's subdomain. Same controller as the tenant
  * route in tenant.php — it needs its own registration only because a form must
  * post to the host it was rendered on, or the session cookie does not travel.
  */

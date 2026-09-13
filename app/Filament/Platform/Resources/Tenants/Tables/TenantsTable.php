@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Filament\Platform\Resources\Restaurants\Tables;
+namespace App\Filament\Platform\Resources\Tenants\Tables;
 
-use App\Models\Restaurant;
+use App\Enums\TenantType;
+use App\Models\Tenant;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -11,10 +12,11 @@ use Filament\Actions\EditAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
-class RestaurantsTable
+class TenantsTable
 {
     public static function configure(Table $table): Table
     {
@@ -23,12 +25,16 @@ class RestaurantsTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('type')
+                    ->badge()
+                    ->formatStateUsing(fn (TenantType $state): string => $state->label())
+                    ->sortable(),
                 TextColumn::make('slug')
                     ->label('Subdomain')
                     ->searchable(),
                 TextColumn::make('phone')
                     ->label('Mobile')
-                    ->state(fn (Restaurant $record): string => $record->dialablePhone())
+                    ->state(fn (Tenant $record): string => $record->dialablePhone())
                     ->searchable(),
                 TextColumn::make('email')
                     ->searchable()
@@ -36,7 +42,7 @@ class RestaurantsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('secondary_phone')
                     ->label('Secondary mobile')
-                    ->state(fn (Restaurant $record): ?string => $record->dialableSecondaryPhone())
+                    ->state(fn (Tenant $record): ?string => $record->dialableSecondaryPhone())
                     ->placeholder('None')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('address')
@@ -62,19 +68,21 @@ class RestaurantsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                SelectFilter::make('type')
+                    ->options(TenantType::options()),
                 TernaryFilter::make('is_active')
                     ->label('Open for business'),
             ])
             ->recordActions([
-                // The restaurant panel's own tenant menu is off (see
-                // .ai/rules/filament.md), so a restaurant's name is the only
+                // The tenant panel's own tenant menu is off (see
+                // .ai/rules/filament.md), so a tenant's name is the only
                 // thing shown there — this is how a super admin supporting one
-                // restaurant gets to its panel.
+                // tenant gets to its panel.
                 Action::make('openPanel')
                     ->label('Open dashboard')
                     ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->iconButton()
-                    ->url(fn (Restaurant $record): string => $record->signInUrl())
+                    ->url(fn (Tenant $record): string => $record->signInUrl())
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 DeleteAction::make(),

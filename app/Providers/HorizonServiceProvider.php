@@ -11,8 +11,8 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Register the Horizon gate.
      *
-     * Queue contents span every restaurant on the platform, so the dashboard
-     * belongs to the product team rather than to any one restaurant's admin.
+     * Queue contents span every tenant on the platform, so the dashboard
+     * belongs to the product team rather than to any one tenant's admin.
      */
     protected function gate(): void
     {

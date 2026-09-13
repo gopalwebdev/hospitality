@@ -27,13 +27,13 @@ enum Permission: string
     /** Arrange the tiles a guest lands on: their order, images and destinations. */
     case StorefrontManage = 'storefront.manage';
 
-    /** Change one restaurant's own configuration. */
+    /** Change one tenant's own configuration. */
     case SettingsManage = 'settings.manage';
 
-    /** Product-team-level: create, suspend, and delete restaurants. */
-    case RestaurantManage = 'restaurant.manage';
+    /** Product-team-level: create, suspend, and delete tenants. */
+    case TenantManage = 'tenant.manage';
 
-    /** Product-team-level: define the roles every restaurant assigns from. */
+    /** Product-team-level: define the roles every tenant assigns from. */
     case RoleManage = 'role.manage';
 
     /** Product-team-level: define the permissions those roles are built from. */
@@ -42,14 +42,14 @@ enum Permission: string
     /**
      * Whether this permission belongs to the product team alone.
      *
-     * A product team permission is never granted to a restaurant role, and a role
-     * holding one is never offered inside a restaurant panel. Together those
-     * two rules are what stop a restaurant admin handing out product team access.
+     * A product team permission is never granted to a tenant role, and a role
+     * holding one is never offered inside a tenant panel. Together those
+     * two rules are what stop a tenant admin handing out product team access.
      */
     public function isProductTeamOnly(): bool
     {
         return match ($this) {
-            self::RestaurantManage, self::RoleManage, self::PermissionManage => true,
+            self::TenantManage, self::RoleManage, self::PermissionManage => true,
             default => false,
         };
     }

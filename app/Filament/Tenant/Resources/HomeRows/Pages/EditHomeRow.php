@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows\Pages;
+namespace App\Filament\Tenant\Resources\HomeRows\Pages;
 
-use App\Filament\Restaurant\Resources\HomeRows\HomeRowResource;
-use App\Filament\Restaurant\Resources\HomeRows\Schemas\HomeRowForm;
+use App\Filament\Tenant\Resources\HomeRows\HomeRowResource;
+use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
 use App\Models\HomeRow;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;

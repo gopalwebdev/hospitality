@@ -22,9 +22,9 @@ enum PermissionGroup: string
     case Menu = 'menu';
     case Orders = 'orders';
     case People = 'people';
-    case Restaurant = 'restaurant';
+    case Tenant = 'tenant';
 
-    /** Reserved for the product team: never granted to a restaurant role. */
+    /** Reserved for the product team: never granted to a tenant role. */
     case ProductTeam = 'product-team';
 
     /** Anything added from the panel whose subject is not one of the above. */
@@ -39,7 +39,7 @@ enum PermissionGroup: string
             self::Menu => 'Menu',
             self::Orders => 'Orders',
             self::People => 'People',
-            self::Restaurant => 'Restaurant',
+            self::Tenant => 'Tenant',
             self::ProductTeam => 'Product team',
             self::Other => 'Other',
         };
@@ -51,11 +51,11 @@ enum PermissionGroup: string
     public function description(): string
     {
         return match ($this) {
-            self::Menu => 'Seeing and editing what a restaurant sells.',
+            self::Menu => 'Seeing and editing what a tenant sells.',
             self::Orders => 'Placing orders and working through them.',
-            self::People => 'Managing who staffs a restaurant.',
-            self::Restaurant => 'Changing one restaurant\'s own configuration and the home screen guests land on.',
-            self::ProductTeam => 'Running the platform itself. A role holding any of these is never offered inside a restaurant panel.',
+            self::People => 'Managing who staffs a tenant.',
+            self::Tenant => 'Changing one tenant\'s own configuration and the home screen guests land on.',
+            self::ProductTeam => 'Running the platform itself. A role holding any of these is never offered inside a tenant panel.',
             self::Other => 'Permissions added from this panel. They do nothing until code checks for them.',
         };
     }
@@ -66,7 +66,7 @@ enum PermissionGroup: string
             self::Menu => Heroicon::OutlinedBookOpen,
             self::Orders => Heroicon::OutlinedShoppingBag,
             self::People => Heroicon::OutlinedUsers,
-            self::Restaurant => Heroicon::OutlinedBuildingStorefront,
+            self::Tenant => Heroicon::OutlinedBuildingStorefront,
             self::ProductTeam => Heroicon::OutlinedShieldCheck,
             self::Other => Heroicon::OutlinedEllipsisHorizontalCircle,
         };
@@ -81,7 +81,7 @@ enum PermissionGroup: string
             self::Menu => 'info',
             self::Orders => 'success',
             self::People => 'warning',
-            self::Restaurant => 'primary',
+            self::Tenant => 'primary',
             self::ProductTeam => 'danger',
             self::Other => 'gray',
         };
@@ -102,8 +102,8 @@ enum PermissionGroup: string
             self::Menu => ['menu'],
             self::Orders => ['order'],
             self::People => ['user'],
-            self::Restaurant => ['settings', 'storefront'],
-            self::ProductTeam => ['restaurant', 'role', 'permission'],
+            self::Tenant => ['settings', 'storefront'],
+            self::ProductTeam => ['tenant', 'role', 'permission'],
             self::Other => [],
         };
     }
@@ -143,7 +143,7 @@ enum PermissionGroup: string
     /**
      * Every group, in the order the panel shows them.
      *
-     * Ordinary restaurant work first and the product team's own powers last,
+     * Ordinary tenant work first and the product team's own powers last,
      * which is roughly least to most dangerous.
      *
      * @return list<self>
@@ -154,7 +154,7 @@ enum PermissionGroup: string
             self::Menu,
             self::Orders,
             self::People,
-            self::Restaurant,
+            self::Tenant,
             self::Other,
             self::ProductTeam,
         ];

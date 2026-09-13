@@ -5,7 +5,7 @@
     paint, so a prop would show one shade and then visibly correct itself in
     front of the guest. The value is the visitor's own choice, from the
     unencrypted `appearance` cookie — there is no brand colour and no per
-    restaurant default. See App\Enums\Appearance.
+    tenant default. See App\Enums\Appearance.
 --}}
 <script>
     (function () {

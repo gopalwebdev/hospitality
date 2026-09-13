@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Actions\Restaurants;
+namespace App\Actions\Tenants;
 
 use App\Enums\Role as RoleEnum;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Refuse a role grant that would put a restaurant over its own limit.
+ * Refuse a role grant that would put a tenant over its own limit.
  *
- * A restaurant may hold at most Restaurant::$max_admins admins and
- * Restaurant::$max_staff staff on its roster at once; a super admin sets both
- * numbers from the restaurant's own record (see RestaurantForm). This is the
+ * A tenant may hold at most Tenant::$max_admins admins and
+ * Tenant::$max_staff staff on its roster at once; a super admin sets both
+ * numbers from the tenant's own record (see TenantForm). This is the
  * one place every path that can grant a capped role checks before the grant
- * is written, whichever panel it comes from: SetRestaurantUserRoles (and
- * AddUserToRestaurant, which calls it) from the tenant panel, and
+ * is written, whichever panel it comes from: SetTenantUserRoles (and
+ * AddUserToTenant, which calls it) from the tenant panel, and
  * SetUserRoles from the product team panel — so the limit cannot be worked
  * around by going through a different door.
  *
@@ -27,18 +27,18 @@ use Illuminate\Validation\ValidationException;
 class EnsureRoleFitsWithinLimit
 {
     /**
-     * @throws ValidationException when $restaurant already holds as many
+     * @throws ValidationException when $tenant already holds as many
      *                             $role holders as its limit allows, not counting $user itself
      */
-    public function __invoke(Restaurant $restaurant, RoleEnum $role, User $user): void
+    public function __invoke(Tenant $tenant, RoleEnum $role, User $user): void
     {
-        $limit = $restaurant->roleLimit($role);
+        $limit = $tenant->roleLimit($role);
 
         if ($limit === null) {
             return;
         }
 
-        $current = $restaurant->roleHolderCount($role, excluding: $user);
+        $current = $tenant->roleHolderCount($role, excluding: $user);
 
         if ($current < $limit) {
             return;
@@ -47,7 +47,7 @@ class EnsureRoleFitsWithinLimit
         throw ValidationException::withMessages([
             'data.roles' => sprintf(
                 '%s already has %d of %d allowed %s.',
-                $restaurant->name,
+                $tenant->name,
                 $current,
                 $limit,
                 $this->roleLabel($role, $current),

@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users\Pages;
+namespace App\Filament\Tenant\Resources\Users\Pages;
 
-use App\Actions\Restaurants\SetRestaurantUserRoles;
-use App\Filament\Restaurant\Resources\Users\UserResource;
+use App\Actions\Tenants\SetTenantUserRoles;
+use App\Filament\Tenant\Resources\Users\UserResource;
 use App\Models\User;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -45,7 +45,7 @@ class EditUser extends EditRecord
         $record->update($data);
 
         if ($roleNames !== null && $record instanceof User) {
-            app(SetRestaurantUserRoles::class)($record, $roleNames);
+            app(SetTenantUserRoles::class)($record, $roleNames);
         }
 
         return $record->refresh();

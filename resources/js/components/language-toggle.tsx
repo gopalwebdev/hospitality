@@ -19,21 +19,21 @@ import type { TenantSharedProps } from '@/types';
  * so this button does not need to know the list.
  */
 export function LanguageToggle() {
-    const { restaurant, locale } = usePage<TenantSharedProps>().props;
+    const { tenant, locale } = usePage<TenantSharedProps>().props;
     const { t } = useTranslations();
 
     const next = locale.available.find(
         (option) => option.value === locale.next,
     );
 
-    if (restaurant === null || next === undefined) {
+    if (tenant === null || next === undefined) {
         return null;
     }
 
     const label = `${t('actions.switch_language')}: ${next.label}`;
 
     return (
-        <Form action={language.update(restaurant.slug)} className="contents">
+        <Form action={language.update(tenant.slug)} className="contents">
             <input type="hidden" name="locale" value={next.value} />
 
             <Button

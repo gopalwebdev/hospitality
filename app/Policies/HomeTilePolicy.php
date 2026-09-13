@@ -10,7 +10,7 @@ use App\Models\User;
  * Who may arrange the home screen guests land on.
  *
  * Its own pair of permissions rather than the menu's: the home screen is the
- * shop window, and a restaurant may well want someone who can rearrange it
+ * shop window, and a tenant may well want someone who can rearrange it
  * without also being able to rewrite prices. storefront.view to look,
  * storefront.manage to change anything.
  */
@@ -50,7 +50,7 @@ class HomeTilePolicy
      * Drag tiles into a new order on the home screen.
      *
      * The order is the whole point of the page, so this is the first thing a
-     * restaurant does here. Filament asks for it by name because the table is
+     * tenant does here. Filament asks for it by name because the table is
      * reorderable, and strictAuthorization refuses when it is missing — see
      * .ai/rules/policies.md.
      */

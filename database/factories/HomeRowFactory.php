@@ -5,7 +5,7 @@ namespace Database\Factories;
 use App\Enums\HomeRowLayout;
 use App\Enums\Locale;
 use App\Models\HomeRow;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -14,14 +14,14 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class HomeRowFactory extends Factory
 {
     /**
-     * A banner row, which is the one a restaurant leads with.
+     * A banner row, which is the one a tenant leads with.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         return [
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'title' => null,
             'layout' => HomeRowLayout::Banner,
             'position' => fake()->numberBetween(0, 20),
@@ -30,12 +30,12 @@ class HomeRowFactory extends Factory
     }
 
     /**
-     * A row on an existing restaurant's home screen.
+     * A row on an existing tenant's home screen.
      */
-    public function ofRestaurant(Restaurant $restaurant): static
+    public function ofTenant(Tenant $tenant): static
     {
         return $this->state(fn (array $attributes): array => [
-            'tenant_id' => $restaurant->getKey(),
+            'tenant_id' => $tenant->getKey(),
         ]);
     }
 

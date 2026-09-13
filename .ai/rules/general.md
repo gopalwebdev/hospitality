@@ -29,4 +29,4 @@ These are house rules, not preferences to be re-litigated:
 ## The staff app has been removed; the guest app and the two panels are the product
 Standing scope decision from the project owner: the staff PWA — its pages, entry, root template, `staff.*` routes, sign-in flow and `lang/en/staff.php` — was deleted outright rather than parked. What remains is the guest app (the one Inertia surface, itself an installable PWA) and the two Filament panels.
 
-The **Staff role** is untouched: it is a Spatie role with a per-restaurant limit (`restaurants.max_staff`), and accounts still hold it. It simply has no surface of its own until a staff app comes back. A feature described for "the app" means the guest app.
+The **Staff role** is untouched: it is a Spatie role with a per-tenant limit (`tenants.max_staff`), and accounts still hold it. It simply has no surface of its own until a staff app comes back. A feature described for "the app" means the guest app.

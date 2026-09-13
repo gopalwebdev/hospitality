@@ -6,10 +6,10 @@ namespace App\Enums;
  * How the guest app is shaded on the phone reading it.
  *
  * Light and dark are the whole of it: there is no brand colour, no per
- * restaurant default, and nothing to configure in the restaurant panel. The choice
+ * tenant default, and nothing to configure in the tenant panel. The choice
  * belongs to whoever is holding the phone, because a guest in a dark dining
  * room and one on a bright terrace want different answers and neither is the
- * restaurant's to make for them.
+ * tenant's to make for them.
  */
 enum Appearance: string
 {

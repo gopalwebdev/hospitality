@@ -29,7 +29,7 @@ export type Translations = {
 };
 
 /**
- * The restaurant's currency, as a code and a scale.
+ * The tenant's currency, as a code and a scale.
  *
  * Never a formatted string: prices cross the wire as integers and are turned
  * into money in the browser, by resources/js/lib/money.ts.
@@ -40,7 +40,7 @@ export type CurrencyProp = {
 };
 
 export type TenantSharedProps = {
-    restaurant: { name: string; slug: string } | null;
+    tenant: { name: string; slug: string; typeNoun: string } | null;
     locale: LocaleProp;
     currency: CurrencyProp | null;
     translations: Translations;

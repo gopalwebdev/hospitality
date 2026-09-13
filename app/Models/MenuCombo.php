@@ -77,7 +77,7 @@ class MenuCombo extends Model
     ];
 
     /**
-     * Take the restaurant from the menu this sits on.
+     * Take the tenant from the menu this sits on.
      *
      * The same reason as MenuCategory::booted(): a relation manager writes
      * these rows against a model Filament's tenancy is not stamping.
@@ -97,13 +97,13 @@ class MenuCombo extends Model
     }
 
     /**
-     * The restaurant selling this.
+     * The tenant selling this.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -173,7 +173,7 @@ class MenuCombo extends Model
     }
 
     /**
-     * Order the way the restaurant arranged them, name only to break ties.
+     * Order the way the tenant arranged them, name only to break ties.
      *
      * @param  Builder<$this>  $query
      */

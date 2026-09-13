@@ -6,7 +6,7 @@ use App\Filament\Platform\Resources\Users\Pages\CreateUser;
 use App\Filament\Platform\Resources\Users\Pages\EditUser;
 use App\Filament\Platform\Resources\Users\Pages\ListUsers;
 use App\Filament\Platform\Resources\Users\UserResource;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\AccountCreatedNotification;
 use App\Notifications\SignInCodeNotification;
@@ -70,9 +70,9 @@ it('serves the create, view and edit pages to the product team', function (): vo
     $this->get("http://restaurant-app.test/dashboard/users/{$other->getKey()}/edit")->assertOk();
 });
 
-it('keeps a restaurant admin off the accounts page', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $user = User::factory()->ofRestaurant($restaurant)->create();
+it('keeps a tenant admin off the accounts page', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->ofTenant($tenant)->create();
     $user->assignRole(RoleEnum::Admin->value);
 
     $this->actingAs($user)
@@ -81,13 +81,13 @@ it('keeps a restaurant admin off the accounts page', function (): void {
 });
 
 it('hides the accounts resource from everyone but the product team', function (RoleEnum $roleEnum): void {
-    $restaurant = Restaurant::factory()->create();
-    $user = User::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->ofTenant($tenant)->create();
     $user->assignRole($roleEnum->value);
 
     $this->actingAs($user);
 
-    // user.manage is held by restaurant roles, so the policy alone would let
+    // user.manage is held by tenant roles, so the policy alone would let
     // Admin through. The resource is what keeps this product-team-only.
     expect(UserResource::canAccess())->toBeFalse();
 })->with(RoleEnum::cases());
@@ -104,12 +104,12 @@ it('shows the accounts resource to the product team', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('lists accounts from every restaurant and the platform', function (): void {
-    $first = Restaurant::factory()->create();
-    $second = Restaurant::factory()->create();
+it('lists accounts from every tenant and the platform', function (): void {
+    $first = Tenant::factory()->create();
+    $second = Tenant::factory()->create();
 
-    $firstStaff = User::factory()->ofRestaurant($first)->create();
-    $secondStaff = User::factory()->ofRestaurant($second)->create();
+    $firstStaff = User::factory()->ofTenant($first)->create();
+    $secondStaff = User::factory()->ofTenant($second)->create();
 
     $platform = enterProductTeamPanel();
 
@@ -117,12 +117,12 @@ it('lists accounts from every restaurant and the platform', function (): void {
         ->assertCanSeeTableRecords([$firstStaff, $secondStaff, $platform]);
 });
 
-it('filters the platform-wide list down to one restaurant', function (): void {
-    $spice = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('filters the platform-wide list down to one tenant', function (): void {
+    $spice = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
 
-    $spiceStaff = User::factory()->ofRestaurant($spice)->create();
-    $otherStaff = User::factory()->ofRestaurant($other)->create();
+    $spiceStaff = User::factory()->ofTenant($spice)->create();
+    $otherStaff = User::factory()->ofTenant($other)->create();
 
     $platform = enterProductTeamPanel();
 
@@ -132,15 +132,15 @@ it('filters the platform-wide list down to one restaurant', function (): void {
         ->assertCanNotSeeTableRecords([$otherStaff, $platform]);
 });
 
-it('filters the platform-wide list by whether an account belongs to a restaurant', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $staff = User::factory()->ofRestaurant($restaurant)->create();
+it('filters the platform-wide list by whether an account belongs to a tenant', function (): void {
+    $tenant = Tenant::factory()->create();
+    $staff = User::factory()->ofTenant($tenant)->create();
     $platform = enterProductTeamPanel();
 
     // Where an account belongs is the tenant column alone, so this splits the
     // list the same way the Tenant column reads it.
     Livewire::test(ListUsers::class)
-        ->filterTable('belongs_to', 'restaurant')
+        ->filterTable('belongs_to', 'tenant')
         ->assertCanSeeTableRecords([$staff])
         ->assertCanNotSeeTableRecords([$platform]);
 
@@ -150,20 +150,20 @@ it('filters the platform-wide list by whether an account belongs to a restaurant
         ->assertCanNotSeeTableRecords([$staff]);
 });
 
-it('opens the account form with a restaurant and role already chosen', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('opens the account form with a tenant and role already chosen', function (): void {
+    $tenant = Tenant::factory()->create();
 
     enterProductTeamPanel();
 
-    // How CreateRestaurant hands a newly onboarded restaurant straight on to
+    // How CreateTenant hands a newly onboarded tenant straight on to
     // creating the admin that runs it.
     Livewire::withQueryParams([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'role' => RoleEnum::Admin->value,
     ])
         ->test(CreateUser::class)
         ->assertFormSet([
-            'tenant_id' => $restaurant->getKey(),
+            'tenant_id' => $tenant->getKey(),
             'roles' => [RoleEnum::Admin->value],
         ]);
 });
@@ -178,9 +178,9 @@ it('shows an account with no tenant as belonging to the platform', function (): 
         ->assertTableColumnStateSet('tenant.name', null, $platform);
 });
 
-it('shows a restaurant account under its restaurant', function (): void {
-    $restaurant = Restaurant::factory()->create(['name' => 'Spice Garden']);
-    $staff = User::factory()->ofRestaurant($restaurant)->create();
+it('shows a tenant account under its tenant', function (): void {
+    $tenant = Tenant::factory()->create(['name' => 'Spice Garden']);
+    $staff = User::factory()->ofTenant($tenant)->create();
 
     enterProductTeamPanel();
 
@@ -233,14 +233,14 @@ it('emails the super admin a code instead of creating the account straight away'
 it('creates the account once the right code is entered', function (): void {
     Notification::fake();
 
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
     enterProductTeamPanel();
 
     [$page, $code] = startCreatingAccount([
         'name' => 'Nadia Rao',
         'email' => 'nadia@example.com',
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'roles' => [RoleEnum::Staff->value],
     ]);
 
@@ -251,25 +251,25 @@ it('creates the account once the right code is entered', function (): void {
     $created = User::query()->where('email', 'nadia@example.com')->sole();
 
     expect($created->name)->toBe('Nadia Rao')
-        ->and($created->tenant_id)->toBe($restaurant->getKey())
+        ->and($created->tenant_id)->toBe($tenant->getKey())
         ->and($created->isSuperAdmin())->toBeFalse()
         ->and($created->roles->pluck('name')->all())->toBe([RoleEnum::Staff->value])
         // The tenant column and the roster are written together, or the row
-        // would name a restaurant the account cannot actually open.
-        ->and($created->restaurants->pluck('id')->all())->toBe([$restaurant->getKey()]);
+        // would name a tenant the account cannot actually open.
+        ->and($created->tenants->pluck('id')->all())->toBe([$tenant->getKey()]);
 });
 
 it('tells the new account that it exists', function (): void {
     Notification::fake();
 
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
     enterProductTeamPanel();
 
     [$page, $code] = startCreatingAccount([
         'name' => 'Nadia Rao',
         'email' => 'nadia@example.com',
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
     ]);
 
     $page->fillForm(['confirmation_code' => $code])
@@ -281,7 +281,7 @@ it('tells the new account that it exists', function (): void {
     Notification::assertSentTo($created, AccountCreatedNotification::class);
 });
 
-it('creates the product team with no restaurant', function (): void {
+it('creates the product team with no tenant', function (): void {
     Notification::fake();
 
     enterProductTeamPanel();
@@ -300,7 +300,7 @@ it('creates the product team with no restaurant', function (): void {
 
     expect($created->tenant_id)->toBeNull()
         ->and($created->isSuperAdmin())->toBeTrue()
-        ->and($created->restaurants)->toBeEmpty();
+        ->and($created->tenants)->toBeEmpty();
 });
 
 it('refuses a wrong code and creates nothing', function (): void {
@@ -421,15 +421,15 @@ it('lets the details be changed before the code is entered', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('updates an account without letting it move to another restaurant', function (): void {
-    $from = Restaurant::factory()->create();
-    $to = Restaurant::factory()->create();
-    $staff = User::factory()->ofRestaurant($from)->create();
+it('updates an account without letting it move to another tenant', function (): void {
+    $from = Tenant::factory()->create();
+    $to = Tenant::factory()->create();
+    $staff = User::factory()->ofTenant($from)->create();
 
     enterProductTeamPanel();
 
     // Where an account belongs is settled when it is opened: the field is
-    // disabled, so a restaurant submitted here is never dehydrated and the
+    // disabled, so a tenant submitted here is never dehydrated and the
     // roster it would have moved to is left alone.
     Livewire::test(EditUser::class, ['record' => $staff->getKey()])
         ->assertFormFieldDisabled('tenant_id')
@@ -444,11 +444,11 @@ it('updates an account without letting it move to another restaurant', function 
 
     expect($staff->name)->toBe('Renamed Person')
         ->and($staff->tenant_id)->toBe($from->getKey())
-        ->and($staff->restaurants->pluck('id')->all())->toBe([$from->getKey()]);
+        ->and($staff->tenants->pluck('id')->all())->toBe([$from->getKey()]);
 });
 
-it('never offers the product team to an account that belongs to a restaurant', function (): void {
-    $staff = User::factory()->ofRestaurant(Restaurant::factory()->create())->create();
+it('never offers the product team to an account that belongs to a tenant', function (): void {
+    $staff = User::factory()->ofTenant(Tenant::factory()->create())->create();
 
     enterProductTeamPanel();
 
@@ -461,17 +461,17 @@ it('never offers the product team to an account that belongs to a restaurant', f
     expect($staff->refresh()->isSuperAdmin())->toBeFalse();
 });
 
-it('refuses at the model to put a restaurant\'s account on the product team', function (): void {
-    $staff = User::factory()->ofRestaurant(Restaurant::factory()->create())->create();
+it('refuses at the model to put a tenant\'s account on the product team', function (): void {
+    $staff = User::factory()->ofTenant(Tenant::factory()->create())->create();
 
     // The backstop behind the disabled toggle: the product team hold every
-    // permission on every restaurant, so the two may never be combined however
+    // permission on every tenant, so the two may never be combined however
     // the write arrives.
     expect(fn () => $staff->forceFill(['is_super_admin' => true])->save())
         ->toThrow(LogicException::class);
 });
 
-it('lets the product team keep no restaurant at all', function (): void {
+it('lets the product team keep no tenant at all', function (): void {
     $superAdmin = User::factory()->superAdmin()->create();
 
     enterProductTeamPanel();
@@ -488,8 +488,8 @@ it('lets the product team keep no restaurant at all', function (): void {
 });
 
 it('syncs roles so a permission check answers from the new set immediately', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $staff = User::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $staff = User::factory()->ofTenant($tenant)->create();
     $staff->assignRole(RoleEnum::Staff->value);
 
     enterProductTeamPanel();
@@ -528,7 +528,7 @@ it('may hand out a role carrying a product team permission', function (): void {
 
     enterProductTeamPanel();
 
-    // The one place this is allowed: a restaurant panel filters these out, and
+    // The one place this is allowed: a tenant panel filters these out, and
     // deciding who is the product team is exactly what this panel is for.
     Livewire::test(EditUser::class, ['record' => $staff->getKey()])
         ->fillForm(['roles' => [RoleEnum::Admin->value]])
@@ -585,14 +585,14 @@ it('refuses self deletion at the policy too', function (): void {
         ->and((new UserPolicy)->delete($platform, $platform))->toBeFalse();
 });
 
-it('leaves an account standing when its restaurant is deleted', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $staff = User::factory()->ofRestaurant($restaurant)->create();
+it('leaves an account standing when its tenant is deleted', function (): void {
+    $tenant = Tenant::factory()->create();
+    $staff = User::factory()->ofTenant($tenant)->create();
 
-    $restaurant->delete();
+    $tenant->delete();
 
     // The tenant column falls back to null rather than taking the account with
-    // it: accounts are platform-wide and outlive any one restaurant.
+    // it: accounts are platform-wide and outlive any one tenant.
     expect(User::query()->whereKey($staff->getKey())->exists())->toBeTrue()
         ->and($staff->refresh()->tenant_id)->toBeNull()
         ->and($staff->isSuperAdmin())->toBeFalse();

@@ -53,9 +53,9 @@ class CreateUser extends CreateRecord
     public bool $hasRequestedCode = false;
 
     /**
-     * Open with a restaurant and a role already chosen, when arrived at from
-     * one — CreateRestaurant sends a newly onboarded restaurant straight here,
-     * and so does the roster on a restaurant's own record.
+     * Open with a tenant and a role already chosen, when arrived at from
+     * one — CreateTenant sends a newly onboarded tenant straight here,
+     * and so does the roster on a tenant's own record.
      */
     protected function fillForm(): void
     {
@@ -67,14 +67,14 @@ class CreateUser extends CreateRecord
     }
 
     /**
-     * The restaurant and role that whoever linked here already chose.
+     * The tenant and role that whoever linked here already chose.
      *
      * Null rather than an empty array when there is nothing to prefill:
      * Schema::fill() hydrates each field's own default only when it is handed
      * null, and skips them for any array, an empty one included.
      *
      * Only these two fields are read, and the form validates both: an unknown
-     * restaurant id or role name simply matches no option and is picked by
+     * tenant id or role name simply matches no option and is picked by
      * hand instead.
      *
      * @return array<string, mixed>|null

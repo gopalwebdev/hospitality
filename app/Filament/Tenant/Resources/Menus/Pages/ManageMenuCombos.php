@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Pages;
+namespace App\Filament\Tenant\Resources\Menus\Pages;
 
 use App\Enums\ItemAvailability;
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuComboForm;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuComboForm;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tables\Reordering;

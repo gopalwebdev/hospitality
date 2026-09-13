@@ -3,14 +3,14 @@
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Resources\Menus\Pages\ManageMenuCombos;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuComboForm;
+use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuCombos;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuComboForm;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\QueryException;
@@ -62,12 +62,12 @@ function dishOn(Menu $menu): MenuItem
 */
 
 it('creates a combo on the menu with the dishes it contains', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $burger = dishOn($menu);
     $fries = dishOn($menu);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -85,7 +85,7 @@ it('creates a combo on the menu with the dishes it contains', function (): void 
 
     $combo = comboNamed('Burger Meal');
 
-    expect($combo->tenant_id)->toBe($restaurant->getKey())
+    expect($combo->tenant_id)->toBe($tenant->getKey())
         ->and($combo->menu_id)->toBe($menu->getKey())
         // ₹299.00 is 29900 paise, exactly. No float reaches the column.
         ->and($combo->price_minor_units)->toBe(29900)
@@ -96,10 +96,10 @@ it('creates a combo on the menu with the dishes it contains', function (): void 
 });
 
 it('leaves the compare-at price empty rather than storing a zero', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -114,10 +114,10 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
 });
 
 it('refuses a compare-at price that is not above what is charged', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // A "was" price at or below the real one advertises a discount that does
     // not exist, which is the one way this field can mislead a guest.
@@ -132,11 +132,11 @@ it('refuses a compare-at price that is not above what is charged', function (): 
 });
 
 it('refuses a combo name the same menu already uses', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCombo::factory()->onMenu($menu)->create(['name' => [Locale::English->value => 'Family Feast']]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -148,17 +148,17 @@ it('refuses a combo name the same menu already uses', function (): void {
 });
 
 it('offers only this menu\'s dishes as combo contents', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $otherMenu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $mine = dishOn($menu);
     $elsewhere = dishOn($otherMenu);
 
-    $theirs = Restaurant::factory()->create();
+    $theirs = Tenant::factory()->create();
     $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // The same call the select inside the repeater makes. A combo may only
     // contain dishes from the menu it is offered on.
@@ -169,11 +169,11 @@ it('offers only this menu\'s dishes as combo contents', function (): void {
         ->and($offered)->not->toContain($theirDish->getKey());
 });
 
-it('refuses at the database a combo containing another restaurant\'s dish', function (): void {
-    $mine = Restaurant::factory()->create();
+it('refuses at the database a combo containing another tenant\'s dish', function (): void {
+    $mine = Tenant::factory()->create();
     $combo = MenuCombo::factory()->onMenu(Menu::factory()->create(['tenant_id' => $mine->getKey()]))->create();
 
-    $theirs = Restaurant::factory()->create();
+    $theirs = Tenant::factory()->create();
     $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
     expect(fn () => DB::table('menu_combo_items')->insert([
@@ -188,8 +188,8 @@ it('refuses at the database a combo containing another restaurant\'s dish', func
 });
 
 it('refuses the same dish twice in one combo', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
     $dish = dishOn($menu);
 
@@ -208,8 +208,8 @@ it('refuses the same dish twice in one combo', function (): void {
 */
 
 it('prices a combo on its own rather than from its contents', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 29900]);
 
     $burger = dishOn($menu);
@@ -228,10 +228,10 @@ it('prices a combo on its own rather than from its contents', function (): void 
         ->and($combo->price_minor_units)->toBe(29900);
 });
 
-it('falls back to the restaurant\'s GST rate, and overrides it when told', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings->update(['tax_rate_basis_points' => 1800]);
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+it('falls back to the tenant\'s GST rate, and overrides it when told', function (): void {
+    $tenant = Tenant::factory()->create();
+    $tenant->settings->update(['tax_rate_basis_points' => 1800]);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $following = MenuCombo::factory()->onMenu($menu)->create();
     $overriding = MenuCombo::factory()->onMenu($menu)->taxedAt(1200)->create();
@@ -247,13 +247,13 @@ it('falls back to the restaurant\'s GST rate, and overrides it when told', funct
 */
 
 it('rearranges combos by dragging them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $first = MenuCombo::factory()->onMenu($menu)->create(['position' => 0]);
     $second = MenuCombo::factory()->onMenu($menu)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     combosOf($menu)->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
@@ -261,13 +261,13 @@ it('rearranges combos by dragging them', function (): void {
 });
 
 it('keeps rearranging combos away from someone who may only read the menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $first = MenuCombo::factory()->onMenu($menu)->create(['position' => 0]);
     $second = MenuCombo::factory()->onMenu($menu)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Staff);
+    enterTenantPanel($tenant, RoleEnum::Staff);
 
     combosOf($menu)->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
@@ -276,14 +276,14 @@ it('keeps rearranging combos away from someone who may only read the menu', func
 });
 
 it('shows only this menu\'s combos', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $otherMenu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $mine = MenuCombo::factory()->onMenu($menu)->create();
     $elsewhere = MenuCombo::factory()->onMenu($otherMenu)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     combosOf($menu)
         ->assertCanSeeTableRecords([$mine])
@@ -291,8 +291,8 @@ it('shows only this menu\'s combos', function (): void {
 });
 
 it('leaves the dishes alone when a combo is deleted', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
     $dish = dishOn($menu);
 
@@ -305,8 +305,8 @@ it('leaves the dishes alone when a combo is deleted', function (): void {
 });
 
 it('takes a dish out of every combo when it is deleted', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
     $dish = dishOn($menu);
 
@@ -321,8 +321,8 @@ it('takes a dish out of every combo when it is deleted', function (): void {
 });
 
 it('takes a menu\'s combos down with it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
 
     $menu->delete();
@@ -331,8 +331,8 @@ it('takes a menu\'s combos down with it', function (): void {
 });
 
 it('keeps an unavailable combo off the guest\'s menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $offered = MenuCombo::factory()->onMenu($menu)->create();
     $soldOut = MenuCombo::factory()->onMenu($menu)->unavailable()->create();
@@ -344,8 +344,8 @@ it('keeps an unavailable combo off the guest\'s menu', function (): void {
 });
 
 it('takes a hidden menu\'s combos down with it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->hidden()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
     MenuCombo::factory()->onMenu($menu)->create();
 
     expect(MenuCombo::query()->orderable()->count())->toBe(0);

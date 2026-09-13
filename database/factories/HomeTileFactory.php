@@ -7,7 +7,7 @@ use App\Enums\Locale;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,14 +16,14 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class HomeTileFactory extends Factory
 {
     /**
-     * A tile opening one of its restaurant's menus, which is the common case.
+     * A tile opening one of its tenant's menus, which is the common case.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         return [
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'home_row_id' => fn (array $attributes): int => HomeRow::factory()
                 ->create(['tenant_id' => $attributes['tenant_id']])
                 ->getKey(),
@@ -40,7 +40,7 @@ class HomeTileFactory extends Factory
     }
 
     /**
-     * A tile in an existing row, and that row's restaurant with it.
+     * A tile in an existing row, and that row's tenant with it.
      *
      * The pair has to be set together or the composite foreign key trips —
      * see .ai/rules/models.md.
@@ -54,7 +54,7 @@ class HomeTileFactory extends Factory
     }
 
     /**
-     * A tile opening an existing menu, and its restaurant with it.
+     * A tile opening an existing menu, and its tenant with it.
      */
     public function openingMenu(Menu $menu): static
     {
@@ -71,7 +71,7 @@ class HomeTileFactory extends Factory
     }
 
     /**
-     * A tile leaving the app for somewhere the restaurant is also found.
+     * A tile leaving the app for somewhere the tenant is also found.
      */
     public function linkingTo(?string $url = null): static
     {

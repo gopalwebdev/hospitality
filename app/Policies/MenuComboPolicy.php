@@ -10,7 +10,7 @@ use App\Models\User;
  * Who may put together the bundles a menu is sold with.
  *
  * Reading is menu.view, which staff and guests hold too; changing anything is
- * menu.manage, which only a restaurant admin has. Which restaurant's records
+ * menu.manage, which only a tenant admin has. Which tenant's records
  * are in front of you is not this policy's business — Filament scopes the
  * relation manager to the panel's tenant, and the composite foreign keys make
  * crossing that boundary a database error.

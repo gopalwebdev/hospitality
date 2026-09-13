@@ -53,10 +53,10 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     ];
 
     /**
-     * An account belongs to a restaurant or to the product team, never both.
+     * An account belongs to a tenant or to the product team, never both.
      *
-     * The product team hold every permission on every restaurant, so letting
-     * one restaurant's own account cross over would hand it the platform —
+     * The product team hold every permission on every tenant, so letting
+     * one tenant's own account cross over would hand it the platform —
      * and the two columns are read independently everywhere else, which is
      * exactly why the combination has to be refused in one place rather than
      * guarded at each call site.
@@ -70,33 +70,33 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             throw_if(
                 $user->is_super_admin && $user->tenant_id !== null,
                 LogicException::class,
-                'An account that belongs to a restaurant may not be on the product team.',
+                'An account that belongs to a tenant may not be on the product team.',
             );
         });
     }
 
     /**
-     * The restaurant this account belongs to, if any.
+     * The tenant this account belongs to, if any.
      *
      * The product team belong to none, so this is null for them. It is not what
      * grants them anything, though: is_super_admin is the only thing that
      * does, and an ordinary account not yet put on a roster also has no tenant.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
-     * The restaurants this user staffs or administers.
+     * The tenants this user staffs or administers.
      *
-     * @return BelongsToMany<Restaurant, $this>
+     * @return BelongsToMany<Tenant, $this>
      */
-    public function restaurants(): BelongsToMany
+    public function tenants(): BelongsToMany
     {
-        return $this->belongsToMany(Restaurant::class, 'restaurant_user', 'user_id', 'tenant_id')->withTimestamps();
+        return $this->belongsToMany(Tenant::class)->withTimestamps();
     }
 
     /**
@@ -140,7 +140,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      *
      * This is a column rather than a role: product team ownership is global and
      * granted deliberately, where roles are what someone does inside a single
-     * restaurant. AppServiceProvider grants a super admin every permission.
+     * tenant. AppServiceProvider grants a super admin every permission.
      */
     public function isSuperAdmin(): bool
     {
@@ -158,7 +158,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Whether this account belongs to the product team rather than to a restaurant.
+     * Whether this account belongs to the product team rather than to a tenant.
      *
      * This is how the product team panel labels a row, and it is a question about
      * the tenant column alone. Do not use it to decide what someone may do:
@@ -174,35 +174,35 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      * Gate entry to each Filament panel.
      *
      * The platform panel is reserved for the product team. The tenant panel is
-     * open to anyone attached to a restaurant, plus the product team for support.
+     * open to anyone attached to a tenant, plus the product team for support.
      * A panel this application does not know about is closed to everyone.
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return match (FilamentPanel::tryFrom($panel->getId())) {
             FilamentPanel::Platform => $this->isSuperAdmin(),
-            FilamentPanel::Restaurant => $this->isSuperAdmin() || $this->restaurants()->exists(),
+            FilamentPanel::Tenant => $this->isSuperAdmin() || $this->tenants()->exists(),
             default => false,
         };
     }
 
     /**
-     * The tenants offered in the panel's restaurant switcher.
+     * The tenants offered in the panel's tenant switcher.
      *
-     * @return Collection<int, Restaurant>
+     * @return Collection<int, Tenant>
      */
     public function getTenants(Panel $panel): Collection
     {
         if ($this->isSuperAdmin()) {
             // Filament asks for this more than once per request.
-            return once(fn (): Collection => Restaurant::query()->orderBy('name')->get());
+            return once(fn (): Collection => Tenant::query()->orderBy('name')->get());
         }
 
-        return $this->restaurants;
+        return $this->tenants;
     }
 
     /**
-     * Guard against a user reaching another restaurant by editing the subdomain.
+     * Guard against a user reaching another tenant by editing the subdomain.
      */
     public function canAccessTenant(Model $tenant): bool
     {
@@ -210,19 +210,19 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             return true;
         }
 
-        return $this->restaurants()->whereKey($tenant)->exists();
+        return $this->tenants()->whereKey($tenant)->exists();
     }
 
     /**
-     * Whether this account is on more than one restaurant's roster.
+     * Whether this account is on more than one tenant's roster.
      *
-     * Roles are held per account, so someone staffing two restaurants cannot
+     * Roles are held per account, so someone staffing two tenants cannot
      * have them changed from either one's panel. Asked by the form that shows
      * the roles and again by the action that saves them, in the same request.
      */
-    public function staffsSeveralRestaurants(): bool
+    public function staffsSeveralTenants(): bool
     {
-        return once(fn (): bool => $this->restaurants()->count() > 1);
+        return once(fn (): bool => $this->tenants()->count() > 1);
     }
 
     /**

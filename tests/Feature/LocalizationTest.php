@@ -2,16 +2,16 @@
 
 use App\Enums\Locale;
 use App\Enums\Role;
-use App\Filament\Restaurant\Resources\MenuItems\Pages\ListMenuItems;
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
-use App\Filament\Restaurant\Resources\Menus\Pages\ListMenus;
+use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
 use App\Http\Middleware\SetLocale;
 use App\Models\HomeTile;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddition;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\App;
@@ -23,16 +23,16 @@ beforeEach(function (): void {
 });
 
 /**
- * A restaurant with one bilingual dish on one bilingual menu.
+ * A tenant with one bilingual dish on one bilingual menu.
  *
- * @return array{Restaurant, Menu, MenuCategory, MenuItem, MenuItemAddition}
+ * @return array{Tenant, Menu, MenuCategory, MenuItem, MenuItemAddition}
  */
 function seedBilingualMenu(): array
 {
-    $restaurant = Restaurant::factory()->create(['slug' => 'spice']);
+    $tenant = Tenant::factory()->create(['slug' => 'spice']);
 
     $menu = Menu::factory()->create([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு'],
     ]);
 
@@ -49,12 +49,12 @@ function seedBilingualMenu(): array
         'name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'],
     ]);
 
-    return [$restaurant, $menu, $category, $item, $addition];
+    return [$tenant, $menu, $category, $item, $addition];
 }
 
-function menuUrl(Restaurant $restaurant, Menu $menu): string
+function menuUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey();
+    return 'http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey();
 }
 
 /*
@@ -64,9 +64,9 @@ function menuUrl(Restaurant $restaurant, Menu $menu): string
 */
 
 it('answers in English when a visitor has chosen nothing', function (): void {
-    [$restaurant, $menu, $category, $item] = seedBilingualMenu();
+    [$tenant, $menu, $category, $item] = seedBilingualMenu();
 
-    $this->get(menuUrl($restaurant, $menu))
+    $this->get(menuUrl($tenant, $menu))
         ->assertOk()
         ->assertSee($menu->getTranslation('name', 'en'))
         ->assertSee($category->getTranslation('name', 'en'))
@@ -81,19 +81,19 @@ it('answers in English when a visitor has chosen nothing', function (): void {
 });
 
 it('falls back to English for a name that has no translation yet', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'name' => ['en' => 'Dinner'],
     ]);
     $item = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create(['name' => ['en' => 'Starters']]))
         ->create(['name' => ['en' => 'Paneer Tikka']]);
 
-    // A restaurant that has not translated its menu yet is the normal state on
+    // A tenant that has not translated its menu yet is the normal state on
     // day one, and a Tamil-reading guest must still get a readable menu.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get(menuUrl($restaurant, $menu))
+        ->get(menuUrl($tenant, $menu))
         ->assertOk()
         ->assertSee('Paneer Tikka')
         ->assertSee('Starters');
@@ -108,7 +108,7 @@ it('falls back to English for a name that has no translation yet', function (): 
 */
 
 it('remembers the chosen language in an unencrypted cookie', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 'spice']);
+    $tenant = Tenant::factory()->create(['slug' => 'spice']);
 
     $response = $this->put(
         'http://spice.restaurant-app.test/preferences/language',
@@ -124,22 +124,22 @@ it('remembers the chosen language in an unencrypted cookie', function (): void {
 
     expect($cookie)->not->toBeNull()
         ->and($cookie->getValue())->toBe(Locale::Tamil->value)
-        ->and($restaurant->slug)->toBe('spice');
+        ->and($tenant->slug)->toBe('spice');
 });
 
 it('answers in Tamil once the language has been chosen', function (): void {
-    [$restaurant, $menu, $category, $item, $addition] = seedBilingualMenu();
+    [$tenant, $menu, $category, $item, $addition] = seedBilingualMenu();
 
     // Read through the props rather than the HTML: Inertia serialises its
     // payload as JSON, which escapes non-ASCII, so assertSee() would be looking
     // for Tamil in a document that spells it \u0ba4 and so on.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get(menuUrl($restaurant, $menu))
+        ->get(menuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('locale.current', Locale::Tamil->value)
             ->where('locale.next', Locale::English->value)
-            // The restaurant's own words, from translated columns...
+            // The tenant's own words, from translated columns...
             ->where('menu.name', $menu->getTranslation('name', 'ta'))
             ->where('sections.0.name', $category->getTranslation('name', 'ta'))
             ->where('sections.0.items.0.name', $item->getTranslation('name', 'ta'))
@@ -152,15 +152,15 @@ it('answers in Tamil once the language has been chosen', function (): void {
 });
 
 it('translates the tiles on the home screen too', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     HomeTile::factory()->openingMenu($menu)->create([
         'label' => ['en' => 'Our menu', 'ta' => 'எங்கள் மெனு'],
     ]);
 
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$restaurant->slug.'.restaurant-app.test/')
+        ->get('http://'.$tenant->slug.'.restaurant-app.test/')
         ->assertOk()
         ->assertDontSee('Our menu')
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
@@ -170,29 +170,29 @@ it('translates the tiles on the home screen too', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| The restaurant panel follows the same choice
+| The tenant panel follows the same choice
 |--------------------------------------------------------------------------
 */
 
-it('offers a language switcher in the restaurant panel', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+it('offers a language switcher in the tenant panel', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     // Posted to the panel's own host: the tenant panel is on a subdomain and a
     // form posting across hosts would lose the session.
-    $this->get('http://'.$restaurant->slug.'.restaurant-app.test/dashboard')
+    $this->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard')
         ->assertOk()
-        ->assertSee(route('preferences.language.update', ['restaurant' => $restaurant->slug]), escape: false)
+        ->assertSee(route('preferences.language.update', ['tenant' => $tenant->slug]), escape: false)
         ->assertSee(Locale::Tamil->label());
 });
 
 it('shows the panel switcher on English until a language is chosen', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Admin);
 
     // A picker showing nothing selected is worse than one showing the language
     // in use, so the current locale is normalised rather than compared raw.
-    $html = (string) $this->get('http://'.$restaurant->slug.'.restaurant-app.test/dashboard')
+    $html = (string) $this->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard')
         ->assertOk()
         ->getContent();
 
@@ -211,44 +211,44 @@ it('offers a language switcher in the product team panel', function (): void {
         ->assertSee(Locale::Tamil->label());
 });
 
-it('shows the panel\'s own labels in English and the restaurant\'s words in the chosen language', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('shows the panel\'s own labels in English and the tenant\'s words in the chosen language', function (): void {
+    $tenant = Tenant::factory()->create();
     Menu::factory()->create([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு'],
     ]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    enterTenantPanel($tenant, Role::Admin);
 
     // The two halves are answered differently on purpose: this application's
-    // labels are written once, in English, and only what a restaurant typed
+    // labels are written once, in English, and only what a tenant typed
     // is translated — and that lives in the database.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$restaurant->slug.'.restaurant-app.test/dashboard/menus')
+        ->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard/menus')
         ->assertOk()
         ->assertSee(__('panel.menus.create'))
         ->assertSee('இரவு உணவு');
 });
 
 it('opens a form in the language the panel was switched to, through the real request', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    enterTenantPanel($tenant, Role::Admin);
 
     // Cookie, then SetLocale, then the form: the path a browser takes.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get(MenuResource::getUrl('edit', ['record' => $menu, 'tenant' => $restaurant]))
+        ->get(MenuResource::getUrl('edit', ['record' => $menu, 'tenant' => $tenant]))
         ->assertOk()
         ->assertSee('_locale&quot;:&quot;'.Locale::Tamil->value.'&quot;', escape: false);
 });
 
 it('searches a table in the language it is showing, and in English', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
-        ->inMenu(Menu::factory()->create(['tenant_id' => $restaurant->getKey()]))
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
     $paneer = MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Paneer Tikka', 'ta' => 'பன்னீர் டிக்கா']]);
     $coffee = MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Filter Coffee']]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    enterTenantPanel($tenant, Role::Admin);
 
     App::setLocale(Locale::Tamil->value);
 
@@ -266,13 +266,13 @@ it('searches a table in the language it is showing, and in English', function ()
 });
 
 it('sorts a table by the name it is showing', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     // Latin-script translations on purpose: how Postgres's collation orders
     // Tamil against Latin is not what this is about.
-    $alpha = Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'name' => ['en' => 'Alpha', 'ta' => 'Zeta']]);
-    $beta = Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'name' => ['en' => 'Beta', 'ta' => 'Apple']]);
-    $charlie = Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'name' => ['en' => 'Charlie']]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $alpha = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Alpha', 'ta' => 'Zeta']]);
+    $beta = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Beta', 'ta' => 'Apple']]);
+    $charlie = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Charlie']]);
+    enterTenantPanel($tenant, Role::Admin);
 
     Livewire::test(ListMenus::class)
         ->sortTable('name')
@@ -288,10 +288,10 @@ it('sorts a table by the name it is showing', function (): void {
 });
 
 it('finds records from the top bar in the language the panel is showing', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு']]);
-    Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'name' => ['en' => 'Lunch']]);
-    enterRestaurantPanel($restaurant, Role::Admin);
+    $tenant = Tenant::factory()->create();
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு']]);
+    Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Lunch']]);
+    enterTenantPanel($tenant, Role::Admin);
 
     App::setLocale(Locale::Tamil->value);
 
@@ -322,21 +322,21 @@ it('leaves roles and permissions in English', function (): void {
 */
 
 it('refuses a language the app is not available in', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
     $this->put(
-        'http://'.$restaurant->slug.'.restaurant-app.test/preferences/language',
+        'http://'.$tenant->slug.'.restaurant-app.test/preferences/language',
         ['locale' => 'fr'],
     )->assertSessionHasErrors('locale');
 });
 
 it('ignores a tampered cookie rather than breaking the page', function (): void {
-    [$restaurant, $menu] = seedBilingualMenu();
+    [$tenant, $menu] = seedBilingualMenu();
 
     // The cookie is unencrypted and therefore visitor-controlled, so a value
     // that is not a language is an ordinary thing to be handed.
     $this->withUnencryptedCookie(SetLocale::COOKIE, 'klingon')
-        ->get(menuUrl($restaurant, $menu))
+        ->get(menuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('locale.current', Locale::English->value),
@@ -351,14 +351,14 @@ it('ignores a tampered cookie rather than breaking the page', function (): void 
 
 it('ships its own strings in English and in no other language', function (): void {
     // A lang/ta existed and was deliberately deleted: this application's words
-    // are written once, and a restaurant's words are translated in the database
+    // are written once, and a tenant's words are translated in the database
     // instead. A second directory here would be a second copy of the chrome to
     // keep in step, for a panel whose framework chrome is English anyway.
     expect(array_map(basename(...), glob(lang_path('*'), GLOB_ONLYDIR) ?: []))->toBe(['en'])
         ->and(dotKeys(require lang_path('en/guest.php')))->not->toBeEmpty();
 });
 
-it('lists exactly the languages a restaurant may write in', function (): void {
+it('lists exactly the languages a tenant may write in', function (): void {
     expect(Locale::values())->toBe(['en', 'ta'])
         ->and(Locale::default())->toBe(Locale::English)
         ->and(Locale::English->next())->toBe(Locale::Tamil)

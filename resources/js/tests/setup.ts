@@ -10,7 +10,7 @@ import { resetPageProps, readPageProps } from './page-props';
 // a page puts in the document head is what they are checking.
 //
 // usePage() is the other half: every page of both phone apps reads the shared
-// props — the restaurant, the language, the chrome strings — and outside
+// props — the tenant, the language, the chrome strings — and outside
 // createInertiaApp there is nowhere for those to come from. Tests set them with
 // stubPageProps(); see page-props.ts.
 vi.mock('@inertiajs/react', async (importOriginal) => ({

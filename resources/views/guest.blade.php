@@ -9,10 +9,10 @@
         {{-- A table's QR code should not turn up in search results. --}}
         <meta name="robots" content="noindex">
 
-        {{-- Installable, so a guest who comes back keeps the restaurant on their
-             home screen. The manifest and the worker are served per restaurant
+        {{-- Installable, so a guest who comes back keeps the tenant on their
+             home screen. The manifest and the worker are served per tenant
              from the root of its subdomain — see ProgressiveWebAppController. --}}
-        <link rel="manifest" href="{{ route('guest.manifest', ['restaurant' => $tenantSlug]) }}">
+        <link rel="manifest" href="{{ route('guest.manifest', ['tenant' => $tenantSlug]) }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="{{ $theme['name'] }}">
@@ -41,7 +41,7 @@
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function () {
                     navigator.serviceWorker
-                        .register(@json(route('guest.service-worker', ['restaurant' => $tenantSlug], absolute: false)))
+                        .register(@json(route('guest.service-worker', ['tenant' => $tenantSlug], absolute: false)))
                         .catch(function () {
                             // An app that cannot register a worker still works;
                             // it just cannot be installed. Never block on it.

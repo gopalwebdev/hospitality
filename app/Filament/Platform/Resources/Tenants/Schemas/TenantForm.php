@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Filament\Platform\Resources\Restaurants\Schemas;
+namespace App\Filament\Platform\Resources\Tenants\Schemas;
 
 use App\Enums\CountryCallingCode;
 use App\Enums\Role as RoleEnum;
-use App\Models\Restaurant;
+use App\Enums\TenantType;
+use App\Models\Tenant;
 use Closure;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -16,12 +17,12 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Str;
 
-class RestaurantForm
+class TenantForm
 {
     public static function configure(Schema $schema): Schema
     {
         // One column of full-width sections, read top to bottom in the order a
-        // restaurant is actually set up: what it is called, how big its roster
+        // tenant is actually set up: what it is called, how big its roster
         // may get, where it trades, and how to reach it. A two-column grid of
         // sections put the address beside the name, which read as two unrelated
         // starting points rather than one sequence.
@@ -29,7 +30,7 @@ class RestaurantForm
             ->columns(1)
             ->components([
                 Section::make('Identity')
-                    ->description('What this restaurant is called, and where it is served from.')
+                    ->description('What this tenant is called, and where it is served from.')
                     ->icon(Heroicon::OutlinedBuildingStorefront)
                     ->schema([
                         TextInput::make('name')
@@ -40,6 +41,15 @@ class RestaurantForm
                             ->afterStateUpdated(function (?string $state, Set $set): void {
                                 $set('slug', Str::slug((string) $state));
                             }),
+
+                        // What the tenant's own panel and guest app call it —
+                        // "this hotel", "this restaurant". No default, so
+                        // onboarding has to say which, and it stays editable
+                        // because nothing a tenant sets up depends on it yet.
+                        Select::make('type')
+                            ->options(TenantType::options())
+                            ->enum(TenantType::class)
+                            ->required(),
 
                         // The slug is the tenant's subdomain, so it has to stay a valid
                         // DNS label: lowercase alphanumerics and inner hyphens only.
@@ -62,10 +72,10 @@ class RestaurantForm
                             ->inline(false)
                             ->helperText('Turning this off takes the storefront offline.'),
                     ])
-                    ->columns(3),
+                    ->columns(2),
 
                 Section::make('Limits')
-                    ->description('How many accounts may hold each role here. A super admin sets these; the restaurant cannot raise its own.')
+                    ->description('How many accounts may hold each role here. A super admin sets these; the tenant cannot raise its own.')
                     ->icon(Heroicon::OutlinedUserGroup)
                     ->schema([
                         TextInput::make('max_admins')
@@ -73,20 +83,20 @@ class RestaurantForm
                             ->numeric()
                             ->integer()
                             ->minValue(1)
-                            ->default(fn (): int => (int) config('restaurants.default_max_admins'))
+                            ->default(fn (): int => (int) config('tenants.default_max_admins'))
                             ->required()
-                            ->helperText('At least one restaurant admin is required.')
-                            ->rule(fn (?Restaurant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Admin)),
+                            ->helperText('At least one tenant admin is required.')
+                            ->rule(fn (?Tenant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Admin)),
 
                         TextInput::make('max_staff')
                             ->label('Max staff')
                             ->numeric()
                             ->integer()
                             ->minValue(1)
-                            ->default(fn (): int => (int) config('restaurants.default_max_staff'))
+                            ->default(fn (): int => (int) config('tenants.default_max_staff'))
                             ->required()
-                            ->helperText('How many floor staff accounts this restaurant may have at once.')
-                            ->rule(fn (?Restaurant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Staff)),
+                            ->helperText('How many floor staff accounts this tenant may have at once.')
+                            ->rule(fn (?Tenant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Staff)),
                     ])
                     ->columns(2),
 
@@ -108,10 +118,10 @@ class RestaurantForm
                     ->columns(3),
 
                 // The platform's own record of how to reach whoever runs this
-                // restaurant. What guests see is on the restaurant's settings
-                // page, which the restaurant edits itself.
+                // tenant. What guests see is on the tenant's settings
+                // page, which the tenant edits itself.
                 Section::make('How the platform reaches them')
-                    ->description('Not shown to guests: the storefront contact details are on the restaurant’s own settings page.')
+                    ->description('Not shown to guests: the storefront contact details are on the tenant’s own settings page.')
                     ->icon(Heroicon::OutlinedPhone)
                     ->schema([
                         TextInput::make('email')
@@ -159,15 +169,15 @@ class RestaurantForm
     /**
      * Refuse a limit lower than the roster it would already break.
      *
-     * A restaurant with 3 staff may not be dropped to a limit of 2 — the panel
+     * A tenant with 3 staff may not be dropped to a limit of 2 — the panel
      * says how many to remove first rather than silently locking the extra
      * ones out of a role they still hold. $record is null while creating,
-     * where a fresh restaurant has no roster yet to break.
+     * where a fresh tenant has no roster yet to break.
      */
-    private static function notBelowCurrentHolders(?Restaurant $record, RoleEnum $role): Closure
+    private static function notBelowCurrentHolders(?Tenant $record, RoleEnum $role): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($record, $role): void {
-            if (! $record instanceof Restaurant) {
+            if (! $record instanceof Tenant) {
                 return;
             }
 
@@ -183,7 +193,7 @@ class RestaurantForm
                 : ($current === 1 ? 'staff member' : 'staff members');
 
             $fail(sprintf(
-                'This restaurant has %d %s. Remove %d before lowering the limit to %d.',
+                'This tenant has %d %s. Remove %d before lowering the limit to %d.',
                 $current,
                 $noun,
                 $current - $limit,

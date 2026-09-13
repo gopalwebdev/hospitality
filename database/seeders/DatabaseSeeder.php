@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the product team owner and the restaurants that exist so far.
+     * Seed the product team owner and the tenants that exist so far.
      *
      * Every seeder here is idempotent, so this is safe to re-run. Run
      * `php artisan accounts:list` afterwards to see who can now sign in.
@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             SuperAdminSeeder::class,
-            RestaurantSeeder::class,
+            TenantSeeder::class,
         ]);
     }
 }

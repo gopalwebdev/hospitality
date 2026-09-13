@@ -9,7 +9,7 @@ use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddition;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
@@ -18,24 +18,24 @@ beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
 
-function guestUrl(Restaurant $restaurant): string
+function guestUrl(Tenant $tenant): string
 {
-    return 'http://'.$restaurant->slug.'.restaurant-app.test/';
+    return 'http://'.$tenant->slug.'.restaurant-app.test/';
 }
 
-function guestMenuUrl(Restaurant $restaurant, Menu $menu): string
+function guestMenuUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey();
+    return 'http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey();
 }
 
 /**
- * A menu with one section holding one dish, for the restaurant given.
+ * A menu with one section holding one dish, for the tenant given.
  *
  * @return array{Menu, MenuCategory, MenuItem}
  */
-function seedOneDish(Restaurant $restaurant): array
+function seedOneDish(Tenant $tenant): array
 {
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $item = MenuItem::factory()->inCategory($category)->create();
 
@@ -49,18 +49,18 @@ function seedOneDish(Restaurant $restaurant): array
 */
 
 it('serves the menu with no sign-in', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    [$menu, $category, $item] = seedOneDish($restaurant);
+    $tenant = Tenant::factory()->create();
+    [$menu, $category, $item] = seedOneDish($tenant);
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertSee($item->name)
         ->assertSee($category->name);
 });
 
 it('leaves out what a guest cannot order', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $showing = MenuCategory::factory()->inMenu($menu)->create();
     $hidden = MenuCategory::factory()->inMenu($menu)->hidden()->create();
@@ -74,7 +74,7 @@ it('leaves out what a guest cannot order', function (): void {
 
     // A phone menu should not make someone scroll past things they cannot
     // have, so these are absent rather than greyed out.
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertSee($available->name)
         ->assertSee($offered->name)
@@ -84,16 +84,16 @@ it('leaves out what a guest cannot order', function (): void {
 });
 
 it('takes a whole hidden menu down, sections and dishes with it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->hidden()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
     MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
 
-    $this->get(guestMenuUrl($restaurant, $menu))->assertNotFound();
+    $this->get(guestMenuUrl($tenant, $menu))->assertNotFound();
 });
 
-it('shows only this restaurant\'s menu', function (): void {
-    $mine = Restaurant::factory()->create();
-    $theirs = Restaurant::factory()->create();
+it('shows only this tenant\'s menu', function (): void {
+    $mine = Tenant::factory()->create();
+    $theirs = Tenant::factory()->create();
 
     [$myMenu, , $mineItem] = seedOneDish($mine);
     [$theirMenu, , $theirsItem] = seedOneDish($theirs);
@@ -103,63 +103,63 @@ it('shows only this restaurant\'s menu', function (): void {
         ->assertSee($mineItem->name)
         ->assertDontSee($theirsItem->name);
 
-    // The restaurant arrives in the domain rather than the path, so scoped
+    // The tenant arrives in the domain rather than the path, so scoped
     // bindings do not cover this: the controller has to refuse it by hand.
     $this->get(guestMenuUrl($mine, $theirMenu))->assertNotFound();
 });
 
-it('hides a restaurant that is switched off', function (): void {
-    $restaurant = Restaurant::factory()->create(['is_active' => false]);
-    [$menu] = seedOneDish($restaurant);
+it('hides a tenant that is switched off', function (): void {
+    $tenant = Tenant::factory()->create(['is_active' => false]);
+    [$menu] = seedOneDish($tenant);
 
-    $this->get(guestUrl($restaurant))->assertNotFound();
-    $this->get(guestMenuUrl($restaurant, $menu))->assertNotFound();
+    $this->get(guestUrl($tenant))->assertNotFound();
+    $this->get(guestMenuUrl($tenant, $menu))->assertNotFound();
 });
 
 /*
 |--------------------------------------------------------------------------
-| Light or dark belongs to the phone, not to the restaurant
+| Light or dark belongs to the phone, not to the tenant
 |--------------------------------------------------------------------------
 */
 
 it('paints the guest app light until the phone says otherwise', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
     // In the first response's HTML, not an Inertia prop: React runs after the
     // paint, so a prop would show one shade and then correct itself.
-    $this->get(guestUrl($restaurant))
+    $this->get(guestUrl($tenant))
         ->assertOk()
         ->assertSee('"light"', escape: false);
 });
 
 it('paints the guest app dark when the phone has asked for dark', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
-    // There is no per restaurant default and no brand colour: the whole of the
+    // There is no per tenant default and no brand colour: the whole of the
     // theming is this cookie, which is unencrypted so the toggle in React and
     // the server read the same value.
     $this->withUnencryptedCookie('appearance', Appearance::Dark->value)
-        ->get(guestUrl($restaurant))
+        ->get(guestUrl($tenant))
         ->assertOk()
         ->assertSee('"dark"', escape: false)
         ->assertDontSee('"light"', escape: false);
 });
 
 it('ignores a tampered appearance cookie rather than breaking the page', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
     // The cookie is unencrypted and therefore visitor-controlled.
     $this->withUnencryptedCookie('appearance', 'neon')
-        ->get(guestUrl($restaurant))
+        ->get(guestUrl($tenant))
         ->assertOk()
         ->assertSee('"light"', escape: false);
 });
 
-it('offers no theme customisation to the restaurant', function (): void {
+it('offers no theme customisation to the tenant', function (): void {
     // Light and dark are the whole of it, so the columns that used to hold a
     // brand colour and a default are gone — see App\Enums\Appearance.
-    expect(Schema::hasColumn('restaurant_settings', 'theme_primary_color'))->toBeFalse()
-        ->and(Schema::hasColumn('restaurant_settings', 'theme_appearance'))->toBeFalse();
+    expect(Schema::hasColumn('tenant_settings', 'theme_primary_color'))->toBeFalse()
+        ->and(Schema::hasColumn('tenant_settings', 'theme_appearance'))->toBeFalse();
 });
 
 /*
@@ -180,9 +180,9 @@ it('loads only its own entry and page', function (): void {
     $manifest = json_decode((string) file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
     $chunk = fn (string $source): string => basename($manifest[$source]['file']);
 
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
-    $guest = $this->get(guestUrl($restaurant))->assertOk()->getContent();
+    $guest = $this->get(guestUrl($tenant))->assertOk()->getContent();
 
     expect($guest)->toContain($chunk('resources/js/guest.tsx'))
         ->and($guest)->toContain($chunk('resources/js/pages/guest/home.tsx'))
@@ -190,23 +190,23 @@ it('loads only its own entry and page', function (): void {
 });
 
 it('makes the guest app installable', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
-    // A guest who comes back keeps the restaurant on their home screen, so the
+    // A guest who comes back keeps the tenant on their home screen, so the
     // app links a manifest and registers a service worker on every page.
-    $this->get(guestUrl($restaurant))
+    $this->get(guestUrl($tenant))
         ->assertOk()
         ->assertSee('rel="manifest"', escape: false)
-        ->assertSee(route('guest.manifest', ['restaurant' => $restaurant->slug]), escape: false)
+        ->assertSee(route('guest.manifest', ['tenant' => $tenant->slug]), escape: false)
         ->assertSee('serviceWorker', escape: false);
 });
 
-it('serves a manifest named for the restaurant, scoped to its subdomain', function (): void {
-    $restaurant = Restaurant::factory()->create(['name' => 'Spice Garden']);
+it('serves a manifest named for the tenant, scoped to its subdomain', function (): void {
+    $tenant = Tenant::factory()->create(['name' => 'Spice Garden']);
 
-    // Per restaurant rather than a static file, so a phone with two restaurants
+    // Per tenant rather than a static file, so a phone with two tenants
     // installed shows two apps.
-    $this->get(route('guest.manifest', ['restaurant' => $restaurant->slug]))
+    $this->get(route('guest.manifest', ['tenant' => $tenant->slug]))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/manifest+json')
         ->assertJsonPath('name', 'Spice Garden')
@@ -217,9 +217,9 @@ it('serves a manifest named for the restaurant, scoped to its subdomain', functi
 });
 
 it('serves a service worker that never caches Inertia\'s own requests', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
-    $response = $this->get(route('guest.service-worker', ['restaurant' => $restaurant->slug]))
+    $response = $this->get(route('guest.service-worker', ['tenant' => $tenant->slug]))
         ->assertOk();
 
     // The same URL answers HTML to a navigation and JSON to Inertia, so only
@@ -230,16 +230,16 @@ it('serves a service worker that never caches Inertia\'s own requests', function
         ->toContain("url.pathname.startsWith('/build/')");
 });
 
-it('does not make a switched-off restaurant installable', function (): void {
-    $restaurant = Restaurant::factory()->create(['is_active' => false]);
+it('does not make a switched-off tenant installable', function (): void {
+    $tenant = Tenant::factory()->create(['is_active' => false]);
 
-    $this->get(route('guest.manifest', ['restaurant' => $restaurant->slug]))->assertNotFound();
-    $this->get(route('guest.service-worker', ['restaurant' => $restaurant->slug]))->assertNotFound();
+    $this->get(route('guest.manifest', ['tenant' => $tenant->slug]))->assertNotFound();
+    $this->get(route('guest.service-worker', ['tenant' => $tenant->slug]))->assertNotFound();
 });
 
-it('leads a menu with the dishes the restaurant featured', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+it('leads a menu with the dishes the tenant featured', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     $second = MenuItem::factory()->inCategory($category)->create([
@@ -254,7 +254,7 @@ it('leads a menu with the dishes the restaurant featured', function (): void {
     ]);
     $plain = MenuItem::factory()->inCategory($category)->create();
 
-    $this->get('http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('featured', 2)
@@ -268,15 +268,15 @@ it('leads a menu with the dishes the restaurant featured', function (): void {
 });
 
 it('paints a loader before the app it is waiting for', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     // React runs after the first paint, so without this a guest on a slow
     // connection is looking at a blank screen with nothing to say the page is
     // coming. It is CSS only and it hides itself the moment Inertia renders
     // into #app, which is what `#app:not(:empty)` is doing.
     foreach (['/', '/menus/'.$menu->getKey()] as $path) {
-        $html = (string) $this->get('http://'.$restaurant->slug.'.restaurant-app.test'.$path)
+        $html = (string) $this->get('http://'.$tenant->slug.'.restaurant-app.test'.$path)
             ->assertOk()
             ->assertSee('id="boot-loader"', escape: false)
             ->getContent();
@@ -295,9 +295,9 @@ it('paints a loader before the app it is waiting for', function (): void {
     }
 });
 
-it('reads a menu in the order the restaurant arranged, rails and all', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+it('reads a menu in the order the tenant arranged, rails and all', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $starters = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $desserts = MenuCategory::factory()->inMenu($menu)->create(['position' => 2]);
@@ -310,7 +310,7 @@ it('reads a menu in the order the restaurant arranged, rails and all', function 
     // featured rail closes the menu.
     $menu->update(['combos_position' => 1, 'featured_position' => 3]);
 
-    $this->get('http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('order', [
@@ -324,8 +324,8 @@ it('reads a menu in the order the restaurant arranged, rails and all', function 
 });
 
 it('opens a menu nobody has arranged with its featured dishes and its combos', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     MenuItem::factory()->inCategory($category)->create();
@@ -333,7 +333,7 @@ it('opens a menu nobody has arranged with its featured dishes and its combos', f
     // Both rails default to where the first category sits and ties break rails
     // first, so the order a menu had before it could be arranged is the order
     // it still has.
-    $this->get('http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('order', ['featured', 'combos', $category->getKey()])
@@ -342,8 +342,8 @@ it('opens a menu nobody has arranged with its featured dishes and its combos', f
 });
 
 it('leaves a sold-out dish out of the featured row', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     MenuItem::factory()->inCategory($category)->create([
@@ -352,7 +352,7 @@ it('leaves a sold-out dish out of the featured row', function (): void {
     ]);
     $available = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
-    $this->get('http://'.$restaurant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('featured', 1)
@@ -371,8 +371,8 @@ it('leaves a sold-out dish out of the featured row', function (): void {
 */
 
 it('nests a category\'s subdivisions under it, its own dishes first', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Biryani']]);
 
     $chicken = MenuCategory::factory()->under($category)->create([
@@ -388,7 +388,7 @@ it('nests a category\'s subdivisions under it, its own dishes first', function (
     $inChicken = MenuItem::factory()->inCategory($chicken)->create();
     $inMutton = MenuItem::factory()->inCategory($mutton)->create();
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('sections', 1)
@@ -405,8 +405,8 @@ it('nests a category\'s subdivisions under it, its own dishes first', function (
 });
 
 it('leaves out a hidden sub-category and an empty category entirely', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $hidden = MenuCategory::factory()->under($category)->hidden()->create();
@@ -414,14 +414,14 @@ it('leaves out a hidden sub-category and an empty category entirely', function (
 
     // A category whose only dishes are in a hidden subdivision has nothing
     // left to read, so it is not sent as an empty heading.
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->has('sections', 0));
 });
 
 it('sends the combos a menu leads with, in the order they were arranged', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $burger = MenuItem::factory()->inCategory($category)->create(['name' => [Locale::English->value => 'Burger']]);
 
@@ -437,7 +437,7 @@ it('sends the combos a menu leads with, in the order they were arranged', functi
 
     $soldOut = MenuCombo::factory()->onMenu($menu)->unavailable()->create();
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('combos', 2)
@@ -460,8 +460,8 @@ it('sends the combos a menu leads with, in the order they were arranged', functi
 });
 
 it('sends a struck-through price only when there is a real offer', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     $onOffer = MenuItem::factory()->inCategory($category)->create([
@@ -475,7 +475,7 @@ it('sends a struck-through price only when there is a real offer', function (): 
         'position' => 1,
     ]);
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $onOffer->getKey())
@@ -487,8 +487,8 @@ it('sends a struck-through price only when there is a real offer', function (): 
 });
 
 it('tells a guest what the prices do not include before they order', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $restaurant->settings->update([
+    $tenant = Tenant::factory()->create();
+    $tenant->settings->update([
         'tax_rate_basis_points' => 500,
         'prices_include_tax' => false,
         'service_charge_enabled' => true,
@@ -497,9 +497,9 @@ it('tells a guest what the prices do not include before they order', function ()
         'parcel_charge_minor_units' => 2000,
     ]);
 
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('charges.taxRateBasisPoints', 500)
@@ -512,12 +512,12 @@ it('tells a guest what the prices do not include before they order', function ()
 });
 
 it('says when a timed menu is being served, and when it is not', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $breakfast = Menu::factory()->servedBetween('07:00', '11:00')->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $breakfast = Menu::factory()->servedBetween('07:00', '11:00')->create(['tenant_id' => $tenant->getKey()]);
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $this->get(guestMenuUrl($restaurant, $breakfast))
+    $this->get(guestMenuUrl($tenant, $breakfast))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             // HH:MM whichever driver stored it, so the app has one shape.
@@ -529,8 +529,8 @@ it('says when a timed menu is being served, and when it is not', function (): vo
     $this->travelTo(now()->setTime(15, 0));
 
     // Still served, still readable — a guest looking for the breakfast card at
-    // three should find it rather than conclude the restaurant has none.
-    $this->get(guestMenuUrl($restaurant, $breakfast))
+    // three should find it rather than conclude the tenant has none.
+    $this->get(guestMenuUrl($tenant, $breakfast))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('menu.isBeingServed', false),
@@ -538,10 +538,10 @@ it('says when a timed menu is being served, and when it is not', function (): vo
 });
 
 it('sends no service window for a menu that has none', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('menu.servedFrom', null)
@@ -550,9 +550,9 @@ it('sends no service window for a menu that has none', function (): void {
         );
 });
 
-it('sends the menu in the order the restaurant dragged it into', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+it('sends the menu in the order the tenant dragged it into', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     // Positions deliberately run against creation order and against
     // alphabetical, so only the dragged order can produce the result.
@@ -589,7 +589,7 @@ it('sends the menu in the order the restaurant dragged it into', function (): vo
     // second one needs a dish to be in the payload at all.
     MenuItem::factory()->inCategory($second)->create();
 
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             // Sections in their dragged order.
@@ -605,8 +605,8 @@ it('sends the menu in the order the restaurant dragged it into', function (): vo
 });
 
 it('sends a dish\'s additions in the order they were dragged into', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $dish = MenuItem::factory()->inCategory($category)->create();
 
@@ -621,7 +621,7 @@ it('sends a dish\'s additions in the order they were dragged into', function ():
 
     // Additions are dragged inside the dish that owns them, and a guest reads
     // them in that order — the same rule as every other list on the menu.
-    $this->get(guestMenuUrl($restaurant, $menu))
+    $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.additions.0.id', $first->getKey())

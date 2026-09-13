@@ -10,13 +10,13 @@ Columns declare their real type and nullability — no catch-all strings, no nul
 
 Any fixed set of values is a PHP backed enum in app/Enums/ (TitleCase cases) cast on the model, not a loose string column. The enum owns its own behaviour — see Role::permissions() and FilamentPanel::path().
 
-Normalize to roughly 3NF and stop: pull repeating groups into their own table with a pivot (restaurant_user), but do not shred simple value objects into tables for the sake of it.
+Normalize to roughly 3NF and stop: pull repeating groups into their own table with a pivot (tenant_user), but do not shred simple value objects into tables for the sake of it.
 
 ## Money is stored as an integer in the minor unit
-Never a float or a decimal string: every monetary column is an integer holding the smallest unit of its currency, so ₹249.50 is stored as 24950. Arithmetic stays exact and no rounding creeps in between the database and a payment provider. Convert to and from a display value at the edge, and name the column so the unit is unmistakable. The currency itself is on restaurant_settings.currency, cast to App\Enums\Currency.
+Never a float or a decimal string: every monetary column is an integer holding the smallest unit of its currency, so ₹249.50 is stored as 24950. Arithmetic stays exact and no rounding creeps in between the database and a payment provider. Convert to and from a display value at the edge, and name the column so the unit is unmistakable. The currency itself is on tenant_settings.currency, cast to App\Enums\Currency.
 
 ## A phone number is two columns: calling code and national number
-Never one free-text string. The calling code goes in its own column cast to App\Enums\CountryCallingCode (backing values carry the plus, '+91', which keeps them strings when used as array keys), and the national number goes in a column of its own holding digits only — ten of them for India. Size number columns to CountryCallingCode::longestMobileNumberLength(), so a country with longer numbers needs a migration as well as an enum case. Restaurant::dialablePhone() puts the two halves back together for display; nothing else should concatenate them by hand. See restaurants.phone_country_code/phone for the shape.
+Never one free-text string. The calling code goes in its own column cast to App\Enums\CountryCallingCode (backing values carry the plus, '+91', which keeps them strings when used as array keys), and the national number goes in a column of its own holding digits only — ten of them for India. Size number columns to CountryCallingCode::longestMobileNumberLength(), so a country with longer numbers needs a migration as well as an enum case. Tenant::dialablePhone() puts the two halves back together for display; nothing else should concatenate them by hand. See tenants.phone_country_code/phone for the shape.
 
 ## A translated column is jsonb, and its unique index is an expression
 Any text a guest reads is a `jsonb` column holding one key per App\Enums\Locale case, not a string — see `.ai/rules/models.md`. They began as `json` and were converted by the `add_postgres_types_and_checks_to_*` migrations: `jsonb` is stored parsed, has the equality and ordering operators plain `json` lacks, and Postgres rebuilds an expression index over the column as part of the type change, so nothing has to be dropped around it. A new translated column is `$table->jsonb(...)`.
@@ -41,7 +41,7 @@ A constraint's values are written out, not read from an enum: a migration has to
 ## One migration per table, and walk rows in chunks
 A change that touches two tables is two migrations, each named for the table it touches — `translate_menu_category_names` and `translate_menu_item_names_and_descriptions` are one change split that way. It keeps a rollback surgical and a name honest about what it does.
 
-A migration that rewrites existing rows uses `chunkById` and selects only the columns it needs, so a restaurant with a long menu costs the same memory as one with a short one. Never `get()` a whole table into an array to loop over it.
+A migration that rewrites existing rows uses `chunkById` and selects only the columns it needs, so a tenant with a long menu costs the same memory as one with a short one. Never `get()` a whole table into an array to loop over it.
 
 ## Timestamps are Asia/Kolkata, set from the environment
 `APP_TIMEZONE` drives `config/app.php` and `DB_TIMEZONE` is handed to the pgsql connection, so `now()` in PHP and `now()` in SQL agree. Neither is hardcoded anywhere, and `phpunit.xml` pins the same zone so tests behave as production does.

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Schemas;
+namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuCategory;
@@ -94,7 +94,7 @@ class MenuSubCategoryForm
     }
 
     /**
-     * The categories of one menu, in the order the restaurant arranged them.
+     * The categories of one menu, in the order the tenant arranged them.
      *
      * Every option list in this class is memoized for the request with once():
      * Filament asks a select for its options more than once while it builds and
@@ -142,7 +142,7 @@ class MenuSubCategoryForm
     }
 
     /**
-     * Every category this restaurant has, labelled with its menu.
+     * Every category this tenant has, labelled with its menu.
      *
      * For the places that are not inside one menu — the dish form, which may
      * file a dish anywhere. Two menus may each have a "Starters", so the menu
@@ -150,7 +150,7 @@ class MenuSubCategoryForm
      *
      * @return array<int, string>
      */
-    public static function categoryOptionsForRestaurant(?int $tenantId): array
+    public static function categoryOptionsForTenant(?int $tenantId): array
     {
         // Both levels, because a dish may be filed at either — labelled with
         // the menu and, for a subdivision, the section it sits under, so

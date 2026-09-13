@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\Role;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Gate;
@@ -15,7 +15,7 @@ beforeEach(function (): void {
 | Horizon dashboard access
 |--------------------------------------------------------------------------
 |
-| The queue carries jobs for every restaurant on the platform, so the
+| The queue carries jobs for every tenant on the platform, so the
 | dashboard is the product team only.
 |
 */
@@ -26,11 +26,11 @@ it('lets a super admin open Horizon', function (): void {
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeTrue();
 });
 
-it('keeps a restaurant admin out of Horizon', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('keeps a tenant admin out of Horizon', function (): void {
+    $tenant = Tenant::factory()->create();
     $user = User::factory()->create();
     $user->assignRole(Role::Admin->value);
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
 
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeFalse();
 });

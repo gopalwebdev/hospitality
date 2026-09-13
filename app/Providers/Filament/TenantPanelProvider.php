@@ -3,9 +3,9 @@
 namespace App\Providers\Filament;
 
 use App\Enums\FilamentPanel;
-use App\Filament\Restaurant\Auth\Login;
+use App\Filament\Tenant\Auth\Login;
 use App\Http\Middleware\SetLocale;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -26,44 +26,44 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 /**
- * A restaurant's own panel, for its admins and staff alike, served at
+ * A tenant's own panel, for its admins and staff alike, served at
  * t1.restaurant-app.com/dashboard and entered through t1.restaurant-app.com/login.
  *
  * The subdomain identifies the tenant, so every resource registered here is
- * automatically scoped to the restaurant in the URL.
+ * automatically scoped to the tenant in the URL.
  */
-class RestaurantPanelProvider extends PanelProvider
+class TenantPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->id(FilamentPanel::Restaurant->value)
-            ->path(FilamentPanel::Restaurant->path())
-            ->tenant(Restaurant::class, slugAttribute: 'slug')
+            ->id(FilamentPanel::Tenant->value)
+            ->path(FilamentPanel::Tenant->path())
+            ->tenant(Tenant::class, slugAttribute: 'slug')
             ->tenantDomain('{tenant:slug}.'.config('app.domain'))
             ->login(Login::class)
             ->brandName(fn (): string => $this->brandName())
             ->brandLogo(fn (): View => view('filament.brand', [
-                'panel' => FilamentPanel::Restaurant,
+                'panel' => FilamentPanel::Tenant,
                 'name' => $this->brandName(),
             ]))
             ->brandLogoHeight('2rem')
             ->colors([
                 'primary' => Color::Amber,
             ])
-            // Signed in, a restaurant sees only its own name in the topbar,
-            // not a name plus a switcher into other restaurants: an admin
-            // panel is scoped to one restaurant, and there is nowhere else to
-            // switch to. A super admin supporting one restaurant opens it from
-            // the Restaurants table in their own panel instead. See
+            // Signed in, a tenant sees only its own name in the topbar,
+            // not a name plus a switcher into other tenants: an admin
+            // panel is scoped to one tenant, and there is nowhere else to
+            // switch to. A super admin supporting one tenant opens it from
+            // the Tenants table in their own panel instead. See
             // .ai/rules/filament.md.
             ->tenantMenu(false)
-            ->discoverResources(in: app_path('Filament/Restaurant/Resources'), for: 'App\Filament\Restaurant\Resources')
-            ->discoverPages(in: app_path('Filament/Restaurant/Pages'), for: 'App\Filament\Restaurant\Pages')
+            ->discoverResources(in: app_path('Filament/Tenant/Resources'), for: 'App\Filament\Tenant\Resources')
+            ->discoverPages(in: app_path('Filament/Tenant/Pages'), for: 'App\Filament\Tenant\Pages')
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Restaurant/Widgets'), for: 'App\Filament\Restaurant\Widgets')
+            ->discoverWidgets(in: app_path('Filament/Tenant/Widgets'), for: 'App\Filament\Tenant\Widgets')
             ->widgets([
                 AccountWidget::class,
             ])
@@ -116,7 +116,7 @@ class RestaurantPanelProvider extends PanelProvider
     }
 
     /**
-     * What this panel calls itself: the restaurant's own name once someone is
+     * What this panel calls itself: the tenant's own name once someone is
      * signed in and a tenant is known, and the generic panel name on the
      * sign-in page, where there is no tenant yet to name.
      */
@@ -124,6 +124,6 @@ class RestaurantPanelProvider extends PanelProvider
     {
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Restaurant ? $tenant->name : FilamentPanel::Restaurant->brandName();
+        return $tenant instanceof Tenant ? $tenant->name : FilamentPanel::Tenant->brandName();
     }
 }

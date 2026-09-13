@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * tenant_id is carried directly as well as through both parents, with a
  * composite foreign key on each, so a combo can neither belong to another
- * restaurant nor contain another restaurant's dish.
+ * tenant nor contain another tenant's dish.
  *
  * @property int $id
  * @property int $tenant_id
@@ -49,7 +49,7 @@ class MenuComboItem extends Model
     ];
 
     /**
-     * Take the restaurant from the combo this line belongs to.
+     * Take the tenant from the combo this line belongs to.
      *
      * Same reason as MenuItemAddition::booted(): the repeater on the combo form
      * writes these rows, and Filament's tenancy does not stamp them.
@@ -69,13 +69,13 @@ class MenuComboItem extends Model
     }
 
     /**
-     * The restaurant selling this.
+     * The tenant selling this.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -99,7 +99,7 @@ class MenuComboItem extends Model
     }
 
     /**
-     * Order the way the restaurant arranged the contents.
+     * Order the way the tenant arranged the contents.
      *
      * @param  Builder<$this>  $query
      */

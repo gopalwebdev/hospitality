@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows\RelationManagers;
+namespace App\Filament\Tenant\Resources\HomeRows\RelationManagers;
 
 use App\Enums\HomeTileAction;
-use App\Filament\Restaurant\Resources\HomeRows\Schemas\HomeTileForm;
+use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeTileForm;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tables\Reordering;
 use App\Models\HomeTile;

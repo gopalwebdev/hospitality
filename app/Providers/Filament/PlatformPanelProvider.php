@@ -29,7 +29,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
  *
  * It is bound to the bare host so it can never be reached from a tenant
  * subdomain, and it is the default panel because it carries no tenancy. It
- * shares /dashboard with every restaurant's panel and is told apart by host,
+ * shares /dashboard with every tenant's panel and is told apart by host,
  * which holds because this provider is registered first (bootstrap/providers.php).
  */
 class PlatformPanelProvider extends PanelProvider

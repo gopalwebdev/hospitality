@@ -2,11 +2,11 @@
 
 use App\Enums\Role;
 use App\Models\HomeTile;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
-use Database\Seeders\RestaurantSeeder;
 use Database\Seeders\SuperAdminSeeder;
+use Database\Seeders\TenantSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 
@@ -27,43 +27,43 @@ it('gives the product team owner no password to store', function (): void {
     expect(Schema::hasColumn('users', 'password'))->toBeFalse();
 });
 
-it('seeds one restaurant for each definition', function (): void {
-    expect(Restaurant::query()->count())->toBe(count(RestaurantSeeder::RESTAURANTS));
+it('seeds one tenant for each definition', function (): void {
+    expect(Tenant::query()->count())->toBe(count(TenantSeeder::TENANTS));
 
-    foreach (RestaurantSeeder::RESTAURANTS as $definition) {
-        expect(Restaurant::query()->where('slug', $definition['slug'])->exists())->toBeTrue();
+    foreach (TenantSeeder::TENANTS as $definition) {
+        expect(Tenant::query()->where('slug', $definition['slug'])->exists())->toBeTrue();
     }
 });
 
-it('gives every seeded restaurant its settings', function (): void {
-    Restaurant::query()->get()->each(function (Restaurant $restaurant): void {
-        expect($restaurant->settings)->not->toBeNull();
+it('gives every seeded tenant its settings', function (): void {
+    Tenant::query()->get()->each(function (Tenant $tenant): void {
+        expect($tenant->settings)->not->toBeNull();
     });
 });
 
-it('gives every seeded restaurant exactly one admin', function (): void {
-    Restaurant::query()->get()->each(function (Restaurant $restaurant): void {
-        $admins = $restaurant->users()->role(Role::Admin->value)->get();
+it('gives every seeded tenant exactly one admin', function (): void {
+    Tenant::query()->get()->each(function (Tenant $tenant): void {
+        $admins = $tenant->users()->role(Role::Admin->value)->get();
 
         expect($admins)->toHaveCount(1);
     });
 });
 
-it('belongs the seeded admin to their restaurant, not the product team', function (): void {
-    Restaurant::query()->get()->each(function (Restaurant $restaurant): void {
-        $admin = $restaurant->users()->role(Role::Admin->value)->firstOrFail();
+it('belongs the seeded admin to their tenant, not the product team', function (): void {
+    Tenant::query()->get()->each(function (Tenant $tenant): void {
+        $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
 
-        expect($admin->tenant_id)->toBe($restaurant->getKey())
+        expect($admin->tenant_id)->toBe($tenant->getKey())
             ->and($admin->belongsToProductTeam())->toBeFalse();
     });
 });
 
-it('lets each restaurant admin into their own panel and no further', function (): void {
-    $restaurant = Restaurant::query()->firstOrFail();
-    $admin = $restaurant->users()->role(Role::Admin->value)->firstOrFail();
+it('lets each tenant admin into their own panel and no further', function (): void {
+    $tenant = Tenant::query()->firstOrFail();
+    $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
 
     $this->actingAs($admin)
-        ->get("http://{$restaurant->slug}.restaurant-app.test/dashboard")
+        ->get("http://{$tenant->slug}.restaurant-app.test/dashboard")
         ->assertOk();
 
     $this->actingAs($admin)
@@ -80,8 +80,8 @@ it('lets the product team owner into the product team panel', function (): void 
 });
 
 it('lists every account and where it signs in', function (): void {
-    $restaurant = Restaurant::query()->firstOrFail();
-    $admin = $restaurant->users()->role(Role::Admin->value)->firstOrFail();
+    $tenant = Tenant::query()->firstOrFail();
+    $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
 
     expect(Artisan::call('accounts:list'))->toBe(0);
 
@@ -92,18 +92,18 @@ it('lists every account and where it signs in', function (): void {
         // /login on each host: the one address to hand anyone who uses a panel.
         ->toContain('restaurant-app.test/login')
         ->toContain($admin->email)
-        ->toContain($restaurant->slug.'.restaurant-app.test/login');
+        ->toContain($tenant->slug.'.restaurant-app.test/login');
 });
 
 it('opens a way into every menu it seeds', function (): void {
-    Restaurant::query()->get()->each(function (Restaurant $restaurant): void {
-        $menus = $restaurant->menus()->pluck('id');
+    Tenant::query()->get()->each(function (Tenant $tenant): void {
+        $menus = $tenant->menus()->pluck('id');
 
         // A guest only ever reaches a menu through a tile, so a seeded card
         // with no tile is a card nobody at a table can get to. There were three
         // menus and one tile.
         expect($menus)->toHaveCount(3)
-            ->and(HomeTile::query()->where('tenant_id', $restaurant->getKey())->pluck('menu_id')->sort()->values()->all())
+            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->pluck('menu_id')->sort()->values()->all())
             ->toBe($menus->sort()->values()->all());
     });
 });
@@ -111,18 +111,18 @@ it('opens a way into every menu it seeds', function (): void {
 it('can be seeded again without duplicating anything', function (): void {
     $this->seed(DatabaseSeeder::class);
 
-    // The product team, plus an admin and a staff member for each restaurant,
-    // both of whom sign in to that restaurant's panel at its /login.
-    $perRestaurant = 2;
+    // The product team, plus an admin and a staff member for each tenant,
+    // both of whom sign in to that tenant's panel at its /login.
+    $perTenant = 2;
 
-    expect(User::query()->count())->toBe(1 + ($perRestaurant * count(RestaurantSeeder::RESTAURANTS)))
-        ->and(Restaurant::query()->count())->toBe(count(RestaurantSeeder::RESTAURANTS));
+    expect(User::query()->count())->toBe(1 + ($perTenant * count(TenantSeeder::TENANTS)))
+        ->and(Tenant::query()->count())->toBe(count(TenantSeeder::TENANTS));
 
-    Restaurant::query()->get()->each(function (Restaurant $restaurant) use ($perRestaurant): void {
-        expect($restaurant->users()->count())->toBe($perRestaurant)
-            ->and($restaurant->settings()->count())->toBe(1)
+    Tenant::query()->get()->each(function (Tenant $tenant) use ($perTenant): void {
+        expect($tenant->users()->count())->toBe($perTenant)
+            ->and($tenant->settings()->count())->toBe(1)
             // Tiles are matched on the menu they open rather than on their
             // label, so a relabelled tile is found rather than seeded again.
-            ->and(HomeTile::query()->where('tenant_id', $restaurant->getKey())->count())->toBe(3);
+            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->count())->toBe(3);
     });
 });

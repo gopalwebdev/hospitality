@@ -17,11 +17,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One dish on one restaurant's menu.
+ * One dish on one tenant's menu.
  *
  * The price is an integer count of the currency's minor unit, never a float:
  * ₹249.50 is stored as 24950. App\Enums\Currency converts at the edges, and
- * the currency itself comes from the restaurant's settings, so nothing here
+ * the currency itself comes from the tenant's settings, so nothing here
  * assumes rupees. `compare_at_price_minor_units` is the higher price shown
  * struck through beside it and is null on almost every dish — see
  * IsPricedOnAMenu.
@@ -130,13 +130,13 @@ class MenuItem extends Model
     }
 
     /**
-     * The restaurant selling this.
+     * The tenant selling this.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -210,7 +210,7 @@ class MenuItem extends Model
     }
 
     /**
-     * Order the way the restaurant arranged its menu, name only to break ties.
+     * Order the way the tenant arranged its menu, name only to break ties.
      *
      * @param  Builder<$this>  $query
      */
@@ -246,7 +246,7 @@ class MenuItem extends Model
     }
 
     /**
-     * Order the way the restaurant arranged the dishes it leads with.
+     * Order the way the tenant arranged the dishes it leads with.
      *
      * A separate order from scopeInMenuOrder(): that one places a dish inside
      * its section, this one places it in the featured row, and a dish answers

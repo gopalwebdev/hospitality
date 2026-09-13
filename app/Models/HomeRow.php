@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * One band of the home screen a guest lands on.
  *
- * A restaurant arranges its shop window as rows, drags them into the order it
+ * A tenant arranges its shop window as rows, drags them into the order it
  * wants them read, and chooses what each one looks like. The row owns the
  * layout; the tiles inside it own their destinations. See App\Enums\HomeRowLayout.
  *
@@ -57,17 +57,17 @@ class HomeRow extends Model
     ];
 
     /**
-     * The restaurant whose home screen this row is on.
+     * The tenant whose home screen this row is on.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
-     * The tiles in this row, in the order the restaurant dragged them into.
+     * The tiles in this row, in the order the tenant dragged them into.
      *
      * @return HasMany<HomeTile, $this>
      */
@@ -87,7 +87,7 @@ class HomeRow extends Model
     }
 
     /**
-     * Order the way the restaurant arranged the home screen.
+     * Order the way the tenant arranged the home screen.
      *
      * @param  Builder<$this>  $query
      */

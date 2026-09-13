@@ -4,22 +4,22 @@ namespace App\Models;
 
 use App\Enums\Currency;
 use Carbon\CarbonImmutable;
-use Database\Factories\RestaurantSettingFactory;
+use Database\Factories\TenantSettingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * How one restaurant is configured.
+ * How one tenant is configured.
  *
- * Exactly one row per restaurant, enforced by a unique key on tenant_id.
+ * Exactly one row per tenant, enforced by a unique key on tenant_id.
  *
  * It carries the tax and the charges every price on the menu is read against:
  * the default GST rate a dish falls back to, whether the prices already include
  * it, and the two optional charges. Each charge is a switch and an amount
  * rather than an amount alone, so "we do not levy a service charge" is a thing
- * a restaurant can say — which matters here, because the CCPA's 2022 guidelines
+ * a tenant can say — which matters here, because the CCPA's 2022 guidelines
  * make a service charge voluntary rather than something a bill may assume.
  *
  * @property int $id
@@ -55,9 +55,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'opens_at',
     'closes_at',
 ])]
-class RestaurantSetting extends Model
+class TenantSetting extends Model
 {
-    /** @use HasFactory<RestaurantSettingFactory> */
+    /** @use HasFactory<TenantSettingFactory> */
     use HasFactory;
 
     /**
@@ -72,10 +72,10 @@ class RestaurantSetting extends Model
     public const int BASIS_POINTS_PER_WHOLE = 10_000;
 
     /**
-     * What a restaurant charges GST at until it says otherwise.
+     * What a tenant charges GST at until it says otherwise.
      *
      * 5% is standalone restaurant service without input tax credit, which is
-     * what almost every restaurant on this platform charges. It is a starting
+     * what almost every tenant on this platform charges. It is a starting
      * point, not a constraint: rates are typed, because India's GST 2.0 reform
      * of September 2025 restructured the slabs and the next notification may do
      * so again.
@@ -101,13 +101,13 @@ class RestaurantSetting extends Model
     ];
 
     /**
-     * The restaurant these settings belong to.
+     * The tenant these settings belong to.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -123,7 +123,7 @@ class RestaurantSetting extends Model
      *
      * A percentage of what has been ordered, in the same minor units, rounded
      * once. Switched off is not the same as set to nothing: the switch is what
-     * lets a bill say the restaurant does not levy one at all.
+     * lets a bill say the tenant does not levy one at all.
      */
     public function serviceChargeOn(int $minorUnits): int
     {

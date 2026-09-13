@@ -6,7 +6,7 @@ use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Models\Menu;
 use App\Models\MenuCombo;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,11 +25,11 @@ class MenuComboFactory extends Factory
         ]).' '.fake()->unique()->numberBetween(1, 9999);
 
         return [
-            // The restaurant is chosen first and the menu follows it, exactly
+            // The tenant is chosen first and the menu follows it, exactly
             // as MenuCategoryFactory does, so that passing a tenant_id cannot
-            // produce a menu at a different restaurant and trip the composite
+            // produce a menu at a different tenant and trip the composite
             // foreign key.
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'menu_id' => fn (array $attributes): int => Menu::factory()
                 ->create(['tenant_id' => $attributes['tenant_id']])
                 ->getKey(),
@@ -44,7 +44,7 @@ class MenuComboFactory extends Factory
     }
 
     /**
-     * Offer this combo on an existing menu, and its restaurant with it.
+     * Offer this combo on an existing menu, and its tenant with it.
      */
     public function onMenu(Menu $menu): static
     {
@@ -82,7 +82,7 @@ class MenuComboFactory extends Factory
     }
 
     /**
-     * A combo taxed at a rate of its own rather than the restaurant's default.
+     * A combo taxed at a rate of its own rather than the tenant's default.
      *
      * Basis points, as stored: 1800 is 18%.
      */

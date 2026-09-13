@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * The currency a restaurant prices its menu in.
+ * The currency a tenant prices its menu in.
  *
  * India is the only market for now (see .ai/rules/app.md), so there is
  * exactly one case. Kept as an enum rather than a constant so a second market

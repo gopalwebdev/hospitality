@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\HomeRows\Pages;
+namespace App\Filament\Tenant\Resources\HomeRows\Pages;
 
-use App\Filament\Restaurant\Resources\HomeRows\HomeRowResource;
+use App\Filament\Tenant\Resources\HomeRows\HomeRowResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Icons\Heroicon;

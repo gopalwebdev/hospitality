@@ -3,14 +3,14 @@
 namespace Database\Factories;
 
 use App\Enums\Currency;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<RestaurantSetting>
+ * @extends Factory<TenantSetting>
  */
-class RestaurantSettingFactory extends Factory
+class TenantSettingFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -20,14 +20,14 @@ class RestaurantSettingFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'contact_email' => fake()->unique()->companyEmail(),
             'contact_phone' => fake()->numerify('+91 ##### #####'),
             'currency' => Currency::IndianRupee,
             'gstin' => null,
-            // The restaurant rate, prices quoted before tax, and neither
-            // charge levied — which is how a restaurant starts out.
-            'tax_rate_basis_points' => RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS,
+            // The tenant rate, prices quoted before tax, and neither
+            // charge levied — which is how a tenant starts out.
+            'tax_rate_basis_points' => TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS,
             'prices_include_tax' => false,
             'service_charge_enabled' => false,
             'service_charge_basis_points' => 0,
@@ -40,7 +40,7 @@ class RestaurantSettingFactory extends Factory
     }
 
     /**
-     * A restaurant whose menu prices already have GST inside them.
+     * A tenant whose menu prices already have GST inside them.
      */
     public function pricesIncludingTax(): static
     {
@@ -50,7 +50,7 @@ class RestaurantSettingFactory extends Factory
     }
 
     /**
-     * A restaurant levying a service charge, as a percentage in basis points.
+     * A tenant levying a service charge, as a percentage in basis points.
      */
     public function withServiceCharge(int $basisPoints = 1000): static
     {
@@ -61,7 +61,7 @@ class RestaurantSettingFactory extends Factory
     }
 
     /**
-     * A restaurant charging a flat amount to pack an order to take away.
+     * A tenant charging a flat amount to pack an order to take away.
      */
     public function withParcelCharge(int $minorUnits = 2000): static
     {
@@ -72,7 +72,7 @@ class RestaurantSettingFactory extends Factory
     }
 
     /**
-     * Indicate that the restaurant is not taking orders.
+     * Indicate that the tenant is not taking orders.
      */
     public function closedForOrders(): static
     {

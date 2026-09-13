@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -40,18 +40,18 @@ class UserFactory extends Factory
     }
 
     /**
-     * Put the account in a restaurant, roster and all.
+     * Put the account in a tenant, roster and all.
      *
      * The tenant column says where the account belongs and the roster is what
-     * opens that restaurant's panel, so a state that set only one of them would
+     * opens that tenant's panel, so a state that set only one of them would
      * describe a user the application cannot actually produce.
      */
-    public function ofRestaurant(Restaurant $restaurant): static
+    public function ofTenant(Tenant $tenant): static
     {
         return $this->state(fn (array $attributes): array => [
-            'tenant_id' => $restaurant->getKey(),
-        ])->afterCreating(function (User $user) use ($restaurant): void {
-            $user->restaurants()->syncWithoutDetaching([$restaurant->getKey()]);
+            'tenant_id' => $tenant->getKey(),
+        ])->afterCreating(function (User $user) use ($tenant): void {
+            $user->tenants()->syncWithoutDetaching([$tenant->getKey()]);
         });
     }
 

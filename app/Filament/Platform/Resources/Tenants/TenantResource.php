@@ -1,38 +1,38 @@
 <?php
 
-namespace App\Filament\Platform\Resources\Restaurants;
+namespace App\Filament\Platform\Resources\Tenants;
 
-use App\Filament\Platform\Resources\Restaurants\Pages\CreateRestaurant;
-use App\Filament\Platform\Resources\Restaurants\Pages\EditRestaurant;
-use App\Filament\Platform\Resources\Restaurants\Pages\ListRestaurants;
-use App\Filament\Platform\Resources\Restaurants\RelationManagers\UsersRelationManager;
-use App\Filament\Platform\Resources\Restaurants\Schemas\RestaurantForm;
-use App\Filament\Platform\Resources\Restaurants\Tables\RestaurantsTable;
-use App\Models\Restaurant;
+use App\Filament\Platform\Resources\Tenants\Pages\CreateTenant;
+use App\Filament\Platform\Resources\Tenants\Pages\EditTenant;
+use App\Filament\Platform\Resources\Tenants\Pages\ListTenants;
+use App\Filament\Platform\Resources\Tenants\RelationManagers\UsersRelationManager;
+use App\Filament\Platform\Resources\Tenants\Schemas\TenantForm;
+use App\Filament\Platform\Resources\Tenants\Tables\TenantsTable;
+use App\Models\Tenant;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
-class RestaurantResource extends Resource
+class TenantResource extends Resource
 {
-    protected static ?string $model = Restaurant::class;
+    protected static ?string $model = Tenant::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema
     {
-        return RestaurantForm::configure($schema);
+        return TenantForm::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return RestaurantsTable::configure($table);
+        return TenantsTable::configure($table);
     }
 
     /**
-     * The roster sits under the restaurant's own record, below its form.
+     * The roster sits under the tenant's own record, below its form.
      */
     public static function getRelations(): array
     {
@@ -44,9 +44,9 @@ class RestaurantResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListRestaurants::route('/'),
-            'create' => CreateRestaurant::route('/create'),
-            'edit' => EditRestaurant::route('/{record}/edit'),
+            'index' => ListTenants::route('/'),
+            'create' => CreateTenant::route('/create'),
+            'edit' => EditTenant::route('/{record}/edit'),
         ];
     }
 }

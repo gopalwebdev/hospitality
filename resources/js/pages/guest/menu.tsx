@@ -60,13 +60,13 @@ export interface Charges {
     /** Basis points: 500 is 5%. */
     taxRateBasisPoints: number;
     pricesIncludeTax: boolean;
-    /** Null when the restaurant does not levy one. */
+    /** Null when the tenant does not levy one. */
     serviceChargeBasisPoints: number | null;
     parcelChargeMinorUnits: number | null;
 }
 
 interface MenuProps {
-    restaurant: { name: string; slug: string } | null;
+    tenant: { name: string; slug: string; typeNoun: string } | null;
     menu: {
         id: number;
         name: string;
@@ -83,7 +83,7 @@ interface MenuProps {
      * The order the blocks of this menu are read in: the two rails by name and
      * a section by its id.
      *
-     * The restaurant drags all three against each other in the panel, so where
+     * The tenant drags all three against each other in the panel, so where
      * the featured dishes and the combos sit is its decision rather than this
      * page's — which is why the order is decided on the server and sent, not
      * assembled here.
@@ -107,7 +107,7 @@ function percentage(basisPoints: number): string {
 }
 
 /**
- * One of a restaurant's menus, read at the table.
+ * One of a tenant's menus, read at the table.
  *
  * One narrow column, thumb-sized rows, no hover anywhere: a guest is holding a
  * phone in one hand. Only orderable dishes arrive here, so there is nothing
@@ -115,12 +115,12 @@ function percentage(basisPoints: number): string {
  * in through.
  *
  * Every name on this page is already in the guest's language: the server picked
- * the translation, falling back to English where a restaurant has not filled
+ * the translation, falling back to English where a tenant has not filled
  * one in. Prices arrive as integers and are formatted here, so they follow that
  * same language — see resources/js/lib/money.ts.
  */
 export default function Menu({
-    restaurant,
+    tenant,
     menu,
     featured,
     combos,
@@ -143,11 +143,7 @@ export default function Menu({
         <>
             <Head title={menu.name} />
 
-            <AppBar
-                title={menu.name}
-                eyebrow={restaurant?.name}
-                backHref={homeUrl}
-            >
+            <AppBar title={menu.name} eyebrow={tenant?.name} backHref={homeUrl}>
                 <Badge variant={acceptingOrders ? 'default' : 'secondary'}>
                     {acceptingOrders ? t('status.open') : t('status.closed')}
                 </Badge>
@@ -186,7 +182,7 @@ export default function Menu({
                         {t('menu.empty')}
                     </p>
                 ) : (
-                    /* In the order the restaurant arranged, rails included: a
+                    /* In the order the tenant arranged, rails included: a
                        menu that leads with its combos and one that closes with
                        them are the same screen read in a different order. */
                     order.map((block) => {
@@ -219,7 +215,7 @@ export default function Menu({
 /**
  * The dishes the menu leads with.
  *
- * A rail rather than a list: these are the dishes the restaurant wants seen
+ * A rail rather than a list: these are the dishes the tenant wants seen
  * first, and a guest should meet them before scrolling rather than instead of
  * the sections, where each one also appears.
  */

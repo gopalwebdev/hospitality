@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Menus\Schemas;
+namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
@@ -69,7 +69,7 @@ class MenuComboForm
                     ->schema([
                         PricingFields::price($currency),
                         PricingFields::compareAtPrice($currency),
-                        PricingFields::taxRatePercentage(PricingFields::restaurantTaxRateBasisPoints()),
+                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
                         PricingFields::availability(),
                     ])
                     ->columns(2),

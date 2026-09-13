@@ -11,15 +11,15 @@ use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddition;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use Closure;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * One of a restaurant's menus, read at the table.
+ * One of a tenant's menus, read at the table.
  *
  * The whole menu comes down together — the sections, their subdivisions, the
  * dishes in each and every dish's additions, plus the combos the menu leads
@@ -44,13 +44,13 @@ use Inertia\Response;
  */
 class MenuController extends Controller
 {
-    public function __invoke(Restaurant $restaurant, Menu $menu): Response
+    public function __invoke(Tenant $tenant, Menu $menu): Response
     {
-        abort_unless($restaurant->is_active, 404);
+        abort_unless($tenant->is_active, 404);
 
-        // The restaurant comes from the subdomain rather than the path, so
+        // The tenant comes from the subdomain rather than the path, so
         // scoped bindings do not cover this and the check is made by hand.
-        abort_unless($menu->tenant_id === $restaurant->getKey(), 404);
+        abort_unless($menu->tenant_id === $tenant->getKey(), 404);
         abort_unless($menu->is_active, 404);
 
         $orderable = ItemAvailability::orderableValues();
@@ -94,7 +94,7 @@ class MenuController extends Controller
         // scrolling down should find it where they expect it.
         $featured = MenuItem::query()
             ->select($this->itemColumns())
-            ->where('tenant_id', $restaurant->getKey())
+            ->where('tenant_id', $tenant->getKey())
             ->featuredOnMenu($menu->getKey())
             ->orderable()
             ->inFeaturedOrder()
@@ -140,7 +140,7 @@ class MenuController extends Controller
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
             ])->values()->all(),
-            // Where the two rails sit among the sections is the restaurant's
+            // Where the two rails sit among the sections is the tenant's
             // decision, dragged on the menu's arrangement screen, so the order
             // is worked out here rather than assumed by the app. Sections with
             // nothing to read have already been filtered out, so nothing in
@@ -167,9 +167,9 @@ class MenuController extends Controller
                         )->values()->all(),
                     ])->values()->all(),
             ])->values()->all(),
-            'charges' => $this->charges($restaurant),
-            'acceptingOrders' => $restaurant->isAcceptingOrders(),
-            'homeUrl' => route('guest.home', ['restaurant' => $restaurant->slug]),
+            'charges' => $this->charges($tenant),
+            'acceptingOrders' => $tenant->isAcceptingOrders(),
+            'homeUrl' => route('guest.home', ['tenant' => $tenant->slug]),
         ]);
     }
 
@@ -258,15 +258,15 @@ class MenuController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function charges(Restaurant $restaurant): array
+    private function charges(Tenant $tenant): array
     {
         // The row the guest middleware has already read for the currency, not
-        // a second query for the same restaurant.
-        $settings = $restaurant->resolvedSettings();
+        // a second query for the same tenant.
+        $settings = $tenant->resolvedSettings();
 
-        if (! $settings instanceof RestaurantSetting) {
+        if (! $settings instanceof TenantSetting) {
             return [
-                'taxRateBasisPoints' => $restaurant->taxRateBasisPoints(),
+                'taxRateBasisPoints' => $tenant->taxRateBasisPoints(),
                 'pricesIncludeTax' => false,
                 'serviceChargeBasisPoints' => null,
                 'parcelChargeMinorUnits' => null,

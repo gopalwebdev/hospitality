@@ -3,9 +3,9 @@
 use App\Enums\FilamentPanel;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Pages\Settings;
-use App\Models\Restaurant;
+use App\Filament\Tenant\Pages\Settings;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -63,16 +63,16 @@ it('refuses every product team page to an account holding nothing', function ():
     }
 });
 
-it('refuses every restaurant page to someone on the roster holding no role', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $powerless = User::factory()->ofRestaurant($restaurant)->create();
+it('refuses every tenant page to someone on the roster holding no role', function (): void {
+    $tenant = Tenant::factory()->create();
+    $powerless = User::factory()->ofTenant($tenant)->create();
 
     $this->actingAs($powerless);
-    Filament::setCurrentPanel(FilamentPanel::Restaurant->value);
+    Filament::setCurrentPanel(FilamentPanel::Tenant->value);
     Filament::bootCurrentPanel();
-    Filament::setTenant($restaurant);
+    Filament::setTenant($tenant);
 
-    $pages = gatedPagesOf(FilamentPanel::Restaurant);
+    $pages = gatedPagesOf(FilamentPanel::Tenant);
 
     expect($pages)->not->toBeEmpty();
 
@@ -89,18 +89,18 @@ it('opens every product team page to the product team', function (): void {
     }
 });
 
-it('opens every restaurant page to a restaurant admin', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+it('opens every tenant page to a tenant admin', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
-    foreach (gatedPagesOf(FilamentPanel::Restaurant) as $page) {
-        expect($page::canAccess())->toBeTrue("{$page} is closed to a restaurant admin");
+    foreach (gatedPagesOf(FilamentPanel::Tenant) as $page) {
+        expect($page::canAccess())->toBeTrue("{$page} is closed to a tenant admin");
     }
 });
 
 it('reflects a permission being taken off a role straight away', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $admin = enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create();
+    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
 
     $settings = Settings::class;
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import Menu, { type MenuItem } from '@/pages/guest/menu';
 
-const restaurant = { name: 'Spice Garden', slug: 'spice' };
+const tenant = { name: 'Spice Garden', slug: 'spice', typeNoun: 'restaurant' };
 const homeUrl = 'http://spice.restaurant-app.test';
 
 const menu = {
@@ -54,7 +54,7 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
 
     return render(
         <Menu
-            restaurant={restaurant}
+            tenant={tenant}
             menu={menu}
             featured={[]}
             combos={[]}
@@ -73,7 +73,7 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
 }
 
 describe('guest menu', () => {
-    it('names the menu and says whether the restaurant is taking orders', () => {
+    it('names the menu and says whether the tenant is taking orders', () => {
         renderMenu();
 
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -194,7 +194,7 @@ describe('guest menu', () => {
         ).toEqual(['Chicken Biryani', 'Mutton Biryani']);
     });
 
-    it('reads the blocks in the order the restaurant arranged them', () => {
+    it('reads the blocks in the order the tenant arranged them', () => {
         renderMenu({
             featured: [dish({ id: 10, name: 'Paneer Tikka' })],
             combos: [
@@ -308,7 +308,7 @@ describe('guest menu', () => {
         expect(screen.getByText(/packed for ₹?20\.00/)).toBeInTheDocument();
     });
 
-    it('leaves out a charge the restaurant does not levy', () => {
+    it('leaves out a charge the tenant does not levy', () => {
         renderMenu({
             sections: [
                 { id: 1, name: 'Starters', items: [dish()], subSections: [] },

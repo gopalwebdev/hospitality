@@ -5,7 +5,7 @@ namespace App\Enums;
 /**
  * How one row of the guest home screen draws the tiles inside it.
  *
- * The row owns the layout, not the tile: a restaurant arranges its home screen
+ * The row owns the layout, not the tile: a tenant arranges its home screen
  * by choosing what a band of it looks like, and every tile in that band is
  * drawn the same way. That is why there is no shape column on home_tiles — a
  * circular link sitting in a banner row would be a screen nobody designed.
@@ -20,7 +20,7 @@ enum HomeRowLayout: string
     /** Image tiles on a horizontal rail the guest swipes through. */
     case Carousel = 'carousel';
 
-    /** Small circles in a strip, for the places a restaurant is also found. */
+    /** Small circles in a strip, for the places a tenant is also found. */
     case Links = 'links';
 
     public function label(): string

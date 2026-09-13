@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\MenuItems\Schemas;
+namespace App\Filament\Tenant\Resources\MenuItems\Schemas;
 
 use App\Enums\Currency;
 use App\Enums\FoodType;
-use App\Filament\Restaurant\Resources\Menus\Schemas\MenuSubCategoryForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuItem;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
@@ -47,7 +47,7 @@ class MenuItemForm
                         // One select, because a dish is filed under exactly one
                         // category — a section or one of its subdivisions, both
                         // offered here as "Lunch · Biryani › Chicken". Only this
-                        // restaurant's are listed, and the composite foreign key
+                        // tenant's are listed, and the composite foreign key
                         // refuses anything else even if the id is tampered with.
                         Select::make('menu_category_id')
                             ->label(__('panel.items.section'))
@@ -62,7 +62,7 @@ class MenuItemForm
                             __('panel.shared.name'),
                             maxLength: 120,
                             // Unique within the category rather than the whole
-                            // restaurant, matching the database index: a lunch
+                            // tenant, matching the database index: a lunch
                             // and a dinner menu may both list a "Paneer Tikka",
                             // and so may two sub-categories of one category.
                             uniqueWithin: fn (Get $get): Builder => MenuItem::query()
@@ -105,11 +105,11 @@ class MenuItemForm
                 Section::make(__('panel.items.tax_section'))
                     ->icon(Heroicon::OutlinedReceiptPercent)
                     ->schema([
-                        PricingFields::taxRatePercentage(PricingFields::restaurantTaxRateBasisPoints()),
+                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
                         PricingFields::hsnCode(),
                     ])
                     ->columns(2)
-                    // Almost every dish is taxed at the restaurant's own rate
+                    // Almost every dish is taxed at the tenant's own rate
                     // and carries no code, so this opens closed and is expanded
                     // by the dishes that genuinely differ.
                     ->collapsed(fn (?MenuItem $record): bool => blank($record?->tax_rate_basis_points) && blank($record?->hsn_code)),
@@ -194,7 +194,7 @@ class MenuItemForm
                     ->maxValue(100)
                     ->step(0.01)
                     ->suffix('%')
-                    ->placeholder(PricingFields::formatRate(PricingFields::restaurantTaxRateBasisPoints())),
+                    ->placeholder(PricingFields::formatRate(PricingFields::tenantTaxRateBasisPoints())),
 
                 Toggle::make('is_available')
                     ->label(__('panel.additions.is_available'))
@@ -288,7 +288,7 @@ class MenuItemForm
     }
 
     /**
-     * The currency this restaurant prices in.
+     * The currency this tenant prices in.
      */
     public static function currency(): Currency
     {
@@ -296,7 +296,7 @@ class MenuItemForm
     }
 
     /**
-     * This restaurant's categories, labelled with the menu they sit on.
+     * This tenant's categories, labelled with the menu they sit on.
      *
      * Two menus may each have a "Starters", so the menu has to be part of the
      * label or the select offers the same word twice.
@@ -305,16 +305,16 @@ class MenuItemForm
      */
     public static function sectionOptions(): array
     {
-        return MenuSubCategoryForm::categoryOptionsForRestaurant(self::tenantKey());
+        return MenuSubCategoryForm::categoryOptionsForTenant(self::tenantKey());
     }
 
     /**
-     * The restaurant the panel is serving, if there is one.
+     * The tenant the panel is serving, if there is one.
      */
     private static function tenantKey(): ?int
     {
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Restaurant ? $tenant->getKey() : null;
+        return $tenant instanceof Tenant ? $tenant->getKey() : null;
     }
 }

@@ -3,13 +3,13 @@
 use App\Actions\Menus\MoveCategoryToMenu;
 use App\Enums\Locale;
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Resources\MenuItems\Pages\ListMenuItems;
-use App\Filament\Restaurant\Resources\Menus\MenuResource;
-use App\Filament\Restaurant\Resources\Menus\Pages\ArrangeMenu;
+use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
+use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\Builder;
@@ -72,11 +72,11 @@ function dishRow(MenuItem $dish): string
 */
 
 it('subdivides a category from the menu page', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->callAction(TestAction::make('createSubCategory')->table(categoryRow($category)), [
@@ -88,21 +88,21 @@ it('subdivides a category from the menu page', function (): void {
 
     $subCategory = categoryNamed('Chicken');
 
-    // The menu and the restaurant are both derived rather than typed: the
+    // The menu and the tenant are both derived rather than typed: the
     // relation sets menu_id, and MenuCategory::booted() takes the tenant.
     expect($subCategory->parent_id)->toBe($category->getKey())
         ->and($subCategory->menu_id)->toBe($menu->getKey())
-        ->and($subCategory->tenant_id)->toBe($restaurant->getKey())
+        ->and($subCategory->tenant_id)->toBe($tenant->getKey())
         ->and($subCategory->isSubCategory())->toBeTrue()
         ->and($subCategory->getTranslation('name', Locale::Tamil->value))->toBe('சிக்கன்');
 });
 
 it('opens its modals the way the browser asks for them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // callAction() builds its own context, so it cannot catch this: the *page*
     // has a record — the menu — and Filament hands it to any action that has
@@ -111,7 +111,7 @@ it('opens its modals the way the browser asks for them', function (): void {
     // the menu's id shipped as the row key. Mounting then looked for a row
     // keyed `1` among rows keyed `category-3`, found none, and quietly declined:
     // every button on this page did nothing at all, and nothing was logged.
-    $html = (string) $this->get(MenuResource::getUrl('arrange', ['record' => $menu, 'tenant' => $restaurant]))
+    $html = (string) $this->get(MenuResource::getUrl('arrange', ['record' => $menu, 'tenant' => $tenant]))
         ->assertOk()
         ->getContent();
 
@@ -131,12 +131,12 @@ it('opens its modals the way the browser asks for them', function (): void {
 });
 
 it('redraws the arrangement from what was saved once an action has run', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $renamed = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Starters']]);
     $deleted = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Doomed']]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // Filament reads every row to find the one a row action is about and keeps
     // that copy for the request, so the page used to be redrawn from rows taken
@@ -156,12 +156,12 @@ it('redraws the arrangement from what was saved once an action has run', functio
 });
 
 it('adds a category to the end of the menu rather than the top', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $last = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->callAction(TestAction::make('createCategory')->table(), [
@@ -170,19 +170,19 @@ it('adds a category to the end of the menu rather than the top', function (): vo
         ])
         ->assertHasNoActionErrors();
 
-    // Where a restaurant adding a section looks for it. Positions are never
+    // Where a tenant adding a section looks for it. Positions are never
     // typed — see .ai/rules/tables.md — so something has to choose one.
     expect(categoryNamed('Desserts')->position)->toBeGreaterThan($last->position);
 });
 
 it('deletes a category from the arrangement, its branch with it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
     $dish = MenuItem::factory()->inCategory($subCategory)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)->callAction(TestAction::make('delete')->table(categoryRow($category)));
 
@@ -194,11 +194,11 @@ it('deletes a category from the arrangement, its branch with it', function (): v
 });
 
 it('keeps the arrangement\'s own actions away from someone who may only read the menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Staff);
+    enterTenantPanel($tenant, RoleEnum::Staff);
 
     // Reading the shape of a menu is menu.view, so the page opens; everything
     // that changes it is menu.manage and is not on it.
@@ -240,12 +240,12 @@ it('separates the two levels for the two tables that show them', function (): vo
 });
 
 it('refuses a sub-category name the same category already uses', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     MenuCategory::factory()->under($category)->create(['name' => [Locale::English->value => 'Chicken']]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->callAction(TestAction::make('createSubCategory')->table(categoryRow($category)), [
@@ -283,14 +283,14 @@ it('refuses two sections of one menu with the same name', function (): void {
 });
 
 it('refuses at the database a subdivision of a category on another menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $onLunch = MenuCategory::factory()->inMenu($lunch)->create();
 
     // The (parent_id, menu_id) key is what stops a branch straddling two menus.
     expect(fn () => DB::table('menu_categories')->insert([
-        'tenant_id' => $restaurant->getKey(),
+        'tenant_id' => $tenant->getKey(),
         'menu_id' => $dinner->getKey(),
         'parent_id' => $onLunch->getKey(),
         'name' => json_encode([Locale::English->value => 'Smuggled'], JSON_THROW_ON_ERROR),
@@ -332,15 +332,15 @@ it('reads a dish under the branch it sits on', function (): void {
 });
 
 it('names the branch a dish sits on, at either level', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Biryani']]);
     $chicken = MenuCategory::factory()->under($section)->create(['name' => [Locale::English->value => 'Chicken']]);
 
     $direct = MenuItem::factory()->inCategory($section)->create();
     $nested = MenuItem::factory()->inCategory($chicken)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // The list is flat now that grouping is gone, so the column has to say
     // where a dish sits — and a subdivision on its own says nothing about
@@ -355,9 +355,9 @@ it('names the branch a dish sits on, at either level', function (): void {
 });
 
 it('filters dishes by menu, and by a category within it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $drinks = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $drinks = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $starters = MenuCategory::factory()->inMenu($lunch)->create();
     $chicken = MenuCategory::factory()->under($starters)->create();
@@ -367,7 +367,7 @@ it('filters dishes by menu, and by a category within it', function (): void {
     $inChicken = MenuItem::factory()->inCategory($chicken)->create();
     $inDrinks = MenuItem::factory()->inCategory($hot)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // A dish reaches its menu through its category, so the menu filter is a
     // relationship rather than a column of its own.
@@ -384,15 +384,15 @@ it('filters dishes by menu, and by a category within it', function (): void {
 });
 
 it('offers only the chosen menu\'s categories once a menu is filtered', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $drinks = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $drinks = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $starters = MenuCategory::factory()->inMenu($lunch)->create();
     $chicken = MenuCategory::factory()->under($starters)->create();
     $hot = MenuCategory::factory()->inMenu($drinks)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     $offered = Livewire::test(ListMenuItems::class)
         ->filterTable('menu', $lunch->getKey())
@@ -409,8 +409,8 @@ it('offers only the chosen menu\'s categories once a menu is filtered', function
 });
 
 it('reads the dishes list menu by menu, section by section', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey(), 'position' => 0]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'position' => 0]);
 
     $first = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $second = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
@@ -420,7 +420,7 @@ it('reads the dishes list menu by menu, section by section', function (): void {
     $inNested = MenuItem::factory()->inCategory($nested)->create(['position' => 0]);
     $inSecond = MenuItem::factory()->inCategory($second)->create(['position' => 0]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // A section's own dishes come before its subdivisions', and the next
     // section follows — the order grouping used to imply.
@@ -432,11 +432,11 @@ it('orders the dishes list without touching a translated json column', function 
     // Ordering by a translated column orders whole JSON documents rather than
     // names, and while the column was plain json Postgres had no ordering
     // operator for it at all and 500'd. Inspecting the compiled SQL catches both.
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // getQuery() is the query before sorting, so the ordering is read off the
     // default sort itself — Filament hands it the query and takes back the
@@ -462,8 +462,8 @@ it('orders the dishes list without touching a translated json column', function 
 */
 
 it('moves a sub-category under another section, dishes and all', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $from = MenuCategory::factory()->inMenu($menu)->create();
     $to = MenuCategory::factory()->inMenu($menu)->create();
     $chicken = MenuCategory::factory()->under($from)->create();
@@ -471,7 +471,7 @@ it('moves a sub-category under another section, dishes and all', function (): vo
     $moving = MenuItem::factory()->inCategory($chicken)->create();
     $staying = MenuItem::factory()->inCategory($from)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->callAction(TestAction::make('rename')->table(categoryRow($chicken)), [
@@ -489,9 +489,9 @@ it('moves a sub-category under another section, dishes and all', function (): vo
 });
 
 it('offers only the sections of this menu as a sub-category\'s parent', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $otherMenu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $from = MenuCategory::factory()->inMenu($menu)->create();
     $sibling = MenuCategory::factory()->inMenu($menu)->create();
@@ -500,7 +500,7 @@ it('offers only the sections of this menu as a sub-category\'s parent', function
 
     $chicken = MenuCategory::factory()->under($from)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->mountAction(TestAction::make('rename')->table(categoryRow($chicken)))
@@ -521,9 +521,9 @@ it('offers only the sections of this menu as a sub-category\'s parent', function
 });
 
 it('refuses at the database to re-parent a sub-category onto another menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $chicken = MenuCategory::factory()->under(MenuCategory::factory()->inMenu($lunch)->create())->create();
     $target = MenuCategory::factory()->inMenu($dinner)->create();
@@ -536,9 +536,9 @@ it('refuses at the database to re-parent a sub-category onto another menu', func
 });
 
 it('refuses to move a section as though it were a subdivision', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $chicken = MenuCategory::factory()->under(MenuCategory::factory()->inMenu($lunch)->create())->create();
 
@@ -546,15 +546,15 @@ it('refuses to move a section as though it were a subdivision', function (): voi
 })->throws(LogicException::class, 'not between menus');
 
 it('refuses a move onto a section that already has that name under it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $from = MenuCategory::factory()->inMenu($menu)->create();
     $to = MenuCategory::factory()->inMenu($menu)->create();
 
     $moving = MenuCategory::factory()->under($from)->create(['name' => [Locale::English->value => 'Chicken']]);
     MenuCategory::factory()->under($to)->create(['name' => [Locale::English->value => 'Chicken']]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)
         ->callAction(TestAction::make('rename')->table(categoryRow($moving)), [
@@ -568,9 +568,9 @@ it('refuses a move onto a section that already has that name under it', function
 });
 
 it('carries a section\'s subdivisions onto another menu with it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $section = MenuCategory::factory()->inMenu($lunch)->create();
     $chicken = MenuCategory::factory()->under($section)->create();
@@ -587,9 +587,9 @@ it('carries a section\'s subdivisions onto another menu with it', function (): v
 });
 
 it('unfeatures the whole branch when a section changes menus', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $lunch = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $dinner = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $section = MenuCategory::factory()->inMenu($lunch)->create();
     $chicken = MenuCategory::factory()->under($section)->create();
@@ -659,13 +659,13 @@ it('takes a section\'s subdivisions and their dishes when it is deleted', functi
 */
 
 it('rearranges the sections of a menu by dragging them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $first = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $second = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)->call('reorderTable', [categoryRow($second), categoryRow($first)]);
 
@@ -673,13 +673,13 @@ it('rearranges the sections of a menu by dragging them', function (): void {
 });
 
 it('puts a drag handle on every kind of row', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
     $dish = MenuItem::factory()->inCategory($category)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // The table is custom data, so Filament's drag is wired to the `__key` of
     // each record array rather than to a model. Asserting the write works says
@@ -694,13 +694,13 @@ it('puts a drag handle on every kind of row', function (): void {
 });
 
 it('drags the two rails in among the categories', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $starters = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $desserts = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // The featured dishes and the combos are rows of this table like any
     // category, which is the whole reason they can be moved at all: they share
@@ -721,14 +721,14 @@ it('drags the two rails in among the categories', function (): void {
 });
 
 it('rearranges subdivisions within their own section', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create();
 
     $first = MenuCategory::factory()->under($section)->create(['position' => 0]);
     $second = MenuCategory::factory()->under($section)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)->call('reorderTable', [categoryRow($second), categoryRow($first)]);
 
@@ -736,14 +736,14 @@ it('rearranges subdivisions within their own section', function (): void {
 });
 
 it('keeps rearranging away from someone who may only read the menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create();
 
     $first = MenuCategory::factory()->under($section)->create(['position' => 0]);
     $second = MenuCategory::factory()->under($section)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Staff);
+    enterTenantPanel($tenant, RoleEnum::Staff);
 
     // reorderTable() short-circuits on the reorder() policy method, so
     // asserting the button is hidden would prove nothing.
@@ -753,18 +753,18 @@ it('keeps rearranging away from someone who may only read the menu', function ()
         ->and($second->refresh()->position)->toBe(1);
 });
 
-it('shows both levels of this menu and nothing from another restaurant', function (): void {
-    $mine = Restaurant::factory()->create();
+it('shows both levels of this menu and nothing from another tenant', function (): void {
+    $mine = Tenant::factory()->create();
     $myMenu = Menu::factory()->create(['tenant_id' => $mine->getKey()]);
     $mySection = MenuCategory::factory()->inMenu($myMenu)->create();
     $mySub = MenuCategory::factory()->under($mySection)->create();
 
-    $theirs = Restaurant::factory()->create();
+    $theirs = Tenant::factory()->create();
     $theirMenu = Menu::factory()->create(['tenant_id' => $theirs->getKey()]);
     $theirSection = MenuCategory::factory()->inMenu($theirMenu)->create();
     $theirSub = MenuCategory::factory()->under($theirSection)->create();
 
-    enterRestaurantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Admin);
 
     // One table holding both levels is the point of this screen; the rows it
     // holds are the ones scoped to this menu, whichever level they sit at.
@@ -788,12 +788,12 @@ it('shows both levels of this menu and nothing from another restaurant', functio
 */
 
 it('links a category to its own dishes, narrowed to it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
     MenuCategory::factory()->inMenu($menu)->create();
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     $url = arrangementOf($menu)
         ->instance()
@@ -812,14 +812,14 @@ it('links a category to its own dishes, narrowed to it', function (): void {
 });
 
 it('does not offer dragging on the dishes page at all', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
 
     $first = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
     $second = MenuItem::factory()->inCategory($starters)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // That page spans every menu, where a position means nothing — and
     // reorderTable() short-circuits on the same check, so a request that
@@ -835,8 +835,8 @@ it('does not offer dragging on the dishes page at all', function (): void {
 });
 
 it('rearranges the dishes of a category on the arrangement', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
     $desserts = MenuCategory::factory()->inMenu($menu)->create();
 
@@ -844,7 +844,7 @@ it('rearranges the dishes of a category on the arrangement', function (): void {
     $second = MenuItem::factory()->inCategory($starters)->create(['position' => 1]);
     $untouched = MenuItem::factory()->inCategory($desserts)->create(['position' => 0]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($starters),
@@ -861,8 +861,8 @@ it('rearranges the dishes of a category on the arrangement', function (): void {
 });
 
 it('rearranges dishes inside a sub-category the same way', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $section = MenuCategory::factory()->inMenu($menu)->create();
     $chicken = MenuCategory::factory()->under($section)->create();
 
@@ -870,7 +870,7 @@ it('rearranges dishes inside a sub-category the same way', function (): void {
     $second = MenuItem::factory()->inCategory($chicken)->create(['position' => 1]);
     $inParent = MenuItem::factory()->inCategory($section)->create(['position' => 0]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($section),
@@ -885,14 +885,14 @@ it('rearranges dishes inside a sub-category the same way', function (): void {
 });
 
 it('leaves a dish under the heading it belongs to when it is dropped elsewhere', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $starters = MenuCategory::factory()->inMenu($menu)->create();
     $desserts = MenuCategory::factory()->inMenu($menu)->create();
 
     $dish = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // Dragging orders a row among its own siblings and nothing else. Re-filing
     // a dish is an edit on its own form, where the parent is a select and the
@@ -908,14 +908,14 @@ it('leaves a dish under the heading it belongs to when it is dropped elsewhere',
 });
 
 it('keeps rearranging dishes away from someone who may only read the menu', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     $first = MenuItem::factory()->inCategory($category)->create(['position' => 0]);
     $second = MenuItem::factory()->inCategory($category)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Staff);
+    enterTenantPanel($tenant, RoleEnum::Staff);
 
     // The arrangement can be read by anyone who may read the menu, so the
     // reorder() policy is the only thing standing between them and a drag —

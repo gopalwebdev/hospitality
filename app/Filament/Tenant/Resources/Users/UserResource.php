@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\Users;
+namespace App\Filament\Tenant\Resources\Users;
 
-use App\Filament\Restaurant\Resources\Users\Pages\CreateUser;
-use App\Filament\Restaurant\Resources\Users\Pages\EditUser;
-use App\Filament\Restaurant\Resources\Users\Pages\ListUsers;
-use App\Filament\Restaurant\Resources\Users\Schemas\UserForm;
-use App\Filament\Restaurant\Resources\Users\Tables\UsersTable;
+use App\Filament\Tenant\Resources\Users\Pages\CreateUser;
+use App\Filament\Tenant\Resources\Users\Pages\EditUser;
+use App\Filament\Tenant\Resources\Users\Pages\ListUsers;
+use App\Filament\Tenant\Resources\Users\Schemas\UserForm;
+use App\Filament\Tenant\Resources\Users\Tables\UsersTable;
 use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -15,10 +15,10 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 /**
- * The people who staff the restaurant whose panel this is.
+ * The people who staff the tenant whose panel this is.
  *
  * Scoping is Filament's: the panel has a tenant, and naming the many-to-many
- * back to it means every query here is limited to the restaurant in the
+ * back to it means every query here is limited to the tenant in the
  * subdomain, and anyone created here joins its roster. Who may use the page at
  * all is UserPolicy's business, through the user.manage permission.
  *
@@ -35,7 +35,7 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $tenantOwnershipRelationshipName = 'restaurants';
+    protected static ?string $tenantOwnershipRelationshipName = 'tenants';
 
     public static function form(Schema $schema): Schema
     {

@@ -12,15 +12,15 @@ import {
 /**
  * The marketing page for the platform itself, served from the root domain.
  *
- * Each restaurant gets its own subdomain for its storefront, and the same
- * subdomain plus /login for the people who work there.
+ * Each tenant — a hotel or a restaurant — gets its own subdomain for its
+ * storefront, and the same subdomain plus /login for the people who work there.
  */
 export default function Welcome() {
     const capabilities = [
         {
-            title: 'One subdomain per restaurant',
+            title: 'One subdomain each',
             description:
-                'Every restaurant gets its own storefront address, and its own admin behind it.',
+                'Every hotel and restaurant gets its own storefront address, and its own admin behind it.',
         },
         {
             title: 'Sign in with a code',
@@ -36,16 +36,16 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title="Restaurant Platform" />
+            <Head title="Hotel & Restaurant Platform" />
 
             <div className="bg-background text-foreground min-h-screen">
                 <header className="border-b">
                     <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-6">
                         <span className="text-lg font-semibold tracking-tight">
-                            Restaurant Platform
+                            Hotel &amp; Restaurant Platform
                         </span>
 
-                        {/* The restaurant panel is server rendered, so this leaves
+                        {/* The tenant panel is server rendered, so this leaves
                             the Inertia app rather than navigating inside it. */}
                         <a
                             href={login.url()}
@@ -61,12 +61,13 @@ export default function Welcome() {
                         <Badge variant="secondary">In development</Badge>
 
                         <h1 className="text-4xl font-semibold tracking-tight">
-                            Run your restaurant from one place.
+                            Run your hotel or restaurant from one place.
                         </h1>
 
                         <p className="text-muted-foreground text-lg">
-                            Menus, offers and orders for every restaurant on the
-                            platform, each on its own subdomain.
+                            Menus, offers and orders for every hotel and
+                            restaurant on the platform, each on its own
+                            subdomain.
                         </p>
                     </div>
 

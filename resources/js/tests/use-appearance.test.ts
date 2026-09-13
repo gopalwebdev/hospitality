@@ -7,7 +7,7 @@ import { initializeTheme, useAppearance } from '@/hooks/use-appearance';
  * Stand in for what the server painted the page with.
  *
  * partials/theme.blade.php writes this onto the root element from the
- * visitor's own cookie. There is no per restaurant default to resolve against
+ * visitor's own cookie. There is no per tenant default to resolve against
  * — light and dark are the whole of the theming.
  */
 function stubServerAppearance(appearance: string | null): void {

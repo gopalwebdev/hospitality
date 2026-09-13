@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\RestaurantSetting;
+use App\Models\TenantSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -40,7 +40,7 @@ return new class extends Migration
             $table->string('gstin', 15)->nullable()->after('currency');
 
             $table->unsignedSmallInteger('tax_rate_basis_points')
-                ->default(RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
+                ->default(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
                 ->after('gstin');
 
             $table->boolean('prices_include_tax')->default(false)->after('tax_rate_basis_points');

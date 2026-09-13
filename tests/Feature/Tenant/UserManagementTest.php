@@ -1,13 +1,13 @@
 <?php
 
-use App\Actions\Restaurants\SetRestaurantUserRoles;
+use App\Actions\Tenants\SetTenantUserRoles;
 use App\Enums\FilamentPanel;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Resources\Users\Pages\CreateUser;
-use App\Filament\Restaurant\Resources\Users\Pages\EditUser;
-use App\Filament\Restaurant\Resources\Users\Pages\ListUsers;
-use App\Models\Restaurant;
+use App\Filament\Tenant\Resources\Users\Pages\CreateUser;
+use App\Filament\Tenant\Resources\Users\Pages\EditUser;
+use App\Filament\Tenant\Resources\Users\Pages\ListUsers;
+use App\Models\Tenant;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -48,9 +48,9 @@ it('refuses the roster to roles without user.manage', function (RoleEnum $roleEn
 })->with([RoleEnum::Staff, RoleEnum::Guest]);
 
 it('keeps staff off the users page', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
     $user = User::factory()->create();
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
     $user->assignRole(RoleEnum::Staff->value);
 
     $this->actingAs($user)
@@ -58,10 +58,10 @@ it('keeps staff off the users page', function (): void {
         ->assertForbidden();
 });
 
-it('serves the users page to a restaurant admin', function (): void {
-    $restaurant = Restaurant::factory()->create(['slug' => 't1']);
+it('serves the users page to a tenant admin', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 't1']);
     $user = User::factory()->create();
-    $user->restaurants()->attach($restaurant);
+    $user->tenants()->attach($tenant);
     $user->assignRole(RoleEnum::Admin->value);
 
     $this->actingAs($user)
@@ -71,41 +71,41 @@ it('serves the users page to a restaurant admin', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| One restaurant never sees another's roster
+| One tenant never sees another's roster
 |--------------------------------------------------------------------------
 */
 
-it('lists only the people who staff this restaurant', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('lists only the people who staff this tenant', function (): void {
+    $tenant = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
 
     // Created before the panel is entered: once it is, Filament's tenancy
-    // observer puts anyone created into the restaurant being served.
+    // observer puts anyone created into the tenant being served.
     $colleague = User::factory()->create();
-    $colleague->restaurants()->attach($restaurant);
+    $colleague->tenants()->attach($tenant);
 
     $stranger = User::factory()->create();
-    $stranger->restaurants()->attach($other);
+    $stranger->tenants()->attach($other);
 
-    $admin = enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(ListUsers::class)
         ->assertCanSeeTableRecords([$admin, $colleague])
         ->assertCanNotSeeTableRecords([$stranger]);
 });
 
-it('answers not found for a user of another restaurant', function (): void {
-    $own = Restaurant::factory()->create(['slug' => 't1']);
-    $other = Restaurant::factory()->create(['slug' => 't2']);
+it('answers not found for a user of another tenant', function (): void {
+    $own = Tenant::factory()->create(['slug' => 't1']);
+    $other = Tenant::factory()->create(['slug' => 't2']);
 
     $admin = User::factory()->create();
-    $admin->restaurants()->attach($own);
+    $admin->tenants()->attach($own);
     $admin->assignRole(RoleEnum::Admin->value);
 
     $stranger = User::factory()->create();
-    $stranger->restaurants()->attach($other);
+    $stranger->tenants()->attach($other);
 
-    // Not 403: a restaurant must not learn that an account exists elsewhere.
+    // Not 403: a tenant must not learn that an account exists elsewhere.
     $this->actingAs($admin)
         ->get("http://t1.restaurant-app.test/dashboard/users/{$stranger->getKey()}/edit")
         ->assertNotFound();
@@ -117,9 +117,9 @@ it('answers not found for a user of another restaurant', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('creates an account and puts it on this restaurant roster', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+it('creates an account and puts it on this tenant roster', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -133,20 +133,20 @@ it('creates an account and puts it on this restaurant roster', function (): void
     $created = User::query()->withEmail('priya@example.com')->sole();
 
     expect($created->name)->toBe('Priya')
-        ->and($created->restaurants->pluck('id')->all())->toBe([$restaurant->getKey()])
+        ->and($created->tenants->pluck('id')->all())->toBe([$tenant->getKey()])
         ->and($created->hasRole(RoleEnum::Staff->value))->toBeTrue()
         ->and($created->isSuperAdmin())->toBeFalse();
 });
 
-it('joins an existing account to the restaurant rather than duplicating it', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('joins an existing account to the tenant rather than duplicating it', function (): void {
+    $tenant = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
 
     $existing = User::factory()->create(['email' => 'chef@example.com', 'name' => 'Chef']);
-    $existing->restaurants()->attach($other);
+    $existing->tenants()->attach($other);
     $existing->assignRole(RoleEnum::Admin->value);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -158,18 +158,18 @@ it('joins an existing account to the restaurant rather than duplicating it', fun
         ->assertHasNoFormErrors();
 
     expect(User::query()->withEmail('chef@example.com')->count())->toBe(1)
-        ->and($existing->refresh()->restaurants()->count())->toBe(2)
-        // Roles are held per account, so joining a second restaurant must not
+        ->and($existing->refresh()->tenants()->count())->toBe(2)
+        // Roles are held per account, so joining a second tenant must not
         // rewrite what this person may do at the first.
         ->and($existing->hasRole(RoleEnum::Admin->value))->toBeTrue()
         ->and($existing->hasRole(RoleEnum::Staff->value))->toBeFalse();
 });
 
 it('finds an existing account however the address was capitalised', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $existing = User::factory()->create(['email' => 'chef@example.com']);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm(['name' => 'Chef', 'email' => 'CHEF@example.com'])
@@ -177,12 +177,12 @@ it('finds an existing account however the address was capitalised', function ():
         ->assertHasNoFormErrors();
 
     expect(User::query()->withEmail('chef@example.com')->count())->toBe(1)
-        ->and($existing->refresh()->restaurants()->whereKey($restaurant)->exists())->toBeTrue();
+        ->and($existing->refresh()->tenants()->whereKey($tenant)->exists())->toBeTrue();
 });
 
 it('requires a name and a real email address', function (array $data, array $errors): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm($data)
@@ -205,12 +205,12 @@ it('requires a name and a real email address', function (array $data, array $err
 |--------------------------------------------------------------------------
 */
 
-it('offers only the roles a restaurant may hand out', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('offers only the roles a tenant may hand out', function (): void {
+    $tenant = Tenant::factory()->create();
     $productTeamRole = Role::factory()->create();
-    $productTeamRole->givePermissionTo(PermissionEnum::RestaurantManage->value);
+    $productTeamRole->givePermissionTo(PermissionEnum::TenantManage->value);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->assertFormFieldExists('roles', function (CheckboxList $field) use ($productTeamRole): bool {
@@ -225,32 +225,32 @@ it('offers only the roles a restaurant may hand out', function (): void {
 });
 
 it('refuses a product team role even when one is submitted anyway', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
     $productTeamRole = Role::factory()->create();
-    $productTeamRole->givePermissionTo(PermissionEnum::RestaurantManage->value);
+    $productTeamRole->givePermissionTo(PermissionEnum::TenantManage->value);
 
     $member = User::factory()->create();
-    $member->restaurants()->attach($restaurant);
+    $member->tenants()->attach($tenant);
 
-    app(SetRestaurantUserRoles::class)($member, [$productTeamRole->name, RoleEnum::Staff->value]);
+    app(SetTenantUserRoles::class)($member, [$productTeamRole->name, RoleEnum::Staff->value]);
 
     expect($member->refresh()->hasRole($productTeamRole->name))->toBeFalse()
         ->and($member->hasRole(RoleEnum::Staff->value))->toBeTrue()
-        ->and($member->can(PermissionEnum::RestaurantManage->value))->toBeFalse();
+        ->and($member->can(PermissionEnum::TenantManage->value))->toBeFalse();
 });
 
-it('changes the roles of someone who staffs only this restaurant', function (): void {
-    // Two admins on purpose: enterRestaurantPanel() seats one to work the
-    // panel from, and this test promotes a second — a restaurant with the
+it('changes the roles of someone who staffs only this tenant', function (): void {
+    // Two admins on purpose: enterTenantPanel() seats one to work the
+    // panel from, and this test promotes a second — a tenant with the
     // default limit of one would refuse that promotion for a reason this
     // test is not about. See UserManagementTest's own limit coverage.
-    $restaurant = Restaurant::factory()->create(['max_admins' => 2]);
+    $tenant = Tenant::factory()->create(['max_admins' => 2]);
 
     $member = User::factory()->create();
-    $member->restaurants()->attach($restaurant);
+    $member->tenants()->attach($tenant);
     $member->assignRole(RoleEnum::Staff->value);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(EditUser::class, ['record' => $member->getKey()])
         ->assertFormSet(['roles' => [RoleEnum::Staff->value]])
@@ -261,15 +261,15 @@ it('changes the roles of someone who staffs only this restaurant', function (): 
     expect($member->refresh()->getRoleNames()->all())->toBe([RoleEnum::Admin->value]);
 });
 
-it('leaves the roles of someone who staffs two restaurants alone', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('leaves the roles of someone who staffs two tenants alone', function (): void {
+    $tenant = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
 
     $member = User::factory()->create();
-    $member->restaurants()->attach([$restaurant->getKey(), $other->getKey()]);
+    $member->tenants()->attach([$tenant->getKey(), $other->getKey()]);
     $member->assignRole(RoleEnum::Staff->value);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(EditUser::class, ['record' => $member->getKey()])
         ->fillForm(['name' => 'Renamed'])
@@ -285,16 +285,16 @@ it('leaves the roles of someone who staffs two restaurants alone', function (): 
 | Role limits
 |--------------------------------------------------------------------------
 |
-| A restaurant may hold only so many admins and staff at once — see
-| Restaurant::roleLimit() and App\Actions\Restaurants\EnsureRoleFitsWithinLimit.
+| A tenant may hold only so many admins and staff at once — see
+| Tenant::roleLimit() and App\Actions\Tenants\EnsureRoleFitsWithinLimit.
 |
 */
 
-it('refuses a second admin once the restaurant already has one', function (): void {
-    // The default limit: enterRestaurantPanel() seats the one admin this
-    // restaurant is allowed.
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+it('refuses a second admin once the tenant already has one', function (): void {
+    // The default limit: enterTenantPanel() seats the one admin this
+    // tenant is allowed.
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -308,16 +308,16 @@ it('refuses a second admin once the restaurant already has one', function (): vo
     expect(User::query()->withEmail('second-admin@example.com')->exists())->toBeFalse();
 });
 
-it('refuses staff past the restaurant\'s own limit', function (): void {
+it('refuses staff past the tenant\'s own limit', function (): void {
     // Created before the panel is entered: once it is, Filament's tenancy
-    // observer puts anyone created into the restaurant being served, and
+    // observer puts anyone created into the tenant being served, and
     // attaching it again here would collide with that.
-    $restaurant = Restaurant::factory()->create(['max_staff' => 1]);
+    $tenant = Tenant::factory()->create(['max_staff' => 1]);
     $existing = User::factory()->create();
-    $existing->restaurants()->attach($restaurant);
+    $existing->tenants()->attach($tenant);
     $existing->assignRole(RoleEnum::Staff->value);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -332,8 +332,8 @@ it('refuses staff past the restaurant\'s own limit', function (): void {
 });
 
 it('still allows the last staff slot the limit permits', function (): void {
-    $restaurant = Restaurant::factory()->create(['max_staff' => 1]);
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create(['max_staff' => 1]);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -348,10 +348,10 @@ it('still allows the last staff slot the limit permits', function (): void {
 });
 
 it('does not count someone against their own limit while re-saving their roles', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $admin = enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create();
+    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
 
-    // The restaurant already has its one allowed admin — the person entering
+    // The tenant already has its one allowed admin — the person entering
     // the panel — so re-saving that same admin's own roles must not be
     // refused as though it were a second one.
     Livewire::test(EditUser::class, ['record' => $admin->getKey()])
@@ -368,51 +368,51 @@ it('does not count someone against their own limit while re-saving their roles',
 |--------------------------------------------------------------------------
 */
 
-it('removes someone from the restaurant without deleting their account', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $other = Restaurant::factory()->create();
+it('removes someone from the tenant without deleting their account', function (): void {
+    $tenant = Tenant::factory()->create();
+    $other = Tenant::factory()->create();
 
     $member = User::factory()->create();
-    $member->restaurants()->attach([$restaurant->getKey(), $other->getKey()]);
+    $member->tenants()->attach([$tenant->getKey(), $other->getKey()]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(ListUsers::class)
-        ->callTableAction('removeFromRestaurant', $member);
+        ->callTableAction('removeFromTenant', $member);
 
     // Looking past the tenant scope on purpose: the point of this test is that
-    // the account survives outside the restaurant it was removed from.
+    // the account survives outside the tenant it was removed from.
     $stillExists = User::query()
         ->withoutGlobalScope(Filament::getTenancyScopeName())
         ->whereKey($member->getKey())
         ->exists();
 
     expect($stillExists)->toBeTrue()
-        ->and($member->refresh()->restaurants->pluck('id')->all())->toBe([$other->getKey()]);
+        ->and($member->refresh()->tenants->pluck('id')->all())->toBe([$other->getKey()]);
 });
 
-it('leaves someone removed from their last restaurant with no panel to enter', function (): void {
-    $restaurant = Restaurant::factory()->create();
+it('leaves someone removed from their last tenant with no panel to enter', function (): void {
+    $tenant = Tenant::factory()->create();
 
     $member = User::factory()->create();
-    $member->restaurants()->attach($restaurant);
+    $member->tenants()->attach($tenant);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(ListUsers::class)
-        ->callTableAction('removeFromRestaurant', $member);
+        ->callTableAction('removeFromTenant', $member);
 
-    expect($member->refresh()->canAccessPanel(filament()->getPanel(FilamentPanel::Restaurant->value)))->toBeFalse();
+    expect($member->refresh()->canAccessPanel(filament()->getPanel(FilamentPanel::Tenant->value)))->toBeFalse();
 });
 
 it('never lets someone remove themselves', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $admin = enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create();
+    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
 
-    expect($admin->can('removeFromRestaurant', $admin))->toBeFalse();
+    expect($admin->can('removeFromTenant', $admin))->toBeFalse();
 
     Livewire::test(ListUsers::class)
-        ->assertTableActionHidden('removeFromRestaurant', $admin);
+        ->assertTableActionHidden('removeFromTenant', $admin);
 
-    expect($admin->refresh()->restaurants()->whereKey($restaurant)->exists())->toBeTrue();
+    expect($admin->refresh()->tenants()->whereKey($tenant)->exists())->toBeTrue();
 });

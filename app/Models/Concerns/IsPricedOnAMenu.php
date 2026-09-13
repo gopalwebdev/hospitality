@@ -3,15 +3,15 @@
 namespace App\Models\Concerns;
 
 use App\Enums\Currency;
-use App\Models\Restaurant;
-use App\Models\RestaurantSetting;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 
 /**
  * Something a guest can buy off a menu: a dish, or a combo of them.
  *
  * Both carry the same four things — a price in minor units, an optional higher
  * price shown struck through beside it, an optional GST rate of their own, and
- * a currency that belongs to the restaurant rather than to them. This is where
+ * a currency that belongs to the tenant rather than to them. This is where
  * that behaviour lives once, so the two models cannot drift.
  *
  * Using models must have `price_minor_units`, `compare_at_price_minor_units`
@@ -20,29 +20,29 @@ use App\Models\RestaurantSetting;
  * Every reader takes an optional override, and lists should pass one.
  * Resolving the currency or the tax rate per row is a query per row that
  * answers the same thing for every one of them — every dish on a menu shares
- * one restaurant. See .ai/rules/models.md.
+ * one tenant. See .ai/rules/models.md.
  */
 trait IsPricedOnAMenu
 {
     /**
      * The currency this is priced in.
      *
-     * Deliberately never reaches through $this->restaurant: that is a lazy
+     * Deliberately never reaches through $this->tenant: that is a lazy
      * load, which Model::shouldBeStrict() turns into an exception outside
      * production and which is an N+1 down a list of dishes inside it.
      */
     public function currency(): Currency
     {
-        $restaurant = $this->relationLoaded('restaurant') ? $this->getRelation('restaurant') : null;
+        $tenant = $this->relationLoaded('tenant') ? $this->getRelation('tenant') : null;
 
-        if ($restaurant instanceof Restaurant) {
-            return $restaurant->currency();
+        if ($tenant instanceof Tenant) {
+            return $tenant->currency();
         }
 
         // value() on an Eloquent builder applies the model's cast, so this
-        // comes back as the enum already. A restaurant with no settings row
+        // comes back as the enum already. A tenant with no settings row
         // yet has no currency, and falls back to the default.
-        $stored = RestaurantSetting::query()
+        $stored = TenantSetting::query()
             ->where('tenant_id', $this->tenant_id)
             ->value('currency');
 
@@ -52,39 +52,39 @@ trait IsPricedOnAMenu
     /**
      * The GST rate this is taxed at, in basis points.
      *
-     * A row of its own overrides, and null means "whatever the restaurant
+     * A row of its own overrides, and null means "whatever the tenant
      * charges" — the answer for almost everything on a menu, so the rate is set
      * once in settings rather than on every dish.
      *
-     * Pass $restaurantRate when rendering a list; every row shares it.
+     * Pass $tenantRate when rendering a list; every row shares it.
      */
-    public function taxRateBasisPoints(?int $restaurantRate = null): int
+    public function taxRateBasisPoints(?int $tenantRate = null): int
     {
         if ($this->tax_rate_basis_points !== null) {
             return $this->tax_rate_basis_points;
         }
 
-        if ($restaurantRate !== null) {
-            return $restaurantRate;
+        if ($tenantRate !== null) {
+            return $tenantRate;
         }
 
-        $restaurant = $this->relationLoaded('restaurant') ? $this->getRelation('restaurant') : null;
+        $tenant = $this->relationLoaded('tenant') ? $this->getRelation('tenant') : null;
 
-        if ($restaurant instanceof Restaurant) {
-            return $restaurant->taxRateBasisPoints();
+        if ($tenant instanceof Tenant) {
+            return $tenant->taxRateBasisPoints();
         }
 
-        $stored = RestaurantSetting::query()
+        $stored = TenantSetting::query()
             ->where('tenant_id', $this->tenant_id)
             ->value('tax_rate_basis_points');
 
         return $stored === null
-            ? RestaurantSetting::DEFAULT_TAX_RATE_BASIS_POINTS
+            ? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS
             : (int) $stored;
     }
 
     /**
-     * Whether this sets its own rate rather than following the restaurant's.
+     * Whether this sets its own rate rather than following the tenant's.
      *
      * What the panel colours a badge on, so the exceptions stand out down a
      * long list of dishes that all follow the default.
@@ -114,7 +114,7 @@ trait IsPricedOnAMenu
     }
 
     /**
-     * The price as money, in the restaurant's own currency.
+     * The price as money, in the tenant's own currency.
      *
      * For the Filament tables, which are server rendered. The guest app is sent
      * the integer and formats it itself — see .ai/rules/js.md.

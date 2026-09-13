@@ -3,45 +3,45 @@
 namespace App\Policies;
 
 use App\Enums\Permission;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 
 /**
- * Who may manage the roster of restaurants on the platform.
+ * Who may manage the roster of tenants on the platform.
  *
- * restaurant.manage is a product team permission, so it is granted to no role at
+ * tenant.manage is a product team permission, so it is granted to no role at
  * all: in practice only a super admin passes these checks, through the
  * Gate::before in AppServiceProvider.
  */
-class RestaurantPolicy
+class TenantPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 
-    public function view(User $user, Restaurant $restaurant): bool
+    public function view(User $user, Tenant $tenant): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 
     public function create(User $user): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 
-    public function update(User $user, Restaurant $restaurant): bool
+    public function update(User $user, Tenant $tenant): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 
-    public function delete(User $user, Restaurant $restaurant): bool
+    public function delete(User $user, Tenant $tenant): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $user->can(Permission::RestaurantManage->value);
+        return $user->can(Permission::TenantManage->value);
     }
 }

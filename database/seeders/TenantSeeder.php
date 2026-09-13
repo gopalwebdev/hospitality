@@ -10,6 +10,7 @@ use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Role;
+use App\Enums\TenantType;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
@@ -18,7 +19,7 @@ use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddition;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -27,23 +28,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 
 /**
- * One restaurant, its settings, and the one administrator who runs it.
+ * One tenant, its settings, and the one administrator who runs it.
  *
- * The admin address uses plus-addressing so every restaurant gets a distinct
+ * The admin address uses plus-addressing so every tenant gets a distinct
  * account while the sign-in codes all land in the same real inbox.
  */
-class RestaurantSeeder extends Seeder
+class TenantSeeder extends Seeder
 {
     use WithoutModelEvents;
 
     /**
-     * The restaurants to seed, keyed by the slug that becomes their subdomain.
+     * The tenants to seed, keyed by the slug that becomes their subdomain.
      *
-     * @var list<array{slug: string, name: string, address: string, pincode: string, email: string, phone: string, admin_name: string, admin_email: string, staff_name: string, staff_email: string}>
+     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, admin_name: string, admin_email: string, staff_name: string, staff_email: string}>
      */
-    public const array RESTAURANTS = [
+    public const array TENANTS = [
         [
             'slug' => 'spice',
+            'type' => TenantType::Restaurant,
             'name' => 'Spice Garden',
             'address' => '12 Mount Road, Chennai',
             'pincode' => '600002',
@@ -57,7 +59,7 @@ class RestaurantSeeder extends Seeder
     ];
 
     /**
-     * The name of the one menu every seeded restaurant gets, in both languages.
+     * The name of the one menu every seeded tenant gets, in both languages.
      *
      * Seeded copy is bilingual on purpose: it is the only way to see that the
      * language toggle in the guest app really does anything without
@@ -68,7 +70,7 @@ class RestaurantSeeder extends Seeder
     public const array MENU_NAME = ['en' => 'Main Menu', 'ta' => 'முதன்மை மெனு'];
 
     /**
-     * The second menu every seeded restaurant gets.
+     * The second menu every seeded tenant gets.
      *
      * One menu was enough to read a storefront but not enough to work the
      * panel: moving a category to another menu, and filing one under the right
@@ -597,15 +599,16 @@ class RestaurantSeeder extends Seeder
     ];
 
     /**
-     * Seed every restaurant, its people, and the menus they serve.
+     * Seed every tenant, its people, and the menus they serve.
      */
     public function run(): void
     {
-        foreach (self::RESTAURANTS as $definition) {
-            $restaurant = Restaurant::query()->updateOrCreate(
+        foreach (self::TENANTS as $definition) {
+            $tenant = Tenant::query()->updateOrCreate(
                 ['slug' => $definition['slug']],
                 [
                     'name' => $definition['name'],
+                    'type' => $definition['type'],
                     'address' => $definition['address'],
                     'pincode' => $definition['pincode'],
                     'email' => $definition['email'],
@@ -615,7 +618,7 @@ class RestaurantSeeder extends Seeder
                 ],
             );
 
-            $restaurant->settings()->firstOrCreate([], [
+            $tenant->settings()->firstOrCreate([], [
                 'contact_email' => "hello@{$definition['slug']}.example.com",
                 'contact_phone' => '+91 98765 43210',
                 'currency' => Currency::IndianRupee,
@@ -624,28 +627,28 @@ class RestaurantSeeder extends Seeder
                 'closes_at' => '23:00:00',
             ]);
 
-            // The admin belongs to this restaurant, not the product team: a
+            // The admin belongs to this tenant, not the product team: a
             // null tenant_id would file them under "Product team" in the
             // platform panel, which they are not.
             $admin = User::query()->firstOrCreate(
                 ['email' => $definition['admin_email']],
-                ['name' => $definition['admin_name'], 'tenant_id' => $restaurant->getKey(), 'email_verified_at' => now()],
+                ['name' => $definition['admin_name'], 'tenant_id' => $tenant->getKey(), 'email_verified_at' => now()],
             );
 
             $admin->syncRoles([Role::Admin->value]);
-            $restaurant->users()->syncWithoutDetaching([$admin->getKey()]);
+            $tenant->users()->syncWithoutDetaching([$admin->getKey()]);
 
             // A staff account for the roster and its limits. Plus-addressing means every
             // seeded account's sign-in code lands in the same real inbox.
             $staff = User::query()->firstOrCreate(
                 ['email' => $definition['staff_email']],
-                ['name' => $definition['staff_name'], 'tenant_id' => $restaurant->getKey(), 'email_verified_at' => now()],
+                ['name' => $definition['staff_name'], 'tenant_id' => $tenant->getKey(), 'email_verified_at' => now()],
             );
 
             $staff->syncRoles([Role::Staff->value]);
-            $restaurant->users()->syncWithoutDetaching([$staff->getKey()]);
+            $tenant->users()->syncWithoutDetaching([$staff->getKey()]);
 
-            $this->seedMenu($restaurant);
+            $this->seedMenu($tenant);
         }
     }
 
@@ -657,30 +660,30 @@ class RestaurantSeeder extends Seeder
      * Every lookup matches on the English name rather than the whole translated
      * column, because a JSON document only compares equal when every language
      * in it does — which would make this seeder duplicate its own menu the
-     * first time a restaurant translated one dish.
+     * first time a tenant translated one dish.
      */
-    private function seedMenu(Restaurant $restaurant): void
+    private function seedMenu(Tenant $tenant): void
     {
         $menu = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $restaurant->getKey()),
+            Menu::query()->where('tenant_id', $tenant->getKey()),
             self::MENU_NAME,
             fn (): Menu => new Menu(['position' => 0, 'is_active' => true]),
-            ['tenant_id' => $restaurant->getKey()],
+            ['tenant_id' => $tenant->getKey()],
         );
 
-        $this->seedCard($restaurant, $menu, self::MENU);
+        $this->seedCard($tenant, $menu, self::MENU);
 
         $drinks = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $restaurant->getKey()),
+            Menu::query()->where('tenant_id', $tenant->getKey()),
             self::DRINKS_MENU_NAME,
             fn (): Menu => new Menu(['position' => 1, 'is_active' => true]),
-            ['tenant_id' => $restaurant->getKey()],
+            ['tenant_id' => $tenant->getKey()],
         );
 
-        $this->seedCard($restaurant, $drinks, self::DRINKS);
+        $this->seedCard($tenant, $drinks, self::DRINKS);
 
         $breakfast = $this->firstOrCreateByEnglishName(
-            Menu::query()->where('tenant_id', $restaurant->getKey()),
+            Menu::query()->where('tenant_id', $tenant->getKey()),
             self::BREAKFAST_MENU_NAME,
             fn (): Menu => new Menu([
                 'position' => 2,
@@ -688,17 +691,17 @@ class RestaurantSeeder extends Seeder
                 'available_from' => self::BREAKFAST_FROM,
                 'available_until' => self::BREAKFAST_UNTIL,
             ]),
-            ['tenant_id' => $restaurant->getKey()],
+            ['tenant_id' => $tenant->getKey()],
         );
 
-        $this->seedCard($restaurant, $breakfast, self::BREAKFAST);
+        $this->seedCard($tenant, $breakfast, self::BREAKFAST);
 
         // After the cards, because a combo names dishes that have to exist.
-        $this->seedCombos($restaurant, $menu);
+        $this->seedCombos($tenant, $menu);
 
         // Every menu gets a way in. A card a guest cannot reach is a card that
         // may as well not be there.
-        $this->seedHomeScreen($restaurant, [$menu, $drinks, $breakfast]);
+        $this->seedHomeScreen($tenant, [$menu, $drinks, $breakfast]);
     }
 
     /**
@@ -706,22 +709,22 @@ class RestaurantSeeder extends Seeder
      *
      * @param  list<array<string, mixed>>  $card
      */
-    private function seedCard(Restaurant $restaurant, Menu $menu, array $card): void
+    private function seedCard(Tenant $tenant, Menu $menu, array $card): void
     {
         foreach ($card as $position => $section) {
-            $category = $this->seedCategory($restaurant, $menu, $section['name'], $position);
+            $category = $this->seedCategory($tenant, $menu, $section['name'], $position);
 
             foreach ($section['items'] ?? [] as $itemPosition => $item) {
-                $this->seedDish($restaurant, $category, $item, $itemPosition);
+                $this->seedDish($tenant, $category, $item, $itemPosition);
             }
 
             // Subdivisions are rows of the same table with a parent, so they
             // are seeded by the same call — only `parent` differs.
             foreach ($section['sub_categories'] ?? [] as $subPosition => $subSection) {
-                $subCategory = $this->seedCategory($restaurant, $menu, $subSection['name'], $subPosition, $category);
+                $subCategory = $this->seedCategory($tenant, $menu, $subSection['name'], $subPosition, $category);
 
                 foreach ($subSection['items'] as $itemPosition => $item) {
-                    $this->seedDish($restaurant, $subCategory, $item, $itemPosition);
+                    $this->seedDish($tenant, $subCategory, $item, $itemPosition);
                 }
             }
         }
@@ -736,7 +739,7 @@ class RestaurantSeeder extends Seeder
      * @param  array<string, string>  $name
      */
     private function seedCategory(
-        Restaurant $restaurant,
+        Tenant $tenant,
         Menu $menu,
         array $name,
         int $position,
@@ -755,7 +758,7 @@ class RestaurantSeeder extends Seeder
             $name,
             fn (): MenuCategory => new MenuCategory(['position' => $position, 'is_active' => true]),
             [
-                'tenant_id' => $restaurant->getKey(),
+                'tenant_id' => $tenant->getKey(),
                 'menu_id' => $menu->getKey(),
                 'parent_id' => $parent?->getKey(),
             ],
@@ -771,7 +774,7 @@ class RestaurantSeeder extends Seeder
      * @param  array<string, mixed>  $item
      */
     private function seedDish(
-        Restaurant $restaurant,
+        Tenant $tenant,
         MenuCategory $category,
         array $item,
         int $position,
@@ -792,7 +795,7 @@ class RestaurantSeeder extends Seeder
                 'position' => $position,
             ]),
             [
-                'tenant_id' => $restaurant->getKey(),
+                'tenant_id' => $tenant->getKey(),
                 'menu_category_id' => $category->getKey(),
             ],
         );
@@ -806,7 +809,7 @@ class RestaurantSeeder extends Seeder
                     'is_available' => true,
                     'position' => $additionPosition,
                 ]),
-                ['tenant_id' => $restaurant->getKey(), 'menu_item_id' => $dish->getKey()],
+                ['tenant_id' => $tenant->getKey(), 'menu_item_id' => $dish->getKey()],
             );
         }
     }
@@ -819,7 +822,7 @@ class RestaurantSeeder extends Seeder
      * failing the seed: the combo is still a working combo one line shorter,
      * and a half-seeded database is worse than a slightly smaller one.
      */
-    private function seedCombos(Restaurant $restaurant, Menu $menu): void
+    private function seedCombos(Tenant $tenant, Menu $menu): void
     {
         foreach (self::COMBOS as $position => $definition) {
             $combo = $this->firstOrCreateByEnglishName(
@@ -832,12 +835,12 @@ class RestaurantSeeder extends Seeder
                     'availability' => ItemAvailability::Available,
                     'position' => $position,
                 ]),
-                ['tenant_id' => $restaurant->getKey(), 'menu_id' => $menu->getKey()],
+                ['tenant_id' => $tenant->getKey(), 'menu_id' => $menu->getKey()],
             );
 
             foreach ($definition['contents'] as $contentPosition => $content) {
                 $dish = MenuItem::query()
-                    ->where('tenant_id', $restaurant->getKey())
+                    ->where('tenant_id', $tenant->getKey())
                     ->onMenu($menu->getKey())
                     ->where('name->'.Locale::English->value, $content['name'][Locale::English->value])
                     ->first();
@@ -849,7 +852,7 @@ class RestaurantSeeder extends Seeder
                 MenuComboItem::query()->firstOrCreate(
                     ['menu_combo_id' => $combo->getKey(), 'menu_item_id' => $dish->getKey()],
                     [
-                        'tenant_id' => $restaurant->getKey(),
+                        'tenant_id' => $tenant->getKey(),
                         'quantity' => $content['quantity'],
                         'position' => $contentPosition,
                     ],
@@ -859,14 +862,14 @@ class RestaurantSeeder extends Seeder
     }
 
     /**
-     * The tiles a freshly seeded restaurant's guests land on: one per menu.
+     * The tiles a freshly seeded tenant's guests land on: one per menu.
      *
      * A guest only ever reaches a menu through a tile, so seeding one tile left
      * the drinks and breakfast cards with no way in — they existed, and nobody
      * arriving at a table could get to them.
      *
      * Matched on the menu each tile opens rather than on its label, so
-     * re-seeding never doubles up and the tile a restaurant has already
+     * re-seeding never doubles up and the tile a tenant has already
      * relabelled keeps its own words.
      *
      * No picture: there is no photography to seed, and a tile without one is a
@@ -874,13 +877,13 @@ class RestaurantSeeder extends Seeder
      *
      * @param  list<Menu>  $menus  in the order a guest should read them
      */
-    private function seedHomeScreen(Restaurant $restaurant, array $menus): void
+    private function seedHomeScreen(Tenant $tenant, array $menus): void
     {
         // One banner row: full-width rectangles, one tap target per line, which
         // is the shape a menu tile wants. A rail of photographs beside it is
-        // something a restaurant adds from the panel.
+        // something a tenant adds from the panel.
         $row = HomeRow::query()->firstOrCreate(
-            ['tenant_id' => $restaurant->getKey(), 'position' => 0],
+            ['tenant_id' => $tenant->getKey(), 'position' => 0],
             ['layout' => HomeRowLayout::Banner, 'is_active' => true],
         );
 
@@ -901,7 +904,7 @@ class RestaurantSeeder extends Seeder
                 'action' => HomeTileAction::Menu,
                 'position' => $position,
                 'is_active' => true,
-                'tenant_id' => $restaurant->getKey(),
+                'tenant_id' => $tenant->getKey(),
                 'home_row_id' => $row->getKey(),
                 'menu_id' => $menu->getKey(),
             ]);
@@ -916,7 +919,7 @@ class RestaurantSeeder extends Seeder
      * @param  Builder<TModel>  $query  already narrowed to the right parent
      * @param  array<string, string>  $translations  the name in every language
      * @param  Closure(): TModel  $make  a new, unsaved record with its own columns set
-     * @param  array<string, mixed>  $owner  the keys tying it to its restaurant and parent
+     * @param  array<string, mixed>  $owner  the keys tying it to its tenant and parent
      * @return TModel
      */
     private function firstOrCreateByEnglishName(

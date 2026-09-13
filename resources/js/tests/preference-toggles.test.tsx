@@ -90,8 +90,8 @@ describe('preference toggles', () => {
         );
     });
 
-    it('offers no language button when there is no restaurant to post to', () => {
-        stubPageProps({ restaurant: null });
+    it('offers no language button when there is no tenant to post to', () => {
+        stubPageProps({ tenant: null });
 
         render(<PreferenceToggles />);
 

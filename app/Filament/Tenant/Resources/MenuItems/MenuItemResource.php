@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\MenuItems;
+namespace App\Filament\Tenant\Resources\MenuItems;
 
-use App\Filament\Restaurant\Resources\MenuItems\Pages\ListMenuItems;
-use App\Filament\Restaurant\Resources\MenuItems\Schemas\MenuItemForm;
-use App\Filament\Restaurant\Resources\MenuItems\Tables\MenuItemsTable;
+use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
+use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
+use App\Filament\Tenant\Resources\MenuItems\Tables\MenuItemsTable;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuItem;
 use BackedEnum;
@@ -14,13 +14,13 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 /**
- * What this restaurant sells.
+ * What this tenant sells.
  *
  * Scoping is Filament's: the panel has a tenant, so every query here is limited
- * to the restaurant in the subdomain and new rows are stamped with it. The
+ * to the tenant in the subdomain and new rows are stamped with it. The
  * composite foreign key on (menu_category_id, tenant_id) is the second
  * half of that — even a tampered form cannot file an item under another
- * restaurant's section, because the database refuses the row.
+ * tenant's section, because the database refuses the row.
  *
  * Who may use the page is MenuItemPolicy's business: menu.view to look,
  * menu.manage to change anything.
@@ -34,8 +34,6 @@ class MenuItemResource extends Resource
     protected static ?int $navigationSort = 20;
 
     protected static ?string $recordTitleAttribute = 'name';
-
-    protected static ?string $tenantOwnershipRelationshipName = 'restaurant';
 
     /**
      * Labels are methods rather than static properties because a property is

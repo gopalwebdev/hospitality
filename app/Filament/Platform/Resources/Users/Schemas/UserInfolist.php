@@ -36,20 +36,20 @@ class UserInfolist
                     ->icon(Heroicon::OutlinedBuildingOffice2)
                     ->schema([
                         TextEntry::make('tenant.name')
-                            ->label('Restaurant')
+                            ->label('Tenant')
                             ->badge()
                             ->color('gray')
-                            ->placeholder('Product team — belongs to no restaurant'),
+                            ->placeholder('Product team — belongs to no tenant'),
 
                         IconEntry::make('is_super_admin')
                             ->label('The product team')
                             ->boolean()
                             ->helperText('This, not an empty tenant, is what grants every permission.'),
 
-                        TextEntry::make('restaurants.name')
+                        TextEntry::make('tenants.name')
                             ->label('Rostered at')
                             ->badge()
-                            ->placeholder('No restaurants')
+                            ->placeholder('No tenants')
                             ->columnSpanFull(),
                     ])
                     ->columns(2),

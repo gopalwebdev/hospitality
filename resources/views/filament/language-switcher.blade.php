@@ -10,14 +10,14 @@
     .ai/rules/filament.md.
 
     The action is worked out per panel because a form must post to the host it
-    was rendered on: the tenant panel lives on a restaurant's subdomain, the
+    was rendered on: the tenant panel lives on a tenant's subdomain, the
     product team's on the root domain, and a cross-host post loses the session.
 --}}
 @php
     $tenant = \Filament\Facades\Filament::getTenant();
 
-    $action = $tenant instanceof \App\Models\Restaurant
-        ? route('preferences.language.update', ['restaurant' => $tenant->slug])
+    $action = $tenant instanceof \App\Models\Tenant
+        ? route('preferences.language.update', ['tenant' => $tenant->slug])
         : route('panel.language.update');
 
     // Normalised rather than compared raw: an application locale that is not one

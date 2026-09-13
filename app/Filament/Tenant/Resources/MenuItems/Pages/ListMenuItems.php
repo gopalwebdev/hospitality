@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Restaurant\Resources\MenuItems\Pages;
+namespace App\Filament\Tenant\Resources\MenuItems\Pages;
 
-use App\Filament\Restaurant\Resources\MenuItems\MenuItemResource;
-use App\Filament\Restaurant\Resources\MenuItems\Schemas\MenuItemForm;
+use App\Filament\Tenant\Resources\MenuItems\MenuItemResource;
+use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Models\MenuCategory;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -43,7 +43,7 @@ class ListMenuItems extends ListRecords
     }
 
     /**
-     * Whether this restaurant has anywhere to put a dish yet.
+     * Whether this tenant has anywhere to put a dish yet.
      */
     private function hasAnyCategory(): bool
     {

@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Filament/Restaurant/Resources/Menus/**'
+  - 'app/Filament/Tenant/Resources/Menus/**'
 ---
 
 # Menus
@@ -36,7 +36,7 @@ Dishes are listed and dragged here but **not edited** here: the dish form carrie
 Both columns default to 0, which is where a menu's first category sits too; ties break rails first, then in declaration order. That is what makes a menu nobody has arranged read exactly as it did before the columns existed — featured, combos, then the categories. One drag renumbers the whole top level and nothing ties again.
 
 ## Featured dishes are a flag on the dish, ordered on their own tab
-`menu_items.is_featured` plus `featured_position` are what a menu leads with; `ManageMenuFeaturedItems` is where they are dragged into order. It hangs off `Menu::menuItems()`, a HasManyThrough that reaches dishes through their categories because a dish carries its category and its restaurant, never its menu.
+`menu_items.is_featured` plus `featured_position` are what a menu leads with; `ManageMenuFeaturedItems` is where they are dragged into order. It hangs off `Menu::menuItems()`, a HasManyThrough that reaches dishes through their categories because a dish carries its category and its tenant, never its menu.
 
 Nothing is created, deleted **or featured** there. The page has no actions at all: it lists the featured dishes and lets them be dragged, which is the one thing the dish's own form cannot do. Whether a dish is featured is the `is_featured` toggle on that form — see `.ai/rules/actions-menus.md`. Where the rail *sits* is a third question again, answered by dragging its row on the arrangement.
 

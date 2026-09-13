@@ -7,7 +7,7 @@ paths:
 # Middleware
 
 ## HandleGuestAppRequests is the one Inertia middleware on a subdomain
-It picks the `guest` root template, shares `$theme` and `$tenantSlug` with it, and sends the shared props. `restaurant`, `currency` and `translations` are Inertia **once props**: none changes while a guest walks between one restaurant's screens, so each is sent on the first visit and left out of every visit after it, which is most of a page's payload on a phone. `locale` and `appearance` are sent every time, because the guest can change both. A tenant-wide abstract base and a staff subclass existed; both went with the staff app, as did `EnsureStaffMemberWorksHere`.
+It picks the `guest` root template, shares `$theme` and `$tenantSlug` with it, and sends the shared props. `tenant`, `currency` and `translations` are Inertia **once props**: none changes while a guest walks between one tenant's screens, so each is sent on the first visit and left out of every visit after it, which is most of a page's payload on a phone. `locale` and `appearance` are sent every time, because the guest can change both. A tenant-wide abstract base and a staff subclass existed; both went with the staff app, as did `EnsureStaffMemberWorksHere`.
 
 There is no `redirectGuestsTo` in `bootstrap/app.php` any more: nothing outside the panels uses `auth`, and each panel carries its own sign-in page.
 

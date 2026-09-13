@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * The roles a user may hold inside a restaurant.
+ * The roles a user may hold inside a tenant.
  *
  * Product team ownership is not here: it is the users.is_super_admin column, and a
  * super admin is granted everything by a Gate::before check rather than by
@@ -14,10 +14,10 @@ namespace App\Enums;
  */
 enum Role: string
 {
-    /** Runs one restaurant. Every restaurant has at least one. */
+    /** Runs one tenant. Every tenant has at least one. */
     case Admin = 'admin';
 
-    /** Works in one restaurant: takes orders and works through them. */
+    /** Works in one tenant: takes orders and works through them. */
     case Staff = 'staff';
 
     /** The diner. Reads the menu and places their own orders. */
@@ -31,9 +31,9 @@ enum Role: string
     public function permissions(): array
     {
         return match ($this) {
-            // A restaurant admin owns everything inside their own tenant, and
-            // nothing at product team level: the roster of restaurants, and the
-            // roles and permissions every restaurant draws from, stay with
+            // A tenant admin owns everything inside their own tenant, and
+            // nothing at product team level: the roster of tenants, and the
+            // roles and permissions every tenant draws from, stay with
             // the product team. Deriving the exclusions from the enum means a
             // new product team permission is withheld here the day it is added.
             self::Admin => self::everyPermissionExcept(...Permission::productTeamOnly()),

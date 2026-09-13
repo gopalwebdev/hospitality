@@ -5,7 +5,7 @@ namespace Database\Factories;
 use App\Enums\Locale;
 use App\Models\Menu;
 use App\Models\MenuCategory;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,11 +24,11 @@ class MenuCategoryFactory extends Factory
         ]).' '.fake()->unique()->numberBetween(1, 9999);
 
         return [
-            // The restaurant is chosen first and the menu follows it, rather
+            // The tenant is chosen first and the menu follows it, rather
             // than the other way round, so that passing a tenant_id — which
-            // most tests do — cannot produce a menu at a different restaurant
+            // most tests do — cannot produce a menu at a different tenant
             // and trip the composite foreign key.
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'menu_id' => fn (array $attributes): int => Menu::factory()
                 ->create(['tenant_id' => $attributes['tenant_id']])
                 ->getKey(),
@@ -41,7 +41,7 @@ class MenuCategoryFactory extends Factory
     }
 
     /**
-     * Put this section on an existing menu, and its restaurant with it.
+     * Put this section on an existing menu, and its tenant with it.
      */
     public function inMenu(Menu $menu): static
     {

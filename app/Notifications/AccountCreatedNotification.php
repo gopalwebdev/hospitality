@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\FilamentPanel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -23,7 +24,7 @@ class AccountCreatedNotification extends Notification implements ShouldQueue
 
     public function __construct(
         private readonly string $signInUrl,
-        private readonly ?string $restaurantName = null,
+        private readonly ?string $tenantName = null,
     ) {
         $this->onQueue('mail');
     }
@@ -38,7 +39,9 @@ class AccountCreatedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $where = $this->restaurantName ?? 'the restaurant platform';
+        // An account with no tenant is the product team's, so it is opened at
+        // the platform itself.
+        $where = $this->tenantName ?? FilamentPanel::Platform->brandName();
 
         return (new MailMessage)
             ->subject('Your account is ready')
@@ -55,7 +58,7 @@ class AccountCreatedNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'restaurant_name' => $this->restaurantName,
+            'tenant_name' => $this->tenantName,
             'sign_in_url' => $this->signInUrl,
         ];
     }

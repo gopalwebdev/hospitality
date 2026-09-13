@@ -78,8 +78,8 @@ class HomeTile extends Model
      */
     protected static function booted(): void
     {
-        // Take the restaurant from the row this sits in. It is the same
-        // restaurant by definition — the composite foreign key insists on it —
+        // Take the tenant from the row this sits in. It is the same
+        // tenant by definition — the composite foreign key insists on it —
         // so nothing that creates a tile has to remember. That includes the
         // tiles relation manager, where Filament's tenancy stamps the row a
         // resource is saving but not the rows hanging off it.
@@ -112,13 +112,13 @@ class HomeTile extends Model
     }
 
     /**
-     * The restaurant whose home screen this is on.
+     * The tenant whose home screen this is on.
      *
-     * @return BelongsTo<Restaurant, $this>
+     * @return BelongsTo<Tenant, $this>
      */
-    public function restaurant(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Restaurant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class);
     }
 
     /**
@@ -145,7 +145,7 @@ class HomeTile extends Model
      * Whether this tile has a picture to show.
      *
      * A tile without one is not broken: the guest app draws the label on the
-     * brand colour instead, so a restaurant can arrange its home screen before
+     * brand colour instead, so a tenant can arrange its home screen before
      * it has photography.
      */
     public function hasImage(): bool
@@ -164,7 +164,7 @@ class HomeTile extends Model
     }
 
     /**
-     * Order the way the restaurant arranged the home screen.
+     * Order the way the tenant arranged the home screen.
      *
      * @param  Builder<$this>  $query
      */

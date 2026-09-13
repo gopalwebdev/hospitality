@@ -27,22 +27,22 @@ interface Row {
 }
 
 interface HomeProps {
-    restaurant: { name: string; slug: string } | null;
+    tenant: { name: string; slug: string; typeNoun: string } | null;
     rows: Row[];
 }
 
 /**
  * What a guest sees after scanning the QR code at their table.
  *
- * The restaurant arranged this — the rows, what each one looks like, the
+ * The tenant arranged this — the rows, what each one looks like, the
  * pictures and where each tile goes — so this page draws whatever it is given
  * and decides nothing. The row carries its own shape down from the server, so
  * adding a layout is a case in App\Enums\HomeRowLayout and a branch here,
  * never a guess about what a row is for.
  */
-export default function Home({ restaurant, rows }: HomeProps) {
+export default function Home({ tenant, rows }: HomeProps) {
     const { t } = useTranslations();
-    const title = restaurant?.name ?? t('home.title');
+    const title = tenant?.name ?? t('home.title');
 
     return (
         <>
@@ -53,7 +53,7 @@ export default function Home({ restaurant, rows }: HomeProps) {
             <main className="flex-1 pt-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
                 {rows.length === 0 ? (
                     <p className="text-muted-foreground px-5 py-16 text-center text-sm">
-                        {t('home.empty')}
+                        {t('home.empty', { type: tenant?.typeNoun ?? '' })}
                     </p>
                 ) : (
                     <div className="flex flex-col gap-6">
@@ -153,7 +153,7 @@ function TileLink({ tile, row }: { tile: Tile; row: Row }) {
 /**
  * One tile.
  *
- * A tile with no picture is not broken — it is a restaurant that has arranged
+ * A tile with no picture is not broken — it is a tenant that has arranged
  * its home screen before it has photography — so it is drawn as its label on
  * the brand colour rather than as an empty box.
  *

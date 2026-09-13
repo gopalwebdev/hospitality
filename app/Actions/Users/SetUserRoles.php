@@ -2,7 +2,7 @@
 
 namespace App\Actions\Users;
 
-use App\Actions\Restaurants\EnsureRoleFitsWithinLimit;
+use App\Actions\Tenants\EnsureRoleFitsWithinLimit;
 use App\Enums\Role as RoleEnum;
 use App\Models\Role;
 use App\Models\User;
@@ -10,7 +10,7 @@ use App\Models\User;
 /**
  * Set the roles an account holds, from the product team panel.
  *
- * Unlike SetRestaurantUserRoles this withholds nothing: a super admin is
+ * Unlike SetTenantUserRoles this withholds nothing: a super admin is
  * exactly who decides that a role carrying a product team permission may be handed
  * out, and it is the only place that decision can be made.
  *
@@ -29,18 +29,18 @@ class SetUserRoles
     {
         $roles = Role::query()->whereIn('name', $roleNames)->get();
 
-        // A restaurant panel refuses to touch the roles of someone who staffs
-        // more than one restaurant, because a role is held per account and
+        // A tenant panel refuses to touch the roles of someone who staffs
+        // more than one tenant, because a role is held per account and
         // would change what they can do everywhere at once (see
-        // .ai/rules/restaurants.md) — this panel is exactly where that call
-        // is made, so it checks every restaurant the grant would apply to,
+        // .ai/rules/tenants.md) — this panel is exactly where that call
+        // is made, so it checks every tenant the grant would apply to,
         // not just one.
-        foreach ($user->restaurants()->get() as $restaurant) {
+        foreach ($user->tenants()->get() as $tenant) {
             foreach ($roles as $role) {
                 $roleEnum = RoleEnum::tryFrom($role->name);
 
                 if ($roleEnum instanceof RoleEnum) {
-                    ($this->ensureRoleFits)($restaurant, $roleEnum, $user);
+                    ($this->ensureRoleFits)($tenant, $roleEnum, $user);
                 }
             }
         }

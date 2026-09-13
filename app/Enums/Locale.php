@@ -3,14 +3,14 @@
 namespace App\Enums;
 
 /**
- * The languages a restaurant's own words are stored in.
+ * The languages a tenant's own words are stored in.
  *
  * This is the single source of truth for what "a language" means here: the
  * cookie middleware validates against it, the language toggle is built from it,
  * and every translated column stores one key per case. Adding a language is a
  * case and nothing else.
  *
- * What is translated is what a **restaurant wrote** — menu, category, dish,
+ * What is translated is what a **tenant wrote** — menu, category, dish,
  * addition and tile names, all of them database columns. What this application
  * writes is English and stays English: `lang/en` is the only directory in
  * `lang/`, so switching language changes the menu a guest reads without
@@ -70,9 +70,9 @@ enum Locale: string
     }
 
     /**
-     * The language's name in English, for the restaurant panel.
+     * The language's name in English, for the tenant panel.
      *
-     * The panels are worked in English by the restaurant's own staff, so a
+     * The panels are worked in English by the tenant's own staff, so a
      * field asking for the Tamil name is clearer labelled "Name (Tamil)" than
      * "Name (தமிழ்)".
      */

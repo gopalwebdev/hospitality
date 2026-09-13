@@ -3,37 +3,37 @@
 namespace App\Http\Controllers\Guest;
 
 use App\Http\Controllers\Controller;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 
 /**
  * What makes the guest app installable.
  *
- * Both are served per restaurant rather than as static files, because the name
- * on the home screen is the restaurant's own — a phone with two restaurants
+ * Both are served per tenant rather than as static files, because the name
+ * on the home screen is the tenant's own — a phone with two tenants
  * installed shows two apps, not one twice — and both live at the root of the
- * restaurant's subdomain, which is what lets the worker's scope be the whole app.
+ * tenant's subdomain, which is what lets the worker's scope be the whole app.
  */
 class ProgressiveWebAppController extends Controller
 {
     /**
      * The splash and status bar colour of the installed app.
      *
-     * Fixed rather than per restaurant: theming is light or dark and nothing
+     * Fixed rather than per tenant: theming is light or dark and nothing
      * else, and a manifest colour is baked in at install time anyway.
      */
     private const string THEME_COLOR = '#E11D48';
 
-    public function manifest(Restaurant $restaurant): JsonResponse
+    public function manifest(Tenant $tenant): JsonResponse
     {
-        abort_unless($restaurant->is_active, 404);
+        abort_unless($tenant->is_active, 404);
 
         return response()->json([
             'id' => '/',
-            'name' => $restaurant->name,
-            'short_name' => $restaurant->name,
-            'description' => 'The menu at '.$restaurant->name.'.',
+            'name' => $tenant->name,
+            'short_name' => $tenant->name,
+            'description' => 'The menu at '.$tenant->name.'.',
             'start_url' => '/',
             'scope' => '/',
             // Standalone is the point of installing: no browser chrome.
@@ -63,11 +63,11 @@ class ProgressiveWebAppController extends Controller
      * - Inertia's own requests are never cached: the same URL answers HTML to a
      *   navigation and JSON to Inertia, and handing one to the other breaks both.
      */
-    public function serviceWorker(Restaurant $restaurant): Response
+    public function serviceWorker(Tenant $tenant): Response
     {
-        abort_unless($restaurant->is_active, 404);
+        abort_unless($tenant->is_active, 404);
 
-        $cache = json_encode('guest-'.$restaurant->slug.'-v1', JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $cache = json_encode('guest-'.$tenant->slug.'-v1', JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         $javascript = <<<JS
         const CACHE = {$cache};

@@ -9,12 +9,12 @@ describe('welcome', () => {
         expect(
             screen.getByRole('heading', {
                 level: 1,
-                name: 'Run your restaurant from one place.',
+                name: 'Run your hotel or restaurant from one place.',
             }),
         ).toBeInTheDocument();
     });
 
-    it('sends people to the restaurant panel with a plain link', () => {
+    it('sends people to the tenant panel with a plain link', () => {
         render(<Welcome />);
 
         const signIn = screen.getByRole('link', { name: 'Sign in' });

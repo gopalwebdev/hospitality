@@ -1,30 +1,30 @@
 <?php
 
-namespace App\Actions\Restaurants;
+namespace App\Actions\Tenants;
 
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Filament\Facades\Filament;
 
 /**
- * Put someone on a restaurant's roster.
+ * Put someone on a tenant's roster.
  *
  * An address that already has an account joins on that account rather than
  * getting a second one: accounts are platform-wide, and one person may staff
- * more than one restaurant.
+ * more than one tenant.
  */
-class AddUserToRestaurant
+class AddUserToTenant
 {
-    public function __construct(private readonly SetRestaurantUserRoles $setRoles) {}
+    public function __construct(private readonly SetTenantUserRoles $setRoles) {}
 
     /**
      * @param  list<string>  $roleNames
      */
-    public function __invoke(Restaurant $restaurant, string $name, string $email, array $roleNames = []): User
+    public function __invoke(Tenant $tenant, string $name, string $email, array $roleNames = []): User
     {
         // Accounts are platform-wide, so this looks past the panel's tenant
         // scope: the address may already have an account at another
-        // restaurant, and creating a second one would collide on the unique
+        // tenant, and creating a second one would collide on the unique
         // email anyway.
         $user = User::query()
             ->withoutGlobalScope(Filament::getTenancyScopeName())
@@ -32,17 +32,17 @@ class AddUserToRestaurant
             ->first();
 
         if (! $user instanceof User) {
-            // A brand new account belongs to the restaurant that opened it.
+            // A brand new account belongs to the tenant that opened it.
             // An existing one keeps whichever tenant it already had: it may
             // staff several, and this panel does not get to move it.
             $user = User::query()->create([
                 'name' => $name,
                 'email' => $email,
-                'tenant_id' => $restaurant->getKey(),
+                'tenant_id' => $tenant->getKey(),
             ]);
         }
 
-        $restaurant->users()->syncWithoutDetaching([$user->getKey()]);
+        $tenant->users()->syncWithoutDetaching([$user->getKey()]);
 
         ($this->setRoles)($user->refresh(), $roleNames);
 

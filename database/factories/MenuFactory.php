@@ -4,7 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\Locale;
 use App\Models\Menu;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -22,16 +22,16 @@ class MenuFactory extends Factory
         ]).' '.fake()->unique()->numberBetween(1, 9999);
 
         // English only by default: a menu with no Tamil copy yet is the normal
-        // state of a restaurant that has just been onboarded, and the guest app
+        // state of a tenant that has just been onboarded, and the guest app
         // has to read correctly in that state.
         return [
-            'tenant_id' => Restaurant::factory(),
+            'tenant_id' => Tenant::factory(),
             'name' => [Locale::English->value => $name],
             'description' => null,
             'position' => fake()->numberBetween(0, 20),
             'is_active' => true,
             // No window by default: most menus are served whenever the
-            // restaurant is open, and servedBetween() is for the ones that are
+            // tenant is open, and servedBetween() is for the ones that are
             // not.
             'available_from' => null,
             'available_until' => null,

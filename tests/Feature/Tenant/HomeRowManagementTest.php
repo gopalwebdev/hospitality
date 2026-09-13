@@ -5,13 +5,13 @@ use App\Enums\HomeTileAction;
 use App\Enums\Locale;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\Role as RoleEnum;
-use App\Filament\Restaurant\Resources\HomeRows\Pages\EditHomeRow;
-use App\Filament\Restaurant\Resources\HomeRows\Pages\ListHomeRows;
-use App\Filament\Restaurant\Resources\HomeRows\RelationManagers\TilesRelationManager;
+use App\Filament\Tenant\Resources\HomeRows\Pages\EditHomeRow;
+use App\Filament\Tenant\Resources\HomeRows\Pages\ListHomeRows;
+use App\Filament\Tenant\Resources\HomeRows\RelationManagers\TilesRelationManager;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
-use App\Models\Restaurant;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -32,11 +32,11 @@ beforeEach(function (): void {
 |
 */
 
-it('lets a restaurant admin arrange the rows', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+it('lets a tenant admin arrange the rows', function (): void {
+    $tenant = Tenant::factory()->create();
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
-    $admin = enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
 
     expect($admin->can('viewAny', HomeRow::class))->toBeTrue()
         ->and($admin->can('create', HomeRow::class))->toBeTrue()
@@ -45,10 +45,10 @@ it('lets a restaurant admin arrange the rows', function (): void {
 });
 
 it('lets staff see the rows but not rearrange them', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
-    $staff = enterRestaurantPanel($restaurant, RoleEnum::Staff);
+    $staff = enterTenantPanel($tenant, RoleEnum::Staff);
 
     expect($staff->can(PermissionEnum::StorefrontView->value))->toBeTrue()
         ->and($staff->can('viewAny', HomeRow::class))->toBeTrue()
@@ -57,8 +57,8 @@ it('lets staff see the rows but not rearrange them', function (): void {
 });
 
 it('keeps someone with no role off the home screen pages', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $nobody = User::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $nobody = User::factory()->ofTenant($tenant)->create();
 
     expect($nobody->can('viewAny', HomeRow::class))->toBeFalse();
 });
@@ -69,9 +69,9 @@ it('keeps someone with no role off the home screen pages', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('creates a row against the restaurant whose panel it is', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+it('creates a row against the tenant whose panel it is', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(ListHomeRows::class)
         ->callAction('create', [
@@ -83,15 +83,15 @@ it('creates a row against the restaurant whose panel it is', function (): void {
 
     $row = HomeRow::query()->withoutGlobalScopes()->sole();
 
-    expect($row->tenant_id)->toBe($restaurant->getKey())
+    expect($row->tenant_id)->toBe($tenant->getKey())
         ->and($row->layout)->toBe(HomeRowLayout::Carousel)
         ->and($row->title)->toBe('This month')
         ->and($row->getTranslation('title', Locale::Tamil->value))->toBe('இந்த மாதம்');
 });
 
 it('lets a row be created with no heading at all', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // A banner into the menu speaks for itself, so the heading is optional in
     // every language — unlike a menu's name, which the fallback requires.
@@ -105,14 +105,14 @@ it('lets a row be created with no heading at all', function (): void {
     expect(HomeRow::query()->withoutGlobalScopes()->sole()->title)->toBeEmpty();
 });
 
-it('shows only this restaurant\'s rows', function (): void {
-    $mine = Restaurant::factory()->create();
-    $theirs = Restaurant::factory()->create();
+it('shows only this tenant\'s rows', function (): void {
+    $mine = Tenant::factory()->create();
+    $theirs = Tenant::factory()->create();
 
-    $myRow = HomeRow::factory()->ofRestaurant($mine)->create();
-    $theirRow = HomeRow::factory()->ofRestaurant($theirs)->create();
+    $myRow = HomeRow::factory()->ofTenant($mine)->create();
+    $theirRow = HomeRow::factory()->ofTenant($theirs)->create();
 
-    enterRestaurantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Admin);
 
     Livewire::test(ListHomeRows::class)
         ->assertCanSeeTableRecords([$myRow])
@@ -120,21 +120,21 @@ it('shows only this restaurant\'s rows', function (): void {
 });
 
 it('orders the rows the way the home screen shows them', function (): void {
-    $restaurant = Restaurant::factory()->create();
+    $tenant = Tenant::factory()->create();
 
-    $last = HomeRow::factory()->ofRestaurant($restaurant)->create(['position' => 5]);
-    $first = HomeRow::factory()->ofRestaurant($restaurant)->create(['position' => 1]);
+    $last = HomeRow::factory()->ofTenant($tenant)->create(['position' => 5]);
+    $first = HomeRow::factory()->ofTenant($tenant)->create(['position' => 1]);
 
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     Livewire::test(ListHomeRows::class)
         ->assertCanSeeTableRecords([$first, $last], inOrder: true);
 });
 
 it('takes a row\'s tiles with it when it is deleted', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
     $tile = HomeTile::factory()->openingMenu($menu)->inRow($row)->create();
 
     $row->delete();
@@ -148,10 +148,10 @@ it('takes a row\'s tiles with it when it is deleted', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('refuses at the database to put a tile in another restaurant\'s row', function (): void {
-    $mine = Restaurant::factory()->create();
-    $theirs = Restaurant::factory()->create();
-    $theirRow = HomeRow::factory()->ofRestaurant($theirs)->create();
+it('refuses at the database to put a tile in another tenant\'s row', function (): void {
+    $mine = Tenant::factory()->create();
+    $theirs = Tenant::factory()->create();
+    $theirRow = HomeRow::factory()->ofTenant($theirs)->create();
 
     // The composite foreign key on (home_row_id, tenant_id) is what makes this
     // a database error rather than something a forgotten where() lets through.
@@ -168,9 +168,9 @@ it('refuses at the database to put a tile in another restaurant\'s row', functio
 */
 
 it('creates a tile that leaves the app for a link', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->layout(HomeRowLayout::Links)->create();
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
+    $row = HomeRow::factory()->ofTenant($tenant)->layout(HomeRowLayout::Links)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
         ->callAction(TestAction::make('create')->table(), [
@@ -192,9 +192,9 @@ it('creates a tile that leaves the app for a link', function (): void {
 });
 
 it('refuses a link tile with no address', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    enterRestaurantPanel($restaurant, RoleEnum::Admin);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
         ->callAction(TestAction::make('create')->table(), [
@@ -206,9 +206,9 @@ it('refuses a link tile with no address', function (): void {
 });
 
 it('clears a link when a tile stops being one', function (): void {
-    $restaurant = Restaurant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $restaurant->getKey()]);
-    $row = HomeRow::factory()->ofRestaurant($restaurant)->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $row = HomeRow::factory()->ofTenant($tenant)->create();
     $tile = HomeTile::factory()->linkingTo('https://example.com')->inRow($row)->create();
 
     $tile->update(['action' => HomeTileAction::Menu, 'menu_id' => $menu->getKey()]);

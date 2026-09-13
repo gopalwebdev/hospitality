@@ -6,7 +6,7 @@
 |--------------------------------------------------------------------------
 |
 | Every word of chrome in the app a diner reads at the table. The dish names,
-| sections and tile labels are not here — those are the restaurant's own words
+| sections and tile labels are not here — those are the tenant's own words
 | and live in translated database columns.
 |
 | The whole file is sent to the browser as one Inertia prop, so keep it to what
@@ -18,7 +18,7 @@ return [
 
     'home' => [
         'title' => 'Welcome',
-        'empty' => 'This restaurant has not set up its home screen yet. Please ask a member of staff.',
+        'empty' => 'This :type has not set up its home screen yet. Please ask a member of staff.',
     ],
 
     'menu' => [
