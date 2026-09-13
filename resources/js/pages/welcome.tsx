@@ -20,7 +20,7 @@ export default function Welcome() {
         {
             title: 'One subdomain per tenant',
             description:
-                'Every tenant gets its own storefront address, and its own admin behind it.',
+                'Every tenant gets its own storefront address, and its own owner behind it.',
         },
         {
             title: 'Sign in with a code',
@@ -36,13 +36,13 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title="Tenant Platform" />
+            <Head title="Hospitality Platform" />
 
             <div className="bg-background text-foreground min-h-screen">
                 <header className="border-b">
                     <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-6">
                         <span className="text-lg font-semibold tracking-tight">
-                            Tenant Platform
+                            Hospitality Platform
                         </span>
 
                         {/* The tenant panel is server rendered, so this leaves

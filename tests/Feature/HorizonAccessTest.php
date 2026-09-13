@@ -20,16 +20,16 @@ beforeEach(function (): void {
 |
 */
 
-it('lets a super admin open Horizon', function (): void {
-    $user = User::factory()->superAdmin()->create();
+it('lets an admin open Horizon', function (): void {
+    $user = User::factory()->admin()->create();
 
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeTrue();
 });
 
-it('keeps a tenant admin out of Horizon', function (): void {
+it('keeps a tenant owner out of Horizon', function (): void {
     $tenant = Tenant::factory()->create();
     $user = User::factory()->create();
-    $user->assignRole(Role::Admin->value);
+    $user->assignRole(Role::Owner->value);
     $user->tenants()->attach($tenant);
 
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeFalse();

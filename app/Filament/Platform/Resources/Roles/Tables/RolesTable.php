@@ -42,7 +42,7 @@ class RolesTable
                     ->sortable(),
 
                 // A row whose delete button is missing says why here, rather
-                // than leaving a super admin to guess at the gap.
+                // than leaving an admin to guess at the gap.
                 IconColumn::make('is_deletable')
                     ->label('Deletable')
                     ->state(fn (Role $record): bool => $record->undeletableReason() === null)
@@ -67,7 +67,7 @@ class RolesTable
 
                 // A built-in or in-use role is read-only, and the resource is
                 // where that is decided. Without an explicit check the buttons
-                // would render for a super admin and then land on a 403,
+                // would render for an admin and then land on a 403,
                 // because Filament authorizes a record action against the
                 // policy, which Gate::before answers first.
                 EditAction::make()

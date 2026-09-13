@@ -72,18 +72,18 @@ class TenantForm
                     ->columns(2),
 
                 Section::make('Limits')
-                    ->description('How many accounts may hold each role here. A super admin sets these; the tenant cannot raise its own.')
+                    ->description('How many accounts may hold each role here. An admin sets these; the tenant cannot raise its own.')
                     ->icon(Heroicon::OutlinedUserGroup)
                     ->schema([
-                        TextInput::make('max_admins')
-                            ->label('Max admins')
+                        TextInput::make('max_owners')
+                            ->label('Max owners')
                             ->numeric()
                             ->integer()
                             ->minValue(1)
-                            ->default(fn (): int => (int) config('tenants.default_max_admins'))
+                            ->default(fn (): int => (int) config('tenants.default_max_owners'))
                             ->required()
-                            ->helperText('At least one tenant admin is required.')
-                            ->rule(fn (?Tenant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Admin)),
+                            ->helperText('At least one tenant owner is required.')
+                            ->rule(fn (?Tenant $record): Closure => self::notBelowCurrentHolders($record, RoleEnum::Owner)),
 
                         TextInput::make('max_staff')
                             ->label('Max staff')
@@ -185,8 +185,8 @@ class TenantForm
                 return;
             }
 
-            $noun = $role === RoleEnum::Admin
-                ? ($current === 1 ? 'admin' : 'admins')
+            $noun = $role === RoleEnum::Owner
+                ? ($current === 1 ? 'owner' : 'owners')
                 : ($current === 1 ? 'staff member' : 'staff members');
 
             $fail(sprintf(

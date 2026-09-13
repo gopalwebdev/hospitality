@@ -139,11 +139,11 @@ class AppServiceProvider extends ServiceProvider
      * Grant the product team every permission.
      *
      * Returning null rather than false leaves every other check to run
-     * normally, so this only ever widens access for a super admin.
+     * normally, so this only ever widens access for an admin.
      */
     protected function configureAuthorization(): void
     {
-        Gate::before(static fn (User $user): ?bool => $user->isSuperAdmin() ? true : null);
+        Gate::before(static fn (User $user): ?bool => $user->isAdmin() ? true : null);
     }
 
     /**

@@ -2,7 +2,7 @@
 
 /*
 |--------------------------------------------------------------------------
-| Admin Panel
+| Tenant Panel
 |--------------------------------------------------------------------------
 |
 | The parts of the tenant panel that follow the language chosen in

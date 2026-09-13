@@ -37,24 +37,24 @@ Defaults are Indian: CountryCallingCode has one case (+91) and mobile numbers va
 
 Currency and timezone are a harder line than that, by product decision, not just a default: `App\Enums\Currency` has exactly one case (`IndianRupee`) and `tenant_settings` carries no timezone column at all — the application timezone comes from `APP_TIMEZONE`/`config('app.timezone')` alone (`.ai/rules/config.md`), never a per-tenant choice. Re-adding either a currency picker or a per-tenant timezone needs a product decision first, not just an enum case — this project has explicitly decided against them "for now," which is a stronger statement than the multi-country shape above.
 
-## A tenant caps its own admins and staff
-`tenants.max_admins` and `tenants.max_staff` (default from `config('tenants.php')`, editable per tenant by a super admin on TenantForm) bound how many accounts may hold the Admin or Staff role on that tenant's roster at once — one admin and five staff out of the box. `Tenant::roleLimit()` and `Tenant::roleHolderCount()` answer "how many, and how many allowed"; `App\Actions\Tenants\EnsureRoleFitsWithinLimit` is the single place every role grant is checked against it, called from `SetTenantUserRoles` (tenant panel) and `SetUserRoles` (product team panel) — never bypass either action to write a role directly.
+## A tenant caps its own owners and staff
+`tenants.max_owners` and `tenants.max_staff` (default from `config('tenants.php')`, editable per tenant by an admin on TenantForm) bound how many accounts may hold the Owner or Staff role on that tenant's roster at once — one admin and five staff out of the box. `Tenant::roleLimit()` and `Tenant::roleHolderCount()` answer "how many, and how many allowed"; `App\Actions\Tenants\EnsureRoleFitsWithinLimit` is the single place every role grant is checked against it, called from `SetTenantUserRoles` (tenant panel) and `SetUserRoles` (product team panel) — never bypass either action to write a role directly.
 
 Lowering a limit below the tenant's current roster is refused at the form field (`TenantForm::notBelowCurrentHolders()`), naming how many to remove first, rather than silently locking the extra accounts out of a role they still hold.
 
 ## Say "product team", not "platform staff"
 The people who run the whole product are the **product team** — that is the vocabulary in class names, method names, comments and UI copy: `isProductTeamOnly()`, `productTeamOnlyValues()`, `belongsToProductTeam()`, `enterProductTeamPanel()`, and "Product team" wherever a null tenant is rendered.
 
-"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every tenant on the platform", and the platform panel's brand name "Tenant Platform". The distinction is people versus product — do not rename those back.
+"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every tenant on the platform", and the platform panel's brand name "Hospitality Platform". The distinction is people versus product — do not rename those back.
 
 ## Three surfaces: two Filament panels and the guest app
 Settled architecture, one surface per audience:
 
 1. **Product team** — Filament platform panel, root domain, `/dashboard` (entered at `/login`). Tenants, roles, permissions, accounts.
-2. **Tenant** — Filament tenant panel, tenant subdomain, `/dashboard` (entered at `/login`), for a tenant's admins and staff alike. Menu, settings, reports, receipt printing.
+2. **Tenant** — Filament tenant panel, tenant subdomain, `/dashboard` (entered at `/login`), for a tenant's owners and staff alike. Menu, settings, reports, receipt printing.
 3. **Guest** — React + Inertia, phone-first, installable as a PWA; arrives by QR and lands on a home screen the tenant arranges out of rows of tiles (`home_rows` → `home_tiles`), walking from there into a menu, a PDF, or off to a link.
 
-Both panels live under `/dashboard` and are told apart by host, and `/login` on either host is the way in — `.ai/rules/filament.md` explains why that depends on provider order. They were once `/super-admin` and `/admin`, in folders named for roles; they are named for whose they are now, because a tenant's panel serves its staff as much as its admins.
+Both panels live under `/dashboard` and are told apart by host, and `/login` on either host is the way in — `.ai/rules/filament.md` explains why that depends on provider order. They were once named for roles, at paths and in folders to match; they are named for whose they are now, because a tenant's panel serves its staff as much as its owners.
 
 A staff app (React, phone-first) existed and was removed on the project owner's instruction. When staff get a surface again it is React rather than a third panel, for the reason it was before: they are on phones, and `.ai/rules/filament.md` reserves panels for laptop-and-larger. The guest app does not work offline — there is no offline requirement, and Inertia needs the server for every page.
 

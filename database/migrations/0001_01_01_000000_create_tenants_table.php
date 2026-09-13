@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('tenants', function (Blueprint $table): void {
             $table->id();
-            // The slug is the tenant's subdomain: `t1` serves t1.tenant-app.com.
+            // The slug is the tenant's subdomain: `t1` serves t1.hospitality.com.
             $table->string('slug');
             $table->string('name');
             $table->string('type', 32);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('secondary_phone_country_code', 4)->nullable();
             $table->string('secondary_phone', CountryCallingCode::longestMobileNumberLength())->nullable();
             $table->boolean('is_active')->default(true);
-            $table->smallInteger('max_admins')->default(config('tenants.default_max_admins'));
+            $table->smallInteger('max_owners')->default(config('tenants.default_max_owners'));
             $table->smallInteger('max_staff')->default(config('tenants.default_max_staff'));
             $table->timestamps();
         });
@@ -35,7 +35,7 @@ return new class extends Migration
             ->implode(', ');
 
         DB::statement("ALTER TABLE tenants
-            ADD CONSTRAINT tenants_role_limits_not_negative CHECK (max_admins >= 0 AND max_staff >= 0),
+            ADD CONSTRAINT tenants_role_limits_not_negative CHECK (max_owners >= 0 AND max_staff >= 0),
             ADD CONSTRAINT tenants_type_is_known CHECK (type IN ({$types}))");
     }
 

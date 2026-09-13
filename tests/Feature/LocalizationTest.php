@@ -54,7 +54,7 @@ function seedBilingualMenu(): array
 
 function menuUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey();
+    return 'http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey();
 }
 
 /*
@@ -111,7 +111,7 @@ it('remembers the chosen language in an unencrypted cookie', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'spice']);
 
     $response = $this->put(
-        'http://spice.tenant-app.test/preferences/language',
+        'http://spice.hospitality.test/preferences/language',
         ['locale' => Locale::Tamil->value],
     );
 
@@ -160,7 +160,7 @@ it('translates the tiles on the home screen too', function (): void {
     ]);
 
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$tenant->slug.'.tenant-app.test/')
+        ->get('http://'.$tenant->slug.'.hospitality.test/')
         ->assertOk()
         ->assertDontSee('Our menu')
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
@@ -176,11 +176,11 @@ it('translates the tiles on the home screen too', function (): void {
 
 it('offers a language switcher in the tenant panel', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     // Posted to the panel's own host: the tenant panel is on a subdomain and a
     // form posting across hosts would lose the session.
-    $this->get('http://'.$tenant->slug.'.tenant-app.test/dashboard')
+    $this->get('http://'.$tenant->slug.'.hospitality.test/dashboard')
         ->assertOk()
         ->assertSee(route('preferences.language.update', ['tenant' => $tenant->slug]), escape: false)
         ->assertSee(Locale::Tamil->label());
@@ -188,11 +188,11 @@ it('offers a language switcher in the tenant panel', function (): void {
 
 it('shows the panel switcher on English until a language is chosen', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     // A picker showing nothing selected is worse than one showing the language
     // in use, so the current locale is normalised rather than compared raw.
-    $html = (string) $this->get('http://'.$tenant->slug.'.tenant-app.test/dashboard')
+    $html = (string) $this->get('http://'.$tenant->slug.'.hospitality.test/dashboard')
         ->assertOk()
         ->getContent();
 
@@ -203,9 +203,9 @@ it('shows the panel switcher on English until a language is chosen', function ()
 });
 
 it('offers a language switcher in the product team panel', function (): void {
-    $this->actingAs(User::factory()->superAdmin()->create());
+    $this->actingAs(User::factory()->admin()->create());
 
-    $this->get('http://tenant-app.test/dashboard')
+    $this->get('http://hospitality.test/dashboard')
         ->assertOk()
         ->assertSee(route('panel.language.update'), escape: false)
         ->assertSee(Locale::Tamil->label());
@@ -217,13 +217,13 @@ it('shows the panel\'s own labels in English and the tenant\'s words in the chos
         'tenant_id' => $tenant->getKey(),
         'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு'],
     ]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     // The two halves are answered differently on purpose: this application's
     // labels are written once, in English, and only what a tenant typed
     // is translated — and that lives in the database.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$tenant->slug.'.tenant-app.test/dashboard/menus')
+        ->get('http://'.$tenant->slug.'.hospitality.test/dashboard/menus')
         ->assertOk()
         ->assertSee(__('panel.menus.create'))
         ->assertSee('இரவு உணவு');
@@ -232,7 +232,7 @@ it('shows the panel\'s own labels in English and the tenant\'s words in the chos
 it('opens a form in the language the panel was switched to, through the real request', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     // Cookie, then SetLocale, then the form: the path a browser takes.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
@@ -248,7 +248,7 @@ it('searches a table in the language it is showing, and in English', function ()
         ->create();
     $paneer = MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Paneer Tikka', 'ta' => 'பன்னீர் டிக்கா']]);
     $coffee = MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Filter Coffee']]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     App::setLocale(Locale::Tamil->value);
 
@@ -272,7 +272,7 @@ it('sorts a table by the name it is showing', function (): void {
     $alpha = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Alpha', 'ta' => 'Zeta']]);
     $beta = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Beta', 'ta' => 'Apple']]);
     $charlie = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Charlie']]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(ListMenus::class)
         ->sortTable('name')
@@ -291,7 +291,7 @@ it('finds records from the top bar in the language the panel is showing', functi
     $tenant = Tenant::factory()->create();
     $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு']]);
     Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Lunch']]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     App::setLocale(Locale::Tamil->value);
 
@@ -307,12 +307,12 @@ it('finds records from the top bar in the language the panel is showing', functi
 it('leaves roles and permissions in English', function (): void {
     // The product team's vocabulary, and code refers to these by name — see
     // .ai/rules/enums.md. Only what a guest reads is translated.
-    $this->actingAs(User::factory()->superAdmin()->create());
+    $this->actingAs(User::factory()->admin()->create());
 
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://tenant-app.test/dashboard/roles')
+        ->get('http://hospitality.test/dashboard/roles')
         ->assertOk()
-        ->assertSee('admin');
+        ->assertSee('owner');
 });
 
 /*
@@ -325,7 +325,7 @@ it('refuses a language the app is not available in', function (): void {
     $tenant = Tenant::factory()->create();
 
     $this->put(
-        'http://'.$tenant->slug.'.tenant-app.test/preferences/language',
+        'http://'.$tenant->slug.'.hospitality.test/preferences/language',
         ['locale' => 'fr'],
     )->assertSessionHasErrors('locale');
 });

@@ -2,9 +2,9 @@
 
 use App\Enums\Locale;
 use App\Enums\Role as RoleEnum;
+use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
-use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\Tenant;
@@ -32,7 +32,7 @@ beforeEach(function (): void {
 it('shows only the language the form is switched to', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The schema argument is omitted on purpose: the helpers resolve the
     // mounted action's own schema when it is left off.
@@ -48,7 +48,7 @@ it('opens on English on a form that was filled, not just a blank one', function 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // `default()` only applies to a form filled with nothing, so every edit
     // form — and every modal handed data, "New sub-category" and its prefilled
@@ -74,7 +74,7 @@ it('opens on the language the panel is being worked in', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // What SetLocale does with the top bar's choice. Someone who switched the
     // panel to Tamil is there to write Tamil, so every form — a page's or a
@@ -99,7 +99,7 @@ it('falls back to English when the form is handed a language it does not have', 
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The switcher is a form field like any other and can arrive as anything.
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
@@ -111,7 +111,7 @@ it('falls back to English when the form is handed a language it does not have', 
 it('shows the other language once the switcher is moved', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->mountAction(TestAction::make('createCategory')->table())
@@ -123,7 +123,7 @@ it('shows the other language once the switcher is moved', function (): void {
 it('keeps the language that is off screen when the form is saved', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The whole point of dehydratedWhenHidden(): typing the Tamil and saving
     // while English is off screen must not blank the English.
@@ -146,7 +146,7 @@ it('keeps the language that is off screen when the form is saved', function (): 
 it('still insists on English while Tamil is the language on screen', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The required rule lives on the English input, which is hidden here — so
     // it rides on every language's input and reads English out of the state.
@@ -166,7 +166,7 @@ it('still refuses a duplicate English name while Tamil is on screen', function (
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Starters']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Uniqueness is built on the English name in the database, so a save that
     // passed validation here would fail at the index instead.
@@ -188,7 +188,7 @@ it('fills the switcher form with every language when editing', function (): void
         'name' => [Locale::English->value => 'Starters', Locale::Tamil->value => 'தொடக்கங்கள்'],
     ]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->mountAction(TestAction::make('rename')->table('category-'.$category->getKey()))

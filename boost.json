@@ -15,9 +15,11 @@
         "infer-conventions",
         "laravel-best-practices",
         "testing-best-practices",
+        "configuring-horizon",
         "wayfinder-development",
         "inertia-react-development",
         "tailwindcss-development",
-        "laravel-permission-development"
+        "laravel-permission-development",
+        "translatable-development"
     ]
 }

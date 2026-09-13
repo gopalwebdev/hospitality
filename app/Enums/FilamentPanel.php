@@ -16,7 +16,7 @@ enum FilamentPanel: string
     /** The product team's panel, on the root domain. */
     case Platform = 'platform';
 
-    /** One tenant's own panel, on its subdomain, for its admins and staff. */
+    /** One tenant's own panel, on its subdomain, for its owners and staff. */
     case Tenant = 'tenant';
 
     /**
@@ -39,7 +39,7 @@ enum FilamentPanel: string
     public function brandName(): string
     {
         return match ($this) {
-            self::Platform => 'Tenant Platform',
+            self::Platform => 'Hospitality Platform',
             self::Tenant => (string) config('app.name'),
         };
     }

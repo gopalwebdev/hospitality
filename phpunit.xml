@@ -19,15 +19,15 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
-        <env name="APP_URL" value="http://tenant-app.test"/>
+        <env name="APP_URL" value="http://hospitality.test"/>
         <env name="APP_TIMEZONE" value="Asia/Kolkata"/>
-        <env name="APP_DOMAIN" value="tenant-app.test"/>
+        <env name="APP_DOMAIN" value="hospitality.test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="tenant_app_testing"/>
+        <env name="DB_DATABASE" value="hospitality_testing"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

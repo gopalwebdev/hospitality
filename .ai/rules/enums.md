@@ -15,7 +15,7 @@ This is why a permission added from the panel is categorised without anything be
 `PermissionGroup::ProductTeam` and `Permission::productTeamOnlyValues()` must stay in step — one decides where a permission is shown, the other whether a tenant may be offered a role holding it. A test in PermissionManagementTest pins them together.
 
 ## Four kinds of account; a role's name is binding, its permissions are not
-There are exactly four kinds of account: the product team (`users.is_super_admin`, not a role) plus three Spatie roles — `admin` runs one tenant, `staff` works in it, `guest` eats there. Do not add a fourth role without asking; `manager` and `customer` were deliberately removed and remapped (manager→admin, customer→guest).
+There are exactly four kinds of account: the product team (`users.is_admin`, not a role) plus three Spatie roles — `owner` runs one tenant, `staff` works in it, `guest` eats there. Do not add a fourth role without asking; `manager` and `customer` were deliberately removed and remapped (manager→admin, customer→guest), and `admin` was later renamed `owner` so it never shares a name with the platform admin (`users.is_admin`).
 
 What a role *grants* is not owned by the code. `App\Enums\Role::permissions()` is a starting point the seeder writes only on the run that first creates the role — re-running never reverts it, because after that the product team edits permissions from the panel. Only the **name** is binding, because code calls `hasRole('admin')`; the name is `disabled()` in RoleForm for built-in roles and `RoleObserver` (wired in `Role::booting()`) throws on a rename or delete.
 

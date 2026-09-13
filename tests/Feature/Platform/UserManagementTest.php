@@ -52,31 +52,31 @@ function startCreatingAccount(array $details): array
 */
 
 it('serves the accounts page to the product team', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/users')
+        ->get('http://hospitality.test/dashboard/users')
         ->assertOk();
 });
 
 it('serves the create, view and edit pages to the product team', function (): void {
-    $platform = User::factory()->superAdmin()->create();
+    $platform = User::factory()->admin()->create();
     $other = User::factory()->create();
 
     $this->actingAs($platform);
 
-    $this->get('http://tenant-app.test/dashboard/users/create')->assertOk();
-    $this->get("http://tenant-app.test/dashboard/users/{$other->getKey()}")->assertOk();
-    $this->get("http://tenant-app.test/dashboard/users/{$other->getKey()}/edit")->assertOk();
+    $this->get('http://hospitality.test/dashboard/users/create')->assertOk();
+    $this->get("http://hospitality.test/dashboard/users/{$other->getKey()}")->assertOk();
+    $this->get("http://hospitality.test/dashboard/users/{$other->getKey()}/edit")->assertOk();
 });
 
-it('keeps a tenant admin off the accounts page', function (): void {
+it('keeps a tenant owner off the accounts page', function (): void {
     $tenant = Tenant::factory()->create();
     $user = User::factory()->ofTenant($tenant)->create();
-    $user->assignRole(RoleEnum::Admin->value);
+    $user->assignRole(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/users')
+        ->get('http://hospitality.test/dashboard/users')
         ->assertForbidden();
 });
 
@@ -88,7 +88,7 @@ it('hides the accounts resource from everyone but the product team', function (R
     $this->actingAs($user);
 
     // user.manage is held by tenant roles, so the policy alone would let
-    // Admin through. The resource is what keeps this product-team-only.
+    // Owner through. The resource is what keeps this product-team-only.
     expect(UserResource::canAccess())->toBeFalse();
 })->with(RoleEnum::cases());
 
@@ -156,15 +156,15 @@ it('opens the account form with a tenant and role already chosen', function (): 
     enterProductTeamPanel();
 
     // How CreateTenant hands a newly onboarded tenant straight on to
-    // creating the admin that runs it.
+    // creating the owner that runs it.
     Livewire::withQueryParams([
         'tenant_id' => $tenant->getKey(),
-        'role' => RoleEnum::Admin->value,
+        'role' => RoleEnum::Owner->value,
     ])
         ->test(CreateUser::class)
         ->assertFormSet([
             'tenant_id' => $tenant->getKey(),
-            'roles' => [RoleEnum::Admin->value],
+            'roles' => [RoleEnum::Owner->value],
         ]);
 });
 
@@ -191,17 +191,17 @@ it('shows a tenant account under its tenant', function (): void {
 });
 
 it('does not treat an account without a tenant as the product team', function (): void {
-    // The trap in "null tenant means super admin": an account that has not been
+    // The trap in "null tenant means admin": an account that has not been
     // put on a roster yet has no tenant either, and must stay powerless.
     $stranded = User::factory()->create();
 
     expect($stranded->tenant_id)->toBeNull()
         ->and($stranded->belongsToProductTeam())->toBeTrue()
-        ->and($stranded->isSuperAdmin())->toBeFalse()
+        ->and($stranded->isAdmin())->toBeFalse()
         ->and($stranded->can(PermissionEnum::UserManage->value))->toBeFalse();
 
     $this->actingAs($stranded)
-        ->get('http://tenant-app.test/dashboard/users')
+        ->get('http://hospitality.test/dashboard/users')
         ->assertForbidden();
 });
 
@@ -211,7 +211,7 @@ it('does not treat an account without a tenant as the product team', function ()
 |--------------------------------------------------------------------------
 */
 
-it('emails the super admin a code instead of creating the account straight away', function (): void {
+it('emails the admin a code instead of creating the account straight away', function (): void {
     Notification::fake();
 
     $platform = enterProductTeamPanel();
@@ -252,7 +252,7 @@ it('creates the account once the right code is entered', function (): void {
 
     expect($created->name)->toBe('Nadia Rao')
         ->and($created->tenant_id)->toBe($tenant->getKey())
-        ->and($created->isSuperAdmin())->toBeFalse()
+        ->and($created->isAdmin())->toBeFalse()
         ->and($created->roles->pluck('name')->all())->toBe([RoleEnum::Staff->value])
         // The tenant column and the roster are written together, or the row
         // would name a tenant the account cannot actually open.
@@ -289,7 +289,7 @@ it('creates the product team with no tenant', function (): void {
     [$page, $code] = startCreatingAccount([
         'name' => 'Priya Menon',
         'email' => 'priya@example.com',
-        'is_super_admin' => true,
+        'is_admin' => true,
     ]);
 
     $page->fillForm(['confirmation_code' => $code])
@@ -299,7 +299,7 @@ it('creates the product team with no tenant', function (): void {
     $created = User::query()->where('email', 'priya@example.com')->sole();
 
     expect($created->tenant_id)->toBeNull()
-        ->and($created->isSuperAdmin())->toBeTrue()
+        ->and($created->isAdmin())->toBeTrue()
         ->and($created->tenants)->toBeEmpty();
 });
 
@@ -453,12 +453,12 @@ it('never offers the product team to an account that belongs to a tenant', funct
     enterProductTeamPanel();
 
     Livewire::test(EditUser::class, ['record' => $staff->getKey()])
-        ->assertFormFieldDisabled('is_super_admin')
-        ->fillForm(['is_super_admin' => true])
+        ->assertFormFieldDisabled('is_admin')
+        ->fillForm(['is_admin' => true])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($staff->refresh()->isSuperAdmin())->toBeFalse();
+    expect($staff->refresh()->isAdmin())->toBeFalse();
 });
 
 it('refuses at the model to put a tenant\'s account on the product team', function (): void {
@@ -467,24 +467,24 @@ it('refuses at the model to put a tenant\'s account on the product team', functi
     // The backstop behind the disabled toggle: the product team hold every
     // permission on every tenant, so the two may never be combined however
     // the write arrives.
-    expect(fn () => $staff->forceFill(['is_super_admin' => true])->save())
+    expect(fn () => $staff->forceFill(['is_admin' => true])->save())
         ->toThrow(LogicException::class);
 });
 
 it('lets the product team keep no tenant at all', function (): void {
-    $superAdmin = User::factory()->superAdmin()->create();
+    $admin = User::factory()->admin()->create();
 
     enterProductTeamPanel();
 
-    Livewire::test(EditUser::class, ['record' => $superAdmin->getKey()])
-        ->assertFormFieldEnabled('is_super_admin')
+    Livewire::test(EditUser::class, ['record' => $admin->getKey()])
+        ->assertFormFieldEnabled('is_admin')
         ->fillForm(['name' => 'Renamed'])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($superAdmin->refresh()->name)->toBe('Renamed')
-        ->and($superAdmin->isSuperAdmin())->toBeTrue()
-        ->and($superAdmin->tenant_id)->toBeNull();
+    expect($admin->refresh()->name)->toBe('Renamed')
+        ->and($admin->isAdmin())->toBeTrue()
+        ->and($admin->tenant_id)->toBeNull();
 });
 
 it('syncs roles so a permission check answers from the new set immediately', function (): void {
@@ -499,19 +499,19 @@ it('syncs roles so a permission check answers from the new set immediately', fun
     expect($staff->can(PermissionEnum::MenuManage->value))->toBeFalse();
 
     Livewire::test(EditUser::class, ['record' => $staff->getKey()])
-        ->fillForm(['roles' => [RoleEnum::Admin->value]])
+        ->fillForm(['roles' => [RoleEnum::Owner->value]])
         ->call('save')
         ->assertHasNoFormErrors();
 
     $staff->refresh();
 
-    expect($staff->roles->pluck('name')->all())->toBe([RoleEnum::Admin->value])
+    expect($staff->roles->pluck('name')->all())->toBe([RoleEnum::Owner->value])
         ->and($staff->can(PermissionEnum::MenuManage->value))->toBeTrue();
 });
 
 it('clears every role when none are chosen', function (): void {
     $staff = User::factory()->create();
-    $staff->assignRole(RoleEnum::Admin->value);
+    $staff->assignRole(RoleEnum::Owner->value);
 
     enterProductTeamPanel();
 
@@ -531,11 +531,11 @@ it('may hand out a role carrying a product team permission', function (): void {
     // The one place this is allowed: a tenant panel filters these out, and
     // deciding who is the product team is exactly what this panel is for.
     Livewire::test(EditUser::class, ['record' => $staff->getKey()])
-        ->fillForm(['roles' => [RoleEnum::Admin->value]])
+        ->fillForm(['roles' => [RoleEnum::Owner->value]])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($staff->refresh()->roles->pluck('name')->all())->toBe([RoleEnum::Admin->value]);
+    expect($staff->refresh()->roles->pluck('name')->all())->toBe([RoleEnum::Owner->value]);
 });
 
 /*
@@ -558,7 +558,7 @@ it('deletes another account', function (): void {
 it('never offers to delete your own account', function (): void {
     $platform = enterProductTeamPanel();
 
-    // Gate::before answers the policy true for a super admin before it runs, so
+    // Gate::before answers the policy true for an admin before it runs, so
     // this rule has to live on the resource to bind them at all.
     expect(UserResource::canDelete($platform))->toBeFalse();
 
@@ -578,7 +578,7 @@ it('offers to delete somebody else', function (): void {
 });
 
 it('refuses self deletion at the policy too', function (): void {
-    $platform = User::factory()->superAdmin()->create();
+    $platform = User::factory()->admin()->create();
     $other = User::factory()->create();
 
     expect($platform->can('delete', $other))->toBeTrue()
@@ -595,5 +595,5 @@ it('leaves an account standing when its tenant is deleted', function (): void {
     // it: accounts are platform-wide and outlive any one tenant.
     expect(User::query()->whereKey($staff->getKey())->exists())->toBeTrue()
         ->and($staff->refresh()->tenant_id)->toBeNull()
-        ->and($staff->isSuperAdmin())->toBeFalse();
+        ->and($staff->isAdmin())->toBeFalse();
 });

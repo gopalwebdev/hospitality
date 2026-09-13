@@ -29,12 +29,12 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $email
  * @property CarbonImmutable|null $email_verified_at
  * @property int|null $tenant_id
- * @property bool $is_super_admin
+ * @property bool $is_admin
  * @property string|null $remember_token
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'email', 'tenant_id', 'is_super_admin'])]
+#[Fillable(['name', 'email', 'tenant_id', 'is_admin'])]
 #[Hidden(['remember_token'])]
 #[ObservedBy([UserObserver::class])]
 class User extends Authenticatable implements FilamentUser, HasTenants
@@ -49,7 +49,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      */
     protected $attributes = [
         'tenant_id' => null,
-        'is_super_admin' => false,
+        'is_admin' => false,
     ];
 
     /**
@@ -99,21 +99,21 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /**
      * The product team: a column rather than a role, and the only thing that grants the platform.
      */
-    public function isSuperAdmin(): bool
+    public function isAdmin(): bool
     {
-        return $this->is_super_admin;
+        return $this->is_admin;
     }
 
     /**
      * @param  Builder<$this>  $query
      */
-    public function scopeSuperAdmins(Builder $query): void
+    public function scopeAdmins(Builder $query): void
     {
-        $query->where('is_super_admin', true);
+        $query->where('is_admin', true);
     }
 
     /**
-     * How a row is labelled, not what the account may do — isSuperAdmin() answers that.
+     * How a row is labelled, not what the account may do — isAdmin() answers that.
      */
     public function belongsToProductTeam(): bool
     {
@@ -123,8 +123,8 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     public function canAccessPanel(Panel $panel): bool
     {
         return match (FilamentPanel::tryFrom($panel->getId())) {
-            FilamentPanel::Platform => $this->isSuperAdmin(),
-            FilamentPanel::Tenant => $this->isSuperAdmin() || $this->tenants()->exists(),
+            FilamentPanel::Platform => $this->isAdmin(),
+            FilamentPanel::Tenant => $this->isAdmin() || $this->tenants()->exists(),
             default => false,
         };
     }
@@ -134,7 +134,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      */
     public function getTenants(Panel $panel): Collection
     {
-        if ($this->isSuperAdmin()) {
+        if ($this->isAdmin()) {
             // Filament asks for this more than once per request.
             return once(fn (): Collection => Tenant::query()->orderBy('name')->get());
         }
@@ -144,7 +144,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->isSuperAdmin() || $this->tenants()->whereKey($tenant)->exists();
+        return $this->isAdmin() || $this->tenants()->whereKey($tenant)->exists();
     }
 
     /**
@@ -163,7 +163,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return [
             'email_verified_at' => 'datetime',
             'tenant_id' => 'integer',
-            'is_super_admin' => 'boolean',
+            'is_admin' => 'boolean',
         ];
     }
 }

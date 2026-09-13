@@ -43,7 +43,7 @@ class UsersTable
                     ->placeholder('Product team')
                     ->sortable(),
 
-                IconColumn::make('is_super_admin')
+                IconColumn::make('is_admin')
                     ->label('The product team')
                     ->boolean()
                     ->trueIcon(Heroicon::OutlinedShieldCheck)
@@ -86,7 +86,7 @@ class UsersTable
                     ->searchable()
                     ->preload(),
 
-                TernaryFilter::make('is_super_admin')
+                TernaryFilter::make('is_admin')
                     ->label('Holds product team access'),
 
                 SelectFilter::make('roles')
@@ -106,7 +106,7 @@ class UsersTable
 
                 // Hidden against your own row: UserResource::canDelete() is
                 // where that is decided, because Gate::before answers the
-                // policy for a super admin before it ever runs.
+                // policy for an admin before it ever runs.
                 DeleteAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedTrash)

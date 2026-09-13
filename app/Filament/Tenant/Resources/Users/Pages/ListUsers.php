@@ -15,7 +15,7 @@ class ListUsers extends ListRecords
     protected static string $resource = UserResource::class;
 
     /**
-     * How much room is left under this tenant's admin and staff limits,
+     * How much room is left under this tenant's owner and staff limits,
      * so nobody has to open the create form to find out it will be refused.
      */
     public function getSubheading(): ?string
@@ -27,9 +27,9 @@ class ListUsers extends ListRecords
         }
 
         return sprintf(
-            '%d of %d admins · %d of %d staff',
-            $tenant->roleHolderCount(RoleEnum::Admin),
-            $tenant->max_admins,
+            '%d of %d owners · %d of %d staff',
+            $tenant->roleHolderCount(RoleEnum::Owner),
+            $tenant->max_owners,
             $tenant->roleHolderCount(RoleEnum::Staff),
             $tenant->max_staff,
         );

@@ -12,11 +12,14 @@ enum TenantType: string
 
     case Restaurant = 'restaurant';
 
+    case Hospital = 'hospital';
+
     public function label(): string
     {
         return match ($this) {
             self::Hotel => 'Hotel',
             self::Restaurant => 'Restaurant',
+            self::Hospital => 'Hospital',
         };
     }
 

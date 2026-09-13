@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
  * There is exactly one, and the account carries no password: signing in means
  * receiving a one-time code at this address.
  */
-class SuperAdminSeeder extends Seeder
+class AdminSeeder extends Seeder
 {
     use WithoutModelEvents;
 
@@ -25,7 +25,7 @@ class SuperAdminSeeder extends Seeder
             [
                 'name' => 'Gopal Narayanan',
                 'email_verified_at' => now(),
-                'is_super_admin' => true,
+                'is_admin' => true,
             ],
         );
     }

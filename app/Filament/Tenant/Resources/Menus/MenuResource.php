@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Menus;
 
+use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
@@ -9,7 +10,6 @@ use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuCombos;
 use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuFeaturedItems;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuForm;
 use App\Filament\Tenant\Resources\Menus\Tables\MenusTable;
-use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use BackedEnum;
 use Filament\Navigation\NavigationItem;

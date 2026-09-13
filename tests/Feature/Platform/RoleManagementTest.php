@@ -28,7 +28,7 @@ beforeEach(function (): void {
 */
 
 it('lets the product team manage roles', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
     $role = Role::factory()->create();
 
     expect($user->can('viewAny', Role::class))->toBeTrue()
@@ -48,20 +48,20 @@ it('refuses role management to every tenant role', function (RoleEnum $roleEnum)
         ->and($user->can('delete', $role))->toBeFalse();
 })->with(RoleEnum::cases());
 
-it('keeps a tenant admin off the roles page', function (): void {
+it('keeps a tenant owner off the roles page', function (): void {
     $user = User::factory()->create();
-    $user->assignRole(RoleEnum::Admin->value);
+    $user->assignRole(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/roles')
+        ->get('http://hospitality.test/dashboard/roles')
         ->assertForbidden();
 });
 
 it('serves the roles page to the product team', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/roles')
+        ->get('http://hospitality.test/dashboard/roles')
         ->assertOk();
 });
 
@@ -406,10 +406,10 @@ it('clears a category when everything in it is unticked', function (): void {
 
 it('ships exactly the roles a tenant needs', function (): void {
     // Four kinds of account in the application: the product team, who are the
-    // is_super_admin column rather than a role, and these three.
-    expect(RoleEnum::values())->toBe(['admin', 'staff', 'guest'])
+    // is_admin column rather than a role, and these three.
+    expect(RoleEnum::values())->toBe(['owner', 'staff', 'guest'])
         ->and(Role::query()->orderBy('name')->pluck('name')->all())
-        ->toBe(['admin', 'guest', 'staff']);
+        ->toBe(['guest', 'owner', 'staff']);
 });
 
 it('seeds a guest role that reads the menu and orders for itself', function (): void {
@@ -440,10 +440,10 @@ it('seeds staff who work orders but do not change the menu', function (): void {
         ->and($staff->hasPermissionTo(PermissionEnum::UserManage->value))->toBeFalse();
 });
 
-it('gives a tenant admin everything but the product team\'s own powers', function (): void {
-    $admin = Role::findByName(RoleEnum::Admin->value);
+it('gives a tenant owner everything but the product team\'s own powers', function (): void {
+    $owner = Role::findByName(RoleEnum::Owner->value);
 
-    expect($admin->permissions->pluck('name')->all())
+    expect($owner->permissions->pluck('name')->all())
         ->toEqualCanonicalizing(array_diff(PermissionEnum::values(), PermissionEnum::productTeamOnlyValues()));
 });
 
@@ -550,7 +550,7 @@ it('changes what a built-in role grants, and keeps the change', function (): voi
 });
 
 it('locks the name of a built-in role in the form', function (): void {
-    $role = Role::findByName(RoleEnum::Admin->value);
+    $role = Role::findByName(RoleEnum::Owner->value);
 
     enterProductTeamPanel();
 
@@ -583,7 +583,7 @@ it('offers edit but not delete against a built-in role', function (RoleEnum $rol
     $role = Role::findByName($roleEnum->value);
 
     // Filament authorises a record action against the policy, which
-    // Gate::before answers for a super admin, so without the explicit check on
+    // Gate::before answers for an admin, so without the explicit check on
     // the resource the delete button would render and then land on a 403.
     Livewire::test(ListRoles::class)
         ->assertTableActionVisible('edit', $role)
@@ -602,40 +602,40 @@ it('offers edit and delete against a custom role', function (): void {
 });
 
 it('opens the edit page for a built-in role', function (): void {
-    $user = User::factory()->superAdmin()->create();
-    $role = Role::findByName(RoleEnum::Admin->value);
+    $user = User::factory()->admin()->create();
+    $role = Role::findByName(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get("http://tenant-app.test/dashboard/roles/{$role->getKey()}/edit")
+        ->get("http://hospitality.test/dashboard/roles/{$role->getKey()}/edit")
         ->assertOk();
 });
 
 it('still shows a built-in role read only', function (): void {
-    $user = User::factory()->superAdmin()->create();
-    $role = Role::findByName(RoleEnum::Admin->value);
+    $user = User::factory()->admin()->create();
+    $role = Role::findByName(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get("http://tenant-app.test/dashboard/roles/{$role->getKey()}")
+        ->get("http://hospitality.test/dashboard/roles/{$role->getKey()}")
         ->assertOk()
-        ->assertSee(RoleEnum::Admin->value);
+        ->assertSee(RoleEnum::Owner->value);
 });
 
 it('refuses to rename a built-in role from anywhere', function (): void {
-    $role = Role::findByName(RoleEnum::Admin->value);
+    $role = Role::findByName(RoleEnum::Owner->value);
 
     expect(fn () => $role->update(['name' => 'renamed']))
         ->toThrow(LogicException::class, 'A built-in role may not be renamed.');
 
-    expect(Role::query()->where('name', RoleEnum::Admin->value)->exists())->toBeTrue();
+    expect(Role::query()->where('name', RoleEnum::Owner->value)->exists())->toBeTrue();
 });
 
 it('refuses to delete a built-in role from anywhere', function (): void {
-    $role = Role::findByName(RoleEnum::Admin->value);
+    $role = Role::findByName(RoleEnum::Owner->value);
 
     expect(fn () => $role->delete())
         ->toThrow(LogicException::class, 'A built-in role may not be deleted.');
 
-    expect(Role::query()->where('name', RoleEnum::Admin->value)->exists())->toBeTrue();
+    expect(Role::query()->where('name', RoleEnum::Owner->value)->exists())->toBeTrue();
 });
 
 /*
@@ -651,7 +651,7 @@ it('withholds any role carrying a product team permission from tenants', functio
     $assignable = Role::query()->assignableWithinTenant()->pluck('name')->all();
 
     expect($assignable)->not->toContain($platformRole->name)
-        ->and($assignable)->toContain(RoleEnum::Admin->value)
+        ->and($assignable)->toContain(RoleEnum::Owner->value)
         ->and($assignable)->toContain(RoleEnum::Staff->value);
 });
 

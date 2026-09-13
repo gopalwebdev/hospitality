@@ -27,6 +27,6 @@ Each file is sent to the browser whole as the `translations` Inertia prop and re
 
 A string that names the business says **tenant** — `'This tenant already has a menu with that name.'` — whatever `tenants.type` holds. This is one common product, so no string varies by a tenant's type and none names a kind of business.
 
-Roles, permissions, accounts and tenants are deliberately **not** in here. They are the product team's vocabulary and code refers to those names, so translating them would make a `hasRole('admin')` check read as though it might not be English.
+Roles, permissions, accounts and tenants are deliberately **not** in here. They are the product team's vocabulary and code refers to those names, so translating them would make a `hasRole('owner')` check read as though it might not be English.
 
 Labels still reach Filament through `getModelLabel()` / `getNavigationGroup()` methods rather than static properties. That is now about the request rather than the language — see `.ai/rules/filament.md`.

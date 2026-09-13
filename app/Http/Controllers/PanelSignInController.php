@@ -28,7 +28,7 @@ class PanelSignInController extends Controller
     }
 
     /**
-     * A tenant's way in, for its admins and staff alike, on its subdomain.
+     * A tenant's way in, for its owners and staff alike, on its subdomain.
      */
     public function tenant(Tenant $tenant): RedirectResponse
     {

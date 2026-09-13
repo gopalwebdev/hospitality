@@ -57,7 +57,7 @@ class UserForm
                         // Moving one to another tenant would carry its roles
                         // across with it, and moving one to the product team
                         // would hand the whole platform to a single tenant's
-                        // admin — so it is offered once and read-only after.
+                        // owner — so it is offered once and read-only after.
                         Select::make('tenant_id')
                             ->label('Tenant')
                             // once(): asked more than once per request while the
@@ -76,14 +76,14 @@ class UserForm
                                 ? 'Settled when the account was opened. An account never moves between tenants, or to the product team.'
                                 : 'Leave empty for the product team. Setting it also puts them on that tenant\'s roster, and cannot be changed later.'),
 
-                        Toggle::make('is_super_admin')
+                        Toggle::make('is_admin')
                             ->label('The product team')
                             ->inline(false)
                             ->disabled(fn (?User $record, Get $get): bool => self::isSignedInUser($record) || filled($get('tenant_id')))
                             ->dehydrated(fn (?User $record, Get $get): bool => ! self::isSignedInUser($record) && blank($get('tenant_id')))
                             ->helperText(fn (Get $get): string => filled($get('tenant_id'))
                                 ? 'Not available to an account that belongs to a tenant — the product team belong to no tenant at all.'
-                                : 'Grants every permission on every tenant. This, not an empty tenant, is what makes a super admin.'),
+                                : 'Grants every permission on every tenant. This, not an empty tenant, is what makes an admin.'),
                     ])
                     ->columns(2),
 
@@ -113,7 +113,7 @@ class UserForm
      * Whether this is the account of whoever is looking at the form.
      *
      * Nobody takes their own product team badge off: it is the one change
-     * that can lock the last super admin out of the platform.
+     * that can lock the last admin out of the platform.
      */
     private static function isSignedInUser(?User $record): bool
     {

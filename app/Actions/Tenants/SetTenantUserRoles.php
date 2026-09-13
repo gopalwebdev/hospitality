@@ -3,8 +3,8 @@
 namespace App\Actions\Tenants;
 
 use App\Enums\Role as RoleEnum;
-use App\Models\Tenant;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 
 /**
@@ -24,7 +24,7 @@ class SetTenantUserRoles
     {
         // Roles are held per account rather than per tenant, so setting
         // them for someone who staffs more than one tenant would change
-        // what they can do at the others. That stays a super admin's call.
+        // what they can do at the others. That stays an admin's call.
         if ($user->staffsSeveralTenants()) {
             return;
         }

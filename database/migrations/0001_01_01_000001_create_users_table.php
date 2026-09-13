@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email');
             $table->timestamp('email_verified_at')->nullable();
             // The product team. A column rather than a role, so a tenant panel can never hand it out.
-            $table->boolean('is_super_admin')->default(false);
+            $table->boolean('is_admin')->default(false);
             $table->rememberToken();
             $table->timestamps();
         });

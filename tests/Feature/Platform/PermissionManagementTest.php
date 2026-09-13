@@ -24,7 +24,7 @@ beforeEach(function (): void {
 */
 
 it('lets the product team manage permissions', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
     $permission = Permission::factory()->create();
 
     expect($user->can('viewAny', Permission::class))->toBeTrue()
@@ -44,20 +44,20 @@ it('refuses permission management to every tenant role', function (RoleEnum $rol
         ->and($user->can('delete', $permission))->toBeFalse();
 })->with(RoleEnum::cases());
 
-it('keeps a tenant admin off the permissions page', function (): void {
+it('keeps a tenant owner off the permissions page', function (): void {
     $user = User::factory()->create();
-    $user->assignRole(RoleEnum::Admin->value);
+    $user->assignRole(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/permissions')
+        ->get('http://hospitality.test/dashboard/permissions')
         ->assertForbidden();
 });
 
 it('serves the permissions page to the product team', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/permissions')
+        ->get('http://hospitality.test/dashboard/permissions')
         ->assertOk();
 });
 
@@ -356,20 +356,20 @@ it('offers edit and delete against a custom permission', function (): void {
 });
 
 it('closes the edit page for a built-in permission', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
     $permission = Permission::query()->where('name', PermissionEnum::MenuView->value)->sole();
 
     $this->actingAs($user)
-        ->get("http://tenant-app.test/dashboard/permissions/{$permission->getKey()}/edit")
+        ->get("http://hospitality.test/dashboard/permissions/{$permission->getKey()}/edit")
         ->assertForbidden();
 });
 
 it('still shows a built-in permission read only', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
     $permission = Permission::query()->where('name', PermissionEnum::MenuView->value)->sole();
 
     $this->actingAs($user)
-        ->get("http://tenant-app.test/dashboard/permissions/{$permission->getKey()}")
+        ->get("http://hospitality.test/dashboard/permissions/{$permission->getKey()}")
         ->assertOk()
         ->assertSee(PermissionEnum::MenuView->value);
 });

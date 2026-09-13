@@ -4,8 +4,8 @@ use App\Enums\Role;
 use App\Models\HomeTile;
 use App\Models\Tenant;
 use App\Models\User;
+use Database\Seeders\AdminSeeder;
 use Database\Seeders\DatabaseSeeder;
-use Database\Seeders\SuperAdminSeeder;
 use Database\Seeders\TenantSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
@@ -15,10 +15,10 @@ beforeEach(function (): void {
 });
 
 it('seeds exactly one product team owner', function (): void {
-    $superAdmins = User::query()->superAdmins()->get();
+    $admins = User::query()->admins()->get();
 
-    expect($superAdmins)->toHaveCount(1)
-        ->and($superAdmins->first()->email)->toBe(SuperAdminSeeder::EMAIL);
+    expect($admins)->toHaveCount(1)
+        ->and($admins->first()->email)->toBe(AdminSeeder::EMAIL);
 });
 
 it('gives the product team owner no password to store', function (): void {
@@ -41,58 +41,58 @@ it('gives every seeded tenant its settings', function (): void {
     });
 });
 
-it('gives every seeded tenant exactly one admin', function (): void {
+it('gives every seeded tenant exactly one owner', function (): void {
     Tenant::query()->get()->each(function (Tenant $tenant): void {
-        $admins = $tenant->users()->role(Role::Admin->value)->get();
+        $owners = $tenant->users()->role(Role::Owner->value)->get();
 
-        expect($admins)->toHaveCount(1);
+        expect($owners)->toHaveCount(1);
     });
 });
 
-it('belongs the seeded admin to their tenant, not the product team', function (): void {
+it('belongs the seeded owner to their tenant, not the product team', function (): void {
     Tenant::query()->get()->each(function (Tenant $tenant): void {
-        $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
+        $owner = $tenant->users()->role(Role::Owner->value)->firstOrFail();
 
-        expect($admin->tenant_id)->toBe($tenant->getKey())
-            ->and($admin->belongsToProductTeam())->toBeFalse();
+        expect($owner->tenant_id)->toBe($tenant->getKey())
+            ->and($owner->belongsToProductTeam())->toBeFalse();
     });
 });
 
-it('lets each tenant admin into their own panel and no further', function (): void {
+it('lets each tenant owner into their own panel and no further', function (): void {
     $tenant = Tenant::query()->firstOrFail();
-    $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
+    $owner = $tenant->users()->role(Role::Owner->value)->firstOrFail();
 
-    $this->actingAs($admin)
-        ->get("http://{$tenant->slug}.tenant-app.test/dashboard")
+    $this->actingAs($owner)
+        ->get("http://{$tenant->slug}.hospitality.test/dashboard")
         ->assertOk();
 
-    $this->actingAs($admin)
-        ->get('http://tenant-app.test/dashboard')
+    $this->actingAs($owner)
+        ->get('http://hospitality.test/dashboard')
         ->assertForbidden();
 });
 
 it('lets the product team owner into the product team panel', function (): void {
-    $superAdmin = User::query()->where('email', SuperAdminSeeder::EMAIL)->firstOrFail();
+    $admin = User::query()->where('email', AdminSeeder::EMAIL)->firstOrFail();
 
-    $this->actingAs($superAdmin)
-        ->get('http://tenant-app.test/dashboard')
+    $this->actingAs($admin)
+        ->get('http://hospitality.test/dashboard')
         ->assertOk();
 });
 
 it('lists every account and where it signs in', function (): void {
     $tenant = Tenant::query()->firstOrFail();
-    $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
+    $owner = $tenant->users()->role(Role::Owner->value)->firstOrFail();
 
     expect(Artisan::call('accounts:list'))->toBe(0);
 
     $output = Artisan::output();
 
     expect($output)
-        ->toContain(SuperAdminSeeder::EMAIL)
+        ->toContain(AdminSeeder::EMAIL)
         // /login on each host: the one address to hand anyone who uses a panel.
-        ->toContain('tenant-app.test/login')
-        ->toContain($admin->email)
-        ->toContain($tenant->slug.'.tenant-app.test/login');
+        ->toContain('hospitality.test/login')
+        ->toContain($owner->email)
+        ->toContain($tenant->slug.'.hospitality.test/login');
 });
 
 it('opens a way into every menu it seeds', function (): void {
@@ -111,7 +111,7 @@ it('opens a way into every menu it seeds', function (): void {
 it('can be seeded again without duplicating anything', function (): void {
     $this->seed(DatabaseSeeder::class);
 
-    // The product team, plus an admin and a staff member for each tenant,
+    // The product team, plus an owner and a staff member for each tenant,
     // both of whom sign in to that tenant's panel at its /login.
     $perTenant = 2;
 

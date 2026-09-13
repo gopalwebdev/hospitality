@@ -44,7 +44,7 @@ enum Permission: string
      *
      * A product team permission is never granted to a tenant role, and a role
      * holding one is never offered inside a tenant panel. Together those
-     * two rules are what stop a tenant admin handing out product team access.
+     * two rules are what stop a tenant owner handing out product team access.
      */
     public function isProductTeamOnly(): bool
     {

@@ -46,8 +46,8 @@ it('gives a guest ordering rights but no management rights', function (): void {
         ->and($user->can(Permission::UserManage->value))->toBeFalse();
 });
 
-it('gives a super admin every permission without holding a role', function (): void {
-    $user = User::factory()->superAdmin()->create();
+it('gives an admin every permission without holding a role', function (): void {
+    $user = User::factory()->admin()->create();
 
     expect($user->roles)->toBeEmpty();
 
@@ -56,9 +56,9 @@ it('gives a super admin every permission without holding a role', function (): v
     }
 });
 
-it('gives a tenant admin everything except product team management', function (): void {
+it('gives a tenant owner everything except product team management', function (): void {
     $user = User::factory()->create();
-    $user->assignRole(Role::Admin->value);
+    $user->assignRole(Role::Owner->value);
 
     foreach (Permission::cases() as $permission) {
         expect($user->can($permission->value))->toBe(! $permission->isProductTeamOnly());

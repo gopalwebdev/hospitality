@@ -20,12 +20,12 @@ beforeEach(function (): void {
 
 function guestUrl(Tenant $tenant): string
 {
-    return 'http://'.$tenant->slug.'.tenant-app.test/';
+    return 'http://'.$tenant->slug.'.hospitality.test/';
 }
 
 function guestMenuUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey();
+    return 'http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey();
 }
 
 /**
@@ -254,7 +254,7 @@ it('leads a menu with the dishes the tenant featured', function (): void {
     ]);
     $plain = MenuItem::factory()->inCategory($category)->create();
 
-    $this->get('http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('featured', 2)
@@ -276,7 +276,7 @@ it('paints a loader before the app it is waiting for', function (): void {
     // coming. It is CSS only and it hides itself the moment Inertia renders
     // into #app, which is what `#app:not(:empty)` is doing.
     foreach (['/', '/menus/'.$menu->getKey()] as $path) {
-        $html = (string) $this->get('http://'.$tenant->slug.'.tenant-app.test'.$path)
+        $html = (string) $this->get('http://'.$tenant->slug.'.hospitality.test'.$path)
             ->assertOk()
             ->assertSee('id="boot-loader"', escape: false)
             ->getContent();
@@ -310,7 +310,7 @@ it('reads a menu in the order the tenant arranged, rails and all', function (): 
     // featured rail closes the menu.
     $menu->update(['combos_position' => 1, 'featured_position' => 3]);
 
-    $this->get('http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('order', [
@@ -333,7 +333,7 @@ it('opens a menu nobody has arranged with its featured dishes and its combos', f
     // Both rails default to where the first category sits and ties break rails
     // first, so the order a menu had before it could be arranged is the order
     // it still has.
-    $this->get('http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('order', ['featured', 'combos', $category->getKey()])
@@ -352,7 +352,7 @@ it('leaves a sold-out dish out of the featured row', function (): void {
     ]);
     $available = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
-    $this->get('http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey())
+    $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('featured', 1)

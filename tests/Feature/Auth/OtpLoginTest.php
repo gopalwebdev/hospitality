@@ -19,18 +19,18 @@ beforeEach(function (): void {
 /**
  * A member of the product team, who may use the platform panel.
  */
-function superAdmin(): User
+function platformAdmin(): User
 {
-    return User::factory()->superAdmin()->create();
+    return User::factory()->admin()->create();
 }
 
 /**
  * A tenant administrator, who may use only their own tenant panel.
  */
-function tenantAdmin(Tenant $tenant): User
+function tenantOwner(Tenant $tenant): User
 {
     $user = User::factory()->create();
-    $user->assignRole(Role::Admin->value);
+    $user->assignRole(Role::Owner->value);
     $user->tenants()->attach($tenant);
 
     return $user;
@@ -44,12 +44,12 @@ function tenantAdmin(Tenant $tenant): User
 dataset('sign-in pages', [
     'product team panel' => [fn (): array => [
         PlatformLogin::class,
-        tap(superAdmin(), fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Platform->value)),
+        tap(platformAdmin(), fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Platform->value)),
     ]],
     'tenant panel' => [fn (): array => [
         TenantLogin::class,
         tap(
-            tenantAdmin(Tenant::factory()->create(['slug' => 't1'])),
+            tenantOwner(Tenant::factory()->create(['slug' => 't1'])),
             fn (): mixed => Filament::setCurrentPanel(FilamentPanel::Tenant->value),
         ),
     ]],
@@ -106,7 +106,7 @@ it('submits the code rather than asking for another one', function (Closure $set
 
 it('issues a code and moves on to asking for it', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -119,7 +119,7 @@ it('issues a code and moves on to asking for it', function (): void {
 
 it('matches the address regardless of how it is capitalised', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => strtoupper($user->email)])
@@ -154,7 +154,7 @@ it('turns down an address that is not an email at all', function (): void {
 
 it('issues no code to a user who cannot reach the panel', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = tenantAdmin(Tenant::factory()->create(['slug' => 't1']));
+    $user = tenantOwner(Tenant::factory()->create(['slug' => 't1']));
 
     // A real account, but not one that can use this panel. It is refused in
     // exactly the same words as an address nobody owns.
@@ -180,7 +180,7 @@ it('will not request a code without an address', function (): void {
 
 it('sends a new code without the code field being filled in', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -197,7 +197,7 @@ it('sends a new code without the code field being filled in', function (): void 
 
 it('turns down a second code asked for inside the cooldown', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -210,7 +210,7 @@ it('turns down a second code asked for inside the cooldown', function (): void {
 
 it('stops issuing codes once the allowance is used up', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
     $maxSends = (int) config('otp.max_sends');
 
     $component = Livewire::test(PlatformLogin::class)
@@ -227,7 +227,7 @@ it('stops issuing codes once the allowance is used up', function (): void {
 
 it('goes back to the address step on request', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -246,7 +246,7 @@ it('goes back to the address step on request', function (): void {
 
 it('keeps the sign-in button disabled until every digit is typed', function (string $code, bool $isEnabled): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -271,7 +271,7 @@ it('keeps the sign-in button disabled until every digit is typed', function (str
 
 it('says how many digits the code has', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -281,7 +281,7 @@ it('says how many digits the code has', function (): void {
 
 it('turns down a code that is not all digits', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -301,9 +301,9 @@ it('turns down a code that is not all digits', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('signs a super admin in with the code that was issued', function (): void {
+it('signs an admin in with the code that was issued', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -317,10 +317,10 @@ it('signs a super admin in with the code that was issued', function (): void {
     $this->assertAuthenticatedAs($user);
 });
 
-it('signs a tenant admin into their own tenant panel', function (): void {
+it('signs a tenant owner into their own tenant panel', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 't1']);
     Filament::setCurrentPanel(FilamentPanel::Tenant->value);
-    $user = tenantAdmin($tenant);
+    $user = tenantOwner($tenant);
 
     $component = Livewire::test(TenantLogin::class)
         ->fillForm(['email' => $user->email])
@@ -340,7 +340,7 @@ it('signs the product team in on a tenant subdomain they staff no part of', func
     // tenant's roster, so were that scope to reach the lookup they would
     // be told their own account does not exist. Booting the panel is what
     // registers the scope, so this signs in with it in place.
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Tenant::factory()->create(['slug' => 't1']);
     Filament::setCurrentPanel(FilamentPanel::Tenant->value);
@@ -365,7 +365,7 @@ it('identifies no tenant until someone has signed in', function (): void {
     // and the scope leaves every query alone while that is true.
     Tenant::factory()->create(['slug' => 't1']);
 
-    $this->get('http://t1.tenant-app.test/dashboard/login')->assertOk();
+    $this->get('http://t1.hospitality.test/dashboard/login')->assertOk();
 
     expect(Filament::getTenant())->toBeNull();
 });
@@ -383,7 +383,7 @@ it('still refuses a code to an address with no account at all', function (): voi
 
 it('marks the address verified once a code has been used', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
     $user->forceFill(['email_verified_at' => null])->save();
 
     $component = Livewire::test(PlatformLogin::class)
@@ -399,7 +399,7 @@ it('marks the address verified once a code has been used', function (): void {
 
 it('turns the first submit into a code request', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -418,7 +418,7 @@ it('turns the first submit into a code request', function (): void {
 
 it('rejects a code that is not the one issued', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -436,7 +436,7 @@ it('rejects a code that is not the one issued', function (): void {
 
 it('rejects a code that has expired', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -456,7 +456,7 @@ it('rejects a code that has expired', function (): void {
 
 it('re-checks panel access when the code is submitted', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -465,7 +465,7 @@ it('re-checks panel access when the code is submitted', function (): void {
     $code = ($this->readCodes)()[0];
 
     // Access is taken away between asking for the code and using it.
-    $user->forceFill(['is_super_admin' => false])->save();
+    $user->forceFill(['is_admin' => false])->save();
 
     $component
         ->fillForm(['email' => $user->email, 'code' => $code])
@@ -477,7 +477,7 @@ it('re-checks panel access when the code is submitted', function (): void {
 
 it('will not let a code be used twice', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])
@@ -498,7 +498,7 @@ it('will not let a code be used twice', function (): void {
 
 it('will not accept a code against a swapped-in address', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
-    $user = superAdmin();
+    $user = platformAdmin();
 
     $component = Livewire::test(PlatformLogin::class)
         ->fillForm(['email' => $user->email])

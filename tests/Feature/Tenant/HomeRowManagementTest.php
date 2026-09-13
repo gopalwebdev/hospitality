@@ -31,16 +31,16 @@ beforeEach(function (): void {
 |
 */
 
-it('lets a tenant admin arrange the rows', function (): void {
+it('lets a tenant owner arrange the rows', function (): void {
     $tenant = Tenant::factory()->create();
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
-    expect($admin->can('viewAny', HomeRow::class))->toBeTrue()
-        ->and($admin->can('create', HomeRow::class))->toBeTrue()
-        ->and($admin->can('update', $row))->toBeTrue()
-        ->and($admin->can('reorder', HomeRow::class))->toBeTrue();
+    expect($owner->can('viewAny', HomeRow::class))->toBeTrue()
+        ->and($owner->can('create', HomeRow::class))->toBeTrue()
+        ->and($owner->can('update', $row))->toBeTrue()
+        ->and($owner->can('reorder', HomeRow::class))->toBeTrue();
 });
 
 it('lets staff see the rows but not rearrange them', function (): void {
@@ -70,7 +70,7 @@ it('keeps someone with no role off the home screen pages', function (): void {
 
 it('creates a row against the tenant whose panel it is', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListHomeRows::class)
         ->callAction('create', [
@@ -90,7 +90,7 @@ it('creates a row against the tenant whose panel it is', function (): void {
 
 it('lets a row be created with no heading at all', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // A banner into the menu speaks for itself, so the heading is optional in
     // every language — unlike a menu's name, which the fallback requires.
@@ -111,7 +111,7 @@ it('shows only this tenant\'s rows', function (): void {
     $myRow = HomeRow::factory()->ofTenant($mine)->create();
     $theirRow = HomeRow::factory()->ofTenant($theirs)->create();
 
-    enterTenantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Owner);
 
     Livewire::test(ListHomeRows::class)
         ->assertCanSeeTableRecords([$myRow])
@@ -124,7 +124,7 @@ it('orders the rows the way the home screen shows them', function (): void {
     $last = HomeRow::factory()->ofTenant($tenant)->create(['position' => 5]);
     $first = HomeRow::factory()->ofTenant($tenant)->create(['position' => 1]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListHomeRows::class)
         ->assertCanSeeTableRecords([$first, $last], inOrder: true);
@@ -168,7 +168,7 @@ it('refuses a tile in another tenant\'s row, even around the form', function ():
 
 it('creates a tile that leaves the app for a link', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->layout(HomeRowLayout::Links)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -192,7 +192,7 @@ it('creates a tile that leaves the app for a link', function (): void {
 
 it('refuses a link tile with no address', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])

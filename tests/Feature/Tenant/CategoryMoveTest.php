@@ -33,7 +33,7 @@ it('moves a category onto another menu, dishes and all', function (): void {
     $category = MenuCategory::factory()->inMenu($lunch)->create(['name' => [Locale::English->value => 'Starters']]);
     $dish = MenuItem::factory()->inCategory($category)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $lunch->getKey()])
         ->callAction(TestAction::make('moveToMenu')->table('category-'.$category->getKey()), ['menu_id' => $dinner->getKey()])
@@ -54,7 +54,7 @@ it('refuses a move onto a menu that already has that name', function (): void {
     $moving = MenuCategory::factory()->inMenu($lunch)->create(['name' => [Locale::English->value => 'Starters']]);
     MenuCategory::factory()->inMenu($dinner)->create(['name' => [Locale::English->value => 'Starters']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Uniqueness is per menu and built on the English name, and nothing but this
     // check refuses a duplicate.
@@ -74,7 +74,7 @@ it('offers only the menus this category is not already on', function (): void {
 
     $category = MenuCategory::factory()->inMenu($lunch)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $lunch->getKey()])
         ->mountAction(TestAction::make('moveToMenu')->table('category-'.$category->getKey()))
@@ -113,7 +113,7 @@ it('rearranges categories by dragging them', function (): void {
     $first = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $second = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Filament's own drag and drop hands back the new order of keys; the
     // trigger button only switches the mode it is done in.

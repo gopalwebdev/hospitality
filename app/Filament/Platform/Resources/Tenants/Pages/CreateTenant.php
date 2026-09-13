@@ -16,14 +16,14 @@ use Filament\Resources\Pages\CreateRecord;
  * creating one leads straight into creating its administrator rather than
  * back to the list. The account itself is made on the Users page, which holds
  * the one-time code confirmation that authorises opening an account at all —
- * minting an admin from here would go around that.
+ * minting an owner from here would go around that.
  */
 class CreateTenant extends CreateRecord
 {
     protected static string $resource = TenantResource::class;
 
     /**
-     * Creating another tenant before this one has an admin is how a
+     * Creating another tenant before this one has an owner is how a
      * tenant nobody can open gets left behind.
      */
     protected static bool $canCreateAnother = false;
@@ -46,13 +46,13 @@ class CreateTenant extends CreateRecord
 
         Notification::make()
             ->title('Now add its administrator')
-            ->body(sprintf('%s has no accounts yet. This form opens with the tenant and the %s role already chosen.', $tenant->name, Role::Admin->value))
+            ->body(sprintf('%s has no accounts yet. This form opens with the tenant and the %s role already chosen.', $tenant->name, Role::Owner->value))
             ->info()
             ->send();
 
         return UserResource::getUrl('create', [
             'tenant_id' => $tenant->getKey(),
-            'role' => Role::Admin->value,
+            'role' => Role::Owner->value,
         ]);
     }
 }

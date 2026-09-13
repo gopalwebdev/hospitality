@@ -41,7 +41,7 @@ class UserInfolist
                             ->color('gray')
                             ->placeholder('Product team — belongs to no tenant'),
 
-                        IconEntry::make('is_super_admin')
+                        IconEntry::make('is_admin')
                             ->label('The product team')
                             ->boolean()
                             ->helperText('This, not an empty tenant, is what grants every permission.'),
@@ -79,7 +79,7 @@ class UserInfolist
      */
     private static function effectivePermissions(User $user): string
     {
-        if ($user->isSuperAdmin()) {
+        if ($user->isAdmin()) {
             return 'Every permission, granted by the product team rather than by a role.';
         }
 

@@ -48,9 +48,9 @@ class ListAccountsCommand extends Command
     {
         $rows = [];
 
-        foreach (User::query()->superAdmins()->orderBy('email')->get() as $user) {
+        foreach (User::query()->admins()->orderBy('email')->get() as $user) {
             $rows[] = [
-                'Super admin',
+                'Admin',
                 $user->email,
                 route('platform.login'),
             ];
@@ -62,8 +62,8 @@ class ListAccountsCommand extends Command
     /**
      * Everyone who runs a tenant, and where they sign in.
      *
-     * An admin runs the tenant from its panel on a laptop. Staff have no
-     * surface of their own, so only admins are listed.
+     * An owner runs the tenant from its panel on a laptop. Staff have no
+     * surface of their own, so only owners are listed.
      *
      * @return list<array{string, string, string}>
      */
@@ -78,9 +78,9 @@ class ListAccountsCommand extends Command
 
         foreach ($tenants as $tenant) {
             foreach ($tenant->users as $user) {
-                if ($user->hasRole(Role::Admin->value)) {
+                if ($user->hasRole(Role::Owner->value)) {
                     $rows[] = [
-                        $tenant->name.' admin',
+                        $tenant->name.' owner',
                         $user->email,
                         $tenant->signInUrl(),
                     ];

@@ -8,9 +8,9 @@ paths:
 ## Each panel owns its own Filament namespace; both live under /dashboard, entered at /login
 Two panels, named for whose they are rather than for a role:
 - **platform** — the product team; root domain; classes under app/Filament/Platform/, `PlatformPanelProvider`
-- **tenant** — one tenant's admins **and** staff; its subdomain; classes under app/Filament/Tenant/, `TenantPanelProvider`
+- **tenant** — one tenant's owners **and** staff; its subdomain; classes under app/Filament/Tenant/, `TenantPanelProvider`
 
-They were `super-admin` at `/super-admin` and `admin` at `/admin`, with folders to match, and were renamed because a tenant's panel is used by its staff as much as its admins — a role in a URL, a folder or a route name was wrong for half its users. Do not name a panel, a path or a folder after a role again.
+They were first named for roles, with paths and folders to match, and were renamed because a tenant's panel is used by its staff as much as its owners — a role in a URL, a folder or a route name was wrong for half its users. Do not name a panel, a path or a folder after a role again.
 
 The tenant panel was later renamed from a name that fitted one kind of business to `tenant` (`app/Filament/Tenant/`, `TenantPanelProvider`, `filament.tenant.*`), for the same reason: a name that fits one kind of customer is wrong for the rest. This is one common product, so its copy says "tenant" too — see `.ai/rules/lang.md`.
 
@@ -29,12 +29,12 @@ A role or permission whose name has an App\Enums case is built-in, because code 
 - a built-in **permission**: read-only, since its name is what `can()` checks
 - any permission a role holds, or any role a user holds, may not be deleted until that link is undone
 
-Those guards live in RoleResource/PermissionResource::canDelete() (and `disabled()` on the name field), NOT in the policy, because AppServiceProvider's Gate::before returns true for a super admin before any policy method runs — a policy check would be skipped for exactly the people who can reach these pages. RoleObserver and PermissionObserver also throw on updating/deleting as a backstop, which is why neither resource offers a bulk delete.
+Those guards live in RoleResource/PermissionResource::canDelete() (and `disabled()` on the name field), NOT in the policy, because AppServiceProvider's Gate::before returns true for an admin before any policy method runs — a policy check would be skipped for exactly the people who can reach these pages. RoleObserver and PermissionObserver also throw on updating/deleting as a backstop, which is why neither resource offers a bulk delete.
 
 Both panels run `strictAuthorization()`, so a resource whose policy lacks the method being asked about is refused rather than waved through. tests/Feature/PanelAuthorizationTest.php walks every registered resource and page in both panels and asserts an account holding nothing is refused, so a page added later cannot ship open.
 
 ## Panels are for laptops and larger screens, not phones
-Both panels are back-office tools — the product team's, and a tenant admin's — used sitting down at a laptop or a bigger display. "Staff" in this codebase means floor staff on phones; they have no surface right now, and would not be given a panel. Design for that width and do not spend effort making a panel page work on a phone: no phone-first layouts, and no hiding columns below a breakpoint with visibleFrom()/hiddenFrom(), which only costs information when a laptop window is dragged narrow. A table may show every column it needs, and a form may assume the room to use columns().
+Both panels are back-office tools — the product team's, and a tenant owner's — used sitting down at a laptop or a bigger display. "Staff" in this codebase means floor staff on phones; they have no surface right now, and would not be given a panel. Design for that width and do not spend effort making a panel page work on a phone: no phone-first layouts, and no hiding columns below a breakpoint with visibleFrom()/hiddenFrom(), which only costs information when a laptop window is dragged narrow. A table may show every column it needs, and a form may assume the room to use columns().
 
 This is enforced, not just intended: both panels render `resources/views/filament/desktop-only.blade.php` through the `BODY_START` render hook, which covers the panel with a "open this on a laptop" message below 1024px. It is CSS-only and inline, so it is correct on first paint and needs none of the utilities a panel does not ship. It is a door, not a second layout — building a phone layout for a panel is exactly what this rule rules out.
 

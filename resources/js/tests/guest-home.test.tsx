@@ -13,8 +13,8 @@ function tile(overrides: Partial<TileProp> = {}): TileProp {
     return {
         id: 1,
         label: 'Menu',
-        imageUrl: 'http://spice.tenant-app.test/tiles/1/image',
-        href: 'http://spice.tenant-app.test/menus/1',
+        imageUrl: 'http://spice.hospitality.test/tiles/1/image',
+        href: 'http://spice.hospitality.test/menus/1',
         isExternal: false,
         ...overrides,
     };
@@ -104,7 +104,7 @@ describe('guest home', () => {
                             tile({
                                 id: 7,
                                 label: 'Wine list',
-                                href: 'http://spice.tenant-app.test/tiles/7',
+                                href: 'http://spice.hospitality.test/tiles/7',
                             }),
                         ],
                     }),

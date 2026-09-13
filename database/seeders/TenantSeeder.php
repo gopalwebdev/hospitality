@@ -30,7 +30,7 @@ use Illuminate\Database\Seeder;
 /**
  * One tenant, its settings, and the one administrator who runs it.
  *
- * The admin address uses plus-addressing so every tenant gets a distinct
+ * The owner address uses plus-addressing so every tenant gets a distinct
  * account while the sign-in codes all land in the same real inbox.
  */
 class TenantSeeder extends Seeder
@@ -40,7 +40,7 @@ class TenantSeeder extends Seeder
     /**
      * The tenants to seed, keyed by the slug that becomes their subdomain.
      *
-     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, admin_name: string, admin_email: string, staff_name: string, staff_email: string}>
+     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string}>
      */
     public const array TENANTS = [
         [
@@ -51,8 +51,8 @@ class TenantSeeder extends Seeder
             'pincode' => '600002',
             'email' => 'hello@spicegarden.example.com',
             'phone' => '9876543210',
-            'admin_name' => 'Spice Garden Admin',
-            'admin_email' => 'gopalwebdev+spice@gmail.com',
+            'owner_name' => 'Spice Garden Owner',
+            'owner_email' => 'gopalwebdev+spice@gmail.com',
             'staff_name' => 'Spice Garden Staff',
             'staff_email' => 'gopalwebdev+spice-staff@gmail.com',
         ],
@@ -627,16 +627,16 @@ class TenantSeeder extends Seeder
                 'closes_at' => '23:00:00',
             ]);
 
-            // The admin belongs to this tenant, not the product team: a
+            // The owner belongs to this tenant, not the product team: a
             // null tenant_id would file them under "Product team" in the
             // platform panel, which they are not.
-            $admin = User::query()->firstOrCreate(
-                ['email' => $definition['admin_email']],
-                ['name' => $definition['admin_name'], 'tenant_id' => $tenant->getKey(), 'email_verified_at' => now()],
+            $owner = User::query()->firstOrCreate(
+                ['email' => $definition['owner_email']],
+                ['name' => $definition['owner_name'], 'tenant_id' => $tenant->getKey(), 'email_verified_at' => now()],
             );
 
-            $admin->syncRoles([Role::Admin->value]);
-            $tenant->users()->syncWithoutDetaching([$admin->getKey()]);
+            $owner->syncRoles([Role::Owner->value]);
+            $tenant->users()->syncWithoutDetaching([$owner->getKey()]);
 
             // A staff account for the roster and its limits. Plus-addressing means every
             // seeded account's sign-in code lands in the same real inbox.

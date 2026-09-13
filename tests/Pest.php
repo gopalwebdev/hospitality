@@ -96,7 +96,7 @@ function enterTenantPanel(Tenant $tenant, Role $role): User
  */
 function enterProductTeamPanel(): User
 {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     test()->actingAs($user);
     Filament::setCurrentPanel(FilamentPanel::Platform->value);

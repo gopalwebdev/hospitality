@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * One business on the platform, and the boundary everything it owns is scoped
- * to. The slug is its subdomain: `t1` is served at t1.tenant-app.com.
+ * to. The slug is its subdomain: `t1` is served at t1.hospitality.com.
  *
  * @property int $id
  * @property string $slug
@@ -32,12 +32,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property CountryCallingCode|null $secondary_phone_country_code
  * @property string|null $secondary_phone
  * @property bool $is_active
- * @property int $max_admins
+ * @property int $max_owners
  * @property int $max_staff
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['slug', 'name', 'type', 'address', 'pincode', 'email', 'phone_country_code', 'phone', 'secondary_phone_country_code', 'secondary_phone', 'is_active', 'max_admins', 'max_staff'])]
+#[Fillable(['slug', 'name', 'type', 'address', 'pincode', 'email', 'phone_country_code', 'phone', 'secondary_phone_country_code', 'secondary_phone', 'is_active', 'max_owners', 'max_staff'])]
 class Tenant extends Model
 {
     /** @use HasFactory<TenantFactory> */
@@ -102,7 +102,7 @@ class Tenant extends Model
     public function roleLimit(RoleEnum $role): ?int
     {
         return match ($role) {
-            RoleEnum::Admin => $this->max_admins,
+            RoleEnum::Owner => $this->max_owners,
             RoleEnum::Staff => $this->max_staff,
             RoleEnum::Guest => null,
         };

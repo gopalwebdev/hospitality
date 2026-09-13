@@ -10,7 +10,7 @@ use App\Models\User;
 /**
  * Set the roles an account holds, from the product team panel.
  *
- * Unlike SetTenantUserRoles this withholds nothing: a super admin is
+ * Unlike SetTenantUserRoles this withholds nothing: an admin is
  * exactly who decides that a role carrying a product team permission may be handed
  * out, and it is the only place that decision can be made.
  *

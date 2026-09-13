@@ -10,8 +10,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Refuse a role grant that would put a tenant over its own limit.
  *
- * A tenant may hold at most Tenant::$max_admins admins and
- * Tenant::$max_staff staff on its roster at once; a super admin sets both
+ * A tenant may hold at most Tenant::$max_owners owners and
+ * Tenant::$max_staff staff on its roster at once; an admin sets both
  * numbers from the tenant's own record (see TenantForm). This is the
  * one place every path that can grant a capped role checks before the grant
  * is written, whichever panel it comes from: SetTenantUserRoles (and
@@ -56,14 +56,14 @@ class EnsureRoleFitsWithinLimit
     }
 
     /**
-     * "admin" reads oddly pluralised next to a count, so this spells out the
+     * "owner" reads oddly pluralised next to a count, so this spells out the
      * plain English word for each capped role rather than leaning on
      * Str::plural().
      */
     private function roleLabel(RoleEnum $role, int $count): string
     {
         return match ($role) {
-            RoleEnum::Admin => $count === 1 ? 'admin' : 'admins',
+            RoleEnum::Owner => $count === 1 ? 'owner' : 'owners',
             RoleEnum::Staff => $count === 1 ? 'staff member' : 'staff members',
             RoleEnum::Guest => $role->value,
         };

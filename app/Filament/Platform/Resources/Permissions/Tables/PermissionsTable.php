@@ -50,7 +50,7 @@ class PermissionsTable
                     ->sortable(),
 
                 // A row whose delete button is missing says why here, rather
-                // than leaving a super admin to guess at the gap.
+                // than leaving an admin to guess at the gap.
                 IconColumn::make('is_deletable')
                     ->label('Deletable')
                     ->state(fn (Permission $record): bool => $record->undeletableReason() === null)
@@ -110,7 +110,7 @@ class PermissionsTable
                     ->icon(Heroicon::OutlinedEye),
 
                 // As with roles: a built-in or in-use permission is read-only,
-                // and offering the button would lead a super admin to a 403.
+                // and offering the button would lead an admin to a 403.
                 EditAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)

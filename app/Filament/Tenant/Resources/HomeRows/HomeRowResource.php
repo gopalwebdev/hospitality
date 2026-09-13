@@ -2,12 +2,12 @@
 
 namespace App\Filament\Tenant\Resources\HomeRows;
 
+use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\HomeRows\Pages\EditHomeRow;
 use App\Filament\Tenant\Resources\HomeRows\Pages\ListHomeRows;
 use App\Filament\Tenant\Resources\HomeRows\RelationManagers\TilesRelationManager;
 use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
 use App\Filament\Tenant\Resources\HomeRows\Tables\HomeRowsTable;
-use App\Filament\Schemas\TranslatedFields;
 use App\Models\HomeRow;
 use BackedEnum;
 use Filament\Resources\Resource;

@@ -13,18 +13,18 @@ Standing instruction from the project owner: a model holds relationships, scopes
 
 Role and Permission are the exception to `#[ObservedBy]`, not to observers. Laravel attaches an `ObservedBy` observer only once the model has finished booting, which is after Spatie's HasPermissions trait has registered the `deleting` listener that detaches a role's users and permissions — so a guard attached that way would ask `$role->users()->exists()` after the answer had been destroyed, and never fire. `Role::booting()` and `Permission::booting()` wire `RoleObserver` and `PermissionObserver` methods as `Class@method` listeners instead, which registers them first. `static::observe()` cannot be called there: it constructs the model, and constructing a model while it boots throws. Cover any such guard with a test that calls `$model->delete()` directly — asserting `isInUse()` alone passes even when the guard is dead.
 
-## Product team ownership is the is_super_admin column, not a role
-`users.is_super_admin` is the single source of truth for the product team. `User::isSuperAdmin()` reads it, `canAccessPanel()` gates the platform panel on it, and `AppServiceProvider::configureAuthorization()` uses `Gate::before` to grant a super admin every permission without holding any role.
+## Product team ownership is the is_admin column, not a role
+`users.is_admin` is the single source of truth for the product team. `User::isAdmin()` reads it, `canAccessPanel()` gates the platform panel on it, and `AppServiceProvider::configureAuthorization()` uses `Gate::before` to grant an admin every permission without holding any role.
 
-There is deliberately no `Role::SuperAdmin`. Spatie roles describe what someone does inside one tenant; product team ownership is global and orthogonal. Do not reintroduce a super-admin role — two sources of truth for this will drift.
+There is deliberately no Spatie role for this. Spatie roles describe what someone does inside one tenant (`owner`, `staff`, `guest`); being an admin is global and orthogonal, and it is the `is_admin` column. Do not add an `admin` role back, and do not bring back a "super admin" by any name — two sources of truth for this will drift.
 
-The model declares `protected $attributes = ['is_super_admin' => false]` because the database default only lands on insert; without it an unsaved User throws MissingAttributeException under `Model::shouldBeStrict()`.
+The model declares `protected $attributes = ['is_admin' => false]` because the database default only lands on insert; without it an unsaved User throws MissingAttributeException under `Model::shouldBeStrict()`.
 
 ## The users resource puts a tenancy global scope on User
 UserResource lives in the tenant panel, so Filament registers a tenancy global scope on User (and attaches anyone created during a tenant request to that tenant). Any query that must see accounts platform-wide has to say so: ->withoutGlobalScope(Filament::getTenancyScopeName()), as AddUserToTenant does when finding an existing account by address. Sign-in is unaffected because Filament resolves the tenant from the authenticated user, so a visitor at the login page has none. The scope only exists once the panel has booted, which HTTP requests do via middleware and the enterTenantPanel() test helper does with Filament::bootCurrentPanel() — a test that only calls setCurrentPanel() proves nothing about tenant isolation.
 
-## tenant_id is where an account belongs; is_super_admin is what it may do
-`users.tenant_id` names the tenant an account belongs to and is what the product team panel lists it under — null renders as "Product team". It grants nothing. `is_super_admin` remains the only source of product team ownership, because an ordinary account that has not been put on a roster yet also has a null tenant, and deriving powers from that would hand the platform to every half-created user. `UserObserver` refuses an account that has both.
+## tenant_id is where an account belongs; is_admin is what it may do
+`users.tenant_id` names the tenant an account belongs to and is what the product team panel lists it under — null renders as "Product team". It grants nothing. `is_admin` remains the only source of product team ownership, because an ordinary account that has not been put on a roster yet also has a null tenant, and deriving powers from that would hand the platform to every half-created user. `UserObserver` refuses an account that has both.
 
 The tenant_user pivot still exists alongside it: tenant_id is the one tenant they belong to, the pivot is every tenant they staff. Write both together (CreateUserAccount, EditUser::syncRoster, UserFactory::ofTenant) — a tenant nobody is rostered at names a panel the account cannot open.
 
@@ -87,3 +87,8 @@ Money stays an integer all the way out of PHP. `MenuItem::formattedPrice()` exis
 The tenant boundary is `App\Models\Tenant` on `tenants`, whatever `tenants.type` holds — this is one common product, and nothing outside `App\Enums\TenantType` names a kind of business. Settings are `tenant_settings`, the roster pivot is `tenant_user`, and the product team's permission is `tenant.manage`.
 
 Every foreign key pointing at `tenants` is called `tenant_id`, which is exactly what Laravel infers from the model, so relationships take no key argument: `belongsTo(Tenant::class)`, `hasMany(Menu::class)`, and `belongsToMany(User::class)` over the conventional `tenant_user`. Filament's default ownership relationship is `tenant()` for the same reason, so a resource sets `$tenantOwnershipRelationshipName` only where it differs — `UserResource`'s `tenants`.
+
+## Admin is the platform account, owner is the tenant role, and the app is Hospitality
+On the project owner's instruction there is no "super admin" by any name. The platform-wide account is an **admin**: `users.is_admin`, `User::isAdmin()`, `User::scopeAdmins()`, `UserFactory::admin()`, `AdminSeeder`, granted everything by `Gate::before`. The tenant-level role that runs one tenant is **owner** (`App\Enums\Role::Owner`, `tenants.max_owners`, `config('tenants.default_max_owners')`), renamed from `admin` so the two never share a name. "Product team" stays the name for the people who hold `is_admin`.
+
+The application is **Hospitality**, one product for hotels, restaurants, hospitals and the like (`App\Enums\TenantType`): `APP_NAME=Hospitality`, the platform brand "Hospitality Platform", the local and test domain `hospitality.test`, the test database `hospitality_testing`, and the Composer package `gopal/hospitality`.

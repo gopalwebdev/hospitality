@@ -65,7 +65,7 @@ it('creates a combo on the menu with the dishes it contains', function (): void 
     $burger = dishOn($menu);
     $fries = dishOn($menu);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -97,7 +97,7 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -115,7 +115,7 @@ it('refuses a compare-at price that is not above what is charged', function (): 
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // A "was" price at or below the real one advertises a discount that does
     // not exist, which is the one way this field can mislead a guest.
@@ -134,7 +134,7 @@ it('refuses a combo name the same menu already uses', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCombo::factory()->onMenu($menu)->create(['name' => [Locale::English->value => 'Family Feast']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
         ->callAction(TestAction::make('create')->table(), [
@@ -156,7 +156,7 @@ it('offers only this menu\'s dishes as combo contents', function (): void {
     $theirs = Tenant::factory()->create();
     $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The same call the select inside the repeater makes. A combo may only
     // contain dishes from the menu it is offered on.
@@ -183,7 +183,7 @@ it('refuses the same dish twice in one combo', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $dish = dishOn($menu);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // A dish appears once, with a quantity — two rows would show as a
     // duplicate line to the guest. No unique index stands behind the form.
@@ -254,7 +254,7 @@ it('rearranges combos by dragging them', function (): void {
     $first = MenuCombo::factory()->onMenu($menu)->create(['position' => 0]);
     $second = MenuCombo::factory()->onMenu($menu)->create(['position' => 1]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
@@ -284,7 +284,7 @@ it('shows only this menu\'s combos', function (): void {
     $mine = MenuCombo::factory()->onMenu($menu)->create();
     $elsewhere = MenuCombo::factory()->onMenu($otherMenu)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
         ->assertCanSeeTableRecords([$mine])

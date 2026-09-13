@@ -24,7 +24,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'tenant_id' => null,
-            'is_super_admin' => false,
+            'is_admin' => false,
             'remember_token' => Str::random(10),
         ];
     }
@@ -32,10 +32,10 @@ class UserFactory extends Factory
     /**
      * Indicate that the account is on the product team.
      */
-    public function superAdmin(): static
+    public function admin(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'is_super_admin' => true,
+            'is_admin' => true,
         ]);
     }
 

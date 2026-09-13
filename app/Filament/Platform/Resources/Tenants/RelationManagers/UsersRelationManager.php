@@ -94,7 +94,7 @@ class UsersRelationManager extends RelationManager
                     ->url(fn (User $record): string => UserResource::getUrl('edit', ['record' => $record])),
             ])
             ->emptyStateHeading('Nobody works here yet')
-            ->emptyStateDescription('A tenant needs an admin before anyone can sign in to run it.')
+            ->emptyStateDescription('A tenant needs an owner before anyone can sign in to run it.')
             ->emptyStateIcon(Heroicon::OutlinedUsers)
             ->defaultSort('name');
     }

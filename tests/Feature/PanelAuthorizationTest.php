@@ -89,18 +89,18 @@ it('opens every product team page to the product team', function (): void {
     }
 });
 
-it('opens every tenant page to a tenant admin', function (): void {
+it('opens every tenant page to a tenant owner', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     foreach (gatedPagesOf(FilamentPanel::Tenant) as $page) {
-        expect($page::canAccess())->toBeTrue("{$page} is closed to a tenant admin");
+        expect($page::canAccess())->toBeTrue("{$page} is closed to a tenant owner");
     }
 });
 
 it('reflects a permission being taken off a role straight away', function (): void {
     $tenant = Tenant::factory()->create();
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
     $settings = Settings::class;
 
@@ -108,12 +108,12 @@ it('reflects a permission being taken off a role straight away', function (): vo
 
     // The product team may edit what any role grants, so a page's availability
     // has to follow that within the same request rather than at deploy time.
-    Role::findByName(RoleEnum::Admin->value)
+    Role::findByName(RoleEnum::Owner->value)
         ->revokePermissionTo(PermissionEnum::SettingsManage->value);
 
-    expect($admin->fresh()->can(PermissionEnum::SettingsManage->value))->toBeFalse();
+    expect($owner->fresh()->can(PermissionEnum::SettingsManage->value))->toBeFalse();
 
-    $this->actingAs($admin->fresh());
+    $this->actingAs($owner->fresh());
 
     expect($settings::canAccess())->toBeFalse();
 });

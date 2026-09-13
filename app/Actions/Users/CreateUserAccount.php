@@ -15,7 +15,7 @@ use App\Notifications\AccountCreatedNotification;
  * show a tenant on a row for someone who cannot open it.
  *
  * A null tenant leaves the account belonging to the platform. That alone
- * grants nothing — is_super_admin is what does — so it is passed separately.
+ * grants nothing — is_admin is what does — so it is passed separately.
  */
 class CreateUserAccount
 {
@@ -28,7 +28,7 @@ class CreateUserAccount
         string $name,
         string $email,
         ?int $tenantId = null,
-        bool $isSuperAdmin = false,
+        bool $isAdmin = false,
         array $roleNames = [],
     ): User {
         $tenant = $tenantId === null
@@ -39,7 +39,7 @@ class CreateUserAccount
             'name' => $name,
             'email' => $email,
             'tenant_id' => $tenant?->getKey(),
-            'is_super_admin' => $isSuperAdmin,
+            'is_admin' => $isAdmin,
         ]);
 
         if ($tenant instanceof Tenant) {

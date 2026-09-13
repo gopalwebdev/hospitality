@@ -27,7 +27,7 @@ beforeEach(fn () => $this->seed(RolesAndPermissionsSeeder::class));
 |
 | The tests elsewhere mount one table or one action at a time, which says
 | nothing about whether the page holding it renders. These two walk every tab a
-| tenant admin opens daily — once with a full tree on them, and once with
+| tenant owner opens daily — once with a full tree on them, and once with
 | nothing at all, because an empty tenant is what every new one starts as
 | and empty states are exactly where a missing relation or a null slips
 | through.
@@ -46,7 +46,7 @@ it('renders every menu page with a full tree on it', function (): void {
     $combo = MenuCombo::factory()->onMenu($menu)->discounted()->create();
     MenuComboItem::factory()->pairing($combo, $direct)->quantity(2)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)->assertOk()->assertCanSeeTableRecords([$menu]);
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->assertOk();
@@ -61,7 +61,7 @@ it('renders the menu page for a tenant with nothing on it yet', function (): voi
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->assertOk();
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])->assertOk();
@@ -74,10 +74,10 @@ it('moves between panel pages without a blank browser load', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The panel is a SPA, so a click fetches the next page over Livewire and
-    // shows a progress bar while it does — rather than leaving an admin looking
+    // shows a progress bar while it does — rather than leaving an owner looking
     // at the page they have just left. The guest app gets the same from Inertia,
     // plus a splash for the first load.
     $html = (string) $this->get(MenuResource::getUrl('index', ['tenant' => $tenant]))
@@ -94,11 +94,11 @@ it('serves every menu tab over HTTP, tab strip and all', function (): void {
     MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
     MenuCombo::factory()->onMenu($menu)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // A Livewire test renders the component and not the page around it, so it
     // says nothing about the layout, the record sub-navigation or the render
-    // hooks. These are the four URLs an admin actually opens.
+    // hooks. These are the four URLs an owner actually opens.
     foreach (['arrange', 'edit', 'featured', 'combos'] as $tab) {
         $this->get(MenuResource::getUrl($tab, ['record' => $menu, 'tenant' => $tenant]))
             ->assertOk()

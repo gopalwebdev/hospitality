@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vite-plus/test';
 import Menu, { type MenuItem } from '@/pages/guest/menu';
 
 const tenant = { name: 'Spice Garden', slug: 'spice' };
-const homeUrl = 'http://spice.tenant-app.test';
+const homeUrl = 'http://spice.hospitality.test';
 
 const menu = {
     id: 1,
@@ -88,7 +88,7 @@ describe('guest menu', () => {
 
         expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute(
             'href',
-            expect.stringContaining('spice.tenant-app.test'),
+            expect.stringContaining('spice.hospitality.test'),
         );
     });
 

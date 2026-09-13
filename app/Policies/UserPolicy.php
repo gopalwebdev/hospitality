@@ -8,7 +8,7 @@ use App\Models\User;
 /**
  * Who may manage the people attached to a tenant.
  *
- * This is the tenant's own roster: user.manage is held by the Admin and
+ * This is the tenant's own roster: user.manage is held by the Owner and
  * Manager roles, and the panel only ever shows users of the tenant whose
  * subdomain is being served, because Filament scopes the resource to the
  * current tenant.
@@ -43,12 +43,12 @@ class UserPolicy
      * removeFromTenant() below is for.
      *
      * Nobody may delete their own account. UserResource states that rule again
-     * because Gate::before answers this method true for a super admin before it
+     * because Gate::before answers this method true for an admin before it
      * ever runs.
      */
     public function delete(User $user, User $model): bool
     {
-        return $user->isSuperAdmin() && ! $user->is($model);
+        return $user->isAdmin() && ! $user->is($model);
     }
 
     /**

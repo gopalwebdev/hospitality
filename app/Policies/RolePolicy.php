@@ -9,10 +9,10 @@ use App\Models\User;
 /**
  * Who may define the roles tenants assign from.
  *
- * role.manage is a product team permission granted to no role, so only a super
+ * role.manage is a product team permission granted to no role, so only an
  * admin passes. Whether a *particular* role may be edited is a separate
  * question — a built-in role is owned by App\Enums\Role and the seeder — and
- * that guard lives on the resource, because Gate::before lets a super admin
+ * that guard lives on the resource, because Gate::before lets an admin
  * past any policy check before it runs.
  */
 class RolePolicy
@@ -44,7 +44,7 @@ class RolePolicy
 
     /**
      * A role is only deleted when nothing depends on it: not built in, held by
-     * nobody, and holding no permissions. Gate::before waves a super admin past
+     * nobody, and holding no permissions. Gate::before waves an admin past
      * this, which is why RoleResource states the same rule again.
      */
     public function delete(User $user, Role $role): bool

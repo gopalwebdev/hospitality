@@ -3,9 +3,9 @@
 namespace App\Filament\Tenant\Resources\HomeRows\Tables;
 
 use App\Enums\HomeRowLayout;
-use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tables\Reordering;
+use App\Filament\Tenant\Resources\HomeRows\Schemas\HomeRowForm;
 use App\Models\HomeRow;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;

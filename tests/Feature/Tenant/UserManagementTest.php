@@ -24,7 +24,7 @@ beforeEach(function (): void {
 | Who may manage a roster
 |--------------------------------------------------------------------------
 |
-| user.manage is what opens this module, and Admin is the only role that holds
+| user.manage is what opens this module, and Owner is the only role that holds
 | it. The policy is checked directly so a failure names the rule.
 |
 */
@@ -36,7 +36,7 @@ it('lets the roles holding user.manage manage the roster', function (RoleEnum $r
     expect($user->can('viewAny', User::class))->toBeTrue()
         ->and($user->can('create', User::class))->toBeTrue()
         ->and($user->can('update', $user))->toBeTrue();
-})->with([RoleEnum::Admin]);
+})->with([RoleEnum::Owner]);
 
 it('refuses the roster to roles without user.manage', function (RoleEnum $roleEnum): void {
     $user = User::factory()->create();
@@ -54,18 +54,18 @@ it('keeps staff off the users page', function (): void {
     $user->assignRole(RoleEnum::Staff->value);
 
     $this->actingAs($user)
-        ->get('http://t1.tenant-app.test/dashboard/users')
+        ->get('http://t1.hospitality.test/dashboard/users')
         ->assertForbidden();
 });
 
-it('serves the users page to a tenant admin', function (): void {
+it('serves the users page to a tenant owner', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 't1']);
     $user = User::factory()->create();
     $user->tenants()->attach($tenant);
-    $user->assignRole(RoleEnum::Admin->value);
+    $user->assignRole(RoleEnum::Owner->value);
 
     $this->actingAs($user)
-        ->get('http://t1.tenant-app.test/dashboard/users')
+        ->get('http://t1.hospitality.test/dashboard/users')
         ->assertOk();
 });
 
@@ -87,10 +87,10 @@ it('lists only the people who staff this tenant', function (): void {
     $stranger = User::factory()->create();
     $stranger->tenants()->attach($other);
 
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListUsers::class)
-        ->assertCanSeeTableRecords([$admin, $colleague])
+        ->assertCanSeeTableRecords([$owner, $colleague])
         ->assertCanNotSeeTableRecords([$stranger]);
 });
 
@@ -98,16 +98,16 @@ it('answers not found for a user of another tenant', function (): void {
     $own = Tenant::factory()->create(['slug' => 't1']);
     $other = Tenant::factory()->create(['slug' => 't2']);
 
-    $admin = User::factory()->create();
-    $admin->tenants()->attach($own);
-    $admin->assignRole(RoleEnum::Admin->value);
+    $owner = User::factory()->create();
+    $owner->tenants()->attach($own);
+    $owner->assignRole(RoleEnum::Owner->value);
 
     $stranger = User::factory()->create();
     $stranger->tenants()->attach($other);
 
     // Not 403: a tenant must not learn that an account exists elsewhere.
-    $this->actingAs($admin)
-        ->get("http://t1.tenant-app.test/dashboard/users/{$stranger->getKey()}/edit")
+    $this->actingAs($owner)
+        ->get("http://t1.hospitality.test/dashboard/users/{$stranger->getKey()}/edit")
         ->assertNotFound();
 });
 
@@ -119,7 +119,7 @@ it('answers not found for a user of another tenant', function (): void {
 
 it('creates an account and puts it on this tenant roster', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -135,7 +135,7 @@ it('creates an account and puts it on this tenant roster', function (): void {
     expect($created->name)->toBe('Priya')
         ->and($created->tenants->pluck('id')->all())->toBe([$tenant->getKey()])
         ->and($created->hasRole(RoleEnum::Staff->value))->toBeTrue()
-        ->and($created->isSuperAdmin())->toBeFalse();
+        ->and($created->isAdmin())->toBeFalse();
 });
 
 it('joins an existing account to the tenant rather than duplicating it', function (): void {
@@ -144,9 +144,9 @@ it('joins an existing account to the tenant rather than duplicating it', functio
 
     $existing = User::factory()->create(['email' => 'chef@example.com', 'name' => 'Chef']);
     $existing->tenants()->attach($other);
-    $existing->assignRole(RoleEnum::Admin->value);
+    $existing->assignRole(RoleEnum::Owner->value);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -161,7 +161,7 @@ it('joins an existing account to the tenant rather than duplicating it', functio
         ->and($existing->refresh()->tenants()->count())->toBe(2)
         // Roles are held per account, so joining a second tenant must not
         // rewrite what this person may do at the first.
-        ->and($existing->hasRole(RoleEnum::Admin->value))->toBeTrue()
+        ->and($existing->hasRole(RoleEnum::Owner->value))->toBeTrue()
         ->and($existing->hasRole(RoleEnum::Staff->value))->toBeFalse();
 });
 
@@ -169,7 +169,7 @@ it('finds an existing account however the address was capitalised', function ():
     $tenant = Tenant::factory()->create();
     $existing = User::factory()->create(['email' => 'chef@example.com']);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm(['name' => 'Chef', 'email' => 'CHEF@example.com'])
@@ -182,7 +182,7 @@ it('finds an existing account however the address was capitalised', function ():
 
 it('requires a name and a real email address', function (array $data, array $errors): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm($data)
@@ -210,14 +210,14 @@ it('offers only the roles a tenant may hand out', function (): void {
     $productTeamRole = Role::factory()->create();
     $productTeamRole->givePermissionTo(PermissionEnum::TenantManage->value);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->assertFormFieldExists('roles', function (CheckboxList $field) use ($productTeamRole): bool {
             $offered = array_keys($field->getOptions());
 
             expect($offered)->toContain(RoleEnum::Staff->value)
-                ->and($offered)->toContain(RoleEnum::Admin->value)
+                ->and($offered)->toContain(RoleEnum::Owner->value)
                 ->and($offered)->not->toContain($productTeamRole->name);
 
             return true;
@@ -240,25 +240,25 @@ it('refuses a product team role even when one is submitted anyway', function ():
 });
 
 it('changes the roles of someone who staffs only this tenant', function (): void {
-    // Two admins on purpose: enterTenantPanel() seats one to work the
+    // Two owners on purpose: enterTenantPanel() seats one to work the
     // panel from, and this test promotes a second — a tenant with the
     // default limit of one would refuse that promotion for a reason this
     // test is not about. See UserManagementTest's own limit coverage.
-    $tenant = Tenant::factory()->create(['max_admins' => 2]);
+    $tenant = Tenant::factory()->create(['max_owners' => 2]);
 
     $member = User::factory()->create();
     $member->tenants()->attach($tenant);
     $member->assignRole(RoleEnum::Staff->value);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(EditUser::class, ['record' => $member->getKey()])
         ->assertFormSet(['roles' => [RoleEnum::Staff->value]])
-        ->fillForm(['roles' => [RoleEnum::Admin->value]])
+        ->fillForm(['roles' => [RoleEnum::Owner->value]])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($member->refresh()->getRoleNames()->all())->toBe([RoleEnum::Admin->value]);
+    expect($member->refresh()->getRoleNames()->all())->toBe([RoleEnum::Owner->value]);
 });
 
 it('leaves the roles of someone who staffs two tenants alone', function (): void {
@@ -269,7 +269,7 @@ it('leaves the roles of someone who staffs two tenants alone', function (): void
     $member->tenants()->attach([$tenant->getKey(), $other->getKey()]);
     $member->assignRole(RoleEnum::Staff->value);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(EditUser::class, ['record' => $member->getKey()])
         ->fillForm(['name' => 'Renamed'])
@@ -285,27 +285,27 @@ it('leaves the roles of someone who staffs two tenants alone', function (): void
 | Role limits
 |--------------------------------------------------------------------------
 |
-| A tenant may hold only so many admins and staff at once — see
+| A tenant may hold only so many owners and staff at once — see
 | Tenant::roleLimit() and App\Actions\Tenants\EnsureRoleFitsWithinLimit.
 |
 */
 
-it('refuses a second admin once the tenant already has one', function (): void {
-    // The default limit: enterTenantPanel() seats the one admin this
+it('refuses a second owner once the tenant already has one', function (): void {
+    // The default limit: enterTenantPanel() seats the one owner this
     // tenant is allowed.
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
-            'name' => 'Second Admin',
-            'email' => 'second-admin@example.com',
-            'roles' => [RoleEnum::Admin->value],
+            'name' => 'Second Owner',
+            'email' => 'second-owner@example.com',
+            'roles' => [RoleEnum::Owner->value],
         ])
         ->call('create')
         ->assertHasFormErrors(['roles']);
 
-    expect(User::query()->withEmail('second-admin@example.com')->exists())->toBeFalse();
+    expect(User::query()->withEmail('second-owner@example.com')->exists())->toBeFalse();
 });
 
 it('refuses staff past the tenant\'s own limit', function (): void {
@@ -317,7 +317,7 @@ it('refuses staff past the tenant\'s own limit', function (): void {
     $existing->tenants()->attach($tenant);
     $existing->assignRole(RoleEnum::Staff->value);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -333,7 +333,7 @@ it('refuses staff past the tenant\'s own limit', function (): void {
 
 it('still allows the last staff slot the limit permits', function (): void {
     $tenant = Tenant::factory()->create(['max_staff' => 1]);
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
         ->fillForm([
@@ -349,17 +349,17 @@ it('still allows the last staff slot the limit permits', function (): void {
 
 it('does not count someone against their own limit while re-saving their roles', function (): void {
     $tenant = Tenant::factory()->create();
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The tenant already has its one allowed admin — the person entering
-    // the panel — so re-saving that same admin's own roles must not be
+    // The tenant already has its one allowed owner — the person entering
+    // the panel — so re-saving that same owner's own roles must not be
     // refused as though it were a second one.
-    Livewire::test(EditUser::class, ['record' => $admin->getKey()])
-        ->fillForm(['roles' => [RoleEnum::Admin->value]])
+    Livewire::test(EditUser::class, ['record' => $owner->getKey()])
+        ->fillForm(['roles' => [RoleEnum::Owner->value]])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($admin->refresh()->hasRole(RoleEnum::Admin->value))->toBeTrue();
+    expect($owner->refresh()->hasRole(RoleEnum::Owner->value))->toBeTrue();
 });
 
 /*
@@ -375,7 +375,7 @@ it('removes someone from the tenant without deleting their account', function ()
     $member = User::factory()->create();
     $member->tenants()->attach([$tenant->getKey(), $other->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListUsers::class)
         ->callTableAction('removeFromTenant', $member);
@@ -397,7 +397,7 @@ it('leaves someone removed from their last tenant with no panel to enter', funct
     $member = User::factory()->create();
     $member->tenants()->attach($tenant);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListUsers::class)
         ->callTableAction('removeFromTenant', $member);
@@ -407,12 +407,12 @@ it('leaves someone removed from their last tenant with no panel to enter', funct
 
 it('never lets someone remove themselves', function (): void {
     $tenant = Tenant::factory()->create();
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
-    expect($admin->can('removeFromTenant', $admin))->toBeFalse();
+    expect($owner->can('removeFromTenant', $owner))->toBeFalse();
 
     Livewire::test(ListUsers::class)
-        ->assertTableActionHidden('removeFromTenant', $admin);
+        ->assertTableActionHidden('removeFromTenant', $owner);
 
-    expect($admin->refresh()->tenants()->whereKey($tenant)->exists())->toBeTrue();
+    expect($owner->refresh()->tenants()->whereKey($tenant)->exists())->toBeTrue();
 });

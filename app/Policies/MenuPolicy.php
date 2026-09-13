@@ -11,7 +11,7 @@ use App\Models\User;
  *
  * The same split as MenuCategoryPolicy and MenuItemPolicy, because it is the
  * same job at a different level: reading is menu.view, which staff hold too;
- * changing anything is menu.manage, which only a tenant admin has. Which
+ * changing anything is menu.manage, which only a tenant owner has. Which
  * tenant's menus are in front of you is not this policy's business —
  * Filament scopes the resource to the panel's tenant, and the observers refuse
  * a row whose parent belongs to another tenant.

@@ -31,7 +31,7 @@ beforeEach(function (): void {
 */
 
 it('lets the product team manage tenants', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
     $tenant = Tenant::factory()->create();
 
     expect($user->can('viewAny', Tenant::class))->toBeTrue()
@@ -51,28 +51,28 @@ it('refuses tenant management to every tenant role', function (Role $role): void
         ->and($user->can('delete', $tenant))->toBeFalse();
 })->with(Role::cases());
 
-it('keeps a tenant admin out of the tenants page', function (): void {
+it('keeps a tenant owner out of the tenants page', function (): void {
     $tenant = Tenant::factory()->create();
     $user = User::factory()->create();
     $user->tenants()->attach($tenant);
-    $user->assignRole(Role::Admin->value);
+    $user->assignRole(Role::Owner->value);
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/tenants')
+        ->get('http://hospitality.test/dashboard/tenants')
         ->assertForbidden();
 });
 
 it('serves the tenants page to the product team', function (): void {
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     $this->actingAs($user)
-        ->get('http://tenant-app.test/dashboard/tenants')
+        ->get('http://hospitality.test/dashboard/tenants')
         ->assertOk();
 });
 
 it('hides the tenants module from anyone without the permission', function (): void {
     $user = User::factory()->create();
-    $user->assignRole(Role::Admin->value);
+    $user->assignRole(Role::Owner->value);
 
     $this->actingAs($user);
 
@@ -144,6 +144,24 @@ it('creates a tenant without the optional contact details', function (): void {
         ->and($tenant->secondary_phone_country_code)->toBeNull()
         ->and($tenant->phone_country_code)->toBe(CountryCallingCode::India);
 });
+
+it('creates a tenant of every type', function (TenantType $type): void {
+    enterProductTeamPanel();
+
+    Livewire::test(CreateTenant::class)
+        ->fillForm([
+            'name' => 'Northside',
+            'type' => $type->value,
+            'slug' => 'northside',
+            'address' => '1 Anna Salai, Chennai',
+            'pincode' => '600002',
+            'phone' => '9000000001',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Tenant::query()->where('slug', 'northside')->sole()->type)->toBe($type);
+})->with(TenantType::cases());
 
 it('suggests a subdomain from the name', function (): void {
     enterProductTeamPanel();
@@ -336,7 +354,7 @@ it('shows what kind of business each tenant is, and filters on it', function ():
         ->assertCanNotSeeTableRecords([$ofTheOther]);
 });
 
-it("links straight to a tenant's own admin sign-in, now that the tenant menu is off", function (): void {
+it("links straight to a tenant's own panel sign-in, now that the tenant menu is off", function (): void {
     $tenant = Tenant::factory()->create(['slug' => 't1']);
     enterProductTeamPanel();
 
@@ -404,14 +422,14 @@ it('deletes a tenant', function (): void {
 | Role limits
 |--------------------------------------------------------------------------
 |
-| How many accounts may hold the admin and staff roles is set here, per
+| How many accounts may hold the owner and staff roles is set here, per
 | tenant — see Tenant::roleLimit() and
 | App\Actions\Tenants\EnsureRoleFitsWithinLimit, which enforces it
 | whenever a role is actually granted.
 |
 */
 
-it('sends a newly created tenant straight on to creating its admin', function (): void {
+it('sends a newly created tenant straight on to creating its owner', function (): void {
     enterProductTeamPanel();
 
     // A tenant with nobody on its roster cannot be opened by anyone, so
@@ -430,7 +448,7 @@ it('sends a newly created tenant straight on to creating its admin', function ()
         ->assertHasNoFormErrors()
         ->assertRedirect(UserResource::getUrl('create', [
             'tenant_id' => Tenant::query()->where('slug', 'corner')->value('id'),
-            'role' => Role::Admin->value,
+            'role' => Role::Owner->value,
         ]));
 });
 
@@ -441,7 +459,7 @@ it('serves the tenant edit page with its roster attached', function (): void {
     // The roster itself is a lazily loaded Livewire component, so its rows are
     // not in this response — what this pins is that registering it has not
     // broken the page it hangs under. Its contents are covered below.
-    $this->actingAs(User::factory()->superAdmin()->create())
+    $this->actingAs(User::factory()->admin()->create())
         ->get(TenantResource::getUrl('edit', ['record' => $tenant]))
         ->assertOk();
 
@@ -465,16 +483,16 @@ it('lists the roster under the tenant\'s own record', function (): void {
         ->assertCanNotSeeTableRecords([$elsewhere]);
 });
 
-it('sets a tenant\'s admin and staff limits', function (): void {
+it('sets a tenant\'s owner and staff limits', function (): void {
     $tenant = Tenant::factory()->create();
     enterProductTeamPanel();
 
     Livewire::test(EditTenant::class, ['record' => $tenant->getRouteKey()])
-        ->fillForm(['max_admins' => 2, 'max_staff' => 10])
+        ->fillForm(['max_owners' => 2, 'max_staff' => 10])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($tenant->refresh()->max_admins)->toBe(2)
+    expect($tenant->refresh()->max_owners)->toBe(2)
         ->and($tenant->max_staff)->toBe(10);
 });
 

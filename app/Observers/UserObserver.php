@@ -14,7 +14,7 @@ class UserObserver
     public function saving(User $user): void
     {
         throw_if(
-            $user->is_super_admin && $user->tenant_id !== null,
+            $user->is_admin && $user->tenant_id !== null,
             LogicException::class,
             'An account that belongs to a tenant may not be on the product team.',
         );

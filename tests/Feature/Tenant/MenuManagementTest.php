@@ -48,24 +48,24 @@ function byEnglishName(string $model, string $name): Menu|MenuCategory|MenuItem|
 |--------------------------------------------------------------------------
 |
 | menu.view opens the pages and staff hold it; menu.manage is what changes
-| anything, and only a tenant admin has it.
+| anything, and only a tenant owner has it.
 |
 */
 
-it('lets a tenant admin manage the menu', function (): void {
+it('lets a tenant owner manage the menu', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $item = MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
 
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
-    expect($admin->can('viewAny', MenuItem::class))->toBeTrue()
-        ->and($admin->can('create', MenuItem::class))->toBeTrue()
-        ->and($admin->can('update', $item))->toBeTrue()
-        ->and($admin->can('delete', $item))->toBeTrue()
-        ->and($admin->can('viewAny', Menu::class))->toBeTrue()
-        ->and($admin->can('create', Menu::class))->toBeTrue()
-        ->and($admin->can('reorder', Menu::class))->toBeTrue();
+    expect($owner->can('viewAny', MenuItem::class))->toBeTrue()
+        ->and($owner->can('create', MenuItem::class))->toBeTrue()
+        ->and($owner->can('update', $item))->toBeTrue()
+        ->and($owner->can('delete', $item))->toBeTrue()
+        ->and($owner->can('viewAny', Menu::class))->toBeTrue()
+        ->and($owner->can('create', Menu::class))->toBeTrue()
+        ->and($owner->can('reorder', Menu::class))->toBeTrue();
 });
 
 it('lets staff read the menu but not change it', function (): void {
@@ -101,7 +101,7 @@ it('keeps someone with no role off the menu pages', function (): void {
 
 it('creates a menu against the tenant whose panel it is', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)
         ->callAction('create', [
@@ -122,7 +122,7 @@ it('creates a menu against the tenant whose panel it is', function (): void {
 
 it('lets a menu be created in English alone', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // A tenant that has not translated its menu yet is the normal state on
     // day one, so only the fallback language is required.
@@ -135,7 +135,7 @@ it('lets a menu be created in English alone', function (): void {
 
 it('requires the fallback language on a menu', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Tamil alone would leave an English-reading guest with a blank heading,
     // and there would be no English name for uniqueness to check.
@@ -151,7 +151,7 @@ it('refuses a menu name the tenant already uses', function (): void {
         'name' => [Locale::English->value => 'Dinner'],
     ]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)
         ->callAction('create', ['name' => [Locale::English->value => 'Dinner'], 'position' => 0, 'is_active' => true])
@@ -182,7 +182,7 @@ it('creates a section on the menu it was filed under', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->callAction(TestAction::make('createCategory')->table(), [
@@ -204,7 +204,7 @@ it('refuses a section name the same menu already uses', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Starters']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->callAction(TestAction::make('createCategory')->table(), [
@@ -221,7 +221,7 @@ it('lets a lunch and a dinner menu each have their own Starters', function (): v
 
     MenuCategory::factory()->inMenu($lunch)->create(['name' => [Locale::English->value => 'Starters']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Uniqueness moved from the tenant to the menu when menus arrived, and
     // this is the case that motivated it.
@@ -246,7 +246,7 @@ it('lets two tenants both have a section of the same name', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->callAction(TestAction::make('createCategory')->table(), [
@@ -287,7 +287,7 @@ it('reads a menu as one tree without grouping or ordering on a translated column
     $chicken = MenuCategory::factory()->under($starters)->create(['position' => 0]);
     $dish = MenuItem::factory()->inCategory($starters)->create(['position' => 0]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     $table = Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->assertOk()
@@ -319,7 +319,7 @@ it('stores a typed price as an exact integer count of minor units', function ():
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
@@ -347,7 +347,7 @@ it('round-trips a price through the edit form without drift', function (): void 
         ->create();
     $item = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 24950]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($item), [
@@ -371,7 +371,7 @@ it('fills the edit form with every language, not just the current one', function
         'name' => [Locale::English->value => 'Paneer Tikka', Locale::Tamil->value => 'பன்னீர் டிக்கா'],
     ]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Spatie hands back one language for a translated attribute; the form edits
     // them all, so the whole document has to be put back before filling.
@@ -397,7 +397,7 @@ it('offers no grouping control on the dishes page', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Grouping was removed rather than fixed: Filament turns it off while
     // reordering anyway, and a group header only breaks when its title changes
@@ -422,7 +422,7 @@ it('saves a dish\'s additions in the same save as the dish', function (): void {
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
@@ -469,7 +469,7 @@ it('lets a dish be saved with no additions at all', function (): void {
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Most dishes have none, so the repeater must not start with a blank row
     // that then fails validation.
@@ -529,7 +529,7 @@ it('shows only this tenant\'s dishes', function (): void {
         MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))->create(),
     )->create();
 
-    enterTenantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->assertCanSeeTableRecords([$myItem])
@@ -543,7 +543,7 @@ it('shows only this tenant\'s menus', function (): void {
     $myMenu = Menu::factory()->create(['tenant_id' => $mine->getKey()]);
     $theirMenu = Menu::factory()->create(['tenant_id' => $theirs->getKey()]);
 
-    enterTenantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)
         ->assertCanSeeTableRecords([$myMenu])
@@ -559,7 +559,7 @@ it('refuses to file a dish under another tenant\'s section', function (): void {
         ->inMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))
         ->create();
 
-    enterTenantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Owner);
 
     // Only this tenant's sections are offered, and Filament validates the
     // submitted value against that list — so a tampered id is rejected here,
@@ -652,7 +652,7 @@ it('features a dish from its own form', function (): void {
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $dish = MenuItem::factory()->inCategory($category)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The dish form's Featured toggle is the only place featuring is set. The
     // menu page's featured row used to carry its own pair of actions for the
@@ -679,7 +679,7 @@ it('takes a dish out of the featured row without taking it off the menu', functi
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $dish = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($dish), [
@@ -705,7 +705,7 @@ it('offers no way to feature a dish from the menu page itself', function (): voi
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $dish = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The featured row is for putting dishes in order and nothing else, so the
     // flag has exactly one home.
@@ -734,7 +734,7 @@ it('shows only the featured dishes of this menu', function (): void {
         ->inCategory(MenuCategory::factory()->inMenu($otherMenu)->create())
         ->create(['is_featured' => true]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])
         ->assertCanSeeTableRecords([$featured])
@@ -757,7 +757,7 @@ it('stores a struck-through price beside the one being charged', function (): vo
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
@@ -785,7 +785,7 @@ it('refuses a struck-through price that is not above what is charged', function 
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
@@ -845,7 +845,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // 40% is the demerit rate GST 2.0 introduced in September 2025, and 12.5%
     // is not a slab at all — the point of typing the rate rather than picking
@@ -891,7 +891,7 @@ it('refiles a dish into a sub-category from the dishes page', function (): void 
     $chicken = MenuCategory::factory()->under($category)->create();
     $dish = MenuItem::factory()->inCategory($category)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Re-filing is an edit: the dish form's category select offers both levels
     // of every menu, so there is no second mechanism that has to repeat the
@@ -916,7 +916,7 @@ it('lifts a dish back out of a sub-category to the category itself', function ()
     $chicken = MenuCategory::factory()->under($category)->create();
     $dish = MenuItem::factory()->inCategory($chicken)->create();
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // Naming the section is how a dish comes back up a level; there is no
     // second field to clear.
@@ -945,7 +945,7 @@ it('unfeatures a dish carried to another menu, and keeps one that stays', functi
     $leaving = MenuItem::factory()->inCategory($from)->create(['is_featured' => true, 'featured_position' => 3]);
     $staying = MenuItem::factory()->inCategory($from)->create(['is_featured' => true, 'featured_position' => 4]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($leaving), [
@@ -985,7 +985,7 @@ it('refuses to refile a dish under a name the target category already has', func
     $moving = MenuItem::factory()->inCategory($from)->create(['name' => [Locale::English->value => 'Paneer Tikka']]);
     MenuItem::factory()->inCategory($to)->create(['name' => [Locale::English->value => 'Paneer Tikka']]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The form's uniqueness rule is scoped to the category chosen in it, so
     // changing that select revalidates the name against where the dish is
@@ -1011,7 +1011,7 @@ it('rearranges the featured row by dragging it', function (): void {
     $first = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 1, 'position' => 7]);
     $second = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 2, 'position' => 7]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     // featured_position is its own order, separate from the position that
     // places a dish inside its section — a dish answers both at once.

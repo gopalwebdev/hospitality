@@ -10,7 +10,7 @@ use App\Models\User;
  * Who may shape a tenant's menu sections.
  *
  * Reading is menu.view, which staff and guests hold too; changing anything is
- * menu.manage, which only a tenant admin has. Which tenant's categories
+ * menu.manage, which only a tenant owner has. Which tenant's categories
  * are in front of you is not this policy's business — Filament scopes the
  * resource to the panel's tenant, and the observers refuse a row whose parent
  * belongs to another tenant.

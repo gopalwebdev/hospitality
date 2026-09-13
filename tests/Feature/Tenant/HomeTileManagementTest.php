@@ -44,21 +44,21 @@ function tileLabelled(string $label): HomeTile
 |
 */
 
-it('lets a tenant admin arrange the home screen', function (): void {
+it('lets a tenant owner arrange the home screen', function (): void {
     $tenant = Tenant::factory()->create();
     $tile = HomeTile::factory()
         ->openingMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
 
-    $admin = enterTenantPanel($tenant, RoleEnum::Admin);
+    $owner = enterTenantPanel($tenant, RoleEnum::Owner);
 
-    expect($admin->can('viewAny', HomeTile::class))->toBeTrue()
-        ->and($admin->can('create', HomeTile::class))->toBeTrue()
-        ->and($admin->can('update', $tile))->toBeTrue()
-        ->and($admin->can('delete', $tile))->toBeTrue()
+    expect($owner->can('viewAny', HomeTile::class))->toBeTrue()
+        ->and($owner->can('create', HomeTile::class))->toBeTrue()
+        ->and($owner->can('update', $tile))->toBeTrue()
+        ->and($owner->can('delete', $tile))->toBeTrue()
         // Dragging the rows is the point of the page, and strictAuthorization
         // makes a missing reorder() a 500 rather than a refusal.
-        ->and($admin->can('reorder', HomeTile::class))->toBeTrue();
+        ->and($owner->can('reorder', HomeTile::class))->toBeTrue();
 });
 
 it('lets staff see the home screen but not rearrange it', function (): void {
@@ -93,7 +93,7 @@ it('creates a tile that opens one of this tenant\'s menus', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -118,7 +118,7 @@ it('creates a tile that shows an uploaded PDF', function (): void {
     Storage::fake('local');
 
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -148,7 +148,7 @@ it('stores a tile\'s picture on the private disk', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -171,7 +171,7 @@ it('lets a tile be created with no picture yet', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     // A tenant arranging its home screen before it has photography is the
@@ -192,7 +192,7 @@ it('requires the label in the fallback language', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -215,7 +215,7 @@ it('refuses a menu tile with no menu chosen', function (): void {
     $tenant = Tenant::factory()->create();
     Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -229,7 +229,7 @@ it('refuses a menu tile with no menu chosen', function (): void {
 
 it('refuses a PDF tile with no file uploaded', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
     $row = HomeRow::factory()->ofTenant($tenant)->create();
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
@@ -283,7 +283,7 @@ it('fills the edit form with every language, not just the current one', function
         'label' => [Locale::English->value => 'Our menu', Locale::Tamil->value => 'எங்கள் மெனு'],
     ]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
         ->mountAction(TestAction::make('edit')->table($tile))
@@ -310,7 +310,7 @@ it('shows only the tiles in the row being edited', function (): void {
         ->inRow($theirRow)
         ->create();
 
-    enterTenantPanel($mine, RoleEnum::Admin);
+    enterTenantPanel($mine, RoleEnum::Owner);
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $myRow, 'pageClass' => EditHomeRow::class])
         ->assertCanSeeTableRecords([$myTile])
@@ -325,7 +325,7 @@ it('orders the tiles the way the home screen shows them', function (): void {
     $last = HomeTile::factory()->openingMenu($menu)->inRow($row)->create(['position' => 5]);
     $first = HomeTile::factory()->openingMenu($menu)->inRow($row)->create(['position' => 1]);
 
-    enterTenantPanel($tenant, RoleEnum::Admin);
+    enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(TilesRelationManager::class, ['ownerRecord' => $row, 'pageClass' => EditHomeRow::class])
         ->assertCanSeeTableRecords([$first, $last], inOrder: true);

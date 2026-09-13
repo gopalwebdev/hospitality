@@ -24,8 +24,8 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 /**
- * The product team's panel, served at tenant-app.com/dashboard and entered
- * through tenant-app.com/login.
+ * The product team's panel, served at hospitality.com/dashboard and entered
+ * through hospitality.com/login.
  *
  * It is bound to the bare host so it can never be reached from a tenant
  * subdomain, and it is the default panel because it carries no tenancy. It

@@ -24,16 +24,16 @@ use Livewire\Attributes\Locked;
 use LogicException;
 
 /**
- * Open an account, with the super admin confirming by one-time code.
+ * Open an account, with the admin confirming by one-time code.
  *
  * The page runs in two steps inside one Livewire component, the way the sign-in
  * page does: the account details are filled in and a code is emailed to the
- * super admin doing it, and the same page then asks for that code before
+ * admin doing it, and the same page then asks for that code before
  * anything is written. Creating an account is what lets someone into a panel,
  * so it is held to the same proof as signing in — and a session left open on an
  * unattended laptop cannot mint one.
  *
- * The code goes to the super admin, not to the new account: the new account has
+ * The code goes to the admin, not to the new account: the new account has
  * no mailbox we have proved anything about yet. What it gets instead, once it
  * exists, is AccountCreatedNotification.
  */
@@ -92,7 +92,7 @@ class CreateUser extends CreateRecord
     }
 
     /**
-     * Step one: check the details, then email the super admin a code.
+     * Step one: check the details, then email the admin a code.
      *
      * Nothing is sent for a form that could not be submitted anyway, so the
      * account fields are validated first.
@@ -221,7 +221,7 @@ class CreateUser extends CreateRecord
             name: (string) $data['name'],
             email: (string) $data['email'],
             tenantId: filled($data['tenant_id'] ?? null) ? (int) $data['tenant_id'] : null,
-            isSuperAdmin: (bool) ($data['is_super_admin'] ?? false),
+            isAdmin: (bool) ($data['is_admin'] ?? false),
             roleNames: array_values((array) ($data['roles'] ?? [])),
         );
     }
@@ -342,13 +342,13 @@ class CreateUser extends CreateRecord
     }
 
     /**
-     * The super admin whose code confirms this creation.
+     * The admin whose code confirms this creation.
      */
     protected function confirmer(): User
     {
         $user = Filament::auth()->user();
 
-        throw_unless($user instanceof User, LogicException::class, 'Creating an account requires a signed-in super admin.');
+        throw_unless($user instanceof User, LogicException::class, 'Creating an account requires a signed-in admin.');
 
         return $user;
     }

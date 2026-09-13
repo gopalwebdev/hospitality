@@ -26,8 +26,8 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 /**
- * A tenant's own panel, for its admins and staff alike, served at
- * t1.tenant-app.com/dashboard and entered through t1.tenant-app.com/login.
+ * A tenant's own panel, for its owners and staff alike, served at
+ * t1.hospitality.com/dashboard and entered through t1.hospitality.com/login.
  *
  * The subdomain identifies the tenant, so every resource registered here is
  * automatically scoped to the tenant in the URL.
@@ -52,9 +52,9 @@ class TenantPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             // Signed in, a tenant sees only its own name in the topbar,
-            // not a name plus a switcher into other tenants: an admin
+            // not a name plus a switcher into other tenants: an owner
             // panel is scoped to one tenant, and there is nowhere else to
-            // switch to. A super admin supporting one tenant opens it from
+            // switch to. An admin supporting one tenant opens it from
             // the Tenants table in their own panel instead. See
             // .ai/rules/filament.md.
             ->tenantMenu(false)

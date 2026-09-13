@@ -76,7 +76,7 @@ class TenantsTable
             ->recordActions([
                 // The tenant panel's own tenant menu is off (see
                 // .ai/rules/filament.md), so a tenant's name is the only
-                // thing shown there — this is how a super admin supporting one
+                // thing shown there — this is how an admin supporting one
                 // tenant gets to its panel.
                 Action::make('openPanel')
                     ->label('Open dashboard')

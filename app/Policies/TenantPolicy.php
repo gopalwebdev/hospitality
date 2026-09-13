@@ -10,7 +10,7 @@ use App\Models\User;
  * Who may manage the roster of tenants on the platform.
  *
  * tenant.manage is a product team permission, so it is granted to no role at
- * all: in practice only a super admin passes these checks, through the
+ * all: in practice only an admin passes these checks, through the
  * Gate::before in AppServiceProvider.
  */
 class TenantPolicy

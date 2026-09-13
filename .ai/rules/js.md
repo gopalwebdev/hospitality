@@ -71,3 +71,8 @@ Formatters are cached per locale-and-currency in `resources/js/lib/money.ts`, be
 `vite.config.ts` carries a `precompress()` plugin that writes a `.br` (Brotli at maximum quality) and a `.gz` beside every built text asset over a kilobyte, using Node's own zlib — no dependency. Compressing once at build time beats compressing per request, but only if the server hands the copy over: nginx needs `brotli_static on;` and `gzip_static on;` for `/build`, or the CDN in front of Laravel Cloud does it. Herd's local nginx does neither, so locally the copies sit unused and the uncompressed asset is served; that is expected, not a bug.
 
 Page components stay lazy — the Inertia Vite plugin splits one chunk per page, and `Vite::prefetch()` warms the other guest pages after load — and images are `loading="lazy" decoding="async"`.
+
+## A spinner that never goes away means the bundle threw
+The boot loader hides only once React renders into `#app`, so any uncaught error on first render leaves the guest app spinning for ever rather than showing an error. Read `storage/logs/browser.log` first.
+
+The usual cause is a stale `public/build` after a shared prop was renamed on the server: the September build still read `props.restaurant` after it became `tenant`, so `restaurant.slug` threw on every load. `npm run build` (or `npm run dev`) fixes it, and also regenerates the Wayfinder files, which bake `APP_DOMAIN` into every tenant route URL — rebuild after changing the domain too.

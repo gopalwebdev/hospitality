@@ -26,7 +26,7 @@ it('shows the settings of the tenant whose panel it is', function (): void {
     $tenant->settings()->update([
         'contact_email' => 'hello@spice.example.com',
     ]);
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->assertFormSet([
@@ -41,7 +41,7 @@ it('never shows another tenant settings', function (): void {
     $other = Tenant::factory()->create();
     $other->settings()->update(['contact_email' => 'theirs@example.com']);
 
-    enterTenantPanel($own, Role::Admin);
+    enterTenantPanel($own, Role::Owner);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['contact_email' => 'ours@example.com']);
@@ -50,7 +50,7 @@ it('never shows another tenant settings', function (): void {
 it('creates settings on first view if a tenant somehow has none', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings()->delete();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)->assertOk();
 
@@ -65,7 +65,7 @@ it('creates settings on first view if a tenant somehow has none', function (): v
 
 it('saves changes against the tenant in the panel', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -87,7 +87,7 @@ it('leaves other tenants settings alone when saving', function (): void {
     $other = Tenant::factory()->create();
     $other->settings()->update(['contact_email' => 'theirs@example.com']);
 
-    enterTenantPanel($own, Role::Admin);
+    enterTenantPanel($own, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm(['contact_email' => 'ours@example.com'])
@@ -98,7 +98,7 @@ it('leaves other tenants settings alone when saving', function (): void {
 
 it('always prices in rupees, with no currency to choose', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)->assertFormFieldDoesNotExist('currency');
 
@@ -107,7 +107,7 @@ it('always prices in rupees, with no currency to choose', function (): void {
 
 it('rejects an address that is not an email', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm(['contact_email' => 'not-an-email'])
@@ -121,8 +121,8 @@ it('rejects an address that is not an email', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('is open to the tenant admin', function (): void {
-    enterTenantPanel(Tenant::factory()->create(), Role::Admin);
+it('is open to the tenant owner', function (): void {
+    enterTenantPanel(Tenant::factory()->create(), Role::Owner);
 
     expect(Settings::canAccess())->toBeTrue();
 });
@@ -133,9 +133,9 @@ it('is closed to floor staff', function (): void {
     expect(Settings::canAccess())->toBeFalse();
 });
 
-it('is open to a super admin supporting a tenant', function (): void {
+it('is open to an admin supporting a tenant', function (): void {
     $tenant = Tenant::factory()->create();
-    $user = User::factory()->superAdmin()->create();
+    $user = User::factory()->admin()->create();
 
     $this->actingAs($user);
     Filament::setCurrentPanel(FilamentPanel::Tenant->value);
@@ -170,7 +170,7 @@ it('starts a tenant on the standalone food-service slab, tax added at the bill',
 
 it('saves the GST rate and whether prices already include it', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -192,7 +192,7 @@ it('saves the GST rate and whether prices already include it', function (): void
 
 it('types a service charge as a percentage and stores it as basis points', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -212,7 +212,7 @@ it('types a service charge as a percentage and stores it as basis points', funct
 
 it('types a parcel charge as money and stores it in minor units', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm([
@@ -251,7 +251,7 @@ it('charges nothing while a charge is switched off, whatever its amount says', f
 
 it('accepts a GST rate no fixed list of slabs would have held', function (): void {
     $tenant = Tenant::factory()->create();
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     // India's GST 2.0 reform of September 2025 restructured the slabs; a rate
     // is typed rather than picked so the next notification is a number, not a
@@ -268,7 +268,7 @@ it('round-trips the GST rate through the form without drift', function (): void 
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['tax_rate_basis_points' => 1250]);
 
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['tax_rate_percentage' => 12.5])
@@ -282,7 +282,7 @@ it('round-trips a service charge through the form without drift', function (): v
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['service_charge_enabled' => true, 'service_charge_basis_points' => 250]);
 
-    enterTenantPanel($tenant, Role::Admin);
+    enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->assertFormSet(['service_charge_percentage' => 2.5])

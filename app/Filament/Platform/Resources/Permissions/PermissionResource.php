@@ -24,7 +24,7 @@ use UnitEnum;
  * As with roles, a built-in permission — one declared in App\Enums\Permission
  * — is read-only here: its name is what the application checks with can(), so
  * renaming or deleting it revokes access silently. The guard sits on the
- * resource rather than the policy because Gate::before answers for a super
+ * resource rather than the policy because Gate::before answers for an
  * admin before any policy method runs.
  */
 class PermissionResource extends Resource
