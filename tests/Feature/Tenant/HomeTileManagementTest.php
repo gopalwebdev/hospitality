@@ -303,8 +303,7 @@ it('shows only the tiles in the row being edited', function (): void {
         ->create();
 
     // Another tenant's tile, which this row could not hold even if the
-    // relation manager forgot to scope: the composite foreign key on
-    // (home_row_id, tenant_id) is what makes that a database error.
+    // relation manager forgot to scope: HomeTileObserver refuses it.
     $theirRow = HomeRow::factory()->ofTenant($theirs)->create();
     $theirTile = HomeTile::factory()
         ->openingMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))

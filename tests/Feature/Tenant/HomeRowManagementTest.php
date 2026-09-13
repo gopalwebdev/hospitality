@@ -15,7 +15,6 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
-use Illuminate\Database\QueryException;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -148,17 +147,17 @@ it('takes a row\'s tiles with it when it is deleted', function (): void {
 |--------------------------------------------------------------------------
 */
 
-it('refuses at the database to put a tile in another tenant\'s row', function (): void {
+it('refuses a tile in another tenant\'s row, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirRow = HomeRow::factory()->ofTenant($theirs)->create();
 
-    // The composite foreign key on (home_row_id, tenant_id) is what makes this
-    // a database error rather than something a forgotten where() lets through.
+    // HomeTileObserver is what makes this an error rather than something a
+    // forgotten where() lets through.
     expect(fn () => HomeTile::factory()->create([
         'tenant_id' => $mine->getKey(),
         'home_row_id' => $theirRow->getKey(),
-    ]))->toThrow(QueryException::class);
+    ]))->toThrow(LogicException::class, 'another tenant');
 });
 
 /*

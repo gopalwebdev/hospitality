@@ -40,7 +40,7 @@ export type CurrencyProp = {
 };
 
 export type TenantSharedProps = {
-    tenant: { name: string; slug: string; typeNoun: string } | null;
+    tenant: { name: string; slug: string } | null;
     locale: LocaleProp;
     currency: CurrencyProp | null;
     translations: Translations;

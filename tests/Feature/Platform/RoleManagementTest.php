@@ -53,7 +53,7 @@ it('keeps a tenant admin off the roles page', function (): void {
     $user->assignRole(RoleEnum::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/roles')
+        ->get('http://tenant-app.test/dashboard/roles')
         ->assertForbidden();
 });
 
@@ -61,7 +61,7 @@ it('serves the roles page to the product team', function (): void {
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/roles')
+        ->get('http://tenant-app.test/dashboard/roles')
         ->assertOk();
 });
 
@@ -606,7 +606,7 @@ it('opens the edit page for a built-in role', function (): void {
     $role = Role::findByName(RoleEnum::Admin->value);
 
     $this->actingAs($user)
-        ->get("http://restaurant-app.test/dashboard/roles/{$role->getKey()}/edit")
+        ->get("http://tenant-app.test/dashboard/roles/{$role->getKey()}/edit")
         ->assertOk();
 });
 
@@ -615,7 +615,7 @@ it('still shows a built-in role read only', function (): void {
     $role = Role::findByName(RoleEnum::Admin->value);
 
     $this->actingAs($user)
-        ->get("http://restaurant-app.test/dashboard/roles/{$role->getKey()}")
+        ->get("http://tenant-app.test/dashboard/roles/{$role->getKey()}")
         ->assertOk()
         ->assertSee(RoleEnum::Admin->value);
 });

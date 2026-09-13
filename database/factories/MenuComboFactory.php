@@ -27,8 +27,7 @@ class MenuComboFactory extends Factory
         return [
             // The tenant is chosen first and the menu follows it, exactly
             // as MenuCategoryFactory does, so that passing a tenant_id cannot
-            // produce a menu at a different tenant and trip the composite
-            // foreign key.
+            // produce a menu at a different tenant.
             'tenant_id' => Tenant::factory(),
             'menu_id' => fn (array $attributes): int => Menu::factory()
                 ->create(['tenant_id' => $attributes['tenant_id']])

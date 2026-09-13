@@ -15,7 +15,7 @@ use Spatie\Translatable\HasTranslations;
  *
  * What this adds is the one thing the package leaves to the application:
  * English is privileged. It is the fallback, it is what the admin forms
- * require, and it is the value every unique index in the schema is built on
+ * require, and it is the value every uniqueness rule checks
  * — so queries that sort or match on a name have to say so, and this is where
  * they say it once.
  */

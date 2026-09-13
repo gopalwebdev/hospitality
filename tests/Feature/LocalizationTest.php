@@ -54,7 +54,7 @@ function seedBilingualMenu(): array
 
 function menuUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$tenant->slug.'.restaurant-app.test/menus/'.$menu->getKey();
+    return 'http://'.$tenant->slug.'.tenant-app.test/menus/'.$menu->getKey();
 }
 
 /*
@@ -111,7 +111,7 @@ it('remembers the chosen language in an unencrypted cookie', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'spice']);
 
     $response = $this->put(
-        'http://spice.restaurant-app.test/preferences/language',
+        'http://spice.tenant-app.test/preferences/language',
         ['locale' => Locale::Tamil->value],
     );
 
@@ -160,7 +160,7 @@ it('translates the tiles on the home screen too', function (): void {
     ]);
 
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$tenant->slug.'.restaurant-app.test/')
+        ->get('http://'.$tenant->slug.'.tenant-app.test/')
         ->assertOk()
         ->assertDontSee('Our menu')
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
@@ -180,7 +180,7 @@ it('offers a language switcher in the tenant panel', function (): void {
 
     // Posted to the panel's own host: the tenant panel is on a subdomain and a
     // form posting across hosts would lose the session.
-    $this->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard')
+    $this->get('http://'.$tenant->slug.'.tenant-app.test/dashboard')
         ->assertOk()
         ->assertSee(route('preferences.language.update', ['tenant' => $tenant->slug]), escape: false)
         ->assertSee(Locale::Tamil->label());
@@ -192,7 +192,7 @@ it('shows the panel switcher on English until a language is chosen', function ()
 
     // A picker showing nothing selected is worse than one showing the language
     // in use, so the current locale is normalised rather than compared raw.
-    $html = (string) $this->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard')
+    $html = (string) $this->get('http://'.$tenant->slug.'.tenant-app.test/dashboard')
         ->assertOk()
         ->getContent();
 
@@ -205,7 +205,7 @@ it('shows the panel switcher on English until a language is chosen', function ()
 it('offers a language switcher in the product team panel', function (): void {
     $this->actingAs(User::factory()->superAdmin()->create());
 
-    $this->get('http://restaurant-app.test/dashboard')
+    $this->get('http://tenant-app.test/dashboard')
         ->assertOk()
         ->assertSee(route('panel.language.update'), escape: false)
         ->assertSee(Locale::Tamil->label());
@@ -223,7 +223,7 @@ it('shows the panel\'s own labels in English and the tenant\'s words in the chos
     // labels are written once, in English, and only what a tenant typed
     // is translated — and that lives in the database.
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://'.$tenant->slug.'.restaurant-app.test/dashboard/menus')
+        ->get('http://'.$tenant->slug.'.tenant-app.test/dashboard/menus')
         ->assertOk()
         ->assertSee(__('panel.menus.create'))
         ->assertSee('இரவு உணவு');
@@ -310,7 +310,7 @@ it('leaves roles and permissions in English', function (): void {
     $this->actingAs(User::factory()->superAdmin()->create());
 
     $this->withUnencryptedCookie(SetLocale::COOKIE, Locale::Tamil->value)
-        ->get('http://restaurant-app.test/dashboard/roles')
+        ->get('http://tenant-app.test/dashboard/roles')
         ->assertOk()
         ->assertSee('admin');
 });
@@ -325,7 +325,7 @@ it('refuses a language the app is not available in', function (): void {
     $tenant = Tenant::factory()->create();
 
     $this->put(
-        'http://'.$tenant->slug.'.restaurant-app.test/preferences/language',
+        'http://'.$tenant->slug.'.tenant-app.test/preferences/language',
         ['locale' => 'fr'],
     )->assertSessionHasErrors('locale');
 });

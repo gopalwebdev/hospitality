@@ -13,8 +13,6 @@ use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use LogicException;
@@ -89,7 +87,7 @@ it('subdivides a category from the menu page', function (): void {
     $subCategory = categoryNamed('Chicken');
 
     // The menu and the tenant are both derived rather than typed: the
-    // relation sets menu_id, and MenuCategory::booted() takes the tenant.
+    // relation sets menu_id, and MenuCategoryObserver takes the tenant.
     expect($subCategory->parent_id)->toBe($category->getKey())
         ->and($subCategory->menu_id)->toBe($menu->getKey())
         ->and($subCategory->tenant_id)->toBe($tenant->getKey())
@@ -214,8 +212,8 @@ it('refuses a third level', function (): void {
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
 
-    // A menu is read as sections and subdivisions; no foreign key can say that,
-    // so the model does.
+    // A menu is read as sections and subdivisions; no constraint can say that,
+    // so MenuCategoryObserver does.
     expect(fn () => MenuCategory::factory()->under($subCategory)->create())
         ->toThrow(LogicException::class, 'two levels deep');
 });
@@ -262,8 +260,7 @@ it('lets a section and a subdivision of one menu share a name', function (): voi
     $curries = MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Curries']]);
 
     // Uniqueness is per level, so "Biryani › Chicken", "Curries › Chicken" and
-    // a top-level "Chicken" are three different things — which is what the
-    // COALESCE in the expression index is for.
+    // a top-level "Chicken" are three different things.
     MenuCategory::factory()->under($biryani)->create(['name' => [Locale::English->value => 'Chicken']]);
     MenuCategory::factory()->under($curries)->create(['name' => [Locale::English->value => 'Chicken']]);
     MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Chicken']]);
@@ -274,30 +271,33 @@ it('lets a section and a subdivision of one menu share a name', function (): voi
 });
 
 it('refuses two sections of one menu with the same name', function (): void {
-    $menu = Menu::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     MenuCategory::factory()->inMenu($menu)->create(['name' => [Locale::English->value => 'Starters']]);
 
-    expect(fn () => MenuCategory::factory()->inMenu($menu)->create([
-        'name' => [Locale::English->value => 'Starters'],
-    ]))->toThrow(QueryException::class);
+    enterTenantPanel($tenant, RoleEnum::Admin);
+
+    // No unique index stands behind this: the form is the only thing that refuses it.
+    arrangementOf($menu)
+        ->callAction(TestAction::make('createCategory')->table(), [
+            'name' => [Locale::English->value => 'Starters'],
+            'is_active' => true,
+        ])
+        ->assertHasActionErrors(['name.'.Locale::English->value]);
 });
 
-it('refuses at the database a subdivision of a category on another menu', function (): void {
+it('refuses a subdivision of a category on another menu, even around the form', function (): void {
     $tenant = Tenant::factory()->create();
     $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $onLunch = MenuCategory::factory()->inMenu($lunch)->create();
 
-    // The (parent_id, menu_id) key is what stops a branch straddling two menus.
-    expect(fn () => DB::table('menu_categories')->insert([
+    // MenuCategoryObserver is what stops a branch straddling two menus.
+    expect(fn () => MenuCategory::factory()->create([
         'tenant_id' => $tenant->getKey(),
         'menu_id' => $dinner->getKey(),
         'parent_id' => $onLunch->getKey(),
-        'name' => json_encode([Locale::English->value => 'Smuggled'], JSON_THROW_ON_ERROR),
-        'is_active' => true,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+    ]))->toThrow(LogicException::class, 'same menu as its parent');
 });
 
 /*
@@ -520,7 +520,7 @@ it('offers only the sections of this menu as a sub-category\'s parent', function
         });
 });
 
-it('refuses at the database to re-parent a sub-category onto another menu', function (): void {
+it('refuses to re-parent a sub-category onto another menu, even around the form', function (): void {
     $tenant = Tenant::factory()->create();
     $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
@@ -529,10 +529,9 @@ it('refuses at the database to re-parent a sub-category onto another menu', func
     $target = MenuCategory::factory()->inMenu($dinner)->create();
 
     // The form never offers a category from another menu, so this is the
-    // backstop under it: (parent_id, menu_id) references (id, menu_id), and a
-    // parent on a different menu is not a pair that exists.
+    // backstop under it.
     expect(fn () => $chicken->update(['parent_id' => $target->getKey()]))
-        ->toThrow(QueryException::class);
+        ->toThrow(LogicException::class, 'same menu as its parent');
 });
 
 it('refuses to move a section as though it were a subdivision', function (): void {

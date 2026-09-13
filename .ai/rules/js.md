@@ -42,7 +42,7 @@ There is **one** language directory, deliberately: this application's words are 
 
 Everything a tenant wrote — menu, category, dish, addition and tile names — arrives on the page's own props, already in the right language. Never translate those in React.
 
-A chrome string that names the business carries `:type`, filled from the shared `tenant.typeNoun` prop — `t('home.empty', { type: tenant?.typeNoun ?? '' })` — so a hotel's guests read "hotel" and a restaurant's read "restaurant". The noun is `App\Enums\TenantType::noun()`, sent by `HandleGuestAppRequests`; React never holds the list of types.
+A chrome string that names the business says "tenant", whatever the tenant's type. The guest app is sent no type at all.
 
 ## Nothing waits on a blank screen
 Two layers, and both are needed because they cover different gaps:

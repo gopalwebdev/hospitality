@@ -7,32 +7,25 @@ use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
- * Move a category, and everything in it, onto another of the same
- * tenant's menus.
+ * Move a top-level category onto another of the same tenant's menus, with its
+ * sub-categories and every dish under both.
  *
- * A tenant that splits one card into a lunch and a dinner menu wants to
- * carry a whole section across rather than retype it. Its subdivisions follow
- * by the ON UPDATE CASCADE on the (parent_id, menu_id) key, and the dishes
- * follow because they hang off a category rather than off a menu.
+ * Dishes follow on their own because they hang off a category; sub-categories
+ * carry menu_id, so they are moved with it. Dishes that were featured stop
+ * being featured, because the featured row belongs to a menu.
  *
- * This is the only way a subdivision ever changes menus: its parent moves, and
- * it follows.
- *
- * Two guards, both backstops: MenuArrangementTable states the same rules as
- * validation, so the panel never reaches these. The target menu has to belong
- * to the same tenant — the composite foreign key would refuse otherwise,
- * but only as a 500 — and the name has to be free on the target, because
- * uniqueness is per menu and the expression index would reject the update
- * after the form had already passed.
+ * The guards are backstops: MenuArrangementTable states the same rules as
+ * validation, so the panel never reaches them.
  */
 class MoveCategoryToMenu
 {
     /**
-     * @throws LogicException when the target menu belongs to another
-     *                        tenant, or already has this name on it
+     * @throws LogicException when the target menu belongs to another tenant, the
+     *                        category is a sub-category, or the name is taken there
      */
     public function __invoke(MenuCategory $category, Menu $target): void
     {
@@ -58,34 +51,29 @@ class MoveCategoryToMenu
             'That menu already has a category with this name.',
         );
 
-        // The subdivisions under it are carried across by the ON UPDATE
-        // CASCADE on (parent_id, menu_id); the dishes follow because they carry
-        // menu_category_id rather than menu_id.
-        $category->update(['menu_id' => $target->getKey()]);
+        DB::transaction(function () use ($category, $target): void {
+            $category->update(['menu_id' => $target->getKey()]);
 
-        // Featuring is per menu — the featured row is "what *this* menu leads
-        // with" — so a dish that has just left a menu cannot still be at the
-        // top of it, and must not silently appear at the top of the one it
-        // arrived on. It stays on the menu under this category; only the
-        // leading-with stops. MoveItemToCategory applies the same rule to a
-        // single dish. Every dish in the branch counts, which means the
-        // subdivisions' dishes too — they moved menus just as surely.
-        MenuItem::query()
-            ->where('is_featured', true)
-            ->where(fn (Builder $inBranch): Builder => $inBranch
-                ->where('menu_category_id', $category->getKey())
-                ->orWhereIn('menu_category_id', MenuCategory::query()
-                    ->select('id')
-                    ->where('parent_id', $category->getKey())))
-            ->update(['is_featured' => false, 'featured_position' => 0]);
+            MenuCategory::query()
+                ->where('parent_id', $category->getKey())
+                ->update(['menu_id' => $target->getKey()]);
+
+            MenuItem::query()
+                ->where('is_featured', true)
+                ->where(fn (Builder $inBranch): Builder => $inBranch
+                    ->where('menu_category_id', $category->getKey())
+                    ->orWhereIn('menu_category_id', MenuCategory::query()
+                        ->select('id')
+                        ->where('parent_id', $category->getKey())))
+                ->update(['is_featured' => false, 'featured_position' => 0]);
+        });
     }
 
     /**
-     * Whether the menu a category is moving to already has a section of its name.
+     * Whether the target menu already has a top-level category of this name.
      *
-     * Uniqueness is per level, so only the target's own top-level sections
-     * count. The arrangement table asks this as validation and this action asks
-     * it again as a backstop, in the same request, so it is answered once.
+     * Asked by the arrangement table as validation and again here in the same
+     * request, so it is answered once.
      */
     public static function nameIsTakenOn(MenuCategory $category, int $menuId): bool
     {

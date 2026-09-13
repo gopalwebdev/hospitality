@@ -2,10 +2,9 @@
 
 namespace App\Filament\Tenant\Resources\HomeRows\Schemas;
 
-use App\Filament\Tenant\CurrentTenant;
 use App\Enums\HomeTileAction;
-use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Models\HomeTile;
 use App\Models\Tenant;
 use Filament\Facades\Filament;
@@ -79,7 +78,7 @@ class HomeTileForm
 
                         // Exactly one of the next three is filled, decided by
                         // the action above. The model clears the others on save
-                        // and refuses a tile with none — see HomeTile::booted().
+                        // and refuses a tile with none — see HomeTileObserver.
                         Select::make('menu_id')
                             ->label(__('panel.tiles.menu_to_open'))
                             ->options(fn (): array => MenuCategoryForm::menuOptions())
@@ -88,7 +87,7 @@ class HomeTileForm
                             ->prefixIcon(Heroicon::OutlinedBookOpen)
                             ->visible(fn (Get $get): bool => self::actionIs($get, HomeTileAction::Menu))
                             ->required(fn (Get $get): bool => self::actionIs($get, HomeTileAction::Menu))
-                            ->helperText(__('panel.tiles.menu_to_open_help', ['type' => CurrentTenant::noun()])),
+                            ->helperText(__('panel.tiles.menu_to_open_help')),
 
                         TextInput::make('url')
                             ->label(__('panel.tiles.link'))

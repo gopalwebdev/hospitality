@@ -7,8 +7,8 @@ use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\Users\Pages\CreateUser;
 use App\Filament\Tenant\Resources\Users\Pages\EditUser;
 use App\Filament\Tenant\Resources\Users\Pages\ListUsers;
-use App\Models\Tenant;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -54,7 +54,7 @@ it('keeps staff off the users page', function (): void {
     $user->assignRole(RoleEnum::Staff->value);
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard/users')
+        ->get('http://t1.tenant-app.test/dashboard/users')
         ->assertForbidden();
 });
 
@@ -65,7 +65,7 @@ it('serves the users page to a tenant admin', function (): void {
     $user->assignRole(RoleEnum::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard/users')
+        ->get('http://t1.tenant-app.test/dashboard/users')
         ->assertOk();
 });
 
@@ -107,7 +107,7 @@ it('answers not found for a user of another tenant', function (): void {
 
     // Not 403: a tenant must not learn that an account exists elsewhere.
     $this->actingAs($admin)
-        ->get("http://t1.restaurant-app.test/dashboard/users/{$stranger->getKey()}/edit")
+        ->get("http://t1.tenant-app.test/dashboard/users/{$stranger->getKey()}/edit")
         ->assertNotFound();
 });
 

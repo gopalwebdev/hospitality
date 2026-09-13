@@ -67,6 +67,16 @@ it('leaves other users codes alone', function (): void {
     expect($theirs->fresh()->hasBeenConsumed())->toBeFalse();
 });
 
+it('takes any code on a local machine while sign-in codes are set aside', function (): void {
+    // Temporary, for development: no code has been issued and this one is
+    // wrong, and on a local machine it still signs in. Every other
+    // environment, this suite's included, checks the code.
+    app()->detectEnvironment(fn (): string => 'local');
+
+    expect(app(VerifyOneTimePassword::class)(User::factory()->create(), '000000'))
+        ->toBe(OtpVerificationResult::Verified);
+});
+
 /*
 |--------------------------------------------------------------------------
 | Delivering codes

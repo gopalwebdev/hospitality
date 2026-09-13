@@ -17,17 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * One business on the platform, and the tenant boundary everything it owns is
- * scoped to. `type` says whether it is a hotel or a restaurant: the panel and
- * the guest app are the same for both, and the type decides what they call it.
- *
- * The slug doubles as the subdomain, so `t1` is served at
- * t1.restaurant-app.com and administered at t1.restaurant-app.com/dashboard.
- *
- * The address and contact details are the platform's record of the business,
- * entered by a super admin when the tenant is onboarded. What guests see
- * on the storefront lives in TenantSetting instead, and the tenant
- * edits that itself.
+ * One business on the platform, and the boundary everything it owns is scoped
+ * to. The slug is its subdomain: `t1` is served at t1.tenant-app.com.
  *
  * @property int $id
  * @property string $slug
@@ -52,17 +43,12 @@ class Tenant extends Model
     /** @use HasFactory<TenantFactory> */
     use HasFactory;
 
-    /**
-     * Bind tenants by slug so route and tenant resolution share one key.
-     */
     public function getRouteKeyName(): string
     {
         return 'slug';
     }
 
     /**
-     * The staff and administrators attached to this tenant.
-     *
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany
@@ -71,8 +57,6 @@ class Tenant extends Model
     }
 
     /**
-     * How this tenant is configured.
-     *
      * @return HasOne<TenantSetting, $this>
      */
     public function settings(): HasOne
@@ -81,8 +65,6 @@ class Tenant extends Model
     }
 
     /**
-     * The menus this tenant serves.
-     *
      * @return HasMany<Menu, $this>
      */
     public function menus(): HasMany
@@ -91,9 +73,6 @@ class Tenant extends Model
     }
 
     /**
-     * The rows of the home screen a guest lands on after scanning a table's
-     * QR code, each holding its own tiles.
-     *
      * @return HasMany<HomeRow, $this>
      */
     public function homeRows(): HasMany
@@ -102,8 +81,6 @@ class Tenant extends Model
     }
 
     /**
-     * Every tile on this tenant's home screen, across all of its rows.
-     *
      * @return HasMany<HomeTile, $this>
      */
     public function homeTiles(): HasMany
@@ -112,8 +89,6 @@ class Tenant extends Model
     }
 
     /**
-     * Limit the query to tenants that are open for business.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeActive(Builder $query): void
@@ -122,12 +97,7 @@ class Tenant extends Model
     }
 
     /**
-     * How many accounts may hold this role on this tenant's roster.
-     *
-     * Null for a role this tenant does not cap — only Admin and Staff are
-     * bounded for now. A super admin sets both limits per tenant from
-     * TenantForm; config/tenants.php only supplies what a newly
-     * created tenant starts with.
+     * How many accounts may hold a role here, or null where the role is not capped.
      */
     public function roleLimit(RoleEnum $role): ?int
     {
@@ -139,52 +109,26 @@ class Tenant extends Model
     }
 
     /**
-     * How many accounts holding this role are on this tenant's roster
-     * right now.
-     *
-     * Roles are held per account, not per tenant (see
-     * .ai/rules/tenants.md), so this counts roster members who happen to
-     * hold the role — someone staffing this tenant and another still
-     * counts once here, against this tenant's own limit. Pass the account
-     * a grant is being considered for as $excluding so it never counts
-     * against its own limit.
+     * How many accounts on this roster hold a role, never counting $excluding.
      */
     public function roleHolderCount(RoleEnum $role, ?User $excluding = null): int
     {
-        // Read into a local before the closure: `when()`'s condition and its
-        // callback are evaluated separately, so the null check outside does
-        // not reach inside — to a reader or to static analysis.
-        $excludedKey = ($excluding instanceof User && $excluding->exists)
-            ? $excluding->getKey()
-            : null;
+        $excludedKey = ($excluding instanceof User && $excluding->exists) ? $excluding->getKey() : null;
 
         return $this->users()
             ->role($role->value)
-            ->when(
-                $excludedKey !== null,
-                fn (Builder $query): Builder => $query->whereKeyNot($excludedKey),
-            )
+            ->when($excludedKey !== null, fn (Builder $query): Builder => $query->whereKeyNot($excludedKey))
             ->count();
     }
 
     /**
-     * This tenant's settings, read once and remembered on the model.
-     *
-     * Currency, tax and whether orders are open are each asked for several
-     * times while one page renders — by the guest middleware, a controller, and
-     * every price on a panel table — and each used to issue its own query for
-     * its own column. Loading the row once and keeping it as the `settings`
-     * relation means the first question pays for all of them, and a list that
-     * eager loaded `settings` pays nothing. It is never a lazy load, so it is
-     * safe on a model that came out of a collection.
+     * The settings row, read once and kept as the `settings` relation so it is
+     * never a lazy load.
      */
     public function resolvedSettings(): ?TenantSetting
     {
         if (! $this->relationLoaded('settings')) {
-            $this->setRelation(
-                'settings',
-                TenantSetting::query()->where('tenant_id', $this->getKey())->first(),
-            );
+            $this->setRelation('settings', TenantSetting::query()->where('tenant_id', $this->getKey())->first());
         }
 
         $settings = $this->getRelation('settings');
@@ -192,59 +136,34 @@ class Tenant extends Model
         return $settings instanceof TenantSetting ? $settings : null;
     }
 
-    /**
-     * The currency this tenant prices in.
-     *
-     * Every price on a menu shares one, so resolve it once and pass it down
-     * rather than asking per dish.
-     */
     public function currency(): Currency
     {
         return $this->resolvedSettings()->currency ?? Currency::IndianRupee;
     }
 
-    /**
-     * The GST rate this tenant charges on anything that names no rate.
-     */
     public function taxRateBasisPoints(): int
     {
-        return $this->resolvedSettings()?->taxRateBasisPoints()
-            ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+        return $this->resolvedSettings()?->taxRateBasisPoints() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 
-    /**
-     * Whether this tenant is taking new orders right now.
-     */
     public function isAcceptingOrders(): bool
     {
         return $this->resolvedSettings()->accepts_orders ?? false;
     }
 
     /**
-     * Where this tenant's admins and staff sign in: /login on its subdomain.
-     *
-     * That address sends someone signed out to the panel's sign-in page and
-     * someone signed in to /dashboard — see PanelSignInController.
+     * /login on this tenant's subdomain, which leads into its panel.
      */
     public function signInUrl(): string
     {
         return route('tenant.login', ['tenant' => $this->slug]);
     }
 
-    /**
-     * The phone number as it is dialled, calling code and all.
-     *
-     * The two halves are stored apart so each column holds one fact; putting
-     * them back together is a display concern and lives here.
-     */
     public function dialablePhone(): string
     {
         return $this->phone_country_code->dialPrefix().' '.$this->phone;
     }
 
-    /**
-     * The secondary phone number as it is dialled, where there is one.
-     */
     public function dialableSecondaryPhone(): ?string
     {
         if (blank($this->secondary_phone) || ! $this->secondary_phone_country_code instanceof CountryCallingCode) {

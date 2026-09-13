@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import Home from '@/pages/guest/home';
 
-const tenant = { name: 'Spice Garden', slug: 'spice', typeNoun: 'hotel' };
+const tenant = { name: 'Spice Garden', slug: 'spice' };
 
 type HomeProps = Parameters<typeof Home>[0];
 type RowProp = HomeProps['rows'][number];
@@ -13,8 +13,8 @@ function tile(overrides: Partial<TileProp> = {}): TileProp {
     return {
         id: 1,
         label: 'Menu',
-        imageUrl: 'http://spice.restaurant-app.test/tiles/1/image',
-        href: 'http://spice.restaurant-app.test/menus/1',
+        imageUrl: 'http://spice.tenant-app.test/tiles/1/image',
+        href: 'http://spice.tenant-app.test/menus/1',
         isExternal: false,
         ...overrides,
     };
@@ -104,7 +104,7 @@ describe('guest home', () => {
                             tile({
                                 id: 7,
                                 label: 'Wine list',
-                                href: 'http://spice.restaurant-app.test/tiles/7',
+                                href: 'http://spice.tenant-app.test/tiles/7',
                             }),
                         ],
                     }),
@@ -194,10 +194,7 @@ describe('guest home', () => {
     it('says so plainly when the tenant has arranged nothing yet', () => {
         render(<Home tenant={tenant} rows={[]} />);
 
-        // The stub's `:type` is filled with the tenant's own noun.
-        expect(
-            screen.getByText('No home screen at this hotel yet.'),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/no home screen yet/i)).toBeInTheDocument();
         expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
 });

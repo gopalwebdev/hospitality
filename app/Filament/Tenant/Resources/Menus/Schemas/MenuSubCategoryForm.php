@@ -43,8 +43,8 @@ class MenuSubCategoryForm
                 Section::make(__('panel.sub_categories.section'))
                     ->icon(Heroicon::OutlinedSquares2x2)
                     ->schema([
-                        // Only this menu's categories, and the composite
-                        // foreign key refuses anything else even if the
+                        // Only this menu's categories; MenuCategoryObserver
+                        // refuses a parent on any other menu even if the
                         // submitted id is tampered with.
                         Select::make('parent_id')
                             ->label(__('panel.categories.section'))
@@ -60,9 +60,8 @@ class MenuSubCategoryForm
                             'name',
                             __('panel.shared.name'),
                             maxLength: 64,
-                            // Unique within the category, matching the
-                            // expression index: two categories of one menu may
-                            // each have a "Chicken".
+                            // Unique within the category: two categories of
+                            // one menu may each have a "Chicken".
                             uniqueWithin: fn (Get $get): Builder => MenuCategory::query()
                                 ->where('parent_id', $get('parent_id')),
                             uniqueMessage: __('panel.sub_categories.unique'),

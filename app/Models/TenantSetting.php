@@ -11,16 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * How one tenant is configured.
- *
- * Exactly one row per tenant, enforced by a unique key on tenant_id.
- *
- * It carries the tax and the charges every price on the menu is read against:
- * the default GST rate a dish falls back to, whether the prices already include
- * it, and the two optional charges. Each charge is a switch and an amount
- * rather than an amount alone, so "we do not levy a service charge" is a thing
- * a tenant can say — which matters here, because the CCPA's 2022 guidelines
- * make a service charge voluntary rather than something a bill may assume.
+ * How one tenant is configured: contact details, the GST every price is read
+ * against, and two optional charges, each a switch plus an amount.
  *
  * @property int $id
  * @property int $tenant_id
@@ -60,32 +52,14 @@ class TenantSetting extends Model
     /** @use HasFactory<TenantSettingFactory> */
     use HasFactory;
 
-    /**
-     * How many basis points make one whole: 100% is 10,000, so 5% is 500.
-     *
-     * Every rate in the application is stored this way — the GST rate here and
-     * on each dish, and the service charge below — so that percentages stay
-     * exact integers, exactly as money stays exact integers in minor units. A
-     * float rate would put rounding error in the middle of an amount that has
-     * to reconcile to the paisa.
-     */
+    /** Every rate is stored in basis points: 100% is 10,000, so 5% is 500. */
     public const int BASIS_POINTS_PER_WHOLE = 10_000;
 
-    /**
-     * What a tenant charges GST at until it says otherwise.
-     *
-     * 5% is standalone restaurant service without input tax credit, which is
-     * what almost every tenant on this platform charges. It is a starting
-     * point, not a constraint: rates are typed, because India's GST 2.0 reform
-     * of September 2025 restructured the slabs and the next notification may do
-     * so again.
-     */
+    /** The GST rate a tenant starts on until it types its own. */
     public const int DEFAULT_TAX_RATE_BASIS_POINTS = 500;
 
     /**
-     * The database defaults only land on insert, so an unsaved row would throw
-     * under Model::shouldBeStrict() when the settings page reads it before the
-     * first save. Same reason as User::$attributes.
+     * Database defaults only land on insert; an unsaved row still has to read under strict mode.
      *
      * @var array<string, mixed>
      */
@@ -101,8 +75,6 @@ class TenantSetting extends Model
     ];
 
     /**
-     * The tenant these settings belong to.
-     *
      * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo
@@ -110,20 +82,13 @@ class TenantSetting extends Model
         return $this->belongsTo(Tenant::class);
     }
 
-    /**
-     * The GST rate a dish falls back to when it names none of its own.
-     */
     public function taxRateBasisPoints(): int
     {
         return $this->tax_rate_basis_points;
     }
 
     /**
-     * The service charge on an amount, or zero when it is switched off.
-     *
-     * A percentage of what has been ordered, in the same minor units, rounded
-     * once. Switched off is not the same as set to nothing: the switch is what
-     * lets a bill say the tenant does not levy one at all.
+     * The service charge on an amount in minor units, or zero when it is switched off.
      */
     public function serviceChargeOn(int $minorUnits): int
     {
@@ -131,14 +96,9 @@ class TenantSetting extends Model
             return 0;
         }
 
-        return (int) round(
-            $minorUnits * $this->service_charge_basis_points / self::BASIS_POINTS_PER_WHOLE,
-        );
+        return (int) round($minorUnits * $this->service_charge_basis_points / self::BASIS_POINTS_PER_WHOLE);
     }
 
-    /**
-     * The flat charge for packing an order to take away, or zero when off.
-     */
     public function parcelCharge(): int
     {
         return $this->parcel_charge_enabled ? $this->parcel_charge_minor_units : 0;

@@ -17,12 +17,12 @@ beforeEach(function (): void {
 
 function homeUrl(Tenant $tenant): string
 {
-    return 'http://'.$tenant->slug.'.restaurant-app.test/';
+    return 'http://'.$tenant->slug.'.tenant-app.test/';
 }
 
 function tileUrl(Tenant $tenant, HomeTile $tile, string $suffix = ''): string
 {
-    return 'http://'.$tenant->slug.'.restaurant-app.test/tiles/'.$tile->getKey().$suffix;
+    return 'http://'.$tenant->slug.'.tenant-app.test/tiles/'.$tile->getKey().$suffix;
 }
 
 /*

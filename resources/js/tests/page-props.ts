@@ -14,7 +14,7 @@ import type { TenantSharedProps, Translations } from '@/types';
  */
 
 const DEFAULT_TRANSLATIONS: Translations = {
-    home: { title: 'Welcome', empty: 'No home screen at this :type yet.' },
+    home: { title: 'Welcome', empty: 'No home screen yet.' },
     menu: {
         title: 'Menu',
         empty: 'This menu is not ready yet.',
@@ -44,7 +44,7 @@ const DEFAULT_TRANSLATIONS: Translations = {
 };
 
 const DEFAULTS: TenantSharedProps = {
-    tenant: { name: 'Spice Garden', slug: 'spice', typeNoun: 'restaurant' },
+    tenant: { name: 'Spice Garden', slug: 'spice' },
     locale: {
         current: 'en',
         next: 'ta',

@@ -71,9 +71,6 @@ class HandleGuestAppRequests extends Middleware
             'tenant' => Inertia::once(fn (): ?array => $tenant instanceof Tenant ? [
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
-                // What the chrome calls this tenant in a sentence — "This
-                // hotel has not set up its home screen yet".
-                'typeNoun' => $tenant->type->noun(),
             ] : null),
             // A code and a scale rather than a formatted string, because prices
             // are formatted in the browser — see resources/js/lib/money.ts.

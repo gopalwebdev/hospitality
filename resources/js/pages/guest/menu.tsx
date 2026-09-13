@@ -66,7 +66,7 @@ export interface Charges {
 }
 
 interface MenuProps {
-    tenant: { name: string; slug: string; typeNoun: string } | null;
+    tenant: { name: string; slug: string } | null;
     menu: {
         id: number;
         name: string;

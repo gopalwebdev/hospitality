@@ -18,8 +18,7 @@ class MenuItemAdditionFactory extends Factory
     public function definition(): array
     {
         // The dish brings the tenant with it, for the same reason
-        // MenuItemFactory takes its tenant from the category: the two
-        // halves of a composite key must never be chosen independently.
+        // MenuItemFactory takes its tenant from the category.
         $item = MenuItem::factory();
 
         $name = fake()->unique()->randomElement([

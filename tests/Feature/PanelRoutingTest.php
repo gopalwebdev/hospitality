@@ -23,9 +23,9 @@ beforeEach(function (): void {
 */
 
 it('serves the product team panel on the root domain', function (): void {
-    $this->get('http://restaurant-app.test/dashboard/login')
+    $this->get('http://tenant-app.test/dashboard/login')
         ->assertOk()
-        ->assertSee('Hotel & Restaurant Platform');
+        ->assertSee('Tenant Platform');
 });
 
 it('serves each panel from the path its enum declares', function (FilamentPanel $panel): void {
@@ -33,8 +33,8 @@ it('serves each panel from the path its enum declares', function (FilamentPanel 
 })->with(FilamentPanel::cases());
 
 it('sends a guest on the product team panel to its own sign-in', function (): void {
-    $this->get('http://restaurant-app.test/dashboard/tenants')
-        ->assertRedirect('http://restaurant-app.test/dashboard/login');
+    $this->get('http://tenant-app.test/dashboard/tenants')
+        ->assertRedirect('http://tenant-app.test/dashboard/login');
 });
 
 it('does not serve the product team panel from a tenant subdomain', function (): void {
@@ -42,19 +42,19 @@ it('does not serve the product team panel from a tenant subdomain', function ():
 
     // Same path, other host: /dashboard on a subdomain is that tenant's panel,
     // and the product team's pages are not part of it.
-    $this->get('http://t1.restaurant-app.test/dashboard/login')
+    $this->get('http://t1.tenant-app.test/dashboard/login')
         ->assertOk()
-        ->assertDontSee('Hotel & Restaurant Platform');
+        ->assertDontSee('Tenant Platform');
 
-    $this->get('http://t1.restaurant-app.test/dashboard/tenants')->assertNotFound();
+    $this->get('http://t1.tenant-app.test/dashboard/tenants')->assertNotFound();
 });
 
 it('serves the tenant panel on a tenant subdomain', function (): void {
     Tenant::factory()->create(['slug' => 't1']);
 
-    $this->get('http://t1.restaurant-app.test/dashboard/login')
+    $this->get('http://t1.tenant-app.test/dashboard/login')
         ->assertOk()
-        ->assertDontSee('Hotel & Restaurant Platform');
+        ->assertDontSee('Tenant Platform');
 });
 
 it('serves both panels under /dashboard, told apart by host', function (): void {
@@ -64,19 +64,19 @@ it('serves both panels under /dashboard, told apart by host', function (): void 
     // a tenant before signing in — so the root domain's /dashboard/login is the
     // product team's, and a tenant's link is its subdomain's /login.
     expect(route('filament.platform.auth.login'))
-        ->toBe('http://restaurant-app.test/dashboard/login')
+        ->toBe('http://tenant-app.test/dashboard/login')
         ->and($tenant->signInUrl())
-        ->toBe('http://t1.restaurant-app.test/login');
+        ->toBe('http://t1.tenant-app.test/login');
 });
 
 it('sends someone signed out from /login to the sign-in page of the panel on that host', function (): void {
     Tenant::factory()->create(['slug' => 't1']);
 
-    $this->get('http://restaurant-app.test/login')
-        ->assertRedirect('http://restaurant-app.test/dashboard/login');
+    $this->get('http://tenant-app.test/login')
+        ->assertRedirect('http://tenant-app.test/dashboard/login');
 
-    $this->get('http://t1.restaurant-app.test/login')
-        ->assertRedirect('http://t1.restaurant-app.test/dashboard/login');
+    $this->get('http://t1.tenant-app.test/login')
+        ->assertRedirect('http://t1.tenant-app.test/dashboard/login');
 });
 
 it('sends someone already signed in from /login straight to /dashboard', function (): void {
@@ -95,18 +95,18 @@ it('sends someone already signed in from /login straight to /dashboard', functio
     }, [Role::Admin, Role::Staff]);
 
     $this->actingAs($productTeam)
-        ->get('http://restaurant-app.test/login')
-        ->assertRedirect('http://restaurant-app.test/dashboard');
+        ->get('http://tenant-app.test/login')
+        ->assertRedirect('http://tenant-app.test/dashboard');
 
     // The tenant panel is one door for everyone who works there: staff
     // arrive exactly where admins do.
     foreach ($members as $member) {
         $this->actingAs($member)
-            ->get('http://t1.restaurant-app.test/login')
-            ->assertRedirect('http://t1.restaurant-app.test/dashboard');
+            ->get('http://t1.tenant-app.test/login')
+            ->assertRedirect('http://t1.tenant-app.test/dashboard');
 
         $this->actingAs($member)
-            ->get('http://t1.restaurant-app.test/dashboard')
+            ->get('http://t1.tenant-app.test/dashboard')
             ->assertOk();
     }
 });
@@ -121,7 +121,7 @@ it('lets a super admin into the product team panel', function (): void {
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertOk();
 });
 
@@ -134,13 +134,13 @@ it('gates the product team panel on the is_super_admin column alone', function (
     }
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertForbidden();
 
     $user->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($user->fresh())
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertOk();
 });
 
@@ -151,7 +151,7 @@ it('keeps a tenant admin out of the product team panel', function (): void {
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertForbidden();
 });
 
@@ -162,7 +162,7 @@ it('lets a tenant admin into their own tenant panel', function (): void {
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard')
+        ->get('http://t1.tenant-app.test/dashboard')
         ->assertOk();
 });
 
@@ -177,7 +177,7 @@ it('stops a tenant admin reaching another tenant by changing the subdomain', fun
     // Filament answers 404 rather than 403 here on purpose: a stranger must not
     // be able to learn that t2 exists by reading the status code.
     $this->actingAs($user)
-        ->get('http://t2.restaurant-app.test/dashboard')
+        ->get('http://t2.tenant-app.test/dashboard')
         ->assertNotFound();
 });
 
@@ -187,15 +187,15 @@ it('lets a super admin support any tenant panel', function (): void {
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard')
+        ->get('http://t1.tenant-app.test/dashboard')
         ->assertOk();
 });
 
 it('redirects a guest on a tenant panel to that tenant login', function (): void {
     Tenant::factory()->create(['slug' => 't1']);
 
-    $this->get('http://t1.restaurant-app.test/dashboard')
-        ->assertRedirect('http://t1.restaurant-app.test/dashboard/login');
+    $this->get('http://t1.tenant-app.test/dashboard')
+        ->assertRedirect('http://t1.tenant-app.test/dashboard/login');
 });
 
 /*
@@ -212,7 +212,7 @@ it('redirects a guest on a tenant panel to that tenant login', function (): void
 it('shows the generic panel name before anyone signs in', function (): void {
     Tenant::factory()->create(['slug' => 't1', 'name' => 'Spice Garden']);
 
-    $this->get('http://t1.restaurant-app.test/dashboard/login')
+    $this->get('http://t1.tenant-app.test/dashboard/login')
         ->assertOk()
         ->assertSee(config('app.name'))
         ->assertDontSee('Spice Garden');
@@ -225,7 +225,7 @@ it("shows the tenant's own name once someone is signed in", function (): void {
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard')
+        ->get('http://t1.tenant-app.test/dashboard')
         ->assertOk()
         ->assertSee('Spice Garden')
         ->assertDontSee(config('app.name'));
@@ -238,7 +238,7 @@ it('gives a super admin no tenant menu to switch tenants from', function (): voi
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://t1.restaurant-app.test/dashboard')
+        ->get('http://t1.tenant-app.test/dashboard')
         ->assertOk()
         ->assertSee('Spice Garden')
         ->assertDontSee('Other Place');

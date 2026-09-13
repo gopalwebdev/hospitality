@@ -27,7 +27,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 /**
  * A tenant's own panel, for its admins and staff alike, served at
- * t1.restaurant-app.com/dashboard and entered through t1.restaurant-app.com/login.
+ * t1.tenant-app.com/dashboard and entered through t1.tenant-app.com/login.
  *
  * The subdomain identifies the tenant, so every resource registered here is
  * automatically scoped to the tenant in the URL.

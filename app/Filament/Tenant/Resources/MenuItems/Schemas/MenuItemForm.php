@@ -4,9 +4,9 @@ namespace App\Filament\Tenant\Resources\MenuItems\Schemas;
 
 use App\Enums\Currency;
 use App\Enums\FoodType;
-use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Models\MenuItem;
 use App\Models\Tenant;
 use Filament\Facades\Filament;
@@ -47,8 +47,8 @@ class MenuItemForm
                         // One select, because a dish is filed under exactly one
                         // category — a section or one of its subdivisions, both
                         // offered here as "Lunch · Biryani › Chicken". Only this
-                        // tenant's are listed, and the composite foreign key
-                        // refuses anything else even if the id is tampered with.
+                        // tenant's are listed, and MenuItemObserver refuses
+                        // anything else even if the id is tampered with.
                         Select::make('menu_category_id')
                             ->label(__('panel.items.section'))
                             ->options(fn (): array => self::sectionOptions())
@@ -156,9 +156,7 @@ class MenuItemForm
      * hasMany with no cache behind it, and the rule does not apply.
      *
      * Additions cannot be dragged from one dish to another: they are edited
-     * inside the dish that owns them, and the composite foreign key on
-     * (menu_item_id, tenant_id) is what makes that structural rather than a
-     * convention.
+     * inside the dish that owns them.
      */
     private static function additions(Currency $currency): Repeater
     {

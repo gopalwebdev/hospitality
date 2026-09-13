@@ -16,6 +16,14 @@ class VerifyOneTimePassword
 {
     public function __invoke(User $user, string $code): OtpVerificationResult
     {
+        // Temporary, for development: on a local machine any code signs in.
+        // Every other environment still checks the code.
+        if (app()->isLocal()) {
+            $user->oneTimePasswords()->whereNull('consumed_at')->update(['consumed_at' => now()]);
+
+            return OtpVerificationResult::Verified;
+        }
+
         $oneTimePassword = $user->oneTimePasswords()
             ->whereNull('consumed_at')
             ->latest('id')

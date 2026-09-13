@@ -6,11 +6,11 @@ use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\Role as RoleEnum;
+use App\Filament\Schemas\PricingFields;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
 use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuFeaturedItems;
-use App\Filament\Schemas\PricingFields;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
@@ -19,8 +19,6 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -30,7 +28,7 @@ beforeEach(function (): void {
 /**
  * Find a record by the English half of its translated name.
  *
- * Every unique index in the schema is built on this value, and so is every
+ * Every uniqueness rule is checked on this value, and so is every
  * lookup here — matching the whole JSON document would only find a record whose
  * every language happened to agree.
  *
@@ -140,7 +138,7 @@ it('requires the fallback language on a menu', function (): void {
     enterTenantPanel($tenant, RoleEnum::Admin);
 
     // Tamil alone would leave an English-reading guest with a blank heading,
-    // and there would be nothing for the unique index to be built on.
+    // and there would be no English name for uniqueness to check.
     Livewire::test(ListMenus::class)
         ->callAction('create', ['name' => [Locale::Tamil->value => 'இரவு உணவு'], 'position' => 0, 'is_active' => true])
         ->assertHasActionErrors(['name.'.Locale::English->value]);
@@ -264,19 +262,15 @@ it('lets two tenants both have a section of the same name', function (): void {
         ->count())->toBe(2);
 });
 
-it('refuses at the database to file a section under another tenant\'s menu', function (): void {
+it('refuses a section on another tenant\'s menu, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirMenu = Menu::factory()->create(['tenant_id' => $theirs->getKey()]);
 
-    expect(fn () => DB::table('menu_categories')->insert([
+    expect(fn () => MenuCategory::factory()->create([
         'tenant_id' => $mine->getKey(),
         'menu_id' => $theirMenu->getKey(),
-        'name' => json_encode([Locale::English->value => 'Smuggled'], JSON_THROW_ON_ERROR),
-        'is_active' => true,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+    ]))->toThrow(LogicException::class, 'another tenant');
 });
 
 it('reads a menu as one tree without grouping or ordering on a translated column', function (): void {
@@ -504,22 +498,17 @@ it('takes a dish\'s additions with it when it is deleted', function (): void {
     expect(MenuItemAddition::query()->whereKey($addition->getKey())->exists())->toBeFalse();
 });
 
-it('refuses at the database to hang an addition off another tenant\'s dish', function (): void {
+it('refuses an addition on another tenant\'s dish, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirItem = MenuItem::factory()->inCategory(
         MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))->create(),
     )->create();
 
-    expect(fn () => DB::table('menu_item_additions')->insert([
+    expect(fn () => MenuItemAddition::factory()->create([
         'tenant_id' => $mine->getKey(),
         'menu_item_id' => $theirItem->getKey(),
-        'name' => json_encode([Locale::English->value => 'Smuggled'], JSON_THROW_ON_ERROR),
-        'price_minor_units' => 1000,
-        'is_available' => true,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+    ]))->toThrow(LogicException::class, 'another tenant');
 });
 
 /*
@@ -574,7 +563,7 @@ it('refuses to file a dish under another tenant\'s section', function (): void {
 
     // Only this tenant's sections are offered, and Filament validates the
     // submitted value against that list — so a tampered id is rejected here,
-    // before the composite foreign key would have refused the row anyway.
+    // before MenuItemObserver would have refused the row anyway.
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Smuggled'],
@@ -590,25 +579,19 @@ it('refuses to file a dish under another tenant\'s section', function (): void {
         ->exists())->toBeFalse();
 });
 
-it('refuses at the database to file a dish under another tenant\'s section', function (): void {
+it('refuses a dish in another tenant\'s section, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
     $theirCategory = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))
         ->create();
 
-    // The composite foreign key is the guarantee behind the tenant scope: even
-    // a tampered request cannot store a dish pointing across tenants.
-    expect(fn () => DB::table('menu_items')->insert([
+    // MenuItemObserver is the guarantee behind the tenant scope: code that goes
+    // around the form still cannot store a dish pointing across tenants.
+    expect(fn () => MenuItem::factory()->create([
         'tenant_id' => $mine->getKey(),
         'menu_category_id' => $theirCategory->getKey(),
-        'name' => json_encode([Locale::English->value => 'Smuggled'], JSON_THROW_ON_ERROR),
-        'price_minor_units' => 1000,
-        'food_type' => FoodType::Vegetarian->value,
-        'availability' => ItemAvailability::Available->value,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+    ]))->toThrow(LogicException::class, 'another tenant');
 });
 
 it('takes a section\'s dishes with it when it is deleted', function (): void {
@@ -1006,7 +989,7 @@ it('refuses to refile a dish under a name the target category already has', func
 
     // The form's uniqueness rule is scoped to the category chosen in it, so
     // changing that select revalidates the name against where the dish is
-    // going — caught here rather than at the expression index.
+    // going — the only place a duplicate is caught.
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($moving), [
             'menu_category_id' => $to->getKey(),

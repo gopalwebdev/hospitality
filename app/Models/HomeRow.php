@@ -15,14 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One band of the home screen a guest lands on.
- *
- * A tenant arranges its shop window as rows, drags them into the order it
- * wants them read, and chooses what each one looks like. The row owns the
- * layout; the tiles inside it own their destinations. See App\Enums\HomeRowLayout.
- *
- * The title is optional — a banner into the menu speaks for itself — and is a
- * translated column like every other word a guest reads.
+ * One band of the home screen. The row owns the layout; its tiles own their destinations.
  *
  * @property int $id
  * @property int $tenant_id
@@ -42,14 +35,10 @@ class HomeRow extends Model
 
     use HasTranslatedNames;
 
-    /**
-     * @var list<string>
-     */
+    /** @var list<string> */
     public array $translatable = ['title'];
 
-    /**
-     * @var array<string, mixed>
-     */
+    /** @var array<string, mixed> */
     protected $attributes = [
         'layout' => HomeRowLayout::Banner->value,
         'position' => 0,
@@ -57,8 +46,6 @@ class HomeRow extends Model
     ];
 
     /**
-     * The tenant whose home screen this row is on.
-     *
      * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo
@@ -67,8 +54,6 @@ class HomeRow extends Model
     }
 
     /**
-     * The tiles in this row, in the order the tenant dragged them into.
-     *
      * @return HasMany<HomeTile, $this>
      */
     public function tiles(): HasMany
@@ -77,8 +62,6 @@ class HomeRow extends Model
     }
 
     /**
-     * Limit the query to rows a guest should see.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeActive(Builder $query): void
@@ -87,8 +70,6 @@ class HomeRow extends Model
     }
 
     /**
-     * Order the way the tenant arranged the home screen.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeInDisplayOrder(Builder $query): void

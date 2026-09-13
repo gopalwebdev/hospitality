@@ -2,10 +2,10 @@
 
 namespace App\Filament\Tenant\Resources\MenuItems;
 
+use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Filament\Tenant\Resources\MenuItems\Tables\MenuItemsTable;
-use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuItem;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -17,10 +17,9 @@ use Filament\Tables\Table;
  * What this tenant sells.
  *
  * Scoping is Filament's: the panel has a tenant, so every query here is limited
- * to the tenant in the subdomain and new rows are stamped with it. The
- * composite foreign key on (menu_category_id, tenant_id) is the second
- * half of that — even a tampered form cannot file an item under another
- * tenant's section, because the database refuses the row.
+ * to the tenant in the subdomain and new rows are stamped with it.
+ * MenuItemObserver is the second half of that — even a tampered form cannot
+ * file an item under another tenant's section.
  *
  * Who may use the page is MenuItemPolicy's business: menu.view to look,
  * menu.manage to change anything.

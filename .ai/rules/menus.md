@@ -42,7 +42,7 @@ Nothing is created, deleted **or featured** there. The page has no actions at al
 
 `featured_position` is deliberately separate from `position`, which orders a dish inside its category. A dish answers both at once and the two orders are unrelated.
 
-Featuring belongs to one menu, so a dish carried to a category on **another** menu is unfeatured on the way — by `MenuItem::booted()` for a single dish and by `MoveCategoryToMenu` for a whole branch. Without that, a dish would appear at the top of a menu nobody had chosen it for, at whatever `featured_position` it happened to hold.
+Featuring belongs to one menu, so a dish carried to a category on **another** menu is unfeatured on the way — by `MenuItemObserver` for a single dish and by `MoveCategoryToMenu` for a whole branch. Without that, a dish would appear at the top of a menu nobody had chosen it for, at whatever `featured_position` it happened to hold.
 
 ## Combos hang off the menu, and are priced on their own
 `menu_combos` sits beside the featured rail rather than under a category: a combo is something a menu leads with, not something in a category, and "which category does a burger meal belong to" is a question with no answer worth having.

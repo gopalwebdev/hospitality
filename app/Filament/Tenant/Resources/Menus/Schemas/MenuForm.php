@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
-use App\Filament\Tenant\CurrentTenant;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use Filament\Forms\Components\TimePicker;
@@ -41,7 +40,7 @@ class MenuForm
                         // two tenants may both have a "Dinner" and one
                         // tenant may not have it twice.
                         uniqueWithin: fn (): Builder => Menu::query(),
-                        uniqueMessage: __('panel.menus.unique', ['type' => CurrentTenant::noun()]),
+                        uniqueMessage: __('panel.menus.unique'),
                     )),
 
                 Section::make(__('panel.menus.description_section'))

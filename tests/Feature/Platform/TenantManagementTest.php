@@ -58,7 +58,7 @@ it('keeps a tenant admin out of the tenants page', function (): void {
     $user->assignRole(Role::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/tenants')
+        ->get('http://tenant-app.test/dashboard/tenants')
         ->assertForbidden();
 });
 
@@ -66,7 +66,7 @@ it('serves the tenants page to the product team', function (): void {
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/tenants')
+        ->get('http://tenant-app.test/dashboard/tenants')
         ->assertOk();
 });
 
@@ -324,16 +324,16 @@ it('lists every tenant on the platform', function (): void {
 });
 
 it('shows what kind of business each tenant is, and filters on it', function (): void {
-    $hotel = Tenant::factory()->hotel()->create();
-    $restaurant = Tenant::factory()->create();
+    $ofOneType = Tenant::factory()->create(['type' => TenantType::Hotel]);
+    $ofTheOther = Tenant::factory()->create(['type' => TenantType::Restaurant]);
     enterProductTeamPanel();
 
     Livewire::test(ListTenants::class)
-        ->assertTableColumnFormattedStateSet('type', 'Hotel', $hotel)
-        ->assertTableColumnFormattedStateSet('type', 'Restaurant', $restaurant)
+        ->assertTableColumnFormattedStateSet('type', 'Hotel', $ofOneType)
+        ->assertTableColumnFormattedStateSet('type', 'Restaurant', $ofTheOther)
         ->filterTable('type', TenantType::Hotel->value)
-        ->assertCanSeeTableRecords([$hotel])
-        ->assertCanNotSeeTableRecords([$restaurant]);
+        ->assertCanSeeTableRecords([$ofOneType])
+        ->assertCanNotSeeTableRecords([$ofTheOther]);
 });
 
 it("links straight to a tenant's own admin sign-in, now that the tenant menu is off", function (): void {

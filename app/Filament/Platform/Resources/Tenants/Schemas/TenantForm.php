@@ -42,10 +42,7 @@ class TenantForm
                                 $set('slug', Str::slug((string) $state));
                             }),
 
-                        // What the tenant's own panel and guest app call it —
-                        // "this hotel", "this restaurant". No default, so
-                        // onboarding has to say which, and it stays editable
-                        // because nothing a tenant sets up depends on it yet.
+                        // No default, so onboarding has to choose; editable afterwards.
                         Select::make('type')
                             ->options(TenantType::options())
                             ->enum(TenantType::class)

@@ -18,7 +18,7 @@ namespace App\Enums;
  * deleted; do not reintroduce a second copy of the chrome.
  *
  * English is the default and the fallback, which is also why it is the locale
- * the database's unique indexes are built on — see App\Models\Concerns\HasTranslatedNames.
+ * every uniqueness rule checks — see App\Models\Concerns\HasTranslatedNames.
  */
 enum Locale: string
 {

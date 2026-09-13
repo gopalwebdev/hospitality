@@ -49,7 +49,7 @@ return [
         'service_window' => 'Hours served',
         'available_from' => 'Served from',
         'available_until' => 'Served until',
-        'unique' => 'This :type already has a menu with that name.',
+        'unique' => 'This tenant already has a menu with that name.',
         'delete_warning' => 'Every section on this menu is deleted with it, and every dish in those sections. Hide it instead to take it off the storefront and keep everything.',
     ],
 
@@ -95,7 +95,7 @@ return [
         'move' => 'Move to another menu',
         'move_help' => 'The category keeps its sub-categories, its dishes and its order; only the menu it sits on changes. Dishes it was leading with stop being featured, because the featured row belongs to a menu.',
         'move_target' => 'Menu to move it to',
-        'move_none' => 'This :type has only one menu, so there is nowhere to move this to.',
+        'move_none' => 'This tenant has only one menu, so there is nowhere to move this to.',
         'moved' => 'Moved to another menu',
     ],
 
@@ -199,7 +199,7 @@ return [
         'on_tap' => 'On tap',
         'goes_to' => 'Goes to',
         'menu_to_open' => 'Menu to open',
-        'menu_to_open_help' => 'Only this :type\'s menus. A tile pointing at a hidden menu stops being shown.',
+        'menu_to_open_help' => 'Only this tenant\'s menus. A tile pointing at a hidden menu stops being shown.',
         'document' => 'PDF to show',
         'document_help' => 'Up to 10 MB. Shown inside the app, with a back arrow out of it.',
         'an_uploaded_pdf' => 'An uploaded PDF',

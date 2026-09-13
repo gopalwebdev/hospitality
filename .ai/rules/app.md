@@ -45,7 +45,7 @@ Lowering a limit below the tenant's current roster is refused at the form field 
 ## Say "product team", not "platform staff"
 The people who run the whole product are the **product team** — that is the vocabulary in class names, method names, comments and UI copy: `isProductTeamOnly()`, `productTeamOnlyValues()`, `belongsToProductTeam()`, `enterProductTeamPanel()`, and "Product team" wherever a null tenant is rendered.
 
-"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every tenant on the platform", and the platform panel's brand name "Hotel & Restaurant Platform". The distinction is people versus product — do not rename those back.
+"Platform" is still correct for the *software*, and is deliberately kept: "accounts are platform-wide", "every tenant on the platform", and the platform panel's brand name "Tenant Platform". The distinction is people versus product — do not rename those back.
 
 ## Three surfaces: two Filament panels and the guest app
 Settled architecture, one surface per audience:
@@ -65,7 +65,7 @@ Keeping the guest app the only Inertia surface on a subdomain is what keeps its 
 
 Subdividing is optional, and the depth is capped at two. A dish names exactly one category whichever level it sits on, so there is no (category, sub-category) pair to keep consistent — that is the whole reason the two levels share a table. A separate `menu_sub_categories` table was built first and replaced; see `.ai/rules/models.md` for what the merge bought.
 
-There is deliberately no third level. `MenuCategory::booted()` refuses a parent that is itself nested, because no foreign key can express that and arbitrary nesting brings cycle checks and an ordering story nobody has asked for.
+There is deliberately no third level. `MenuCategoryObserver` refuses a parent that is itself nested, because no constraint can express that and arbitrary nesting brings cycle checks and an ordering story nobody has asked for.
 
 Alongside the sections, a menu carries `menu_combos` — bundles sold at one price, each listing existing dishes in `menu_combo_items` with a quantity. A combo hangs off the **menu** rather than a category, because it is something the menu leads with rather than something in a section, and its price is its own: a combo exists precisely because it costs less than the sum of its parts, so nothing derives one from the other.
 
@@ -79,17 +79,17 @@ A menu carries two **rails** as well as its categories: the dishes the tenant le
 
 Every list a guest reads is ordered by `position` within its own parent — the blocks of a menu, subdivisions within a category, dishes within a category, additions within a dish — and each is dragged into that order in the panel, on one screen: the menu's arrangement (`.ai/rules/menus.md`). Nothing is ordered alphabetically, and nothing is ordered across parents.
 
-Featuring belongs to **one menu**, so a dish that leaves a menu stops being featured — `MenuItem::booted()` clears the flag when a dish's category crosses menus, and `MoveCategoryToMenu` clears it for a whole branch, rather than letting a dish appear at the top of a menu nobody chose it for.
+Featuring belongs to **one menu**, so a dish that leaves a menu stops being featured — `MenuItemObserver` clears the flag when a dish's category crosses menus, and `MoveCategoryToMenu` clears it for a whole branch, rather than letting a dish appear at the top of a menu nobody chose it for.
 
 Prices carry an optional `compare_at_price_minor_units` — the higher "was" price shown struck through — which is null on almost every row, because null is how a dish says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option.
 
-`menu_items`, `menu_item_additions` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as restaurant service — override it. See the settings page for the global rate, `prices_include_tax`, and the two optional charges.
+`menu_items`, `menu_item_additions` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as food service — override it. See the settings page for the global rate, `prices_include_tax`, and the two optional charges.
 
 ## Two languages a tenant writes in; the application itself is English
 `App\Enums\Locale` has one case per language a tenant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.
 
 **The application's own words are not part of that.** `lang/en` is the only language directory; a `lang/ta` mirroring every string existed and was deleted on the project owner's instruction — the codebase is written in English and translation lives at the database level only. So switching language changes the menu a guest reads and leaves the words around it alone. Do not reintroduce a second language directory; adding a language is a case and nothing else. See `.ai/rules/lang.md`.
 
-Like the India assumption above, the pair of languages is a "for now". The one thing that does not scale for free is the expression unique indexes, which are built on English — see `.ai/rules/migrations.md`.
+Like the India assumption above, the pair of languages is a "for now". The one thing that does not scale for free is uniqueness, which every form checks on the English name — see `.ai/rules/models.md`.
 
 All three surfaces switch language: the guest app through its toggle, and both Filament panels through a switcher in the top bar. What that switch reaches is the tenant's own words — menu, category, dish, addition and tile names. Roles and permissions stay English too, and for a second reason: code refers to those names.

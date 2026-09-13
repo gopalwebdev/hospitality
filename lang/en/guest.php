@@ -18,7 +18,7 @@ return [
 
     'home' => [
         'title' => 'Welcome',
-        'empty' => 'This :type has not set up its home screen yet. Please ask a member of staff.',
+        'empty' => 'This tenant has not set up its home screen yet. Please ask a member of staff.',
     ],
 
     'menu' => [

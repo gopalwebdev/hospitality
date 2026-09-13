@@ -27,7 +27,7 @@ interface Row {
 }
 
 interface HomeProps {
-    tenant: { name: string; slug: string; typeNoun: string } | null;
+    tenant: { name: string; slug: string } | null;
     rows: Row[];
 }
 
@@ -53,7 +53,7 @@ export default function Home({ tenant, rows }: HomeProps) {
             <main className="flex-1 pt-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
                 {rows.length === 0 ? (
                     <p className="text-muted-foreground px-5 py-16 text-center text-sm">
-                        {t('home.empty', { type: tenant?.typeNoun ?? '' })}
+                        {t('home.empty')}
                     </p>
                 ) : (
                     <div className="flex flex-col gap-6">

@@ -23,9 +23,7 @@ class MenuComboItemFactory extends Factory
         // of its own. MenuItem::factory() on its own would build a category —
         // and with it a menu and a tenant — that has nothing to do with
         // this combo, and overriding tenant_id afterwards only makes the two
-        // halves of the composite key disagree. That is the trap
-        // .ai/rules/models.md warns about, and it fails as a foreign key
-        // violation rather than as anything that names the cause.
+        // disagree, which MenuComboItemObserver refuses.
         return [
             'menu_combo_id' => MenuCombo::factory(),
             'tenant_id' => fn (array $attributes): int => $this->combo($attributes)->tenant_id,
@@ -38,9 +36,9 @@ class MenuComboItemFactory extends Factory
     /**
      * Put an existing dish into an existing combo.
      *
-     * Both must belong to one tenant; the composite foreign keys refuse
-     * anything else, which is what makes this the only safe way to pair two
-     * records a test already has.
+     * Both must belong to one tenant; MenuComboItemObserver refuses anything
+     * else, which is what makes this the only safe way to pair two records a
+     * test already has.
      */
     public function pairing(MenuCombo $combo, MenuItem $item): static
     {

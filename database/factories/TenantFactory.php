@@ -26,7 +26,7 @@ class TenantFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 99999),
-            'type' => TenantType::Restaurant,
+            'type' => fake()->randomElement(TenantType::cases()),
             'address' => fake()->streetAddress().', '.fake()->city(),
             'pincode' => (string) fake()->numberBetween(100000, 999999),
             'email' => fake()->unique()->companyEmail(),
@@ -40,9 +40,6 @@ class TenantFactory extends Factory
 
     /**
      * Every tenant has settings, so one is made alongside it.
-     *
-     * The id is passed straight through rather than nesting a factory, which
-     * would otherwise create a second tenant to hang the settings off.
      */
     public function configure(): static
     {
@@ -54,22 +51,12 @@ class TenantFactory extends Factory
     }
 
     /**
-     * Indicate that the tenant is closed and should not serve its storefront.
+     * A tenant that is closed and does not serve its storefront.
      */
     public function inactive(): static
     {
         return $this->state(fn (array $attributes): array => [
             'is_active' => false,
-        ]);
-    }
-
-    /**
-     * A hotel rather than a restaurant.
-     */
-    public function hotel(): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'type' => TenantType::Hotel,
         ]);
     }
 }

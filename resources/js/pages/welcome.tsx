@@ -12,15 +12,15 @@ import {
 /**
  * The marketing page for the platform itself, served from the root domain.
  *
- * Each tenant — a hotel or a restaurant — gets its own subdomain for its
- * storefront, and the same subdomain plus /login for the people who work there.
+ * Each tenant gets its own subdomain for its storefront, and the same
+ * subdomain plus /login for the people who work there.
  */
 export default function Welcome() {
     const capabilities = [
         {
-            title: 'One subdomain each',
+            title: 'One subdomain per tenant',
             description:
-                'Every hotel and restaurant gets its own storefront address, and its own admin behind it.',
+                'Every tenant gets its own storefront address, and its own admin behind it.',
         },
         {
             title: 'Sign in with a code',
@@ -36,13 +36,13 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title="Hotel & Restaurant Platform" />
+            <Head title="Tenant Platform" />
 
             <div className="bg-background text-foreground min-h-screen">
                 <header className="border-b">
                     <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-6">
                         <span className="text-lg font-semibold tracking-tight">
-                            Hotel &amp; Restaurant Platform
+                            Tenant Platform
                         </span>
 
                         {/* The tenant panel is server rendered, so this leaves
@@ -61,13 +61,12 @@ export default function Welcome() {
                         <Badge variant="secondary">In development</Badge>
 
                         <h1 className="text-4xl font-semibold tracking-tight">
-                            Run your hotel or restaurant from one place.
+                            Run your tenant from one place.
                         </h1>
 
                         <p className="text-muted-foreground text-lg">
-                            Menus, offers and orders for every hotel and
-                            restaurant on the platform, each on its own
-                            subdomain.
+                            Menus, offers and orders for every tenant on the
+                            platform, each on its own subdomain.
                         </p>
                     </div>
 

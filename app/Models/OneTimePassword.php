@@ -12,10 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A single sign-in code issued to one user.
- *
- * Only the hash of the code is kept. A row is retired either by being consumed
- * on a successful sign-in, or by a newer code being issued for the same user.
+ * A sign-in code issued to one user. Only its hash is kept.
  *
  * @property int $id
  * @property int $user_id
@@ -34,8 +31,6 @@ class OneTimePassword extends Model
     use HasFactory;
 
     /**
-     * The user this code will sign in.
-     *
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
@@ -43,33 +38,22 @@ class OneTimePassword extends Model
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Whether this code is past its lifetime.
-     */
     public function hasExpired(): bool
     {
         return $this->expires_at->isPast();
     }
 
-    /**
-     * Whether this code has already been spent or retired.
-     */
     public function hasBeenConsumed(): bool
     {
         return $this->consumed_at !== null;
     }
 
-    /**
-     * Whether this code has burnt through its allowance of wrong guesses.
-     */
     public function hasExhaustedAttempts(): bool
     {
         return $this->attempts >= (int) config('otp.max_attempts');
     }
 
     /**
-     * Limit the query to codes that could still sign someone in.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeLive(Builder $query): void

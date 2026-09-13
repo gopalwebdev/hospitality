@@ -56,8 +56,8 @@ it('refuses a move onto a menu that already has that name', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Admin);
 
-    // Uniqueness is per menu and built on the English name, so without this the
-    // update would fail at the expression index instead.
+    // Uniqueness is per menu and built on the English name, and nothing but this
+    // check refuses a duplicate.
     Livewire::test(ArrangeMenu::class, ['record' => $lunch->getKey()])
         ->callAction(TestAction::make('moveToMenu')->table('category-'.$moving->getKey()), ['menu_id' => $dinner->getKey()])
         ->assertHasActionErrors(['menu_id']);

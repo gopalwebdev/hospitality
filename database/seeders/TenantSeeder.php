@@ -307,7 +307,7 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Bottled', 'ta' => 'பாட்டில்'],
                     'items' => [
                         [
-                            // Sealed goods rather than restaurant service, and
+                            // Sealed goods rather than food service, and
                             // an aerated drink at that — 40% under GST 2.0.
                             'name' => ['en' => 'Cola', 'ta' => 'கோலா'],
                             'price_minor_units' => 6000,
@@ -586,7 +586,7 @@ class TenantSeeder extends Seeder
                     'food_type' => FoodType::Vegetarian,
                 ],
                 [
-                    // Sold as a sealed tub rather than as restaurant service,
+                    // Sold as a sealed tub rather than as food service,
                     // so it carries a rate of its own — 18%, not the 5% the
                     // rest of the card follows.
                     'name' => ['en' => 'Ice Cream Tub', 'ta' => 'ஐஸ்கிரீம் டப்'],

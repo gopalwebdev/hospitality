@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Enums\ItemAvailability;
 use App\Models\Concerns\HasTranslatedNames;
 use App\Models\Concerns\IsPricedOnAMenu;
+use App\Observers\MenuComboObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MenuComboFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,20 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A bundle sold at one price: burger, fries and a drink for ₹299.
- *
- * Hangs off the menu rather than off a category, because that is what it is —
- * something the menu leads with, arranged in a row of its own beside the
- * featured dishes and dragged into order there. It is not a dish and does not
- * live in a section.
- *
- * Its price is its own. The dishes inside it are listed so a guest can see what
- * they are getting, not to be added up: a combo exists precisely because it
- * costs less than its parts, and repricing a dish must never quietly reprice
- * every combo containing it.
- *
- * The name and description are translated columns, and money is an integer
- * count of minor units, exactly as on MenuItem.
+ * Dishes sold together at one price, on a menu rather than in a category. Its price is its own.
  *
  * @property int $id
  * @property int $tenant_id
@@ -55,6 +44,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'availability',
     'position',
 ])]
+#[ObservedBy([MenuComboObserver::class])]
 class MenuCombo extends Model
 {
     /** @use HasFactory<MenuComboFactory> */
@@ -63,42 +53,16 @@ class MenuCombo extends Model
     use HasTranslatedNames;
     use IsPricedOnAMenu;
 
-    /**
-     * @var list<string>
-     */
+    /** @var list<string> */
     public array $translatable = ['name', 'description'];
 
-    /**
-     * @var array<string, mixed>
-     */
+    /** @var array<string, mixed> */
     protected $attributes = [
         'position' => 0,
         'availability' => ItemAvailability::Available->value,
     ];
 
     /**
-     * Take the tenant from the menu this sits on.
-     *
-     * The same reason as MenuCategory::booted(): a relation manager writes
-     * these rows against a model Filament's tenancy is not stamping.
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (self $combo): void {
-            if (filled($combo->tenant_id) || blank($combo->menu_id)) {
-                return;
-            }
-
-            $combo->tenant_id = Menu::query()
-                ->withoutGlobalScopes()
-                ->whereKey($combo->menu_id)
-                ->value('tenant_id');
-        });
-    }
-
-    /**
-     * The tenant selling this.
-     *
      * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo
@@ -107,8 +71,6 @@ class MenuCombo extends Model
     }
 
     /**
-     * The menu this combo is offered on.
-     *
      * @return BelongsTo<Menu, $this>
      */
     public function menu(): BelongsTo
@@ -117,8 +79,6 @@ class MenuCombo extends Model
     }
 
     /**
-     * What is in the bundle, with the quantity of each.
-     *
      * @return HasMany<MenuComboItem, $this>
      */
     public function comboItems(): HasMany
@@ -127,11 +87,6 @@ class MenuCombo extends Model
     }
 
     /**
-     * The dishes in the bundle, without the quantities.
-     *
-     * For reading names and food types in one query. When the quantity matters
-     * — anywhere it is shown or ordered — use comboItems() instead.
-     *
      * @return BelongsToMany<MenuItem, $this>
      */
     public function menuItems(): BelongsToMany
@@ -142,28 +97,17 @@ class MenuCombo extends Model
     }
 
     /**
-     * What the dishes inside would cost bought separately.
-     *
-     * Only ever shown beside the combo price to make the saving concrete, and
-     * never used as the price itself. Reads the loaded contents rather than
-     * querying, so a list that eager loaded them costs nothing extra.
+     * What the dishes inside cost bought separately — shown beside the price, never used as it.
      */
     public function contentsPriceMinorUnits(): int
     {
-        return $this->comboItems
-            ->reduce(
-                static fn (int $total, MenuComboItem $comboItem): int => $total
-                    + ($comboItem->menuItem->price_minor_units * $comboItem->quantity),
-                0,
-            );
+        return $this->comboItems->reduce(
+            static fn (int $total, MenuComboItem $comboItem): int => $total + ($comboItem->menuItem->price_minor_units * $comboItem->quantity),
+            0,
+        );
     }
 
     /**
-     * Limit the query to combos a guest may actually order.
-     *
-     * Both halves matter, exactly as on MenuItem: a combo is orderable only if
-     * it is available and the menu it sits on is showing.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeOrderable(Builder $query): void
@@ -173,8 +117,6 @@ class MenuCombo extends Model
     }
 
     /**
-     * Order the way the tenant arranged them, name only to break ties.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeInMenuOrder(Builder $query): void

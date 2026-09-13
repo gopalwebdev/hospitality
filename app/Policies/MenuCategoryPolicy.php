@@ -12,8 +12,8 @@ use App\Models\User;
  * Reading is menu.view, which staff and guests hold too; changing anything is
  * menu.manage, which only a tenant admin has. Which tenant's categories
  * are in front of you is not this policy's business — Filament scopes the
- * resource to the panel's tenant, and the composite foreign key on menu_items
- * makes crossing that boundary a database error.
+ * resource to the panel's tenant, and the observers refuse a row whose parent
+ * belongs to another tenant.
  */
 class MenuCategoryPolicy
 {

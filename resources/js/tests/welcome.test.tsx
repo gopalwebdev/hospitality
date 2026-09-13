@@ -9,7 +9,7 @@ describe('welcome', () => {
         expect(
             screen.getByRole('heading', {
                 level: 1,
-                name: 'Run your hotel or restaurant from one place.',
+                name: 'Run your tenant from one place.',
             }),
         ).toBeInTheDocument();
     });

@@ -25,7 +25,7 @@ Each file is sent to the browser whole as the `translations` Inertia prop and re
 ## panel.php is the tenant panel, and only its menu surfaces
 `lang/en/panel.php` holds the labels of the Filament resources a tenant works in daily — menus, the arrangement, dishes, additions and home screen tiles — plus the navigation groups they sit under.
 
-A string that names the business carries a `:type` placeholder — `'This :type already has a menu with that name.'` — filled at the call site with `CurrentTenant::noun()`. Never write "tenant" or "restaurant" into one: a hotel's admin would read it. `guest.php` does the same, filled in the browser from the `tenant.typeNoun` prop. Where a sentence reads as well without the noun ("Start with a banner row that opens your menu"), leave it out.
+A string that names the business says **tenant** — `'This tenant already has a menu with that name.'` — whatever `tenants.type` holds. This is one common product, so no string varies by a tenant's type and none names a kind of business.
 
 Roles, permissions, accounts and tenants are deliberately **not** in here. They are the product team's vocabulary and code refers to those names, so translating them would make a `hasRole('admin')` check read as though it might not be English.
 

@@ -19,3 +19,6 @@ Do not "fix" this back to a uniform response without asking. If this ever fronts
 
 ## Request limits still key on the address, not the account
 ThrottleOneTimePasswordRequests allows `otp.max_sends` codes per `otp.send_window` seconds, at least `otp.resend_cooldown` seconds apart, keyed on a hash of the address. Keying on the address rather than the user id means the limit survives an account being deleted and recreated, and it applies before any code is issued.
+
+## Local development accepts any sign-in code (temporary)
+On the project owner's instruction, `VerifyOneTimePassword` returns Verified for any code when `app()->isLocal()`, retiring any outstanding code, so signing in during development needs no email. Every other environment checks the code as before — `testing` included, so the suite still exercises real verification, and a test pins the local bypass on its own. It is a stopgap until OTP is fixed: remove it then, and never widen it beyond the local environment.

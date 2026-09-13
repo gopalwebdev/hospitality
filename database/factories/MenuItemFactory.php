@@ -20,8 +20,7 @@ class MenuItemFactory extends Factory
     public function definition(): array
     {
         // The category brings the tenant with it. Letting the two be
-        // chosen independently would trip the composite foreign key, which is
-        // exactly the mistake that key exists to catch.
+        // chosen independently is exactly what MenuItemObserver refuses.
         $category = MenuCategory::factory();
         $english = Locale::English->value;
 

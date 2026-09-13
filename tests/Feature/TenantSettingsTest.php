@@ -155,7 +155,7 @@ it('is open to a super admin supporting a tenant', function (): void {
 |
 */
 
-it('starts a tenant on the standalone restaurant slab, tax added at the bill', function (): void {
+it('starts a tenant on the standalone food-service slab, tax added at the bill', function (): void {
     $tenant = Tenant::factory()->create();
 
     // The default in $attributes and TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS have to agree; a

@@ -42,8 +42,7 @@ class HomeTileFactory extends Factory
     /**
      * A tile in an existing row, and that row's tenant with it.
      *
-     * The pair has to be set together or the composite foreign key trips —
-     * see .ai/rules/models.md.
+     * The pair has to be set together or HomeTileObserver refuses the tile.
      */
     public function inRow(HomeRow $row): static
     {

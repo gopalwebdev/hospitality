@@ -63,11 +63,11 @@ it('lets each tenant admin into their own panel and no further', function (): vo
     $admin = $tenant->users()->role(Role::Admin->value)->firstOrFail();
 
     $this->actingAs($admin)
-        ->get("http://{$tenant->slug}.restaurant-app.test/dashboard")
+        ->get("http://{$tenant->slug}.tenant-app.test/dashboard")
         ->assertOk();
 
     $this->actingAs($admin)
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertForbidden();
 });
 
@@ -75,7 +75,7 @@ it('lets the product team owner into the product team panel', function (): void 
     $superAdmin = User::query()->where('email', SuperAdminSeeder::EMAIL)->firstOrFail();
 
     $this->actingAs($superAdmin)
-        ->get('http://restaurant-app.test/dashboard')
+        ->get('http://tenant-app.test/dashboard')
         ->assertOk();
 });
 
@@ -90,9 +90,9 @@ it('lists every account and where it signs in', function (): void {
     expect($output)
         ->toContain(SuperAdminSeeder::EMAIL)
         // /login on each host: the one address to hand anyone who uses a panel.
-        ->toContain('restaurant-app.test/login')
+        ->toContain('tenant-app.test/login')
         ->toContain($admin->email)
-        ->toContain($tenant->slug.'.restaurant-app.test/login');
+        ->toContain($tenant->slug.'.tenant-app.test/login');
 });
 
 it('opens a way into every menu it seeds', function (): void {

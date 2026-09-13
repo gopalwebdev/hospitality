@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FilamentPanel;
+use App\Observers\UserObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -10,6 +11,7 @@ use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +21,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
-use LogicException;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -35,15 +36,14 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['name', 'email', 'tenant_id', 'is_super_admin'])]
 #[Hidden(['remember_token'])]
+#[ObservedBy([UserObserver::class])]
 class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable;
 
     /**
-     * Column defaults only apply once a row is written. Declaring them here
-     * means a User that has not been saved yet still answers isSuperAdmin()
-     * and belongsToProductTeam() instead of throwing under strict mode.
+     * Database defaults only land on insert; an unsaved user still has to answer under strict mode.
      *
      * @var array<string, mixed>
      */
@@ -53,34 +53,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     ];
 
     /**
-     * An account belongs to a tenant or to the product team, never both.
-     *
-     * The product team hold every permission on every tenant, so letting
-     * one tenant's own account cross over would hand it the platform —
-     * and the two columns are read independently everywhere else, which is
-     * exactly why the combination has to be refused in one place rather than
-     * guarded at each call site.
-     *
-     * UserForm states the same rule as a disabled toggle, so the panel never
-     * offers this; reaching it means something went around the resource.
-     */
-    protected static function booted(): void
-    {
-        static::saving(function (self $user): void {
-            throw_if(
-                $user->is_super_admin && $user->tenant_id !== null,
-                LogicException::class,
-                'An account that belongs to a tenant may not be on the product team.',
-            );
-        });
-    }
-
-    /**
-     * The tenant this account belongs to, if any.
-     *
-     * The product team belong to none, so this is null for them. It is not what
-     * grants them anything, though: is_super_admin is the only thing that
-     * does, and an ordinary account not yet put on a roster also has no tenant.
+     * The tenant this account belongs to; null for the product team. It grants nothing.
      *
      * @return BelongsTo<Tenant, $this>
      */
@@ -90,7 +63,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * The tenants this user staffs or administers.
+     * Every tenant this account staffs.
      *
      * @return BelongsToMany<Tenant, $this>
      */
@@ -100,8 +73,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * The sign-in codes issued to this user.
-     *
      * @return HasMany<OneTimePassword, $this>
      */
     public function oneTimePasswords(): HasMany
@@ -110,12 +81,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Accounts hold no password: the only way in is a one-time code.
-     *
-     * Returning an empty string keeps every framework code path that reaches
-     * for a password hash working. In particular it makes Laravel's
-     * AuthenticateSession middleware fall through instead of logging the user
-     * straight back out again.
+     * Accounts hold no password. An empty string keeps AuthenticateSession from signing them out.
      */
     public function getAuthPassword(): string
     {
@@ -123,11 +89,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Limit the query to the account at an address, however it was capitalised.
-     *
-     * Addresses are stored as they were typed, so every lookup by email has to
-     * fold case or a returning user is treated as a stranger.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeWithEmail(Builder $query, string $email): void
@@ -136,11 +97,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Whether this account is on the product team that runs the platform.
-     *
-     * This is a column rather than a role: product team ownership is global and
-     * granted deliberately, where roles are what someone does inside a single
-     * tenant. AppServiceProvider grants a super admin every permission.
+     * The product team: a column rather than a role, and the only thing that grants the platform.
      */
     public function isSuperAdmin(): bool
     {
@@ -148,8 +105,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Limit the query to the product team.
-     *
      * @param  Builder<$this>  $query
      */
     public function scopeSuperAdmins(Builder $query): void
@@ -158,25 +113,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Whether this account belongs to the product team rather than to a tenant.
-     *
-     * This is how the product team panel labels a row, and it is a question about
-     * the tenant column alone. Do not use it to decide what someone may do:
-     * isSuperAdmin() answers that, and the two differ for an account that has
-     * not been put on a roster yet.
+     * How a row is labelled, not what the account may do — isSuperAdmin() answers that.
      */
     public function belongsToProductTeam(): bool
     {
         return $this->tenant_id === null;
     }
 
-    /**
-     * Gate entry to each Filament panel.
-     *
-     * The platform panel is reserved for the product team. The tenant panel is
-     * open to anyone attached to a tenant, plus the product team for support.
-     * A panel this application does not know about is closed to everyone.
-     */
     public function canAccessPanel(Panel $panel): bool
     {
         return match (FilamentPanel::tryFrom($panel->getId())) {
@@ -187,8 +130,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * The tenants offered in the panel's tenant switcher.
-     *
      * @return Collection<int, Tenant>
      */
     public function getTenants(Panel $panel): Collection
@@ -201,24 +142,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->tenants;
     }
 
-    /**
-     * Guard against a user reaching another tenant by editing the subdomain.
-     */
     public function canAccessTenant(Model $tenant): bool
     {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        return $this->tenants()->whereKey($tenant)->exists();
+        return $this->isSuperAdmin() || $this->tenants()->whereKey($tenant)->exists();
     }
 
     /**
-     * Whether this account is on more than one tenant's roster.
-     *
-     * Roles are held per account, so someone staffing two tenants cannot
-     * have them changed from either one's panel. Asked by the form that shows
-     * the roles and again by the action that saves them, in the same request.
+     * Roles are held per account, so someone on several rosters has them changed by the product team only.
      */
     public function staffsSeveralTenants(): bool
     {
@@ -226,8 +156,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * Get the attributes that should be cast.
-     *
      * @return array<string, string>
      */
     protected function casts(): array

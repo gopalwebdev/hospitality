@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\DB;
  * sub-category is an edit on its own form, where the parent is a select and the
  * name is revalidated against where it is going (.ai/rules/actions-menus.md).
  * A drag that re-parented would be a second mechanism having to repeat that
- * uniqueness rule, and getting it wrong means the expression unique index
- * refuses the write as a 500 rather than as a message.
+ * uniqueness rule, and getting it wrong would store a duplicate name that
+ * nothing else refuses.
  *
  * Keys are formatted here as well as parsed here, so the table that renders
  * them and the action that reads them cannot drift apart.
@@ -63,8 +63,8 @@ class ApplyMenuArrangement
         $rank = array_flip(array_values($order));
 
         // Each select carries what its model's own saving hooks read as well as
-        // what this writes: MenuCategory::booted() looks at menu_id and
-        // tenant_id, MenuItem::booted() at is_featured. Model::shouldBeStrict()
+        // what this writes: MenuCategoryObserver looks at menu_id and
+        // parent_id, MenuItemObserver at is_featured. Model::shouldBeStrict()
         // throws on an attribute that was never fetched.
         $categories = MenuCategory::query()
             ->select(['id', 'menu_id', 'tenant_id', 'parent_id', 'position'])

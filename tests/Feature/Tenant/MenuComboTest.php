@@ -13,8 +13,6 @@ use App\Models\MenuItem;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -169,36 +167,39 @@ it('offers only this menu\'s dishes as combo contents', function (): void {
         ->and($offered)->not->toContain($theirDish->getKey());
 });
 
-it('refuses at the database a combo containing another tenant\'s dish', function (): void {
+it('refuses a combo containing another tenant\'s dish, even around the form', function (): void {
     $mine = Tenant::factory()->create();
     $combo = MenuCombo::factory()->onMenu(Menu::factory()->create(['tenant_id' => $mine->getKey()]))->create();
 
     $theirs = Tenant::factory()->create();
     $theirDish = dishOn(Menu::factory()->create(['tenant_id' => $theirs->getKey()]));
 
-    expect(fn () => DB::table('menu_combo_items')->insert([
-        'tenant_id' => $mine->getKey(),
-        'menu_combo_id' => $combo->getKey(),
-        'menu_item_id' => $theirDish->getKey(),
-        'quantity' => 1,
-        'position' => 0,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]))->toThrow(QueryException::class);
+    expect(fn () => MenuComboItem::factory()->pairing($combo, $theirDish)->create())
+        ->toThrow(LogicException::class, 'another tenant');
 });
 
 it('refuses the same dish twice in one combo', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $combo = MenuCombo::factory()->onMenu($menu)->create();
     $dish = dishOn($menu);
 
-    MenuComboItem::factory()->pairing($combo, $dish)->create();
+    enterTenantPanel($tenant, RoleEnum::Admin);
 
     // A dish appears once, with a quantity — two rows would show as a
-    // duplicate line to the guest.
-    expect(fn () => MenuComboItem::factory()->pairing($combo, $dish)->create())
-        ->toThrow(QueryException::class);
+    // duplicate line to the guest. No unique index stands behind the form.
+    combosOf($menu)
+        ->callAction(TestAction::make('create')->table(), [
+            'name' => [Locale::English->value => 'Double Trouble'],
+            'price' => '199',
+            'availability' => ItemAvailability::Available->value,
+            'comboItems' => [
+                ['menu_item_id' => $dish->getKey(), 'quantity' => 1],
+                ['menu_item_id' => $dish->getKey(), 'quantity' => 1],
+            ],
+        ])
+        ->assertHasActionErrors();
+
+    expect(MenuCombo::query()->withoutGlobalScopes()->where('name->'.Locale::English->value, 'Double Trouble')->exists())->toBeFalse();
 });
 
 /*

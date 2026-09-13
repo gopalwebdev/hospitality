@@ -49,9 +49,8 @@ class MenuCategoryForm
                         maxLength: 64,
                         // Unique within the menu rather than the tenant, so
                         // a lunch card and a dinner card may both have a
-                        // "Starters". Matches the expression index exactly.
-                        // Per level, matching the expression index: a menu may
-                        // have a top-level "Chicken" and a "Biryani › Chicken".
+                        // "Starters". Per level too: a menu may have a
+                        // top-level "Chicken" and a "Biryani › Chicken".
                         uniqueWithin: fn (): Builder => MenuCategory::query()
                             ->where('menu_id', $menuId)
                             ->topLevel(),

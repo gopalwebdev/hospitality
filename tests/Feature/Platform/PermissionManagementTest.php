@@ -49,7 +49,7 @@ it('keeps a tenant admin off the permissions page', function (): void {
     $user->assignRole(RoleEnum::Admin->value);
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/permissions')
+        ->get('http://tenant-app.test/dashboard/permissions')
         ->assertForbidden();
 });
 
@@ -57,7 +57,7 @@ it('serves the permissions page to the product team', function (): void {
     $user = User::factory()->superAdmin()->create();
 
     $this->actingAs($user)
-        ->get('http://restaurant-app.test/dashboard/permissions')
+        ->get('http://tenant-app.test/dashboard/permissions')
         ->assertOk();
 });
 
@@ -360,7 +360,7 @@ it('closes the edit page for a built-in permission', function (): void {
     $permission = Permission::query()->where('name', PermissionEnum::MenuView->value)->sole();
 
     $this->actingAs($user)
-        ->get("http://restaurant-app.test/dashboard/permissions/{$permission->getKey()}/edit")
+        ->get("http://tenant-app.test/dashboard/permissions/{$permission->getKey()}/edit")
         ->assertForbidden();
 });
 
@@ -369,7 +369,7 @@ it('still shows a built-in permission read only', function (): void {
     $permission = Permission::query()->where('name', PermissionEnum::MenuView->value)->sole();
 
     $this->actingAs($user)
-        ->get("http://restaurant-app.test/dashboard/permissions/{$permission->getKey()}")
+        ->get("http://tenant-app.test/dashboard/permissions/{$permission->getKey()}")
         ->assertOk()
         ->assertSee(PermissionEnum::MenuView->value);
 });

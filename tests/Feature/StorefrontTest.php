@@ -11,7 +11,7 @@ it('serves the guest home screen from a tenant\'s own subdomain', function (): v
 
     // A guest scanning a QR code lands on the rows the tenant arranged,
     // and walks from there into a menu or a PDF.
-    $this->get('http://t1.restaurant-app.test/')
+    $this->get('http://t1.tenant-app.test/')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->component('home')
@@ -22,17 +22,17 @@ it('serves the guest home screen from a tenant\'s own subdomain', function (): v
 });
 
 it('serves the marketing page on the root domain', function (): void {
-    $this->get('http://restaurant-app.test/')
+    $this->get('http://tenant-app.test/')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->component('welcome'));
 });
 
 it('returns 404 for a subdomain with no tenant behind it', function (): void {
-    $this->get('http://nope.restaurant-app.test/')->assertNotFound();
+    $this->get('http://nope.tenant-app.test/')->assertNotFound();
 });
 
 it('takes an inactive tenant storefront offline', function (): void {
     Tenant::factory()->inactive()->create(['slug' => 'closed']);
 
-    $this->get('http://closed.restaurant-app.test/')->assertNotFound();
+    $this->get('http://closed.tenant-app.test/')->assertNotFound();
 });

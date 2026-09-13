@@ -3,7 +3,6 @@
 namespace App\Filament\Tenant\Resources\Users\Tables;
 
 use App\Actions\Tenants\RemoveUserFromTenant;
-use App\Filament\Tenant\CurrentTenant;
 use App\Models\Tenant;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -54,8 +53,8 @@ class UsersTable
                     ->color('danger')
                     ->authorize('removeFromTenant')
                     ->requiresConfirmation()
-                    ->modalHeading(fn (): string => 'Remove from this '.CurrentTenant::noun())
-                    ->modalDescription(fn (): string => 'Their account stays, and they lose access to this '.CurrentTenant::noun().'.')
+                    ->modalHeading('Remove from this tenant')
+                    ->modalDescription('Their account stays, and they lose access to this tenant.')
                     ->action(function (User $record): void {
                         $tenant = Filament::getTenant();
 
@@ -64,7 +63,7 @@ class UsersTable
                         app(RemoveUserFromTenant::class)($tenant, $record);
 
                         Notification::make()
-                            ->title('Removed from this '.$tenant->type->noun())
+                            ->title('Removed from this tenant')
                             ->success()
                             ->send();
                     }),

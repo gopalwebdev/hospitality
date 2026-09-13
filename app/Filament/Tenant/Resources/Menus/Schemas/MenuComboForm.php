@@ -106,9 +106,8 @@ class MenuComboForm
                     ->required()
                     ->searchable()
                     ->preload()
-                    // A dish appears in a combo once, with a quantity. The
-                    // unique key on (menu_combo_id, menu_item_id) refuses a
-                    // second row anyway; this is where an admin is told.
+                    // A dish appears in a combo once, with a quantity, and
+                    // nothing but this refuses a second row.
                     ->distinct()
                     ->validationMessages(['distinct' => __('panel.combos.duplicate_dish')]),
 

@@ -60,12 +60,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | The bare host the application is served from, without a scheme or port.
-    | Tenants are tenants on subdomains of it (t1.restaurant-app.com),
+    | Tenants are tenants on subdomains of it (t1.tenant-app.com),
     | while the root host serves the platform panel.
     |
     */
 
-    'domain' => env('APP_DOMAIN', 'restaurant-app.test'),
+    'domain' => env('APP_DOMAIN', 'tenant-app.test'),
 
     /*
     |--------------------------------------------------------------------------

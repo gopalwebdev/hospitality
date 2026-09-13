@@ -93,8 +93,7 @@ final class TranslatedFields
      *
      * `uniqueWithin` narrows the query the name is checked against — the menu a
      * section sits on, the section a dish sits in — and is only ever applied to
-     * the fallback language, because that is what the database's unique indexes
-     * are built on.
+     * the fallback language, because that is the one value a name is unique on.
      *
      * `editing` names the row being edited when the form is not bound to one.
      * A form on a resource or a relation manager has its record injected and
@@ -199,9 +198,9 @@ final class TranslatedFields
     /**
      * Refuse a name another record in the same place already uses.
      *
-     * Checked against the fallback language only, because that is exactly what
-     * the database's unique index is built on — so the form and the constraint
-     * cannot disagree, and a save can never fail after passing validation.
+     * Checked against the fallback language only, the one value a name is unique
+     * on. The schema has no unique index, so this rule is the only thing that
+     * refuses a duplicate.
      *
      * $value is passed in rather than taken from the input this is attached to:
      * the rule rides on every language's input so it runs whichever one is on
@@ -230,7 +229,7 @@ final class TranslatedFields
             // handed whatever record its surroundings have, and an action modal
             // on a page falls back to that page's own record: a menu, whose id
             // would otherwise exclude the category that happens to share it and
-            // let a duplicate straight through to the unique index.
+            // let a duplicate straight through.
             if ($record instanceof Model && $record::class === $matches->getModel()::class) {
                 $matches->whereKeyNot($record->getKey());
             }

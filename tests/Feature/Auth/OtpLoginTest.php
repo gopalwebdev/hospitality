@@ -365,7 +365,7 @@ it('identifies no tenant until someone has signed in', function (): void {
     // and the scope leaves every query alone while that is true.
     Tenant::factory()->create(['slug' => 't1']);
 
-    $this->get('http://t1.restaurant-app.test/dashboard/login')->assertOk();
+    $this->get('http://t1.tenant-app.test/dashboard/login')->assertOk();
 
     expect(Filament::getTenant())->toBeNull();
 });

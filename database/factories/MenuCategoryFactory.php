@@ -26,8 +26,8 @@ class MenuCategoryFactory extends Factory
         return [
             // The tenant is chosen first and the menu follows it, rather
             // than the other way round, so that passing a tenant_id — which
-            // most tests do — cannot produce a menu at a different tenant
-            // and trip the composite foreign key.
+            // most tests do — cannot produce a menu at a different tenant,
+            // which MenuCategoryObserver would refuse.
             'tenant_id' => Tenant::factory(),
             'menu_id' => fn (array $attributes): int => Menu::factory()
                 ->create(['tenant_id' => $attributes['tenant_id']])
@@ -55,7 +55,7 @@ class MenuCategoryFactory extends Factory
      * Make this a subdivision of an existing category, menu and all.
      *
      * All three columns together, because a subdivision must sit on the same
-     * menu as its parent — the composite (parent_id, menu_id) key insists on it.
+     * menu as its parent — MenuCategoryObserver insists on it.
      */
     public function under(MenuCategory $parent): static
     {

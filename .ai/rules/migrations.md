@@ -5,8 +5,24 @@ paths:
 
 # Migrations
 
+## One migration file per table, edited in place
+Standing instruction from the project owner: every table has exactly **one** migration, `create_<table>_table`, and a change to a table is an edit to that file — never a new `add_`, `alter_` or `rename_` migration. The history was squashed to this shape, `0001_01_01_000000_create_tenants_table.php` through `0001_01_01_000023_create_home_tiles_table.php`, numbered in foreign key order. Laravel's multi-table stubs (users and sessions, cache and cache_locks, jobs, job_batches and failed_jobs) and Spatie's five permission tables are split one table per file as well.
+
+The consequence is deliberate, and "for now": a database is rebuilt with `php artisan migrate:fresh --seed` after a schema change rather than migrated forward. Revisit this before anything runs with data worth keeping, because at that point a change needs a forward migration again.
+
+## No indexes, for now
+Also the project owner's instruction: no table carries an index beyond its primary key — no `->index()`, no `->unique()`, no composite unique, no expression index, on the framework and Spatie tables too. Foreign keys and CHECK constraints stay; Postgres builds no index for either.
+
+What that moved out of the database, and where it went:
+
+- **Uniqueness** — a name per menu or category, a tenant's slug, an account's email, a dish once per combo — is refused by the forms and nowhere else. Code that writes around a form can store a duplicate.
+- **A child row on its parent's tenant** was a composite foreign key on `(parent_id, tenant_id)`, which needs a unique index to reference. It is now `App\Actions\Tenants\InheritParentTenant`, called from each child's observer — see `.ai/rules/models.md`. A raw `DB::table()` write goes around it.
+- **A sub-category on its parent's menu** was the composite `(parent_id, menu_id)` key, whose `ON UPDATE CASCADE` carried a branch across when its category moved menus. `MenuCategoryObserver` now refuses the mismatch, and `MoveCategoryToMenu` moves the sub-categories itself.
+
+When indexes come back, they go in the table's own migration.
+
 ## Strict schema, enums for fixed value sets, light normalization
-Columns declare their real type and nullability — no catch-all strings, no nullable-by-default. Every relationship is a real foreign key with an explicit onDelete, and anything that must not repeat gets a unique or composite-unique index.
+Columns declare their real type and nullability — no catch-all strings, no nullable-by-default. Every relationship is a real foreign key with an explicit onDelete.
 
 Any fixed set of values is a PHP backed enum in app/Enums/ (TitleCase cases) cast on the model, not a loose string column. The enum owns its own behaviour — see Role::permissions() and FilamentPanel::path().
 
@@ -16,32 +32,20 @@ Normalize to roughly 3NF and stop: pull repeating groups into their own table wi
 Never a float or a decimal string: every monetary column is an integer holding the smallest unit of its currency, so ₹249.50 is stored as 24950. Arithmetic stays exact and no rounding creeps in between the database and a payment provider. Convert to and from a display value at the edge, and name the column so the unit is unmistakable. The currency itself is on tenant_settings.currency, cast to App\Enums\Currency.
 
 ## A phone number is two columns: calling code and national number
-Never one free-text string. The calling code goes in its own column cast to App\Enums\CountryCallingCode (backing values carry the plus, '+91', which keeps them strings when used as array keys), and the national number goes in a column of its own holding digits only — ten of them for India. Size number columns to CountryCallingCode::longestMobileNumberLength(), so a country with longer numbers needs a migration as well as an enum case. Tenant::dialablePhone() puts the two halves back together for display; nothing else should concatenate them by hand. See tenants.phone_country_code/phone for the shape.
+Never one free-text string. The calling code goes in its own column cast to App\Enums\CountryCallingCode (backing values carry the plus, '+91', which keeps them strings when used as array keys), and the national number goes in a column of its own holding digits only — ten of them for India. Size number columns to CountryCallingCode::longestMobileNumberLength(). Tenant::dialablePhone() puts the two halves back together for display; nothing else should concatenate them by hand. See tenants.phone_country_code/phone for the shape.
 
-## A translated column is jsonb, and its unique index is an expression
-Any text a guest reads is a `jsonb` column holding one key per App\Enums\Locale case, not a string — see `.ai/rules/models.md`. They began as `json` and were converted by the `add_postgres_types_and_checks_to_*` migrations: `jsonb` is stored parsed, has the equality and ordering operators plain `json` lacks, and Postgres rebuilds an expression index over the column as part of the type change, so nothing has to be dropped around it. A new translated column is `$table->jsonb(...)`.
-
-A plain `$table->unique(['menu_id', 'name'])` is still useless: JSON documents only compare equal when every language in them does, so two menus both called "Dinner" slip through the moment their Tamil halves differ. Put the constraint on the fallback language, with a raw statement, because Blueprint cannot express an expression index:
-
-```php
-DB::statement("CREATE UNIQUE INDEX menus_tenant_id_name_en_unique ON menus (tenant_id, (name ->> 'en'))");
-```
-
-Convert values to JSON text **while the column is still text** — Postgres will not cast `Starters` to json — and create the index after the type change. `translate_menu_names_and_descriptions` does both in that order and its `down()` mirrors them.
-
-Several older migrations carried a second copy of these index statements to repair what a SQLite table rebuild strips. SQLite is gone (`.ai/rules/config.md`), and so are those repairs; do not reintroduce them.
+## A translated column is jsonb
+Any text a guest reads is a `jsonb` column holding one key per App\Enums\Locale case, not a string — see `.ai/rules/models.md`. `jsonb` is stored parsed and has the equality and ordering operators plain `json` lacks. A new translated column is `$table->jsonb(...)`.
 
 ## Rules the database can state, it states
-Postgres is the only engine, so a rule a CHECK constraint can express is written as one as well as in the model and the form — raw `ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)`, dropped by name in `down()`. What exists: money, positions and role limits are never negative (Postgres has no unsigned integers, so `unsignedInteger` alone promised nothing); rates are 0–10000 basis points; a combo holds a dish at least once; a menu's service window is both times or neither; a category is not its own parent; and a tile's action and its destination match — exactly the column its action uses is filled.
+Postgres is the only engine, so a rule a CHECK constraint can express is written as one as well as in the model and the form — a raw `ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)` after `Schema::create()`, in the table's own migration. What exists: money, positions and role limits are never negative (Postgres has no unsigned integers, so `unsignedInteger` alone promises nothing); rates are 0–10000 basis points; a combo holds a dish at least once; a menu's service window is both times or neither; a category is not its own parent; a tile's action and its destination match; and a tenant's type is one `App\Enums\TenantType` knows.
 
-Two things are deliberately **not** constraints. A compare-at price above the price is refused by the form but not by the database, because repricing a dish upwards can strand an old offer and `hasComparePrice()` is what hides one. And "no third level of category" needs a subquery, which a CHECK cannot hold, so it stays in `MenuCategory::booted()`.
+Two things are deliberately **not** constraints. A compare-at price above the price is refused by the form but not by the database, because repricing a dish upwards can strand an old offer and `hasComparePrice()` is what hides one. And "no third level of category" needs a subquery, which a CHECK cannot hold, so it stays in `MenuCategoryObserver`.
 
-A constraint's values are written out, not read from an enum: a migration has to mean the same thing when it is run again after the enum has grown. A new tile action is a new migration replacing `home_tiles_destination_matches_action`. Before adding a constraint to a table with rows, check the existing data satisfies it — a failed validation aborts the deploy.
+`tenants_type_is_known` is built from `TenantType::cases()`, so adding a type is an enum case and a `migrate:fresh`. A constraint may read an enum here only because each table's one migration is edited in place rather than replayed against an older enum.
 
-## One migration per table, and walk rows in chunks
-A change that touches two tables is two migrations, each named for the table it touches — `translate_menu_category_names` and `translate_menu_item_names_and_descriptions` are one change split that way. It keeps a rollback surgical and a name honest about what it does.
-
-A migration that rewrites existing rows uses `chunkById` and selects only the columns it needs, so a tenant with a long menu costs the same memory as one with a short one. Never `get()` a whole table into an array to loop over it.
+## Walk rows in chunks
+Code that rewrites existing rows — a seeder, a command — uses `chunkById` and selects only the columns it needs, so a tenant with a long menu costs the same memory as one with a short one. Never `get()` a whole table into an array to loop over it.
 
 ## Timestamps are Asia/Kolkata, set from the environment
 `APP_TIMEZONE` drives `config/app.php` and `DB_TIMEZONE` is handed to the pgsql connection, so `now()` in PHP and `now()` in SQL agree. Neither is hardcoded anywhere, and `phpunit.xml` pins the same zone so tests behave as production does.
