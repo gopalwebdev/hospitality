@@ -229,9 +229,9 @@ class MenuItemsTable
             // Items are not dragged here. This page is a flat list of every
             // item on every menu, and an item's position is only ever read
             // within its own category — so a drag here would rewrite a number
-            // that meant nothing where it landed. Items are put in order on
-            // the menu's arrangement page, under the heading they belong to,
-            // which is the only place the order is legible anyway.
+            // that meant nothing where it landed. Items are put in order in
+            // the table their category's row opens on the menu's arrangement
+            // page, which is the only place the order is legible anyway.
             //
             // Menu, then section, then the order the tenant dragged the
             // items into. Filament's grouping used to imply this; with the

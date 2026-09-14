@@ -18,14 +18,14 @@ use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
 /**
- * The first thing a menu opens on: everything it holds, in the order it is read.
+ * The first thing a menu opens on: its outline, in the order it is read.
  *
- * A menu used to be edited across four tabs that each showed one layer of it.
- * This page is one list of the whole menu — its featured items, its combos,
- * every category, every subdivision and every item — where each is added,
- * edited and deleted on its own row, and one drag puts any of them somewhere else.
+ * Its featured items, its combos, every category and every sub-category, each
+ * one row. A row is dragged into place here, and a click opens what is inside
+ * it — a category's items, the featured items, the combos — in a modal holding
+ * a table of its own, where those are ordered, added, edited and deleted.
  *
- * The table is built on custom data because those rows are several models and
+ * The table is built on custom data because those rows are categories and
  * blocks that may not be rows anywhere yet; see MenuArrangementTable for what
  * that costs. What it means here is this page owns reordering itself:
  * Filament's own reorderTable() writes one UPDATE over an Eloquent query, and

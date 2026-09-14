@@ -63,7 +63,8 @@ return [
         'edit' => 'Edit',
         'delete' => 'Delete',
         'create_category' => 'New category',
-        'add_item' => 'Add item',
+        'open' => 'Open',
+        'close' => 'Close',
         'feature_items' => 'Feature items',
         'items_to_feature' => 'Items to feature',
         'feature' => 'Feature',
@@ -79,15 +80,8 @@ return [
         'items_count' => '{0} No items|{1} 1 item|[2,*] :count items',
         'combos_count' => '{0} No combos|{1} 1 combo|[2,*] :count combos',
         'sub_categories_count' => '{0} no sub-categories|{1} 1 sub-category|[2,*] :count sub-categories',
-        'featured_description' => 'The items this menu opens with.',
-        'combos_description' => 'Items sold together for one price.',
         'empty_heading' => 'Nothing on this menu yet',
-        'empty_description' => 'A menu is read section by section — Starters, Desserts, Housekeeping. Add the first category, then fill it with items.',
-        'drag_hint_item' => 'An item moves within its own category. Edit it to file it somewhere else.',
-        'drag_hint_sub_category' => 'A sub-category moves within its own category. Edit it to put it under another.',
-        'drag_hint_top_level' => 'A category moves among the other categories and rows, never inside one.',
-        'drag_hint_featured_item' => 'A featured item moves within the featured items.',
-        'drag_hint_combo' => 'A combo moves within the combos.',
+        'empty_description' => 'A menu is read section by section — Starters, Desserts, Housekeeping. Add the first category, then open it to fill it with items.',
     ],
 
     'categories' => [
@@ -122,6 +116,7 @@ return [
     ],
 
     'combos' => [
+        'label' => 'combo',
         'plural' => 'Combos',
         'create' => 'New combo',
         'section' => 'Combo',
@@ -166,7 +161,9 @@ return [
         'service_requests_tab' => 'Service requests',
         'featured_heading' => 'Featured items',
         'featured_empty_heading' => 'Nothing featured yet',
-        'featured_empty_description' => 'A menu reads fine without this. Turn on Featured when editing an item to lead with it here.',
+        'featured_empty_description' => 'A menu reads fine without this. Feature a few of its items to lead with them.',
+        'category_empty_heading' => 'Nothing in here yet',
+        'category_empty_description' => 'Add the first thing a guest can order from here, or ask for.',
     ],
 
     'add_ons' => [

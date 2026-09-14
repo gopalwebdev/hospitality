@@ -46,4 +46,16 @@ class MenuComboPolicy
     {
         return $user->can(Permission::MenuManage->value);
     }
+
+    /**
+     * Drag a menu's combos into a new order.
+     *
+     * Rearranging the menu is changing it, so this is menu.manage like the
+     * rest. Filament asks for this by name the moment a table is reorderable,
+     * and strictAuthorization refuses outright when it is missing.
+     */
+    public function reorder(User $user): bool
+    {
+        return $user->can(Permission::MenuManage->value);
+    }
 }

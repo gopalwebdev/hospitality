@@ -100,6 +100,6 @@ A conditional table `description()` — one shown only while an action is unavai
 ## Forms stay compact, and icon buttons are named on hover
 A form that fits the screen beats a column of full-width sections. Put related fields in a few `->compact()` sections and lay them side by side in a `Grid` with `->gridContainer()` and container breakpoints (`'@3xl' => 3`), so the same form sits side by side on a page and stacks in a modal — see `MenuForm`. The project owner found the menu's Edit tab, then four stacked sections, took far too much space.
 
-Every icon-only action carries a `tooltip()` naming it; `iconButton()` alone leaves a pencil and a bin to be guessed at. On the menu page a row's actions are one `ActionGroup::buttonGroup()` strip for the same reason (`.ai/rules/menus.md`).
+Every icon-only action carries a `tooltip()` naming it; `iconButton()` alone leaves a pencil and a bin to be guessed at. On the menu page a row's actions are separate icon buttons, each with its tooltip and a colour for what it does. An `ActionGroup::buttonGroup()` strip was tried there first, and it drew misaligned icons and a solid red delete button (`.ai/rules/menus.md`).
 
 Time pickers are configured once, for every form (`.ai/rules/providers.md`), so a form gives a picker only its label and its rules.

@@ -47,17 +47,4 @@ enum MenuBlockType: string
 
         return is_string($label) ? $label : $this->value;
     }
-
-    /**
-     * What the panel says this block is, under its name.
-     */
-    public function description(): string
-    {
-        $description = match ($this) {
-            self::Featured => __('panel.arrangement.featured_description'),
-            self::Combos => __('panel.arrangement.combos_description'),
-        };
-
-        return is_string($description) ? $description : '';
-    }
 }

@@ -1,10 +1,10 @@
 <?php
 
-use App\Actions\Menus\ApplyMenuArrangement;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
+use App\Filament\Tenant\Resources\Menus\RelationManagers\CombosRelationManager;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuComboForm;
 use App\Models\Menu;
 use App\Models\MenuCategory;
@@ -33,11 +33,11 @@ function comboNamed(string $name): MenuCombo
 }
 
 /**
- * Open the menu page, where a menu's combos are added, edited and put in order.
+ * Open the table a menu's combos are added, edited and put in order in — what its Combos row opens on the menu page.
  */
 function combosOf(Menu $menu): Testable
 {
-    return Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()]);
+    return Livewire::test(CombosRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class]);
 }
 
 /**
@@ -65,11 +65,12 @@ it('creates a combo on the menu with the items it contains', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $burger = itemOn($menu);
     $fries = itemOn($menu);
+    $existing = MenuCombo::factory()->onMenu($menu)->create(['position' => 3]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
-        ->callAction(TestAction::make('createCombo')->table(), [
+        ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Burger Meal', Locale::Tamil->value => 'பர்கர் உணவு'],
             'description' => [Locale::English->value => 'Burger, fries and a drink.'],
             'price' => '299',
@@ -86,6 +87,8 @@ it('creates a combo on the menu with the items it contains', function (): void {
 
     expect($combo->tenant_id)->toBe($tenant->getKey())
         ->and($combo->menu_id)->toBe($menu->getKey())
+        // At the end of the combos, where whoever added it looks for it.
+        ->and($combo->position)->toBeGreaterThan($existing->position)
         // ₹299.00 is 29900 paise, exactly. No float reaches the column.
         ->and($combo->price_minor_units)->toBe(29900)
         ->and($combo->compare_at_price_minor_units)->toBe(36000)
@@ -101,7 +104,7 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
-        ->callAction(TestAction::make('createCombo')->table(), [
+        ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Lunch Box'],
             'price' => '150',
             'availability' => ItemAvailability::Available->value,
@@ -121,7 +124,7 @@ it('refuses a compare-at price that is not above what is charged', function (): 
     // A "was" price at or below the real one advertises a discount that does
     // not exist, which is the one way this field can mislead a guest.
     combosOf($menu)
-        ->callAction(TestAction::make('createCombo')->table(), [
+        ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Lunch Box'],
             'price' => '150',
             'compare_at_price' => '150',
@@ -138,7 +141,7 @@ it('refuses a combo name the same menu already uses', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     combosOf($menu)
-        ->callAction(TestAction::make('createCombo')->table(), [
+        ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Family Feast'],
             'price' => '999',
             'availability' => ItemAvailability::Available->value,
@@ -189,7 +192,7 @@ it('refuses the same item twice in one combo', function (): void {
     // An item appears once, with a quantity — two rows would show as a
     // duplicate line to the guest. No unique index stands behind the form.
     combosOf($menu)
-        ->callAction(TestAction::make('createCombo')->table(), [
+        ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Double Trouble'],
             'price' => '199',
             'availability' => ItemAvailability::Available->value,
@@ -257,16 +260,12 @@ it('rearranges combos by dragging them', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    combosOf($menu)->call('reorderTable', [
-        'combos',
-        ApplyMenuArrangement::comboKey($second->getKey()),
-        ApplyMenuArrangement::comboKey($first->getKey()),
-    ]);
+    combosOf($menu)->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
     expect($second->refresh()->position)->toBeLessThan($first->refresh()->position);
 });
 
-it('keeps rearranging combos away from someone who may only read the menu', function (): void {
+it('keeps changing and rearranging combos away from someone who may only read the menu', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
@@ -275,11 +274,15 @@ it('keeps rearranging combos away from someone who may only read the menu', func
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
-    combosOf($menu)->call('reorderTable', [
-        'combos',
-        ApplyMenuArrangement::comboKey($second->getKey()),
-        ApplyMenuArrangement::comboKey($first->getKey()),
-    ]);
+    // Reading the combos is menu.view, so the table opens; changing them is
+    // menu.manage. reorderTable() short-circuits on the reorder() policy, so
+    // the drag is asserted by calling it rather than by a hidden button.
+    combosOf($menu)
+        ->assertOk()
+        ->assertActionHidden(TestAction::make('create')->table())
+        ->assertActionHidden(TestAction::make('edit')->table($first))
+        ->assertActionHidden(TestAction::make('delete')->table($first))
+        ->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
     expect($first->refresh()->position)->toBe(0)
         ->and($second->refresh()->position)->toBe(1);
@@ -295,13 +298,12 @@ it('shows only this menu\'s combos', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    $rows = array_keys(combosOf($menu)->instance()->getTable()->getRecords()->all());
-
-    expect($rows)->toContain(ApplyMenuArrangement::comboKey($mine->getKey()))
-        ->and($rows)->not->toContain(ApplyMenuArrangement::comboKey($elsewhere->getKey()));
+    combosOf($menu)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$elsewhere]);
 });
 
-it('edits a combo from the menu page, keeping what is in it', function (): void {
+it('edits a combo from its table, keeping what is in it', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 29900]);
@@ -311,12 +313,10 @@ it('edits a combo from the menu page, keeping what is in it', function (): void 
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The contents are a repeater bound to a relationship, and a row on the
-    // menu page is an array rather than a model. Had the form not been handed
-    // the combo itself, the burger would not have been loaded into it, and
-    // saving the new price would have taken it out.
+    // The contents are a repeater bound to a relationship. Saving a new price
+    // must write the combo and leave the burger it already holds alone.
     combosOf($menu)
-        ->callAction(TestAction::make('editCombo')->table(ApplyMenuArrangement::comboKey($combo->getKey())), [
+        ->callAction(TestAction::make('edit')->table($combo), [
             'price' => '249',
         ])
         ->assertHasNoActionErrors();
@@ -326,7 +326,7 @@ it('edits a combo from the menu page, keeping what is in it', function (): void 
         ->and($line->refresh()->quantity)->toBe(2);
 });
 
-it('deletes a combo from the menu page, leaving its items alone', function (): void {
+it('deletes a combo from its table, leaving its items alone', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $combo = MenuCombo::factory()->onMenu($menu)->create();
@@ -336,7 +336,7 @@ it('deletes a combo from the menu page, leaving its items alone', function (): v
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    combosOf($menu)->callAction(TestAction::make('deleteCombo')->table(ApplyMenuArrangement::comboKey($combo->getKey())));
+    combosOf($menu)->callAction(TestAction::make('delete')->table($combo));
 
     expect(MenuCombo::query()->withoutGlobalScopes()->find($combo->getKey()))->toBeNull()
         ->and(MenuItem::query()->withoutGlobalScopes()->find($menuItem->getKey()))->not->toBeNull();

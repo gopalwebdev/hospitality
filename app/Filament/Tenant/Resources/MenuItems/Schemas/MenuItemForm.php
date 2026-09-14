@@ -33,7 +33,7 @@ class MenuItemForm
     public const array TRANSLATED = ['name', 'description'];
 
     /**
-     * `$categoryId` is where a new item is filed unless changed: the category an "Add item" button was pressed on.
+     * `$categoryId` is where a new item is filed unless changed: the category whose table it is added from.
      */
     public static function configure(Schema $schema, ?int $categoryId = null): Schema
     {

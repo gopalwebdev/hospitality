@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Menus\ApplyMenuArrangement;
 use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
@@ -11,6 +10,7 @@ use App\Filament\Schemas\PricingFields;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
+use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationManager;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
@@ -310,14 +310,14 @@ it('reads a menu as one tree without grouping or ordering on a translated column
         ->getTable();
 
     expect($table->getDefaultGroup())->toBeNull()
-        // A section, then its own items, then its subdivisions: the order a
-        // guest reads the menu in. Nothing is featured and there are no combos,
-        // so neither of those rows is drawn.
+        // A section, then its subdivisions: the order a guest reads the menu
+        // in. Nothing is featured and there are no combos, so neither of those
+        // rows is drawn, and the section's item opens in a table of its own.
         ->and(array_keys($table->getRecords()->all()))->toBe([
             'category-'.$starters->getKey(),
-            'item-'.$menuItem->getKey(),
             'category-'.$chicken->getKey(),
-        ]);
+        ])
+        ->and($menuItem->menu_category_id)->toBe($starters->getKey());
 });
 
 /*
@@ -683,9 +683,8 @@ it('features an item from its own form', function (): void {
 
     expect($menuItem->refresh()->is_featured)->toBeTrue();
 
-    $rows = array_keys(Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->instance()->getTable()->getRecords()->all());
-
-    expect($rows)->toContain(ApplyMenuArrangement::featuredItemKey($menuItem->getKey()));
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->assertCanSeeTableRecords([$menuItem]);
 });
 
 it('takes an item out of the featured row without taking it off the menu', function (): void {
@@ -728,7 +727,7 @@ it('offers only this menu\'s unfeatured items to feature from the menu page', fu
 
     // Featuring belongs to one menu, so another menu's items are not on offer,
     // and an item already led with is not offered a second time.
-    Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
         ->mountAction(TestAction::make('featureItems')->table())
         ->assertSchemaComponentExists('items', checkComponentUsing: function ($component) use ($plain): bool {
             expect(array_keys($component->getOptions()))->toBe([$plain->getKey()]);
@@ -756,11 +755,9 @@ it('shows only the featured items of this menu', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    $rows = array_keys(Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->instance()->getTable()->getRecords()->all());
-
-    expect($rows)->toContain(ApplyMenuArrangement::featuredItemKey($featured->getKey()))
-        ->and($rows)->not->toContain(ApplyMenuArrangement::featuredItemKey($plain->getKey()))
-        ->and($rows)->not->toContain(ApplyMenuArrangement::featuredItemKey($elsewhere->getKey()));
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->assertCanSeeTableRecords([$featured])
+        ->assertCanNotSeeTableRecords([$plain, $elsewhere]);
 });
 
 /*
@@ -1123,24 +1120,27 @@ it('rearranges the featured row by dragging it', function (): void {
     $first = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 1, 'position' => 1]);
     $second = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 2, 'position' => 2]);
 
+    // Featured on another of this tenant's menus. Its id arriving in the drag
+    // must not move it: the featured items table is one menu's.
+    $elsewhere = MenuItem::factory()
+        ->inCategory(MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create())
+        ->create(['is_featured' => true, 'featured_position' => 7]);
+
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // featured_position is its own order, separate from the position that
-    // places an item inside its section — an item answers both at once, and
-    // is a row in both lists on the menu page.
-    Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->call('reorderTable', [
-        'featured',
-        ApplyMenuArrangement::featuredItemKey($second->getKey()),
-        ApplyMenuArrangement::featuredItemKey($first->getKey()),
-        'category-'.$category->getKey(),
-        'item-'.$first->getKey(),
-        'item-'.$second->getKey(),
-    ]);
+    // places an item inside its category — an item answers both at once, and
+    // is a row in its category's table and in the featured items table. That
+    // table hangs off a HasManyThrough, whose join Filament's own reorder
+    // cannot update, so this calls its override for real.
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->call('reorderTable', [$second->getKey(), $elsewhere->getKey(), $first->getKey()]);
 
     expect($second->refresh()->featured_position)->toBeLessThan($first->refresh()->featured_position)
-        // Dragging the featured row must not disturb where either item sits
-        // in its own section.
-        ->and($first->refresh()->position)->toBeLessThan($second->refresh()->position);
+        // Dragging the featured items must not disturb where either item sits
+        // in its own category.
+        ->and($first->refresh()->position)->toBeLessThan($second->refresh()->position)
+        ->and($elsewhere->refresh()->featured_position)->toBe(7);
 });
 
 it('keeps rearranging the featured row away from someone who may only read the menu', function (): void {
@@ -1153,11 +1153,8 @@ it('keeps rearranging the featured row away from someone who may only read the m
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
-    Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->call('reorderTable', [
-        'featured',
-        ApplyMenuArrangement::featuredItemKey($second->getKey()),
-        ApplyMenuArrangement::featuredItemKey($first->getKey()),
-    ]);
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->call('reorderTable', [$second->getKey(), $first->getKey()]);
 
     expect($first->refresh()->featured_position)->toBe(1)
         ->and($second->refresh()->featured_position)->toBe(2);

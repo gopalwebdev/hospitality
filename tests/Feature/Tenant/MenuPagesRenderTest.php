@@ -7,6 +7,9 @@ use App\Filament\Tenant\Resources\Menus\MenuResource;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
+use App\Filament\Tenant\Resources\Menus\RelationManagers\CategoryItemsRelationManager;
+use App\Filament\Tenant\Resources\Menus\RelationManagers\CombosRelationManager;
+use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationManager;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
@@ -47,12 +50,24 @@ it('renders every menu page with a full tree on it', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)->assertOk()->assertCanSeeTableRecords([$menu]);
-    // The featured items and the combos are rows of the menu page now, not tabs.
+    // The menu page is an outline. What is inside a category, the featured
+    // items and the combos each open in a table of their own.
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
         ->assertOk()
-        ->assertSee($direct->name)
-        ->assertSee($nested->name)
-        ->assertSee($combo->name);
+        ->assertSee($category->name)
+        ->assertSee($sub->name);
+    Livewire::test(CategoryItemsRelationManager::class, ['ownerRecord' => $category, 'pageClass' => ArrangeMenu::class])
+        ->assertOk()
+        ->assertCanSeeTableRecords([$direct]);
+    Livewire::test(CategoryItemsRelationManager::class, ['ownerRecord' => $sub, 'pageClass' => ArrangeMenu::class])
+        ->assertOk()
+        ->assertCanSeeTableRecords([$nested]);
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->assertOk()
+        ->assertCanSeeTableRecords([$direct]);
+    Livewire::test(CombosRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
+        ->assertOk()
+        ->assertCanSeeTableRecords([$combo]);
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])->assertOk();
     Livewire::test(ListMenuItems::class)->assertOk()->assertCanSeeTableRecords([$direct, $nested]);
     Livewire::test(Settings::class)->assertOk();
@@ -65,6 +80,8 @@ it('renders the menu page for a tenant with nothing on it yet', function (): voi
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->assertOk();
+    Livewire::test(FeaturedItemsRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])->assertOk();
+    Livewire::test(CombosRelationManager::class, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])->assertOk();
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])->assertOk();
     Livewire::test(ListMenuItems::class)->assertOk();
 });

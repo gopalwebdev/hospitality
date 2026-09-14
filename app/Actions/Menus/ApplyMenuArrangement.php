@@ -5,27 +5,24 @@ namespace App\Actions\Menus;
 use App\Models\Menu;
 use App\Models\MenuBlock;
 use App\Models\MenuCategory;
-use App\Models\MenuCombo;
-use App\Models\MenuItem;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Put a menu in the order an admin has just dragged it into.
+ * Put a menu's outline in the order an admin has just dragged it into.
  *
- * The menu page is one flat table of everything on the menu — its blocks, the
- * featured items and combos listed under two of them, the categories at both
- * levels and the items in each — so a drag arrives as one flat list of keys.
- * This turns that back into the positions the menu stores: on `menu_blocks`,
- * `menu_categories`, `menu_items` (`position` and `featured_position`) and
- * `menu_combos`.
+ * The menu page lists a menu's blocks (its featured items and its combos), its
+ * categories and, under each, its sub-categories, so a drag arrives as one flat
+ * list of keys. This turns that back into the positions the menu stores, on
+ * `menu_blocks` and `menu_categories`. What is *inside* a category or a block is
+ * not on that page: it is ordered in the table the row opens, by Filament's own
+ * reorder.
  *
  * **A row only moves within its own list.** The lists are the top level (blocks
- * and categories ordered against each other), the featured items, the combos,
- * the sub-categories of one category, and the items of one category. A row
- * dropped into another branch keeps the parent it had and lands at the matching
- * place among its own siblings, so no drag can produce a menu that could not
- * exist. Re-filing is an edit on the row's own form (.ai/rules/actions-menus.md).
+ * and categories ordered against each other) and the sub-categories of one
+ * category. A sub-category dropped under another category keeps the parent it
+ * had and lands at the matching place among its own siblings, so no drag can
+ * produce a menu that could not exist. Re-parenting is an edit on the row's own
+ * form (.ai/rules/actions-menus.md).
  *
  * **A row the table did not draw keeps its place.** A block with nothing in it
  * is not drawn, so it is not in the order; only the rows that were sent are
@@ -53,30 +50,6 @@ class ApplyMenuArrangement
     }
 
     /**
-     * The key identifying an item's row under its category.
-     */
-    public static function itemKey(int $id): string
-    {
-        return 'item-'.$id;
-    }
-
-    /**
-     * The key identifying an item's row in the featured list, which is not its row under its category.
-     */
-    public static function featuredItemKey(int $id): string
-    {
-        return 'featured-'.$id;
-    }
-
-    /**
-     * The key identifying a combo's row.
-     */
-    public static function comboKey(int $id): string
-    {
-        return 'combo-'.$id;
-    }
-
-    /**
      * Renumber every list on this menu that the drag touched.
      *
      * @param  list<string>  $order  the rows of the table, in their new order
@@ -85,34 +58,11 @@ class ApplyMenuArrangement
     {
         $rank = array_flip(array_values($order));
 
-        // Each select carries what its model's own saving hooks read as well as
-        // what this writes: MenuCategoryObserver looks at menu_id and
-        // parent_id, MenuItemObserver at is_featured — and at is_service_request and
-        // diet only when one of them changes, which a renumber never does.
-        // Model::shouldBeStrict() throws on an attribute that was never fetched.
+        // The select carries what MenuCategoryObserver reads as well as what
+        // this writes — menu_id and parent_id. Model::shouldBeStrict() throws on
+        // an attribute that was never fetched.
         $categories = MenuCategory::query()
             ->select(['id', 'menu_id', 'tenant_id', 'parent_id', 'position'])
-            ->where('menu_id', $menu->getKey())
-            ->inMenuOrder()
-            ->get();
-
-        $items = MenuItem::query()
-            ->select(['id', 'menu_category_id', 'is_featured', 'featured_position', 'position'])
-            ->whereIn('menu_category_id', $categories->modelKeys())
-            ->inMenuOrder()
-            ->get();
-
-        // Its own query rather than a filter over the items above: the featured
-        // list has an order of its own, which is not the order of any category.
-        $featured = MenuItem::query()
-            ->select(['id', 'menu_category_id', 'is_featured', 'featured_position', 'position'])
-            ->whereIn('menu_category_id', $categories->modelKeys())
-            ->where('is_featured', true)
-            ->inFeaturedOrder()
-            ->get();
-
-        $combos = MenuCombo::query()
-            ->select(['id', 'menu_id', 'tenant_id', 'position'])
             ->where('menu_id', $menu->getKey())
             ->inMenuOrder()
             ->get();
@@ -122,7 +72,7 @@ class ApplyMenuArrangement
             ->where('menu_id', $menu->getKey())
             ->get();
 
-        DB::transaction(function () use ($menu, $rank, $categories, $items, $featured, $combos, $blocks): void {
+        DB::transaction(function () use ($menu, $rank, $categories, $blocks): void {
             $this->renumber(
                 $menu->readingOrder($categories->whereNull('parent_id'), $blocks),
                 $rank,
@@ -134,14 +84,6 @@ class ApplyMenuArrangement
             foreach ($categories->whereNotNull('parent_id')->groupBy('parent_id') as $children) {
                 $this->renumber($children->all(), $rank, static fn (MenuCategory $child): string => static::categoryKey($child->getKey()));
             }
-
-            foreach ($items->groupBy('menu_category_id') as $siblings) {
-                $this->renumber($siblings->all(), $rank, static fn (MenuItem $item): string => static::itemKey($item->getKey()));
-            }
-
-            $this->renumber($featured->all(), $rank, static fn (MenuItem $item): string => static::featuredItemKey($item->getKey()), 'featured_position');
-
-            $this->renumber($combos->all(), $rank, static fn (MenuCombo $combo): string => static::comboKey($combo->getKey()));
         });
     }
 
@@ -155,13 +97,13 @@ class ApplyMenuArrangement
      * A block every menu has but nobody has placed is unsaved and reads at 0,
      * so it is written the first time it lands anywhere else.
      *
-     * @template TRow of Model
+     * @template TRow of MenuBlock|MenuCategory
      *
      * @param  array<int, TRow>  $siblings  in their current order
      * @param  array<string, int>  $rank
      * @param  callable(TRow): string  $keyFor
      */
-    private function renumber(array $siblings, array $rank, callable $keyFor, string $column = 'position'): void
+    private function renumber(array $siblings, array $rank, callable $keyFor): void
     {
         $slots = [];
         $sent = [];
@@ -186,11 +128,11 @@ class ApplyMenuArrangement
         }
 
         foreach (array_values($siblings) as $position => $sibling) {
-            if ((int) $sibling->getAttribute($column) === $position) {
+            if ($sibling->position === $position) {
                 continue;
             }
 
-            $sibling->setAttribute($column, $position);
+            $sibling->position = $position;
             $sibling->save();
         }
     }

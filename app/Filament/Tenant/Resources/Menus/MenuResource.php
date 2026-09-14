@@ -95,13 +95,13 @@ class MenuResource extends Resource
     /**
      * A menu is two tabs across the top of one record.
      *
-     * Arrangement comes first because it is what a menu mostly *is*: every
-     * block, category, subdivision, item, featured item and combo, in the
-     * order a guest reads them, each added and edited where it sits. Edit is
-     * the menu itself — its name, its hours and whether guests see it.
+     * Arrangement comes first because it is what a menu mostly *is*: its
+     * blocks, categories and sub-categories in the order a guest reads them,
+     * each opening a table of what is inside it. Edit is the menu itself — its
+     * name, its hours and whether guests see it.
      *
      * Featured items and combos were tabs of their own and are neither any
-     * more: both are rows of the arrangement now, beside everything else.
+     * more: each is a row of the arrangement that opens its own table.
      *
      * @return array<int, NavigationItem>
      */
