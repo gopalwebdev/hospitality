@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Guest;
 
 use App\Enums\ItemAvailability;
-use App\Enums\MenuBlock;
 use App\Http\Controllers\Controller;
 use App\Models\Charge;
 use App\Models\Menu;
+use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
@@ -143,16 +143,16 @@ class MenuController extends Controller
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
             ])->values()->all(),
-            // Where the two rails sit among the sections is the tenant's
-            // decision, dragged on the menu's arrangement screen, so the order
-            // is worked out here rather than assumed by the app. Sections with
+            // Where the featured and combos rails sit among the sections is the
+            // tenant's decision, dragged on the menu page, so the order is
+            // worked out here rather than assumed by the app. Sections with
             // nothing to read have already been filtered out, so nothing in
-            // this list points at a block that was not sent.
+            // this list points at a section that was not sent.
             'order' => array_map(
-                fn (MenuBlock|MenuCategory $block): string|int => $block instanceof MenuBlock
-                    ? $block->value
-                    : $block->getKey(),
-                $menu->readingOrder($sections),
+                fn (MenuBlock|MenuCategory $entry): string|int => $entry instanceof MenuBlock
+                    ? $entry->type->value
+                    : $entry->getKey(),
+                $menu->readingOrder($sections, $this->blocks($menu)),
             ),
             'sections' => $sections->map(fn (MenuCategory $category): array => [
                 'id' => $category->getKey(),
@@ -210,6 +210,19 @@ class MenuController extends Controller
                 $item->setRelation('additions', $inSection->additions);
             }
         }
+    }
+
+    /**
+     * Where this menu's blocks have been placed. Featured and combos have no row until they are.
+     *
+     * @return EloquentCollection<int, MenuBlock>
+     */
+    private function blocks(Menu $menu): EloquentCollection
+    {
+        return MenuBlock::query()
+            ->select(['id', 'menu_id', 'type', 'position'])
+            ->where('menu_id', $menu->getKey())
+            ->get();
     }
 
     /**

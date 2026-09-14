@@ -29,15 +29,19 @@ use Filament\Tables\Table;
  */
 class ChargeResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = Charge::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedReceiptPercent;
 
     /**
      * Beside Settings, where charges used to live.
      */
+    #[\Override]
     protected static ?int $navigationSort = 85;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
     /**

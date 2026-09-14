@@ -13,6 +13,7 @@ use Filament\Support\Icons\Heroicon;
  */
 class ListCharges extends ListRecords
 {
+    #[\Override]
     protected static string $resource = ChargeResource::class;
 
     protected function getHeaderActions(): array

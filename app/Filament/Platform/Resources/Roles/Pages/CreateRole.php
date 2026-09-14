@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreateRole extends CreateRecord
 {
+    #[\Override]
     protected static string $resource = RoleResource::class;
 
     /**

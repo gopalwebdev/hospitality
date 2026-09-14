@@ -17,8 +17,10 @@ use Filament\Tables\Table;
 
 class TenantResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = Tenant::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema

@@ -16,16 +16,11 @@ return new class extends Migration
             $table->jsonb('description')->nullable();
             $table->time('available_from')->nullable();
             $table->time('available_until')->nullable();
-            // The rails sit in the same order as the categories; see Menu::readingOrder().
-            $table->integer('position')->default(0);
-            $table->integer('featured_position')->default(0);
-            $table->integer('combos_position')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE menus
-            ADD CONSTRAINT menus_positions_not_negative CHECK ("position" >= 0 AND featured_position >= 0 AND combos_position >= 0),
             ADD CONSTRAINT menus_service_window_paired CHECK ((available_from IS NULL) = (available_until IS NULL))');
     }
 

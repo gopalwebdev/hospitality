@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\MenuBlock;
+use App\Enums\MenuBlockType;
 use App\Models\Concerns\HasTranslatedNames;
 use Carbon\CarbonImmutable;
 use Database\Factories\MenuFactory;
@@ -22,16 +22,13 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property int $tenant_id
  * @property string $name
  * @property string|null $description
- * @property int $position
- * @property int $featured_position
- * @property int $combos_position
  * @property bool $is_active
  * @property string|null $available_from
  * @property string|null $available_until
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'description', 'position', 'featured_position', 'combos_position', 'is_active', 'available_from', 'available_until'])]
+#[Fillable(['name', 'description', 'is_active', 'available_from', 'available_until'])]
 class Menu extends Model
 {
     /** @use HasFactory<MenuFactory> */
@@ -42,15 +39,9 @@ class Menu extends Model
     /** @var list<string> */
     public array $translatable = ['name', 'description'];
 
-    /**
-     * The rails start level with the first category; ties read rails first. See readingOrder().
-     *
-     * @var array<string, mixed>
-     */
+    /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
-        'position' => 0,
-        'featured_position' => 0,
-        'combos_position' => 0,
         'is_active' => true,
     ];
 
@@ -86,6 +77,16 @@ class Menu extends Model
     public function subCategories(): HasMany
     {
         return $this->hasMany(MenuCategory::class)->whereNotNull('parent_id');
+    }
+
+    /**
+     * What has been placed on this menu's top level beside its categories. See readingOrder().
+     *
+     * @return HasMany<MenuBlock, $this>
+     */
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(MenuBlock::class);
     }
 
     /**
@@ -125,30 +126,43 @@ class Menu extends Model
     }
 
     /**
-     * The featured rail, the combos rail and the categories, in the order a guest reads them.
+     * The blocks and top-level categories, in the order a guest reads them.
      *
-     * All three share one number space. Ties break rails first, so a menu nobody
-     * has arranged opens with its featured items, then its combos.
+     * Both share one number space. A block every menu has but nobody has placed
+     * has no row, and reads at 0. Ties break blocks first, in MenuBlockType
+     * order, so a menu nobody has arranged opens with its featured items, then
+     * its combos, then its categories.
      *
      * @param  iterable<MenuCategory>  $categories  this menu's top-level categories, in order
+     * @param  iterable<MenuBlock>  $blocks  this menu's saved blocks
      * @return list<MenuBlock|MenuCategory>
      */
-    public function readingOrder(iterable $categories): array
+    public function readingOrder(iterable $categories, iterable $blocks): array
     {
-        $blocks = [];
+        $types = MenuBlockType::cases();
+        $rankOf = array_flip(array_map(static fn (MenuBlockType $type): string => $type->value, $types));
+        $entries = [];
+        $placed = [];
 
-        foreach (MenuBlock::cases() as $rail) {
-            $blocks[] = [$rail->positionOn($this), $rail === MenuBlock::Featured ? 0 : 1, $rail];
+        foreach ($blocks as $block) {
+            $entries[] = [$block->position, $rankOf[$block->type->value], $block];
+            $placed[$block->type->value] = true;
+        }
+
+        foreach ($types as $type) {
+            if ($type->isOnEveryMenu() && ! isset($placed[$type->value])) {
+                $entries[] = [0, $rankOf[$type->value], new MenuBlock(['menu_id' => $this->getKey(), 'type' => $type])];
+            }
         }
 
         foreach ($categories as $category) {
-            $blocks[] = [$category->position, 2, $category];
+            $entries[] = [$category->position, count($types), $category];
         }
 
-        // PHP sorts stably, so categories sharing a position keep the query's order.
-        usort($blocks, static fn (array $a, array $b): int => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+        // PHP sorts stably, so rows sharing a position keep the order they were handed in.
+        usort($entries, static fn (array $a, array $b): int => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
 
-        return array_map(static fn (array $block): MenuBlock|MenuCategory => $block[2], $blocks);
+        return array_map(static fn (array $entry): MenuBlock|MenuCategory => $entry[2], $entries);
     }
 
     public function hasServiceWindow(): bool
@@ -212,11 +226,13 @@ class Menu extends Model
     }
 
     /**
+     * Menus are not put in order by hand, so a list of them reads alphabetically, in English.
+     *
      * @param  Builder<$this>  $query
      */
-    public function scopeInMenuOrder(Builder $query): void
+    public function scopeByName(Builder $query): void
     {
-        $query->orderBy('position')->orderBy(self::fallbackLocalePath());
+        $query->orderBy(self::fallbackLocalePath());
     }
 
     /**
@@ -225,9 +241,6 @@ class Menu extends Model
     protected function casts(): array
     {
         return [
-            'position' => 'integer',
-            'featured_position' => 'integer',
-            'combos_position' => 'integer',
             'is_active' => 'boolean',
         ];
     }

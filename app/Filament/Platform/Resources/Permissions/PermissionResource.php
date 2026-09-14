@@ -29,14 +29,19 @@ use UnitEnum;
  */
 class PermissionResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = Permission::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
+    #[\Override]
     protected static string|UnitEnum|null $navigationGroup = 'Access control';
 
+    #[\Override]
     protected static ?int $navigationSort = 20;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema

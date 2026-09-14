@@ -1,18 +1,27 @@
 <?php
 
+use App\Actions\Menus\ApplyMenuArrangement;
 use App\Actions\Menus\MoveCategoryToMenu;
+use App\Enums\Diet;
+use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuBlockType;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Filament\Tenant\Resources\Menus\MenuResource;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Models\Menu;
+use App\Models\MenuBlock;
 use App\Models\MenuCategory;
+use App\Models\MenuCombo;
+use App\Models\MenuComboItem;
 use App\Models\MenuItem;
+use App\Models\MenuItemAddition;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use LogicException;
@@ -33,10 +42,9 @@ function categoryNamed(string $name): MenuCategory
 }
 
 /**
- * Open the one table a menu is arranged on.
+ * Open the one table a menu is arranged and edited on.
  *
- * Both levels of category, the items in each and the two rails are rows of
- * this single table now — see MenuArrangementTable.
+ * Everything on a menu is a row of this single table — see MenuArrangementTable.
  */
 function arrangementOf(Menu $menu): Testable
 {
@@ -195,6 +203,7 @@ it('keeps the arrangement\'s own actions away from someone who may only read the
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
@@ -203,8 +212,13 @@ it('keeps the arrangement\'s own actions away from someone who may only read the
     arrangementOf($menu)
         ->assertOk()
         ->assertActionHidden(TestAction::make('createCategory')->table())
+        ->assertActionHidden(TestAction::make('createCombo')->table())
+        ->assertActionHidden(TestAction::make('featureItems')->table())
         ->assertActionHidden(TestAction::make('rename')->table(categoryRow($category)))
-        ->assertActionHidden(TestAction::make('delete')->table(categoryRow($category)));
+        ->assertActionHidden(TestAction::make('delete')->table(categoryRow($category)))
+        ->assertActionHidden(TestAction::make('createItem')->table(categoryRow($category)))
+        ->assertActionHidden(TestAction::make('editItem')->table(itemRow($menuItem)))
+        ->assertActionHidden(TestAction::make('deleteItem')->table(itemRow($menuItem)));
 });
 
 it('refuses a third level', function (): void {
@@ -410,7 +424,7 @@ it('offers only the chosen menu\'s categories once a menu is filtered', function
 
 it('reads the items list menu by menu, section by section', function (): void {
     $tenant = Tenant::factory()->create();
-    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'position' => 0]);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $first = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $second = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
@@ -676,7 +690,8 @@ it('puts a drag handle on every kind of row', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $subCategory = MenuCategory::factory()->under($category)->create();
-    $menuItem = MenuItem::factory()->inCategory($category)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -686,37 +701,78 @@ it('puts a drag handle on every kind of row', function (): void {
     $html = arrangementOf($menu)->call('toggleTableReordering')->html();
 
     expect($html)->toContain('x-sortable-item="featured"')
+        ->toContain('x-sortable-item="'.ApplyMenuArrangement::featuredItemKey($menuItem->getKey()).'"')
         ->toContain('x-sortable-item="combos"')
+        ->toContain('x-sortable-item="'.ApplyMenuArrangement::comboKey($combo->getKey()).'"')
         ->toContain('x-sortable-item="'.categoryRow($category).'"')
         ->toContain('x-sortable-item="'.categoryRow($subCategory).'"')
         ->toContain('x-sortable-item="'.itemRow($menuItem).'"');
 });
 
-it('drags the two rails in among the categories', function (): void {
+it('drags the featured and combo rows in among the categories', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $starters = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
     $desserts = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
+    $featured = MenuItem::factory()->inCategory($starters)->create(['is_featured' => true]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The featured items and the combos are rows of this table like any
-    // category, which is the whole reason they can be moved at all: they share
-    // one number space, kept on the menu itself.
+    // The blocks share the categories' number space, so moving one is the same
+    // kind of drag as moving a category. Neither had a row before this.
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($starters),
+        itemRow($featured),
         'combos',
+        ApplyMenuArrangement::comboKey($combo->getKey()),
         categoryRow($desserts),
         'featured',
+        ApplyMenuArrangement::featuredItemKey($featured->getKey()),
     ]);
 
-    $menu->refresh();
+    $blocks = MenuBlock::query()
+        ->where('menu_id', $menu->getKey())
+        ->get()
+        ->mapWithKeys(fn (MenuBlock $block): array => [$block->type->value => $block->position])
+        ->all();
 
     expect($starters->refresh()->position)->toBe(0)
-        ->and($menu->combos_position)->toBe(1)
-        ->and($desserts->refresh()->position)->toBe(2)
-        ->and($menu->featured_position)->toBe(3);
+        ->and($blocks)->toEqual([MenuBlockType::Combos->value => 1, MenuBlockType::Featured->value => 3])
+        ->and($desserts->refresh()->position)->toBe(2);
+});
+
+it('leaves an empty row where it was when the rows around it are dragged', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    $starters = MenuCategory::factory()->inMenu($menu)->create(['position' => 0]);
+    $desserts = MenuCategory::factory()->inMenu($menu)->create(['position' => 1]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // Nothing is featured, so the featured row is neither drawn nor sent. It
+    // must not be pushed to the bottom of the menu for having been left out.
+    arrangementOf($menu)->call('reorderTable', [
+        'combos',
+        ApplyMenuArrangement::comboKey($combo->getKey()),
+        categoryRow($desserts),
+        categoryRow($starters),
+    ]);
+
+    $categories = MenuCategory::query()->where('menu_id', $menu->getKey())->topLevel()->inMenuOrder()->get();
+    $blocks = MenuBlock::query()->where('menu_id', $menu->getKey())->get();
+
+    $order = array_map(
+        fn (MenuBlock|MenuCategory $entry): string|int => $entry instanceof MenuBlock ? $entry->type->value : $entry->getKey(),
+        $menu->readingOrder($categories, $blocks),
+    );
+
+    expect($order)->toBe([MenuBlockType::Featured->value, MenuBlockType::Combos->value, $desserts->getKey(), $starters->getKey()])
+        // The featured row is still at the top it never left, so it still has no row.
+        ->and($blocks->map(fn (MenuBlock $block): MenuBlockType => $block->type)->all())->toBe([MenuBlockType::Combos]);
 });
 
 it('rearranges subdivisions within their own section', function (): void {
@@ -786,28 +842,222 @@ it('shows both levels of this menu and nothing from another tenant', function ()
 |
 */
 
-it('links a category to its own items, narrowed to it', function (): void {
+it('draws the featured and combo rows only once there is something in them', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $starters = MenuCategory::factory()->inMenu($menu)->create();
-    MenuCategory::factory()->inMenu($menu)->create();
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    $url = arrangementOf($menu)
-        ->instance()
-        ->getTable()
-        ->getAction('openItems')
-        ->record(['kind' => 'category', 'category_id' => $starters->getKey()])
-        ->getUrl();
+    // An empty row used to head every menu saying "No combos"; the header's
+    // buttons are how one is started instead.
+    expect(array_keys(arrangementOf($menu)->instance()->getTable()->getRecords()->all()))
+        ->toBe([categoryRow($category), itemRow($menuItem)]);
 
-    // The query key is `filters`, not `tableFilters`: ListRecords binds the
-    // property as `#[Url(as: 'filters')]`, and the wrong name is not an error —
-    // it silently opens the page showing every item on every menu.
-    expect($url)->toContain('filters%5Bmenu_category_id%5D%5Bvalue%5D='.$starters->getKey());
+    arrangementOf($menu)
+        ->assertActionVisible(TestAction::make('createCombo')->table())
+        ->assertActionVisible(TestAction::make('featureItems')->table());
 
-    expect((string) $this->get($url)->assertOk()->getContent())
-        ->toContain('menu_category_id&quot;:[{&quot;value&quot;:&quot;'.$starters->getKey().'&quot;}');
+    $menuItem->update(['is_featured' => true]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create();
+
+    expect(array_keys(arrangementOf($menu)->instance()->getTable()->getRecords()->all()))->toBe([
+        'featured',
+        ApplyMenuArrangement::featuredItemKey($menuItem->getKey()),
+        'combos',
+        ApplyMenuArrangement::comboKey($combo->getKey()),
+        categoryRow($category),
+        itemRow($menuItem),
+    ]);
+});
+
+it('adds an item under the category or sub-category its button was pressed on', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $section = MenuCategory::factory()->inMenu($menu)->create();
+    $chicken = MenuCategory::factory()->under($section)->create();
+    $existing = MenuItem::factory()->inCategory($chicken)->create(['position' => 4]);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)
+        ->callAction(TestAction::make('createItem')->table(categoryRow($chicken)), [
+            'name' => [Locale::English->value => 'Chicken 65'],
+            'price' => '220',
+        ])
+        ->assertHasNoActionErrors();
+
+    $menuItem = MenuItem::query()->withoutGlobalScopes()->where('name->'.Locale::English->value, 'Chicken 65')->sole();
+
+    // Only a name and a price were typed. The category came from the row, and
+    // the form kept the rest of its defaults — which filling it with the
+    // category instead would have skipped.
+    expect($menuItem->menu_category_id)->toBe($chicken->getKey())
+        ->and($menuItem->tenant_id)->toBe($tenant->getKey())
+        ->and($menuItem->price_minor_units)->toBe(22000)
+        ->and($menuItem->availability)->toBe(ItemAvailability::Available)
+        ->and($menuItem->diet)->toBe(Diet::Vegetarian)
+        ->and($menuItem->position)->toBeGreaterThan($existing->position);
+});
+
+it('starts a sub-category under the category its button was pressed on, showing', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    MenuCategory::factory()->inMenu($menu)->create();
+    $biryani = MenuCategory::factory()->inMenu($menu)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)
+        ->callAction(TestAction::make('createSubCategory')->table(categoryRow($biryani)), [
+            'name' => [Locale::English->value => 'Chicken'],
+        ])
+        ->assertHasNoActionErrors();
+
+    $chicken = categoryNamed('Chicken');
+
+    expect($chicken->parent_id)->toBe($biryani->getKey())
+        ->and($chicken->is_active)->toBeTrue();
+});
+
+it('edits an item where it sits, keeping the add-ons and tax nobody touched', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->taxedAt(1200)->create(['price_minor_units' => 10000]);
+    $addOn = MenuItemAddition::factory()->onItem($menuItem)->create(['price_minor_units' => 4000]);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // The add-ons are a repeater bound to a relationship, which needs a real
+    // record behind the form, and a row on this page is an array. Had the form
+    // not been handed the item, the repeater would have loaded nothing and the
+    // save would have deleted the add-on.
+    arrangementOf($menu)
+        ->callAction(TestAction::make('editItem')->table(itemRow($menuItem)), [
+            'price' => '150',
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($menuItem->refresh()->price_minor_units)->toBe(15000)
+        ->and($menuItem->tax_rate_basis_points)->toBe(1200)
+        ->and($menuItem->additions()->pluck('id')->all())->toBe([$addOn->getKey()])
+        ->and($addOn->refresh()->price_minor_units)->toBe(4000);
+});
+
+it('adds an add-on to an item from the menu page', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)
+        ->callAction(TestAction::make('editItem')->table(itemRow($menuItem)), [
+            'additions' => [
+                ['name' => [Locale::English->value => 'Extra cheese'], 'price' => '40', 'is_available' => true],
+            ],
+        ])
+        ->assertHasNoActionErrors();
+
+    $addOn = $menuItem->additions()->sole();
+
+    expect($addOn->price_minor_units)->toBe(4000)
+        ->and($addOn->tenant_id)->toBe($tenant->getKey());
+});
+
+it('deletes an item from the menu page', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $menuItem = MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)->callAction(TestAction::make('deleteItem')->table(itemRow($menuItem)));
+
+    expect(MenuItem::query()->withoutGlobalScopes()->whereKey($menuItem->getKey())->exists())->toBeFalse();
+});
+
+it('features items from the menu page, after the ones already featured', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+
+    $already = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 4]);
+    $first = MenuItem::factory()->inCategory($category)->create();
+    $second = MenuItem::factory()->inCategory($category)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)
+        ->callAction(TestAction::make('featureItems')->table(), [
+            'items' => [$second->getKey(), $first->getKey()],
+        ])
+        ->assertHasNoActionErrors();
+
+    // In the order they were picked, behind what the menu already led with.
+    expect($second->refresh()->is_featured)->toBeTrue()
+        ->and($second->featured_position)->toBe(5)
+        ->and($first->refresh()->featured_position)->toBe(6)
+        ->and($already->refresh()->featured_position)->toBe(4);
+});
+
+it('takes an item off the featured row from the menu page, and leaves it on the menu', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['is_featured' => true, 'featured_position' => 2]);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    arrangementOf($menu)->callAction(TestAction::make('unfeature')->table(ApplyMenuArrangement::featuredItemKey($menuItem->getKey())));
+
+    expect($menuItem->refresh()->is_featured)->toBeFalse()
+        ->and($menuItem->featured_position)->toBe(0)
+        ->and($menuItem->menu_category_id)->toBe($category->getKey());
+});
+
+it('reads the menu page in the same number of queries however much is on it', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    // A branch of every kind of row: a category, a sub-category, an item in
+    // each, one of them featured, and a combo with something in it.
+    $addBranch = function () use ($menu): void {
+        $category = MenuCategory::factory()->inMenu($menu)->create();
+        $subCategory = MenuCategory::factory()->under($category)->create();
+        $featured = MenuItem::factory()->inCategory($category)->create(['is_featured' => true]);
+        MenuItem::factory()->inCategory($subCategory)->create();
+        MenuComboItem::factory()->pairing(MenuCombo::factory()->onMenu($menu)->create(), $featured)->create();
+    };
+
+    $queriesToRender = function () use ($menu): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        arrangementOf($menu)->assertOk();
+
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+
+    $addBranch();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // The first render warms what a request caches, the permissions among them.
+    $queriesToRender();
+    $withOneBranch = $queriesToRender();
+
+    foreach (range(1, 4) as $ignored) {
+        $addBranch();
+    }
+
+    // A query per row would add dozens here; the page asks once per kind of row.
+    expect($queriesToRender())->toBe($withOneBranch);
 });
 
 it('does not offer dragging on the items page at all', function (): void {

@@ -10,6 +10,7 @@ use Filament\Support\Icons\Heroicon;
 
 class ViewRole extends ViewRecord
 {
+    #[\Override]
     protected static string $resource = RoleResource::class;
 
     protected function getHeaderActions(): array

@@ -20,8 +20,8 @@ return RectorConfig::configure()
         __DIR__.'/routes',
         __DIR__.'/tests',
     ])
-    ->withPhpVersion(PhpVersion::PHP_84)
-    ->withPhpSets(php84: true)
+    ->withPhpVersion(PhpVersion::PHP_85)
+    ->withPhpSets(php85: true)
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,

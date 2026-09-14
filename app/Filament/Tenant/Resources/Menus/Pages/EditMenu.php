@@ -10,14 +10,14 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
 
 /**
- * One menu, and the items it leads with.
+ * What a menu is called, when it is served and whether guests see it.
  *
- * A page rather than a modal, because the featured items relation manager
- * hangs under the form — naming a menu and choosing what it opens with are the
- * same sitting.
+ * A page rather than a modal because it is one of the menu's two tabs; what the
+ * menu holds is edited on the other one, ArrangeMenu.
  */
 class EditMenu extends EditRecord
 {
+    #[\Override]
     protected static string $resource = MenuResource::class;
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class EditUser extends EditRecord
 {
+    #[\Override]
     protected static string $resource = UserResource::class;
 
     /**

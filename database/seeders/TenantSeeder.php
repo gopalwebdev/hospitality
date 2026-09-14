@@ -829,14 +829,13 @@ class TenantSeeder extends Seeder
     {
         $menus = [];
 
-        foreach ($cards as $position => $key) {
+        foreach ($cards as $key) {
             $card = self::CARDS[$key];
 
             $menu = $this->firstOrCreateByEnglishName(
                 Menu::query()->where('tenant_id', $tenant->getKey()),
                 $card['name'],
                 fn (): Menu => new Menu([
-                    'position' => $position,
                     'is_active' => true,
                     'available_from' => $card['available_from'] ?? null,
                     'available_until' => $card['available_until'] ?? null,

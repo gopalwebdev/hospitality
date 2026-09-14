@@ -39,11 +39,13 @@ use LogicException;
  */
 class CreateUser extends CreateRecord
 {
+    #[\Override]
     protected static string $resource = UserResource::class;
 
     /**
      * Creating another would need a second code, so the page does not offer it.
      */
+    #[\Override]
     protected static bool $canCreateAnother = false;
 
     /**

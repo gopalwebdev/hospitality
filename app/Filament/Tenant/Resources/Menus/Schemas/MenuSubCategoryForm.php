@@ -33,7 +33,10 @@ class MenuSubCategoryForm
      */
     public const array TRANSLATED = ['name'];
 
-    public static function configure(Schema $schema, ?int $menuId = null, ?MenuCategory $editing = null): Schema
+    /**
+     * `$parentId` is the category a new sub-category starts under: the one its button was pressed on.
+     */
+    public static function configure(Schema $schema, ?int $menuId = null, ?MenuCategory $editing = null, ?int $parentId = null): Schema
     {
         return $schema
             ->columns(1)
@@ -49,7 +52,7 @@ class MenuSubCategoryForm
                         Select::make('parent_id')
                             ->label(__('panel.categories.section'))
                             ->options(fn (): array => self::categoryOptions($menuId))
-                            ->default(fn (): ?int => self::onlyCategoryKey($menuId))
+                            ->default(fn (): ?int => $parentId ?? self::onlyCategoryKey($menuId))
                             ->required()
                             ->searchable()
                             ->preload()

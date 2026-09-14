@@ -32,12 +32,16 @@ use Filament\Tables\Table;
  */
 class HomeRowResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = HomeRow::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSquares2x2;
 
+    #[\Override]
     protected static ?int $navigationSort = 1;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'title';
 
     /**

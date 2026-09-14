@@ -47,16 +47,4 @@ class MenuPolicy
     {
         return $user->can(Permission::MenuManage->value);
     }
-
-    /**
-     * Drag menus into a new order.
-     *
-     * Filament asks for this by name the moment a table is reorderable, and
-     * strictAuthorization refuses outright when it is missing — see
-     * .ai/rules/policies.md.
-     */
-    public function reorder(User $user): bool
-    {
-        return $user->can(Permission::MenuManage->value);
-    }
 }

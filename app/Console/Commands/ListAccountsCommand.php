@@ -15,8 +15,10 @@ use Illuminate\Console\Command;
  */
 class ListAccountsCommand extends Command
 {
+    #[\Override]
     protected $signature = 'accounts:list';
 
+    #[\Override]
     protected $description = 'List the accounts that can sign in to each panel';
 
     public function handle(): int

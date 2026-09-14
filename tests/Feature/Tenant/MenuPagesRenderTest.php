@@ -7,8 +7,6 @@ use App\Filament\Tenant\Resources\Menus\MenuResource;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
-use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuCombos;
-use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuFeaturedItems;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
@@ -49,10 +47,13 @@ it('renders every menu page with a full tree on it', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenus::class)->assertOk()->assertCanSeeTableRecords([$menu]);
-    Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->assertOk();
+    // The featured items and the combos are rows of the menu page now, not tabs.
+    Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])
+        ->assertOk()
+        ->assertSee($direct->name)
+        ->assertSee($nested->name)
+        ->assertSee($combo->name);
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])->assertOk();
-    Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])->assertOk()->assertCanSeeTableRecords([$direct]);
-    Livewire::test(ManageMenuCombos::class, ['record' => $menu->getKey()])->assertOk()->assertCanSeeTableRecords([$combo]);
     Livewire::test(ListMenuItems::class)->assertOk()->assertCanSeeTableRecords([$direct, $nested]);
     Livewire::test(Settings::class)->assertOk();
 });
@@ -65,8 +66,6 @@ it('renders the menu page for a tenant with nothing on it yet', function (): voi
 
     Livewire::test(ArrangeMenu::class, ['record' => $menu->getKey()])->assertOk();
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])->assertOk();
-    Livewire::test(ManageMenuFeaturedItems::class, ['record' => $menu->getKey()])->assertOk();
-    Livewire::test(ManageMenuCombos::class, ['record' => $menu->getKey()])->assertOk();
     Livewire::test(ListMenuItems::class)->assertOk();
 });
 
@@ -98,8 +97,8 @@ it('serves every menu tab over HTTP, tab strip and all', function (): void {
 
     // A Livewire test renders the component and not the page around it, so it
     // says nothing about the layout, the record sub-navigation or the render
-    // hooks. These are the four URLs an owner actually opens.
-    foreach (['arrange', 'edit', 'featured', 'combos'] as $tab) {
+    // hooks. These are the two URLs an owner actually opens.
+    foreach (['arrange', 'edit'] as $tab) {
         $this->get(MenuResource::getUrl($tab, ['record' => $menu, 'tenant' => $tenant]))
             ->assertOk()
             ->assertSee(__('panel.arrangement.title'));

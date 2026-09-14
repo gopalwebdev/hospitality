@@ -324,7 +324,7 @@ it('files a permission added from the panel under Other, and then offers it', fu
     Livewire::test(CreateRole::class)
         ->assertFormFieldExists(
             RoleForm::statePathFor(PermissionGroup::Other),
-            fn (CheckboxList $field): bool => array_key_exists($custom->getKey(), $field->getOptions()),
+            fn (CheckboxList $field): bool => array_key_exists((string) $custom->getKey(), $field->getOptions()),
         );
 });
 

@@ -3,7 +3,6 @@
 namespace App\Filament\Tenant\Resources\Menus\Tables;
 
 use App\Filament\Schemas\TranslatedFields;
-use App\Filament\Tables\Reordering;
 use App\Filament\Tenant\Resources\Menus\MenuResource;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuForm;
 use App\Models\Menu;
@@ -22,7 +21,6 @@ class MenusTable
 {
     public static function configure(Table $table): Table
     {
-
         return $table
             ->columns([
                 TextColumn::make('name')
@@ -72,12 +70,11 @@ class MenusTable
                     DeleteBulkAction::make(),
                 ]),
             ])
-            // Opening a menu opens its arrangement, which is what a menu mostly
-            // is; renaming one is the pencil beside it. The other tabs are a
-            // click away from there.
+            // Opening a menu opens everything on it, which is what a menu mostly
+            // is; renaming one is the pencil beside it.
             ->recordUrl(fn (Menu $record): string => MenuResource::getUrl('arrange', ['record' => $record]))
-            ->reorderable('position')
-            ->reorderRecordsTriggerAction(Reordering::trigger())
-            ->defaultSort('position');
+            // Menus are not put in order by hand: a guest reaches one through a
+            // home screen tile, so this list only has to be easy to scan.
+            ->defaultSort(fn (Builder $query): Builder => TranslatedFields::sort($query, 'name', 'asc'));
     }
 }

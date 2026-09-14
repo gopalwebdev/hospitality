@@ -4,8 +4,10 @@ use App\Enums\Appearance;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuBlockType;
 use App\Models\Charge;
 use App\Models\Menu;
+use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
@@ -310,7 +312,8 @@ it('reads a menu in the order the tenant arranged, rails and all', function (): 
     // Untouched, a menu opens with its featured items and its combos. This one
     // has been dragged: the combos sit between the two sections and the
     // featured rail closes the menu.
-    $menu->update(['combos_position' => 1, 'featured_position' => 3]);
+    MenuBlock::factory()->onMenu($menu)->ofType(MenuBlockType::Combos)->create(['position' => 1]);
+    MenuBlock::factory()->onMenu($menu)->ofType(MenuBlockType::Featured)->create(['position' => 3]);
 
     $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
@@ -332,9 +335,9 @@ it('opens a menu nobody has arranged with its featured items and its combos', fu
 
     MenuItem::factory()->inCategory($category)->create();
 
-    // Both rails default to where the first category sits and ties break rails
-    // first, so the order a menu had before it could be arranged is the order
-    // it still has.
+    // Neither rail has a row until it is dragged somewhere, and one without a
+    // row reads level with the first category, rails first — so a menu nobody
+    // has arranged reads the way every menu did before one could be.
     $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page

@@ -32,14 +32,19 @@ use UnitEnum;
  */
 class RoleResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = Role::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
 
+    #[\Override]
     protected static string|UnitEnum|null $navigationGroup = 'Access control';
 
+    #[\Override]
     protected static ?int $navigationSort = 10;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema

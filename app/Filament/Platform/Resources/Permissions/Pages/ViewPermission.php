@@ -10,6 +10,7 @@ use Filament\Support\Icons\Heroicon;
 
 class ViewPermission extends ViewRecord
 {
+    #[\Override]
     protected static string $resource = PermissionResource::class;
 
     protected function getHeaderActions(): array

@@ -73,6 +73,7 @@ class MenuItem extends Model
      *
      * @var array<string, mixed>
      */
+    #[\Override]
     protected $attributes = [
         'position' => 0,
         'is_service' => false,

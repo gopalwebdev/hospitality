@@ -39,6 +39,7 @@ class HomeRow extends Model
     public array $translatable = ['title'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'layout' => HomeRowLayout::Banner->value,
         'position' => 0,

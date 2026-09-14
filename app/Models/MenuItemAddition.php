@@ -40,6 +40,7 @@ class MenuItemAddition extends Model
     public array $translatable = ['name'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'price_minor_units' => 0,
         'is_available' => true,

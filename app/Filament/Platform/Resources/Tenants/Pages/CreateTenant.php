@@ -20,12 +20,14 @@ use Filament\Resources\Pages\CreateRecord;
  */
 class CreateTenant extends CreateRecord
 {
+    #[\Override]
     protected static string $resource = TenantResource::class;
 
     /**
      * Creating another tenant before this one has an owner is how a
      * tenant nobody can open gets left behind.
      */
+    #[\Override]
     protected static bool $canCreateAnother = false;
 
     protected function getCreatedNotificationTitle(): ?string

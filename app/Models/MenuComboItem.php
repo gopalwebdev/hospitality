@@ -34,6 +34,7 @@ class MenuComboItem extends Model
     use HasFactory;
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'quantity' => 1,
         'position' => 0,

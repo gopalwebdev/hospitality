@@ -32,8 +32,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class TilesRelationManager extends RelationManager
 {
+    #[\Override]
     protected static string $relationship = 'tiles';
 
+    #[\Override]
     protected static string|\BackedEnum|null $icon = Heroicon::OutlinedSquares2x2;
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string

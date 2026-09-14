@@ -8,6 +8,7 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditTenant extends EditRecord
 {
+    #[\Override]
     protected static string $resource = TenantResource::class;
 
     protected function getHeaderActions(): array

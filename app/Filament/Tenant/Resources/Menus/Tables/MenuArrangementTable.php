@@ -5,15 +5,18 @@ namespace App\Filament\Tenant\Resources\Menus\Tables;
 use App\Actions\Menus\ApplyMenuArrangement;
 use App\Actions\Menus\MoveCategoryToMenu;
 use App\Enums\Currency;
-use App\Enums\MenuBlock;
+use App\Enums\Locale;
+use App\Enums\MenuBlockType;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Tables\Reordering;
-use App\Filament\Tenant\Resources\MenuItems\MenuItemResource;
-use App\Filament\Tenant\Resources\Menus\MenuResource;
+use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
+use App\Filament\Tenant\Resources\Menus\Schemas\MenuComboForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Models\Menu;
+use App\Models\MenuBlock;
 use App\Models\MenuCategory;
+use App\Models\MenuCombo;
 use App\Models\MenuItem;
 use Closure;
 use Filament\Actions\Action;
@@ -24,23 +27,23 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * A whole menu as one list: the two rails, every category, every subdivision
- * and every item, in the order a guest reads them.
+ * A whole menu as one list, in the order a guest reads it — and the one place it is edited.
  *
- * This replaced a page of four tables — categories, sub-categories, featured
- * items, combos — where the thing an admin most wanted to see, the items
- * under each heading, was on another page entirely, and where the rails could
- * not be moved at all. One table now says what the menu *is*, and one drag says
- * what order it is read in.
+ * Every row a menu has: its blocks (the featured items and the combos, each with
+ * what is in it listed underneath), every category, every subdivision and every
+ * item. Each is added to, edited and deleted from its own row, and one drag puts
+ * any of them somewhere else. A block with nothing in it is not drawn at all;
+ * the buttons in the header are how one is started.
  *
  * It is built on Filament's custom data (`records()`) rather than on a query,
- * because the rows are three different models plus two rails that are not rows
- * anywhere. Two consequences before editing:
+ * because the rows are several models plus blocks that may not be rows anywhere
+ * yet. Two consequences before editing:
  *
  * - Every record is a plain array keyed by `__key`, so an action's `$record` is
  *   an array and nothing here may be typed `Model`. The model behind a row is
@@ -51,14 +54,19 @@ use Illuminate\Support\Facades\Gate;
  *   `reorderable()` call still matters: it renders the handles, and its
  *   condition is what Filament checks before accepting the write.
  *
- * Items are listed and dragged here but not edited here. The item form carries
- * prices, tax and a repeater of add-ons bound to a relationship, and a
- * repeater needs a real record behind the schema — so every item row links to
- * the items page, which is where an item has always been edited.
+ * Items and combos are edited here too, in a slide-over, and both forms carry a
+ * repeater bound to a relationship. A repeater needs a real record behind its
+ * schema and a row here is an array, so each of those actions hands the schema
+ * the model (`$schema->model(...)`) and saves the repeater the way Filament's own
+ * CreateAction does.
  */
 class MenuArrangementTable
 {
-    private const string RAIL = 'rail';
+    private const string BLOCK = 'block';
+
+    private const string FEATURED_ITEM = 'featured_item';
+
+    private const string COMBO = 'combo';
 
     private const string CATEGORY = 'category';
 
@@ -69,10 +77,10 @@ class MenuArrangementTable
     public static function configure(Table $table, Menu $menu): Table
     {
         // Asked once for the page rather than per row per action: every
-        // mutation here is menu.manage, and MenuCategoryPolicy answers it
-        // without looking at the record. The record *is* checked, with its real
-        // policy method, at the moment an action writes — see the closures
-        // below, where the model has been loaded anyway.
+        // mutation here is menu.manage, and the menu policies answer it without
+        // looking at the record. The record *is* checked, with its real policy
+        // method, at the moment an action writes — see the closures below,
+        // where the model has been loaded anyway.
         $mayManage = Gate::allows('create', MenuCategory::class);
 
         return $table
@@ -103,52 +111,53 @@ class MenuArrangementTable
                     ->label(__('panel.shared.showing'))
                     ->badge()
                     ->color(fn (array $record): string => $record['state_color'] ?? 'gray')
-                    // A rail is neither showing nor hidden: it is drawn when it
+                    // A block is neither showing nor hidden: it is drawn when it
                     // has something in it.
                     ->placeholder(''),
             ])
             ->headerActions([
-                Action::make('createCategory')
-                    ->label(__('panel.arrangement.create_category'))
-                    ->icon(Heroicon::OutlinedPlus)
-                    ->visible($mayManage)
-                    ->schema(fn (Schema $schema): Schema => MenuCategoryForm::configure($schema, $menu->getKey()))
-                    ->action(function (array $data) use ($menu): void {
-                        Gate::authorize('create', MenuCategory::class);
-
-                        $menu->categories()->create([
-                            ...$data,
-                            // New sections land at the bottom of the menu,
-                            // where whoever added one looks for it.
-                            'position' => self::nextPosition($menu->categories()),
-                        ]);
-
-                        Notification::make()->title(__('panel.arrangement.category_created'))->success()->send();
-                    }),
+                self::createCategoryAction('createCategory', $menu)->visible($mayManage),
+                self::createComboAction('createCombo', $menu)->color('gray')->visible($mayManage),
+                self::featureItemsAction('featureItems', $menu)->color('gray')->visible($mayManage),
             ])
             ->recordActions([
+                // What a row is mostly for sits on the row itself; everything
+                // else about it is under the ⋯.
+                self::createItemAction()
+                    ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
+                self::featureItemsAction('addFeaturedItems', $menu)
+                    ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Featured)),
+                self::createComboAction('addCombo', $menu)
+                    ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Combos)),
+                self::editItemAction($menu)
+                    ->visible(fn (array $record): bool => $mayManage && self::isItemRow($record)),
+                self::editComboAction($menu)
+                    ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::COMBO),
+
                 ActionGroup::make([
-                    self::renameAction($menu, $mayManage),
-                    self::createSubCategoryAction($menu, $mayManage),
-                    self::moveCategoryAction($menu, $mayManage),
-                    self::openItemsAction(),
-                    self::deleteAction($menu, $mayManage),
+                    self::renameAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
+                    self::createSubCategoryAction($menu)
+                        // Two levels and no more, so only a top-level category holds one.
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY),
+                    self::moveCategoryAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY),
+                    self::unfeatureAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::FEATURED_ITEM),
+                    self::deleteItemAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::ITEM),
+                    self::deleteComboAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::COMBO),
+                    self::deleteCategoryAction($menu)
+                        ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
                 ])
                     ->label(__('panel.arrangement.actions'))
                     ->icon(Heroicon::OutlinedEllipsisHorizontal)
                     ->color('gray')
-                    // A rail is arranged here and filled in elsewhere, so its
-                    // row carries the link rather than a menu of actions.
-                    ->visible(fn (array $record): bool => $record['kind'] !== self::RAIL),
-
-                Action::make('openRail')
-                    ->label(__('panel.arrangement.open_rail'))
-                    ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-                    ->color('gray')
-                    ->link()
-                    ->url(fn (array $record): string => (string) $record['url'])
-                    ->visible(fn (array $record): bool => $record['kind'] === self::RAIL),
+                    ->visible(fn (array $record): bool => $mayManage && $record['kind'] !== self::BLOCK),
             ])
+            // Clicking a row opens whatever edits it.
+            ->recordAction(fn (array $record): ?string => $mayManage ? self::editActionFor($record) : null)
             // Filament renders the handles on this call and short-circuits the
             // write on it too, so the condition is the authorization: putting a
             // menu in order is changing it. See ArrangeMenu::reorderTable().
@@ -156,15 +165,19 @@ class MenuArrangementTable
             ->reorderRecordsTriggerAction(Reordering::trigger())
             ->emptyStateHeading(__('panel.arrangement.empty_heading'))
             ->emptyStateDescription(__('panel.arrangement.empty_description'))
-            ->emptyStateIcon(Heroicon::OutlinedRectangleStack);
+            ->emptyStateIcon(Heroicon::OutlinedRectangleStack)
+            ->emptyStateActions([
+                self::createCategoryAction('createFirstCategory', $menu)->button()->visible($mayManage),
+            ]);
     }
 
     /**
      * Every row of this menu, in reading order and keyed for the table.
      *
-     * Three queries whatever the menu holds: its categories at both levels, the
-     * items in them, and a count of its combos. The featured count comes from
-     * the items already loaded rather than being asked for again.
+     * Four queries whatever the menu holds: its categories at both levels with
+     * the items in them, its placed blocks, and its combos with a count of what
+     * is in each. The featured items are picked out of the items already loaded
+     * rather than asked for again.
      *
      * @return Collection<string, array<string, mixed>>
      */
@@ -177,38 +190,51 @@ class MenuArrangementTable
             ->select(['id', 'parent_id', 'name', 'position', 'is_active'])
             ->where('menu_id', $menu->getKey())
             ->with(['menuItems' => fn ($items) => $items
-                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'is_service', 'availability', 'is_featured', 'position'])
+                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'is_service', 'availability', 'is_featured', 'featured_position', 'position'])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
+
+        $blocks = MenuBlock::query()
+            ->select(['id', 'menu_id', 'type', 'position'])
+            ->where('menu_id', $menu->getKey())
+            ->get();
+
+        $combos = MenuCombo::query()
+            ->select(['id', 'menu_id', 'name', 'description', 'price_minor_units', 'availability', 'position'])
+            ->where('menu_id', $menu->getKey())
+            ->withCount('comboItems')
+            ->inMenuOrder()
+            ->get();
+
+        // In the featured order, which is the same as MenuItem::scopeInFeaturedOrder().
+        $english = Locale::default()->value;
+        $featured = $categories
+            ->flatMap(fn (MenuCategory $category): array => $category->menuItems->where('is_featured', true)->all())
+            ->sort(fn (MenuItem $a, MenuItem $b): int => [$a->featured_position, $a->getTranslation('name', $english)]
+                <=> [$b->featured_position, $b->getTranslation('name', $english)])
+            ->values();
 
         $subCategories = $categories
             ->filter(fn (MenuCategory $category): bool => $category->isSubCategory())
             ->groupBy('parent_id');
 
-        $railCounts = [
-            MenuBlock::Featured->value => $categories->sum(
-                fn (MenuCategory $category): int => $category->menuItems->where('is_featured', true)->count(),
-            ),
-            MenuBlock::Combos->value => $menu->combos()->count(),
-        ];
-
         $topLevel = $categories->filter(fn (MenuCategory $category): bool => $category->isTopLevel());
 
         $rows = [];
 
-        foreach ($menu->readingOrder($topLevel) as $block) {
-            if ($block instanceof MenuBlock) {
-                $rows[] = self::railRow($block, $menu, $railCounts[$block->value]);
+        foreach ($menu->readingOrder($topLevel, $blocks) as $entry) {
+            if ($entry instanceof MenuBlock) {
+                array_push($rows, ...self::blockRows($entry, $featured, $combos, $currency, $complimentary));
 
                 continue;
             }
 
-            $children = $subCategories->get($block->getKey(), new Collection);
+            $children = $subCategories->get($entry->getKey(), new Collection);
 
-            $rows[] = self::categoryRow($block, self::CATEGORY, depth: 0, subCategoryCount: $children->count());
+            $rows[] = self::categoryRow($entry, self::CATEGORY, depth: 0, subCategoryCount: $children->count());
 
-            foreach ($block->menuItems as $item) {
+            foreach ($entry->menuItems as $item) {
                 $rows[] = self::itemRow($item, $currency, $complimentary, depth: 1);
             }
 
@@ -225,31 +251,50 @@ class MenuArrangementTable
     }
 
     /**
-     * One of the two rails: what it is, how much is in it, where to fill it.
+     * A block's row and the rows of what is in it — or nothing at all while it is empty.
+     *
+     * An empty block used to be a heading with nothing under it, wherever it had
+     * been placed. It is not drawn now: the header's buttons start one, and it
+     * appears where it was placed as soon as it has something in it.
+     *
+     * @param  Collection<int, MenuItem>  $featured
+     * @param  EloquentCollection<int, MenuCombo>  $combos
+     * @return list<array<string, mixed>>
+     */
+    private static function blockRows(MenuBlock $block, Collection $featured, EloquentCollection $combos, Currency $currency, string $complimentary): array
+    {
+        return match ($block->type) {
+            MenuBlockType::Featured => $featured->isEmpty() ? [] : [
+                self::blockRow($block, trans_choice('panel.arrangement.items_count', $featured->count(), ['count' => $featured->count()])),
+                ...$featured->map(fn (MenuItem $item): array => self::itemRow($item, $currency, $complimentary, depth: 1, kind: self::FEATURED_ITEM))->all(),
+            ],
+            MenuBlockType::Combos => $combos->isEmpty() ? [] : [
+                self::blockRow($block, trans_choice('panel.arrangement.combos_count', $combos->count(), ['count' => $combos->count()])),
+                ...$combos->map(fn (MenuCombo $combo): array => self::comboRow($combo, $currency))->all(),
+            ],
+        };
+    }
+
+    /**
+     * The heading row of a block: what it is and how much is in it.
      *
      * @return array<string, mixed>
      */
-    private static function railRow(MenuBlock $rail, Menu $menu, int $count): array
+    private static function blockRow(MenuBlock $block, string $meta): array
     {
         return [
-            '__key' => $rail->value,
-            'kind' => self::RAIL,
-            'id' => null,
-            'category_id' => null,
+            '__key' => ApplyMenuArrangement::blockKey($block),
+            'kind' => self::BLOCK,
+            'block' => $block->type->value,
+            'id' => $block->getKey(),
             'depth' => 0,
-            'name' => $rail->label(),
-            'detail' => $rail->description(),
-            'type' => __('panel.arrangement.rail'),
+            'name' => $block->type->label(),
+            'detail' => $block->type->description(),
+            'type' => __('panel.arrangement.block'),
             'type_color' => 'warning',
-            'meta' => $rail === MenuBlock::Featured
-                ? trans_choice('panel.arrangement.items_count', $count, ['count' => $count])
-                : trans_choice('panel.arrangement.combos_count', $count, ['count' => $count]),
+            'meta' => $meta,
             'state' => null,
             'state_color' => null,
-            'url' => MenuResource::getUrl(
-                $rail === MenuBlock::Featured ? 'featured' : 'combos',
-                ['record' => $menu],
-            ),
         ];
     }
 
@@ -266,8 +311,8 @@ class MenuArrangementTable
         return [
             '__key' => ApplyMenuArrangement::categoryKey($category->getKey()),
             'kind' => $kind,
+            'block' => null,
             'id' => $category->getKey(),
-            'category_id' => $category->getKey(),
             'depth' => $depth,
             'name' => $category->name,
             'detail' => null,
@@ -282,22 +327,23 @@ class MenuArrangementTable
                 ? __('panel.shared.showing')
                 : __('panel.arrangement.hidden'),
             'state_color' => $category->is_active ? 'success' : 'gray',
-            'url' => null,
         ];
     }
 
     /**
-     * One item, under whichever heading it is filed, labelled as an item or a service request.
+     * One item, under its category or in the featured list, labelled as an item or a service request.
      *
      * @return array<string, mixed>
      */
-    private static function itemRow(MenuItem $item, Currency $currency, string $complimentary, int $depth): array
+    private static function itemRow(MenuItem $item, Currency $currency, string $complimentary, int $depth, string $kind = self::ITEM): array
     {
         return [
-            '__key' => ApplyMenuArrangement::itemKey($item->getKey()),
-            'kind' => self::ITEM,
+            '__key' => $kind === self::FEATURED_ITEM
+                ? ApplyMenuArrangement::featuredItemKey($item->getKey())
+                : ApplyMenuArrangement::itemKey($item->getKey()),
+            'kind' => $kind,
+            'block' => null,
             'id' => $item->getKey(),
-            'category_id' => $item->menu_category_id,
             'depth' => $depth,
             'name' => $item->name,
             'detail' => $item->description,
@@ -308,7 +354,31 @@ class MenuArrangementTable
             'meta' => $item->isComplimentary() ? $complimentary : $item->formattedPrice($currency),
             'state' => $item->availability->label(),
             'state_color' => $item->availability->color(),
-            'url' => null,
+        ];
+    }
+
+    /**
+     * One combo, with its price and how many items are in it.
+     *
+     * @return array<string, mixed>
+     */
+    private static function comboRow(MenuCombo $combo, Currency $currency): array
+    {
+        $contents = (int) $combo->getAttribute('combo_items_count');
+
+        return [
+            '__key' => ApplyMenuArrangement::comboKey($combo->getKey()),
+            'kind' => self::COMBO,
+            'block' => null,
+            'id' => $combo->getKey(),
+            'depth' => 1,
+            'name' => $combo->name,
+            'detail' => $combo->description,
+            'type' => __('panel.combos.section'),
+            'type_color' => 'gray',
+            'meta' => $combo->formattedPrice($currency).' · '.trans_choice('panel.arrangement.items_count', $contents, ['count' => $contents]),
+            'state' => $combo->availability->label(),
+            'state_color' => $combo->availability->color(),
         ];
     }
 
@@ -323,7 +393,7 @@ class MenuArrangementTable
     private static function nameHtml(array $record): string
     {
         $indent = ((int) $record['depth']) * 1.25;
-        $isHeading = $record['kind'] !== self::ITEM;
+        $isHeading = in_array($record['kind'], [self::BLOCK, self::CATEGORY, self::SUB_CATEGORY], true);
         $detail = filled($record['detail'])
             ? '<div style="font-size:0.75rem;opacity:0.65;margin-top:0.125rem">'.e((string) $record['detail']).'</div>'
             : '';
@@ -334,12 +404,32 @@ class MenuArrangementTable
             .'</div>';
     }
 
-    private static function renameAction(Menu $menu, bool $mayManage): Action
+    /**
+     * A new top-level category, at the bottom of the menu where whoever added it looks for it.
+     */
+    private static function createCategoryAction(string $name, Menu $menu): Action
+    {
+        return Action::make($name)
+            ->label(__('panel.arrangement.create_category'))
+            ->icon(Heroicon::OutlinedPlus)
+            ->schema(fn (Schema $schema): Schema => MenuCategoryForm::configure($schema, $menu->getKey()))
+            ->action(function (array $data) use ($menu): void {
+                Gate::authorize('create', MenuCategory::class);
+
+                $menu->categories()->create([
+                    ...$data,
+                    'position' => self::nextTopLevelPosition($menu),
+                ]);
+
+                Notification::make()->title(__('panel.arrangement.category_created'))->success()->send();
+            });
+    }
+
+    private static function renameAction(Menu $menu): Action
     {
         return Action::make('rename')
-            ->label(__('panel.arrangement.rename'))
+            ->label(__('panel.arrangement.edit'))
             ->icon(Heroicon::OutlinedPencilSquare)
-            ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record))
             ->schema(fn (array $record, Schema $schema): Schema => self::categoryForm($schema, $menu, $record))
             ->fillForm(function (array $record) use ($menu): array {
                 $category = self::category($record, $menu);
@@ -360,15 +450,15 @@ class MenuArrangementTable
             });
     }
 
-    private static function createSubCategoryAction(Menu $menu, bool $mayManage): Action
+    private static function createSubCategoryAction(Menu $menu): Action
     {
         return Action::make('createSubCategory')
             ->label(__('panel.sub_categories.create'))
             ->icon(Heroicon::OutlinedSquares2x2)
-            // Two levels and no more, so only a top-level category holds one.
-            ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY)
-            ->schema(fn (Schema $schema): Schema => MenuSubCategoryForm::configure($schema, $menu->getKey()))
-            ->fillForm(fn (array $record): array => ['parent_id' => $record['id']])
+            // The category it was opened from is the parent's default rather
+            // than filled in: filling a form with anything at all skips every
+            // other field's default, "showing on the menu" included.
+            ->schema(fn (array $record, Schema $schema): Schema => MenuSubCategoryForm::configure($schema, $menu->getKey(), parentId: (int) $record['id']))
             ->action(function (array $data) use ($menu): void {
                 Gate::authorize('create', MenuCategory::class);
 
@@ -393,12 +483,11 @@ class MenuArrangementTable
      * menu, so there is no "which menu" field to change, and this does one
      * thing no edit does — it unfeatures every item in the branch.
      */
-    private static function moveCategoryAction(Menu $menu, bool $mayManage): Action
+    private static function moveCategoryAction(Menu $menu): Action
     {
         return Action::make('moveToMenu')
             ->label(__('panel.categories.move'))
             ->icon(Heroicon::OutlinedArrowRightCircle)
-            ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY)
             ->modalHeading(__('panel.categories.move'))
             ->modalDescription(__('panel.categories.move_help'))
             ->schema(fn (array $record): array => [
@@ -409,8 +498,7 @@ class MenuArrangementTable
                     ->native(false)
                     ->prefixIcon(Heroicon::OutlinedBookOpen)
                     // Uniqueness is per menu and built on the English name, so
-                    // a clash is caught here rather than at the expression
-                    // index after the form has passed.
+                    // a clash is caught here rather than after the form has passed.
                     ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record, $menu): void {
                         if (MoveCategoryToMenu::nameIsTakenOn(self::category($record, $menu), (int) $value)) {
                             $fail(__('panel.categories.unique'));
@@ -428,34 +516,13 @@ class MenuArrangementTable
             });
     }
 
-    /**
-     * Where an item is actually edited: its own page, narrowed to this branch.
-     */
-    private static function openItemsAction(): Action
-    {
-        return Action::make('openItems')
-            ->label(fn (array $record): string => (string) ($record['kind'] === self::ITEM
-                ? __('panel.arrangement.open_item')
-                : __('panel.arrangement.open_items')))
-            ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-            // `filters`, not `tableFilters`: ListRecords binds the property as
-            // `#[Url(as: 'filters')]`, so the other name arrives as an unread
-            // query parameter and the page opens showing every item there is.
-            ->url(fn (array $record): string => MenuItemResource::getUrl('index', [
-                'filters' => [
-                    'menu_category_id' => ['value' => $record['category_id']],
-                ],
-            ]));
-    }
-
-    private static function deleteAction(Menu $menu, bool $mayManage): Action
+    private static function deleteCategoryAction(Menu $menu): Action
     {
         return Action::make('delete')
             ->label(__('panel.arrangement.delete'))
             ->icon(Heroicon::OutlinedTrash)
             ->color('danger')
             ->requiresConfirmation()
-            ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record))
             ->modalHeading(__('panel.arrangement.delete'))
             ->modalDescription(fn (array $record): string => (string) ($record['kind'] === self::CATEGORY
                 ? __('panel.categories.delete_warning')
@@ -466,6 +533,216 @@ class MenuArrangementTable
                 Gate::authorize('delete', $category);
 
                 $category->delete();
+
+                Notification::make()->title(__('panel.arrangement.deleted'))->success()->send();
+            });
+    }
+
+    /**
+     * A new item, filed under the category or sub-category the button was pressed on.
+     *
+     * The category is the select's default rather than filled in, for the same
+     * reason as a new sub-category's parent: filling the form would skip the
+     * item's other defaults, its availability and diet among them.
+     */
+    private static function createItemAction(): Action
+    {
+        return Action::make('createItem')
+            ->label(__('panel.arrangement.add_item'))
+            ->icon(Heroicon::OutlinedPlus)
+            ->slideOver()
+            ->modalHeading(__('panel.items.create'))
+            ->schema(fn (array $record, Schema $schema): Schema => MenuItemForm::configure(
+                $schema->model(MenuItem::class),
+                categoryId: (int) $record['id'],
+            ))
+            ->action(function (array $data, Schema $schema): void {
+                Gate::authorize('create', MenuItem::class);
+
+                $item = MenuItem::query()->create([
+                    ...MenuItemForm::storePricing($data),
+                    // At the bottom of its category, where whoever added it looks for it.
+                    'position' => ((int) MenuItem::query()->where('menu_category_id', $data['menu_category_id'])->max('position')) + 1,
+                ]);
+
+                $schema->model($item)->saveRelationships();
+
+                Notification::make()->title(__('panel.arrangement.item_created'))->success()->send();
+            });
+    }
+
+    private static function editItemAction(Menu $menu): Action
+    {
+        return Action::make('editItem')
+            ->label(__('panel.arrangement.edit'))
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->iconButton()
+            ->slideOver()
+            ->modalHeading(fn (array $record): string => (string) $record['name'])
+            ->schema(fn (array $record, Schema $schema): Schema => MenuItemForm::configure($schema->model(self::item($record, $menu))))
+            ->fillForm(function (array $record) use ($menu): array {
+                $item = self::item($record, $menu);
+
+                return MenuItemForm::fillTranslations(MenuItemForm::fillPricing($item->attributesToArray()), $item);
+            })
+            ->action(function (array $data, array $record, Schema $schema) use ($menu): void {
+                $item = self::item($record, $menu);
+
+                Gate::authorize('update', $item);
+
+                $item->update(MenuItemForm::storePricing($data));
+                $schema->model($item)->saveRelationships();
+
+                Notification::make()->title(__('panel.arrangement.saved'))->success()->send();
+            });
+    }
+
+    private static function deleteItemAction(Menu $menu): Action
+    {
+        return Action::make('deleteItem')
+            ->label(__('panel.arrangement.delete'))
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalHeading(__('panel.arrangement.delete'))
+            ->modalDescription(__('panel.items.delete_warning'))
+            ->action(function (array $record) use ($menu): void {
+                $item = self::item($record, $menu);
+
+                Gate::authorize('delete', $item);
+
+                $item->delete();
+
+                Notification::make()->title(__('panel.arrangement.deleted'))->success()->send();
+            });
+    }
+
+    /**
+     * Put some of this menu's items at the end of what it leads with.
+     *
+     * The Featured toggle on the item form does the same to one item; this is
+     * the way to do it from the menu, several at once. Both write `is_featured`,
+     * and MenuItemObserver keeps an item that leaves the menu from staying on it.
+     */
+    private static function featureItemsAction(string $name, Menu $menu): Action
+    {
+        return Action::make($name)
+            ->label(__('panel.arrangement.feature_items'))
+            ->icon(Heroicon::OutlinedStar)
+            ->modalHeading(__('panel.arrangement.feature_items'))
+            ->modalSubmitActionLabel(__('panel.arrangement.feature'))
+            ->schema([
+                Select::make('items')
+                    ->label(__('panel.arrangement.items_to_feature'))
+                    ->options(fn (): array => self::unfeaturedItemOptions($menu))
+                    ->multiple()
+                    ->searchable()
+                    ->required(),
+            ])
+            ->action(function (array $data) use ($menu): void {
+                $chosen = array_map(intval(...), $data['items']);
+
+                $items = MenuItem::query()
+                    ->onMenu($menu->getKey())
+                    ->where('is_featured', false)
+                    ->whereKey($chosen)
+                    ->get()
+                    ->sortBy(fn (MenuItem $item): int => (int) array_search($item->getKey(), $chosen, true));
+
+                $position = self::nextFeaturedPosition($menu);
+
+                foreach ($items as $item) {
+                    Gate::authorize('update', $item);
+
+                    $item->update(['is_featured' => true, 'featured_position' => $position++]);
+                }
+
+                Notification::make()->title(__('panel.arrangement.featured'))->success()->send();
+            });
+    }
+
+    private static function unfeatureAction(Menu $menu): Action
+    {
+        return Action::make('unfeature')
+            ->label(__('panel.arrangement.unfeature'))
+            ->icon(Heroicon::OutlinedXMark)
+            ->action(function (array $record) use ($menu): void {
+                $item = self::item($record, $menu);
+
+                Gate::authorize('update', $item);
+
+                $item->update(['is_featured' => false, 'featured_position' => 0]);
+
+                Notification::make()->title(__('panel.arrangement.unfeatured'))->success()->send();
+            });
+    }
+
+    private static function createComboAction(string $name, Menu $menu): Action
+    {
+        return Action::make($name)
+            ->label(__('panel.combos.create'))
+            ->icon(Heroicon::OutlinedSparkles)
+            ->slideOver()
+            ->modalHeading(__('panel.combos.create'))
+            ->schema(fn (Schema $schema): Schema => MenuComboForm::configure($schema->model(MenuCombo::class), $menu->getKey()))
+            ->action(function (array $data, Schema $schema) use ($menu): void {
+                Gate::authorize('create', MenuCombo::class);
+
+                $combo = $menu->combos()->create([
+                    ...PricingFields::store($data),
+                    'position' => self::nextPosition($menu->combos()),
+                ]);
+
+                $schema->model($combo)->saveRelationships();
+
+                Notification::make()->title(__('panel.arrangement.combo_created'))->success()->send();
+            });
+    }
+
+    private static function editComboAction(Menu $menu): Action
+    {
+        return Action::make('editCombo')
+            ->label(__('panel.arrangement.edit'))
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->iconButton()
+            ->slideOver()
+            ->modalHeading(fn (array $record): string => (string) $record['name'])
+            ->schema(fn (array $record, Schema $schema): Schema => MenuComboForm::configure(
+                $schema->model(self::combo($record, $menu)),
+                $menu->getKey(),
+            ))
+            ->fillForm(function (array $record) use ($menu): array {
+                $combo = self::combo($record, $menu);
+
+                return MenuComboForm::fillTranslations(PricingFields::fill($combo->attributesToArray()), $combo);
+            })
+            ->action(function (array $data, array $record, Schema $schema) use ($menu): void {
+                $combo = self::combo($record, $menu);
+
+                Gate::authorize('update', $combo);
+
+                $combo->update(PricingFields::store($data));
+                $schema->model($combo)->saveRelationships();
+
+                Notification::make()->title(__('panel.arrangement.saved'))->success()->send();
+            });
+    }
+
+    private static function deleteComboAction(Menu $menu): Action
+    {
+        return Action::make('deleteCombo')
+            ->label(__('panel.arrangement.delete'))
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalHeading(__('panel.arrangement.delete'))
+            ->modalDescription(__('panel.combos.delete_warning'))
+            ->action(function (array $record) use ($menu): void {
+                $combo = self::combo($record, $menu);
+
+                Gate::authorize('delete', $combo);
+
+                $combo->delete();
 
                 Notification::make()->title(__('panel.arrangement.deleted'))->success()->send();
             });
@@ -507,6 +784,59 @@ class MenuArrangementTable
     }
 
     /**
+     * The item a row stands for, and only if it is on the menu being arranged.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function item(array $record, Menu $menu): MenuItem
+    {
+        $menuId = $menu->getKey();
+        $itemId = (int) $record['id'];
+
+        return once(fn (): MenuItem => MenuItem::query()
+            ->onMenu($menuId)
+            ->findOrFail($itemId));
+    }
+
+    /**
+     * The combo a row stands for, scoped to the menu being arranged.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function combo(array $record, Menu $menu): MenuCombo
+    {
+        $menuId = $menu->getKey();
+        $comboId = (int) $record['id'];
+
+        return once(fn (): MenuCombo => MenuCombo::query()
+            ->where('menu_id', $menuId)
+            ->findOrFail($comboId));
+    }
+
+    /**
+     * This menu's items that are not featured yet, labelled with where each is filed.
+     *
+     * @return array<int, string>
+     */
+    private static function unfeaturedItemOptions(Menu $menu): array
+    {
+        $menuId = $menu->getKey();
+
+        // once(): Filament asks a select for its options more than once while
+        // it builds and validates one form.
+        return once(fn (): array => MenuItem::query()
+            ->onMenu($menuId)
+            ->where('is_featured', false)
+            ->with(['menuCategory:id,parent_id,name', 'menuCategory.parent:id,name'])
+            ->inMenuOrder()
+            ->get()
+            ->mapWithKeys(fn (MenuItem $item): array => [
+                $item->getKey() => sprintf('%s · %s', $item->menuCategory->path(), $item->name),
+            ])
+            ->all());
+    }
+
+    /**
      * @param  array<string, mixed>  $record
      */
     private static function isCategoryRow(array $record): bool
@@ -515,14 +845,63 @@ class MenuArrangementTable
     }
 
     /**
+     * @param  array<string, mixed>  $record
+     */
+    private static function isItemRow(array $record): bool
+    {
+        return in_array($record['kind'], [self::ITEM, self::FEATURED_ITEM], strict: true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     */
+    private static function isBlockRow(array $record, MenuBlockType $type): bool
+    {
+        return $record['kind'] === self::BLOCK && $record['block'] === $type->value;
+    }
+
+    /**
+     * The action a click on a row opens: whatever edits it.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private static function editActionFor(array $record): ?string
+    {
+        return match ($record['kind']) {
+            self::CATEGORY, self::SUB_CATEGORY => 'rename',
+            self::ITEM, self::FEATURED_ITEM => 'editItem',
+            self::COMBO => 'editCombo',
+            default => null,
+        };
+    }
+
+    /**
      * The place at the end of a list, so something new lands where it is looked
      * for rather than at the top.
      *
-     * @param  HasMany<MenuCategory, Menu>|HasMany<MenuCategory, MenuCategory>  $siblings
+     * @param  HasMany<MenuCategory, MenuCategory>|HasMany<MenuCombo, Menu>  $siblings
      */
     private static function nextPosition(HasMany $siblings): int
     {
         return ((int) $siblings->max('position')) + 1;
+    }
+
+    /**
+     * The place at the end of the menu's top level, which its categories and blocks share.
+     */
+    private static function nextTopLevelPosition(Menu $menu): int
+    {
+        return max((int) $menu->categories()->max('position'), (int) $menu->blocks()->max('position')) + 1;
+    }
+
+    /**
+     * The place at the end of the featured list, or the first place when it is empty.
+     */
+    private static function nextFeaturedPosition(Menu $menu): int
+    {
+        $last = MenuItem::query()->featuredOnMenu($menu->getKey())->max('featured_position');
+
+        return $last === null ? 0 : ((int) $last) + 1;
     }
 
     /**

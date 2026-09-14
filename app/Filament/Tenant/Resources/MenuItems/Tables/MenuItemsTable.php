@@ -222,9 +222,11 @@ class MenuItemsTable
     /**
      * Read the list the way a guest reads the menu.
      *
-     * Menu, then the section an item sits under, then a section's own items
-     * before its subdivisions', then the order they were dragged into. Grouping
-     * used to imply most of this; with the group gone the query says it.
+     * Menu, oldest first — menus are not put in order by hand, and a name
+     * would be a translated column (.ai/rules/tables.md) — then the section an
+     * item sits under, then a section's own items before its subdivisions',
+     * then the order they were dragged into. Grouping used to imply most of
+     * this; with the group gone the query says it.
      *
      * Raw because each rank is a correlated subquery over menu_categories,
      * which appears twice — once as the item's own category and once as that
@@ -238,11 +240,7 @@ class MenuItemsTable
     private static function inMenuOrder(Builder $query): Builder
     {
         return $query
-            ->orderByRaw(
-                '(select menus.position from menus'
-                .' join menu_categories on menu_categories.menu_id = menus.id'
-                .' where menu_categories.id = menu_items.menu_category_id)'
-            )
+            ->orderByRaw('(select menu_id from menu_categories where id = menu_items.menu_category_id)')
             ->orderByRaw(
                 'coalesce('
                 .'(select parents.position from menu_categories parents'

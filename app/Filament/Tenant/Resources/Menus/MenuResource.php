@@ -6,8 +6,6 @@ use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
-use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuCombos;
-use App\Filament\Tenant\Resources\Menus\Pages\ManageMenuFeaturedItems;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuForm;
 use App\Filament\Tenant\Resources\Menus\Tables\MenusTable;
 use App\Models\Menu;
@@ -23,11 +21,11 @@ use Filament\Tables\Table;
 /**
  * The menus this tenant serves: Lunch, Dinner, Drinks.
  *
- * The top of the hierarchy the panel edits. One menu opens on its arrangement:
- * its categories, their subdivisions, the items in each and the two rails it
- * leads with, all in one list and all dragged into order there. Items are
- * still their own page — there are far more of them, and they are the thing a
- * tenant edits daily.
+ * The top of the hierarchy the panel edits. One menu opens on everything it
+ * holds — its categories, their subdivisions, the items in each, its featured
+ * items and its combos — all in one list, added to, edited and dragged into
+ * order there. The Items page still lists every item across every menu, for
+ * finding one without knowing where it is filed.
  *
  * A tenant that serves one card all day simply keeps one menu.
  *
@@ -37,15 +35,19 @@ use Filament\Tables\Table;
  */
 class MenuResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = Menu::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
     /**
      * First in the group, because it is the level everything else hangs off.
      */
+    #[\Override]
     protected static ?int $navigationSort = 5;
 
     /**
@@ -91,18 +93,15 @@ class MenuResource extends Resource
     }
 
     /**
-     * A menu is four tabs across the top of one record, not four tables down
-     * one page.
+     * A menu is two tabs across the top of one record.
      *
      * Arrangement comes first because it is what a menu mostly *is*: every
-     * category, every subdivision and every item in the order a guest reads
-     * them, with the featured and combo rails sitting among them. The three
-     * that follow are the details behind it — what the menu is called and when
-     * it is served, which items it leads with, and the combos it sells.
+     * block, category, subdivision, item, featured item and combo, in the
+     * order a guest reads them, each added and edited where it sits. Edit is
+     * the menu itself — its name, its hours and whether guests see it.
      *
-     * Categories and sub-categories were two of those tabs and are neither any
-     * more: both are rows of the arrangement, where the items under them are
-     * finally visible in the same list.
+     * Featured items and combos were tabs of their own and are neither any
+     * more: both are rows of the arrangement now, beside everything else.
      *
      * @return array<int, NavigationItem>
      */
@@ -111,8 +110,6 @@ class MenuResource extends Resource
         return $page->generateNavigationItems([
             ArrangeMenu::class,
             EditMenu::class,
-            ManageMenuFeaturedItems::class,
-            ManageMenuCombos::class,
         ]);
     }
 
@@ -127,8 +124,6 @@ class MenuResource extends Resource
             'index' => ListMenus::route('/'),
             'arrange' => ArrangeMenu::route('/{record}/arrange'),
             'edit' => EditMenu::route('/{record}/edit'),
-            'featured' => ManageMenuFeaturedItems::route('/{record}/featured'),
-            'combos' => ManageMenuCombos::route('/{record}/combos'),
         ];
     }
 }

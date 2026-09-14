@@ -83,7 +83,7 @@ class MenuCategoryForm
     }
 
     /**
-     * This tenant's menus, in the order it arranged them.
+     * This tenant's menus, by name.
      *
      * Read as models rather than plucked, because the label is a translated
      * column: `pluck('name->en')` comes back keyed by the path itself, and
@@ -99,7 +99,7 @@ class MenuCategoryForm
         // it builds and validates one form.
         return once(fn (): array => Menu::query()
             ->where('tenant_id', $tenantId)
-            ->inMenuOrder()
+            ->byName()
             ->get()
             ->mapWithKeys(fn (Menu $menu): array => [$menu->getKey() => $menu->name])
             ->all());

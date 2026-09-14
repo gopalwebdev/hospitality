@@ -27,14 +27,19 @@ use Filament\Tables\Table;
  */
 class UserResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = User::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
+    #[\Override]
     protected static ?int $navigationSort = 10;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
+    #[\Override]
     protected static ?string $tenantOwnershipRelationshipName = 'tenants';
 
     public static function form(Schema $schema): Schema

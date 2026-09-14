@@ -59,8 +59,7 @@ final class TranslatedFields
      *
      * `formatStateUsing()` and not `default()` alone, because a default only
      * applies to a form that is *filled with nothing*. Every edit form — and
-     * every modal handed data, which includes "New sub-category" and its
-     * prefilled parent — skips it, so this control came up with neither
+     * every modal handed data — skips it, so this control came up with neither
      * language lit and the form's own rules had to guess what was on screen.
      * Formatting runs on the way in whatever the state is.
      */

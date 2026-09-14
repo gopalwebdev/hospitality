@@ -9,6 +9,7 @@ use Filament\Support\Icons\Heroicon;
 
 class ListPermissions extends ListRecords
 {
+    #[\Override]
     protected static string $resource = PermissionResource::class;
 
     protected function getHeaderActions(): array

@@ -42,6 +42,7 @@ class MenuCategory extends Model
     public array $translatable = ['name'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'position' => 0,
         'is_active' => true,

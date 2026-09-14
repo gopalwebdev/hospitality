@@ -38,10 +38,13 @@ use LogicException;
  */
 class Settings extends Page
 {
+    #[\Override]
     protected string $view = 'filament.tenant.pages.settings';
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
+    #[\Override]
     protected static ?int $navigationSort = 90;
 
     /**

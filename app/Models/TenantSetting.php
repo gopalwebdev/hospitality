@@ -55,6 +55,7 @@ class TenantSetting extends Model
      *
      * @var array<string, mixed>
      */
+    #[\Override]
     protected $attributes = [
         'currency' => Currency::IndianRupee->value,
         'tax_rate_basis_points' => self::DEFAULT_TAX_RATE_BASIS_POINTS,

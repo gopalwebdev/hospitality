@@ -9,6 +9,7 @@ use Filament\Support\Icons\Heroicon;
 
 class EditPermission extends EditRecord
 {
+    #[\Override]
     protected static string $resource = PermissionResource::class;
 
     protected function getHeaderActions(): array

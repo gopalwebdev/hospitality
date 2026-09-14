@@ -9,6 +9,7 @@ use Filament\Support\Icons\Heroicon;
 
 class ListUsers extends ListRecords
 {
+    #[\Override]
     protected static string $resource = UserResource::class;
 
     protected function getHeaderActions(): array

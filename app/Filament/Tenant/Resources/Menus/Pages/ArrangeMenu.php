@@ -20,25 +20,29 @@ use LogicException;
 /**
  * The first thing a menu opens on: everything it holds, in the order it is read.
  *
- * A menu used to be edited across four tables that each showed one layer of it,
- * and the order of the featured and combo rails could not be changed at all.
- * This page is one list of the whole menu — both rails, every category, every
- * subdivision and every item — and one drag puts any of them somewhere else.
+ * A menu used to be edited across four tabs that each showed one layer of it.
+ * This page is one list of the whole menu — its featured items, its combos,
+ * every category, every subdivision and every item — where each is added,
+ * edited and deleted on its own row, and one drag puts any of them somewhere else.
  *
- * The table is built on custom data because those rows are three models and two
- * rails; see MenuArrangementTable for what that costs. What it means here is
- * this page owns reordering itself: Filament's own reorderTable() writes one
- * UPDATE over an Eloquent query, and there isn't one.
+ * The table is built on custom data because those rows are several models and
+ * blocks that may not be rows anywhere yet; see MenuArrangementTable for what
+ * that costs. What it means here is this page owns reordering itself:
+ * Filament's own reorderTable() writes one UPDATE over an Eloquent query, and
+ * there isn't one.
  */
 class ArrangeMenu extends Page implements HasTable
 {
     use InteractsWithRecord;
     use InteractsWithTable;
 
+    #[\Override]
     protected static string $resource = MenuResource::class;
 
+    #[\Override]
     protected string $view = 'filament.tenant.resources.menus.pages.arrange-menu';
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsUpDown;
 
     public function mount(int|string $record): void

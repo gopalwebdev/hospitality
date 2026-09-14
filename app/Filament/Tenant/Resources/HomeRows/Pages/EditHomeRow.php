@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
  */
 class EditHomeRow extends EditRecord
 {
+    #[\Override]
     protected static string $resource = HomeRowResource::class;
 
     /**

@@ -24,10 +24,13 @@ use Filament\Tables\Table;
  */
 class UsersRelationManager extends RelationManager
 {
+    #[\Override]
     protected static string $relationship = 'users';
 
+    #[\Override]
     protected static ?string $title = 'Users';
 
+    #[\Override]
     protected static string|\BackedEnum|null $icon = Heroicon::OutlinedUsers;
 
     public function table(Table $table): Table

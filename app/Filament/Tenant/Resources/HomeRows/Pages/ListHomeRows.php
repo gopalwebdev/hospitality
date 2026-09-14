@@ -16,6 +16,7 @@ use Filament\Support\Icons\Heroicon;
  */
 class ListHomeRows extends ListRecords
 {
+    #[\Override]
     protected static string $resource = HomeRowResource::class;
 
     public function getHeading(): string

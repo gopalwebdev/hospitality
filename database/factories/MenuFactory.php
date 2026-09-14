@@ -28,7 +28,6 @@ class MenuFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'name' => [Locale::English->value => $name],
             'description' => null,
-            'position' => fake()->numberBetween(0, 20),
             'is_active' => true,
             // No window by default: most menus are served whenever the
             // tenant is open, and servedBetween() is for the ones that are

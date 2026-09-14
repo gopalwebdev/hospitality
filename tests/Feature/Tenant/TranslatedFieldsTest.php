@@ -51,10 +51,10 @@ it('opens on English on a form that was filled, not just a blank one', function 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // `default()` only applies to a form filled with nothing, so every edit
-    // form — and every modal handed data, "New sub-category" and its prefilled
-    // parent included — came up with neither language lit. The switcher decides
-    // which box is on screen and which language the "required in English" rule
-    // reads, so nothing selected is not a cosmetic state.
+    // form — and every modal handed data — came up with neither language lit.
+    // The switcher decides which box is on screen and which language the
+    // "required in English" rule reads, so nothing selected is not a cosmetic
+    // state.
     $english = Locale::default()->value;
 
     Livewire::test(EditMenu::class, ['record' => $menu->getKey()])

@@ -26,12 +26,16 @@ use Filament\Tables\Table;
  */
 class MenuItemResource extends Resource
 {
+    #[\Override]
     protected static ?string $model = MenuItem::class;
 
+    #[\Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedListBullet;
 
+    #[\Override]
     protected static ?int $navigationSort = 20;
 
+    #[\Override]
     protected static ?string $recordTitleAttribute = 'name';
 
     /**

@@ -52,6 +52,7 @@ class Charge extends Model
     public array $translatable = ['name'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'applies_to_all_menus' => true,
         'is_active' => true,

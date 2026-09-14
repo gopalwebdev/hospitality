@@ -14,6 +14,7 @@ use Filament\Support\Icons\Heroicon;
  */
 class ListMenus extends ListRecords
 {
+    #[\Override]
     protected static string $resource = MenuResource::class;
 
     protected function getHeaderActions(): array

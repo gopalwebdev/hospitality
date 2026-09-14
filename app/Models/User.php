@@ -47,6 +47,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      *
      * @var array<string, mixed>
      */
+    #[\Override]
     protected $attributes = [
         'tenant_id' => null,
         'is_admin' => false,

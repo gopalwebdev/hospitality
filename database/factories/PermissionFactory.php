@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class PermissionFactory extends Factory
 {
+    #[\Override]
     protected $model = Permission::class;
 
     /**

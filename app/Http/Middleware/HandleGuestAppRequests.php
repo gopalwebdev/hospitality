@@ -27,6 +27,7 @@ class HandleGuestAppRequests extends Middleware
     /**
      * @var string
      */
+    #[\Override]
     protected $rootView = 'guest';
 
     /**

@@ -32,7 +32,10 @@ class MenuItemForm
      */
     public const array TRANSLATED = ['name', 'description'];
 
-    public static function configure(Schema $schema): Schema
+    /**
+     * `$categoryId` is where a new item is filed unless changed: the category an "Add item" button was pressed on.
+     */
+    public static function configure(Schema $schema, ?int $categoryId = null): Schema
     {
         $currency = PricingFields::currency();
 
@@ -52,6 +55,7 @@ class MenuItemForm
                         Select::make('menu_category_id')
                             ->label(__('panel.items.section'))
                             ->options(fn (): array => self::sectionOptions())
+                            ->default($categoryId)
                             ->required()
                             ->searchable()
                             ->preload()
@@ -117,23 +121,32 @@ class MenuItemForm
                     ])
                     ->columns(2),
 
+                // The two sections most items never open render their fields
+                // only once opened (deferLoading). Only the rendering waits:
+                // their state is filled and saved with the rest of the form.
                 Section::make(__('panel.items.tax_section'))
+                    ->key('taxSection')
                     ->icon(Heroicon::OutlinedReceiptPercent)
-                    ->schema([
-                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
-                        PricingFields::hsnCode(),
-                    ])
-                    ->columns(2)
+                    ->schema(Schema::make()
+                        ->components([
+                            PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
+                            PricingFields::hsnCode(),
+                        ])
+                        ->columns(2)
+                        ->deferLoading())
                     // Almost every item is taxed at the tenant's own rate
                     // and carries no code, so this opens closed and is expanded
                     // by the items that genuinely differ.
                     ->collapsed(fn (?MenuItem $record): bool => blank($record?->tax_rate_basis_points) && blank($record?->hsn_code)),
 
                 Section::make(__('panel.add_ons.section'))
+                    ->key('addOnsSection')
                     ->icon(Heroicon::OutlinedPlusCircle)
-                    ->schema([
-                        self::additions($currency),
-                    ])
+                    ->schema(Schema::make()
+                        ->components([
+                            self::additions($currency),
+                        ])
+                        ->deferLoading())
                     ->collapsed(fn (?MenuItem $record): bool => $record?->additions()->doesntExist() ?? true),
             ]);
     }

@@ -57,6 +57,7 @@ class MenuCombo extends Model
     public array $translatable = ['name', 'description'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'position' => 0,
         'availability' => ItemAvailability::Available->value,

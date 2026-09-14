@@ -54,6 +54,7 @@ class HomeTile extends Model
     public array $translatable = ['label'];
 
     /** @var array<string, mixed> */
+    #[\Override]
     protected $attributes = [
         'position' => 0,
         'is_active' => true,

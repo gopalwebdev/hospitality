@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class EditRole extends EditRecord
 {
+    #[\Override]
     protected static string $resource = RoleResource::class;
 
     protected function getHeaderActions(): array

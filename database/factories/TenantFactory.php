@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
  */
 class TenantFactory extends Factory
 {
+    #[\Override]
     protected $model = Tenant::class;
 
     /**
