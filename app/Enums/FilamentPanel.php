@@ -44,6 +44,19 @@ enum FilamentPanel: string
         };
     }
 
+    /**
+     * An installed panel's title bar: the 600 shade of the primary colour its
+     * provider registers, in hex because a manifest is read without Filament's
+     * stylesheet.
+     */
+    public function themeColor(): string
+    {
+        return match ($this) {
+            self::Platform => '#4F46E5',
+            self::Tenant => '#D97706',
+        };
+    }
+
     public function signInDescription(): string
     {
         return match ($this) {

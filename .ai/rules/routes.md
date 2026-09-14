@@ -15,7 +15,13 @@ API routes are versioned from the first one: `/api/v1/...`. Route names are dot-
 ## Tenant route names say which app they belong to
 Every route name on a tenant's subdomain carries its app's prefix — `guest.home`, `guest.menus.show`, `guest.menus.basket-quotes.store`, `guest.tiles.document.show`, `guest.manifest`, `guest.service-worker` — so a second app there later cannot collide. The one exception is `preferences.language.update`, which the guest app and the tenant's panel both post to and neither owns.
 
-`manifest.webmanifest` and `service-worker.js` are the two paths that are not resource nouns: they are the filenames browsers expect, served from the root of the subdomain so the worker's scope is the whole app.
+`manifest.webmanifest` and `service-worker.js` are the two paths that are not resource nouns: they are the filenames browsers expect. The guest app's are served from the root of the subdomain so the worker's scope is the whole app.
+
+The panels serve the same two files under their own path, so a panel's worker never replaces the guest app's (`.ai/rules/filament.md`):
+- **Product team:** `platform.manifest` and `platform.service-worker`, in `routes/web.php`.
+- **Tenant:** `tenant.manifest` and `tenant.service-worker`, in `routes/tenant.php`.
+
+The prefix is `FilamentPanel::path()`, never a typed `dashboard`. Filament registers nothing at those two paths.
 
 `POST /menus/{menu}/basket-quotes` is the guest app's one JSON endpoint: a basket kept on the phone, priced against the menu it came from (`Guest\BasketQuoteController`, `.ai/rules/actions-menus.md`). A quote is the resource created, so the path is a noun like every other. It sits in the guest middleware group beside the menu it belongs to, is throttled to 60 a minute because anyone at a table can reach it, and checks the tenant and the menu by hand like every guest controller.
 

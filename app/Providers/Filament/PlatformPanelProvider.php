@@ -69,6 +69,16 @@ class PlatformPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_START,
                 fn (): View => view('filament.desktop-only'),
             )
+            // Installable, so the panel opens in a window of its own. See
+            // PanelProgressiveWebAppController.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View => view('filament.progressive-web-app', [
+                    'panel' => FilamentPanel::Platform,
+                    'manifestUrl' => route('platform.manifest'),
+                    'serviceWorkerUrl' => route('platform.service-worker', absolute: false),
+                ]),
+            )
             // The language this panel is worked in. Menu names come out of
             // translated columns, so this has to be a server round trip.
             ->renderHook(

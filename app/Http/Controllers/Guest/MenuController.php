@@ -250,10 +250,10 @@ class MenuController extends Controller
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'name', 'min_selections', 'max_selections'])
+            ->select(['id', 'name', 'min_selections', 'max_selections', 'allows_quantities'])
             ->whereKey($groupIds)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'menu_add_on_group_id', 'name', 'price_minor_units', 'max_quantity', 'is_preselected'])
+                ->select(['id', 'menu_add_on_group_id', 'name', 'price_minor_units', 'max_quantity', 'is_default'])
                 ->available()
                 ->inMenuOrder()])
             ->get()
@@ -271,7 +271,7 @@ class MenuController extends Controller
         foreach ($groupIdsByItem[$item->getKey()] ?? [] as $groupId) {
             $group = $groups->get($groupId);
 
-            if ($group instanceof MenuAddOnGroup && ! $group->canBeMetBy((int) $group->options->sum('max_quantity'))) {
+            if ($group instanceof MenuAddOnGroup && ! $group->canBeMetBy($group->picksOffered())) {
                 return false;
             }
         }
@@ -301,11 +301,13 @@ class MenuController extends Controller
                 'options' => $group->options->map(fn (MenuAddOnOption $option): array => [
                     'id' => $option->getKey(),
                     'name' => $option->name,
-                    // Zero is a real price, and the app says "Free" rather
-                    // than "+ ₹0.00" — which reads as a mistake.
+                    // Zero is a real price; the app shows no price beside it
+                    // rather than "+ ₹0.00", which reads as a mistake.
                     'priceMinorUnits' => $option->price_minor_units,
-                    'maxQuantity' => $option->max_quantity,
-                    'isPreselected' => $option->is_preselected,
+                    // One whenever the group does not allow the same option
+                    // twice, whatever the option's own cap says.
+                    'maxQuantity' => $group->quantityAllowedFor($option),
+                    'isDefault' => $option->is_default,
                 ])->values()->all(),
             ])
             ->all());

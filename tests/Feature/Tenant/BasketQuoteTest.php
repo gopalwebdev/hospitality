@@ -43,7 +43,7 @@ function seedCurryWithChoices(): array
     $curry = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 28900]);
 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
-    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->allowingQuantities()->create();
 
     MenuItemAddOnGroup::factory()->linking($curry, $bread)->create(['position' => 0]);
     MenuItemAddOnGroup::factory()->linking($curry, $extras)->create(['position' => 1]);
@@ -56,8 +56,7 @@ function seedCurryWithChoices(): array
         'bread' => $bread,
         'extras' => $extras,
         'butterNaan' => MenuAddOnOption::factory()->inGroup($bread)->free()->create(),
-        // A rate of its own, so a line's GST has to be worked out part by part.
-        'garlicNaan' => MenuAddOnOption::factory()->inGroup($bread)->taxedAt(1800)->create(['price_minor_units' => 2000]),
+        'garlicNaan' => MenuAddOnOption::factory()->inGroup($bread)->create(['price_minor_units' => 2000]),
         'cheese' => MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price_minor_units' => 4000]),
         'paneer' => MenuAddOnOption::factory()->inGroup($extras)->create(['price_minor_units' => 6000]),
     ];
@@ -83,7 +82,7 @@ function basketLine(string $key, MenuItem|MenuCombo $thing, int $quantity = 1, a
     ];
 }
 
-it('prices each line with its choices, adds GST at each part\'s own rate, and the charges this menu carries', function (): void {
+it('prices each line with its choices, taxes the add-ons at the item\'s rate, and adds the charges this menu carries', function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'curry' => $curry, 'garlicNaan' => $garlicNaan, 'cheese' => $cheese] = seedCurryWithChoices();
 
     $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 59900, 'tax_rate_basis_points' => null]);
@@ -106,14 +105,15 @@ it('prices each line with its choices, adds GST at each part\'s own rate, and th
                 ['key' => 'combo', 'status' => QuoteBasket::OK, 'unitPriceMinorUnits' => 59900, 'totalMinorUnits' => 59900],
             ],
             'subtotalMinorUnits' => 137700,
-            // 5% of the curries, the cheese and the combo; 18% of the naan.
-            'taxMinorUnits' => 2890 + 800 + 2995 + 720,
+            // 5% of every part: an add-on is taxed at the rate of the item it is
+            // added to, so the naan and the cheese pay the curry's 5%.
+            'taxMinorUnits' => 2890 + 200 + 800 + 2995,
             'pricesIncludeTax' => false,
             'charges' => [
                 ['id' => $service->getKey(), 'name' => $service->name, 'amountMinorUnits' => 13770],
                 ['id' => $packing->getKey(), 'name' => $packing->name, 'amountMinorUnits' => 2000],
             ],
-            'totalMinorUnits' => 137700 + 7405 + 13770 + 2000,
+            'totalMinorUnits' => 137700 + 6885 + 13770 + 2000,
         ]);
 });
 
@@ -127,6 +127,12 @@ it('flags a line whose choices break the rules of its groups, and prices the res
     $runOut = MenuAddOnOption::factory()->inGroup($extras)->unavailable()->create();
     $notOffered = MenuAddOnOption::factory()->inGroup(MenuAddOnGroup::factory()->ofTenant($tenant)->create())->create();
 
+    // Offered on the curry, and capped at three, but its group does not allow
+    // the same option twice: one of each at most.
+    $sides = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    MenuItemAddOnGroup::factory()->linking($curry, $sides)->create(['position' => 2]);
+    $chutney = MenuAddOnOption::factory()->inGroup($sides)->upTo(3)->create();
+
     $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
         basketLine('meets-every-rule', $curry, choices: [[$butterNaan, 1], [$cheese, 2], [$paneer, 1]]),
         basketLine('no-bread', $curry),
@@ -135,6 +141,7 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         basketLine('three-cheese', $curry, choices: [[$butterNaan, 1], [$cheese, 3]]),
         basketLine('run-out', $curry, choices: [[$butterNaan, 1], [$runOut, 1]]),
         basketLine('not-offered-on-it', $curry, choices: [[$butterNaan, 1], [$notOffered, 1]]),
+        basketLine('two-of-one-without-quantities', $curry, choices: [[$butterNaan, 1], [$chutney, 2]]),
     ]])->assertOk();
 
     expect(collect($response->json('lines'))->pluck('status', 'key')->all())->toBe([
@@ -145,6 +152,7 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         'three-cheese' => QuoteBasket::INVALID,
         'run-out' => QuoteBasket::INVALID,
         'not-offered-on-it' => QuoteBasket::INVALID,
+        'two-of-one-without-quantities' => QuoteBasket::INVALID,
     ])
         // A flagged line adds nothing until it is changed.
         ->and($response->json('subtotalMinorUnits'))->toBe(28900 + 8000 + 6000);

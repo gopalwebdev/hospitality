@@ -163,8 +163,8 @@ final class TranslatedFields
      * fields included — so `text()`'s array of one input per language, spread
      * directly into the row, became two cells (English and Tamil) and pushed
      * every field after them one column to the right. The add-on group options
-     * table showed a price under "Extra price" only by coincidence of column
-     * count; a narrower table showed it under the wrong header entirely.
+     * table showed each price under the header after its own, and never drew
+     * its last column at all.
      *
      * Wrapping the inputs in a `Group` makes them one component. `Group` adds no
      * state-path segment of its own, so this still passes `inRepeaterRow: true`

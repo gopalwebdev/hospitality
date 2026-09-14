@@ -687,7 +687,7 @@ it('sends each add-on group once, and each item the groups it offers in its own 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
 
-    $garlic = MenuAddOnOption::factory()->inGroup($bread)->preselected()->create(['position' => 1, 'price_minor_units' => 2000]);
+    $garlic = MenuAddOnOption::factory()->inGroup($bread)->asDefault()->create(['position' => 1, 'price_minor_units' => 2000]);
     $butter = MenuAddOnOption::factory()->inGroup($bread)->free()->create(['position' => 0]);
     MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create();
 
@@ -710,10 +710,13 @@ it('sends each add-on group once, and each item the groups it offers in its own 
                 'maxSelections' => 1,
                 // In the order they were dragged into.
                 'options' => [
-                    ['id' => $butter->getKey(), 'name' => $butter->name, 'priceMinorUnits' => 0, 'maxQuantity' => 1, 'isPreselected' => false],
-                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'priceMinorUnits' => 2000, 'maxQuantity' => 1, 'isPreselected' => true],
+                    ['id' => $butter->getKey(), 'name' => $butter->name, 'priceMinorUnits' => 0, 'maxQuantity' => 1, 'isDefault' => false],
+                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'priceMinorUnits' => 2000, 'maxQuantity' => 1, 'isDefault' => true],
                 ],
             ])
+            // Its option is capped at two, but the group does not allow the same
+            // option twice, so a guest is sent a cap of one.
+            ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxQuantity'] ?? null) === 1)
             ->where('quoteUrl', guestMenuUrl($tenant, $menu).'/basket-quotes'),
         );
 });

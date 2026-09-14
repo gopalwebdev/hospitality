@@ -14,13 +14,14 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('menu_add_on_group_id')->constrained()->cascadeOnDelete();
             $table->jsonb('name');
-            // What one of it adds to the item's price; zero is a real price.
+            // What one of it adds to the item's price; zero is a real price. No tax
+            // rate: an add-on is part of the item it is added to, taxed at its rate.
             $table->integer('price_minor_units')->default(0);
-            $table->smallInteger('tax_rate_basis_points')->nullable();
-            // How many of this one option a guest may take: 2 × extra cheese.
+            // How many of this one option a guest may take: 2 × extra cheese. Only
+            // read while its group allows quantities.
             $table->smallInteger('max_quantity')->default(1);
-            // Ticked before the guest touches anything: "Medium" on a spice level.
-            $table->boolean('is_preselected')->default(false);
+            // Ticked for the guest when they open the item: "Medium" on a spice level.
+            $table->boolean('is_default')->default(false);
             $table->boolean('is_available')->default(true);
             $table->integer('position')->default(0);
             $table->timestamps();
@@ -29,7 +30,6 @@ return new class extends Migration
         DB::statement('ALTER TABLE menu_add_on_options
             ADD CONSTRAINT menu_add_on_options_position_not_negative CHECK ("position" >= 0),
             ADD CONSTRAINT menu_add_on_options_price_not_negative CHECK (price_minor_units >= 0),
-            ADD CONSTRAINT menu_add_on_options_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_add_on_options_max_quantity_in_range CHECK (max_quantity BETWEEN 1 AND 99)');
     }
 

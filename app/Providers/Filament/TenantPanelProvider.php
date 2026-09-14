@@ -82,6 +82,12 @@ class TenantPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_START,
                 fn (): View => view('filament.desktop-only'),
             )
+            // Installable, so the panel opens in a window of its own. See
+            // PanelProgressiveWebAppController.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|string => $this->progressiveWebApp(),
+            )
             // The language this panel is worked in. Menu names come out of
             // translated columns, so this has to be a server round trip.
             ->renderHook(
@@ -134,5 +140,24 @@ class TenantPanelProvider extends PanelProvider
         $tenant = Filament::getTenant();
 
         return $tenant instanceof Tenant ? $tenant->name : FilamentPanel::Tenant->brandName();
+    }
+
+    /**
+     * The manifest and the worker, once a tenant is known. The sign-in page has
+     * no tenant, so there is no app to name and nothing to install.
+     */
+    private function progressiveWebApp(): View|string
+    {
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Tenant) {
+            return '';
+        }
+
+        return view('filament.progressive-web-app', [
+            'panel' => FilamentPanel::Tenant,
+            'manifestUrl' => route('tenant.manifest', ['tenant' => $tenant]),
+            'serviceWorkerUrl' => route('tenant.service-worker', ['tenant' => $tenant], absolute: false),
+        ]);
     }
 }

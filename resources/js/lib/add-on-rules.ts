@@ -6,9 +6,10 @@ export interface AddOnOption {
     name: string;
     /** What one of it adds, in the currency's minor unit; 0 is free. */
     priceMinorUnits: number;
-    /** How many of this one option a guest may take on one item. */
+    /** How many of this one option a guest may take on one item: 1 unless its group allows quantities. */
     maxQuantity: number;
-    isPreselected: boolean;
+    /** Ticked for the guest when the sheet opens: "Medium" on a spice level. */
+    isDefault: boolean;
 }
 
 /**
@@ -172,13 +173,13 @@ export function step(
     return withQuantity(option.id, (picks[option.id] ?? 0) + delta, picks);
 }
 
-/** What the sheet opens with: every pre-selected option, as far as each group's maximum allows. */
+/** What the sheet opens with: every default option, as far as each group's maximum allows. */
 export function initialPicks(groups: AddOnGroup[]): Picks {
     let picks: Picks = {};
 
     for (const group of groups) {
         for (const option of group.options) {
-            if (option.isPreselected && hasRoomIn(group, picks)) {
+            if (option.isDefault && hasRoomIn(group, picks)) {
                 picks = withQuantity(option.id, 1, picks);
             }
         }

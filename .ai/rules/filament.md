@@ -18,7 +18,7 @@ URLs, on either host: `/login` is the way in (`platform.login` on the root domai
 
 The two panels share `/dashboard` and are told apart by host, which holds for one non-obvious reason: the tenant panel's sign-in route — and its logout, and its tenant redirect — carries **no domain**, because nobody has a tenant before signing in, so it answers on the root domain too. `PlatformPanelProvider` is therefore registered **before** `TenantPanelProvider` in `bootstrap/providers.php`, so the platform panel's root-domain routes are matched first; swap the order and the root domain's `/dashboard/login` becomes a tenant-less tenant sign-in. `PanelRoutingTest` pins it. A link to a tenant's panel is `Tenant::signInUrl()`, never `route('filament.tenant.auth.login')`, which has no host of its own.
 
-App\Enums\FilamentPanel is the single source of truth for the Filament panel id (`platform`, `tenant` — route names are built from it) and for the path; the providers and User::canAccessPanel() all read it. Never hardcode a panel id or a panel path anywhere else.
+App\Enums\FilamentPanel is the single source of truth for the Filament panel id (`platform`, `tenant` — route names are built from it), for the path, and for an installed panel's colour (`themeColor()`); the providers, the routes and User::canAccessPanel() all read it. Never hardcode a panel id or a panel path anywhere else.
 
 Never put a page, resource or widget where both panels discover it. Shared behaviour goes in an abstract base under app/Filament/Auth/ (see OtpLogin) and each panel registers its own thin subclass.
 
@@ -53,6 +53,10 @@ This is about **Spatie roles and permissions specifically**, because of that cac
 
 **A `->table()` repeater gives a row's schema one cell per top-level component, hidden fields included.** It does not know a `TranslatedFields::text()` field is really two inputs (English and Tamil); spread directly into a row's schema, they became two cells, and everything after them shifted one column right — the add-on group options table showed a price under "GST", a GST rate under "Default", and never drew "Available" at all. `TranslatedFields::textCell()` wraps the pair in a `Group` so they count as one component; `Group` adds no state-path segment of its own, so `inRepeaterRow`'s `'../../'` lookup still finds the switcher two levels up. Use `textCell()`, never a bare `text()`, for a translated name inside a `->table()` repeater's row schema.
 
+A column that comes and goes with an answer needs both lists to read that answer: `->table(fn (Get $get) => ...)` and `->schema(fn (Get $get) => ...)`, leaving the column and its field out together. Hiding the field alone still draws its cell. The add-on group's Max qty column works this way, pinned by a test comparing header cells with row cells in the rendered HTML.
+
+In a Livewire test, read the modal's HTML from the partial whose key *starts with* `action-modals`. It is `action-modals` when mounted and `action-modals.0` after an update, and `html()` holds no modal at all.
+
 ## Translated fields are one box and one switcher, not a box per language
 Guest-facing text is stored one value per language (`.ai/rules/models.md`). Build the inputs with `App\Filament\Schemas\TranslatedFields::text()` / `::optionalText()` / `::textarea()`, and put `TranslatedFields::localeSwitcher()` once at the top of the form.
 
@@ -69,7 +73,7 @@ Four things the switcher costs, all handled inside `TranslatedFields` and none o
 
 A translated field in each row of a repeater — an add-on group's options — passes `inRepeaterRow: true`. A relative `$get()` resolves inside the row, where there is no switcher, so without it every row showed the panel's language whatever the switcher said; the add-ons repeater before it did exactly that.
 
-A field that is hidden but `dehydratedWhenHidden()` is **validated while hidden** too. Give its rules the same condition as its visibility — "At least" on an add-on group floors at 1 only while "Guest must choose" is on, and at 0 while it holds the 0 that makes the group optional.
+A field that is hidden but `dehydratedWhenHidden()` is **validated while hidden** too. Give its rules the same condition as its visibility. An add-on group's Minimum floors at 1 only while the group is required and of more than one, which is the only time it is shown; hidden, it may hold anything, and the save works the real minimum out from the answers.
 
 Table columns must still go through `TranslatedFields::sort()` / `::search()` — both answer in the panel's language, with English for anything untranslated — and every edit action still needs `->mutateRecordDataUsing(fn (array $data, Model $record) => XForm::fillTranslations($data, $record))` — Spatie hands back one language, and a form editing all of them needs the whole document.
 
@@ -88,6 +92,16 @@ The panel's own labels are English and stay English: `lang/en/panel.php` is the 
 `->spa(hasPrefetching: true)` on both providers, so moving between pages is a Livewire visit with a progress bar across the top rather than a browser load, and hovering a link fetches its page before the click. Links inside a panel carry `wire:navigate.hover`; a form post — the language switcher, for one — is unaffected, and so is anything pointing off the panel's host (Filament compares hosts, so the product team's link into a tenant's subdomain stays a real browser visit).
 
 Deployment runs `php artisan optimize` and `php artisan filament:optimize` (`composer deploy`), which cache Filament's components and Blade Icons. Never run those locally: a component cache stops new resources and pages being discovered until it is cleared.
+
+## Both panels are installable, and neither works offline
+The project owner asked for the panels to be PWAs. Both providers hang `resources/views/filament/progressive-web-app.blade.php` on `PanelsRenderHook::HEAD_END`. Filament's base layout renders that hook on every panel page, sign-in included, and sets no manifest or theme colour of its own. The view links the panel's manifest and registers its worker, both served by `PanelProgressiveWebAppController`.
+
+- **Under `/dashboard`, never the root.** A tenant's subdomain also serves the guest app, whose worker is scoped to `/`. A panel worker at the root would replace it. Scoped to `/dashboard`, it takes only the panel's pages, and takes them off the guest worker, which would otherwise keep copies of them. The script is at `/dashboard/service-worker.js`, whose default scope (`/dashboard/`) misses `/dashboard` itself, so it is served with `Service-Worker-Allowed: /dashboard`.
+- **The worker does nothing.** It has no fetch handler and no cache: a panel page is a signed-in Livewire page, and a stale copy is worse than the browser's offline page. Installing buys a window of its own, not offline use.
+- **The tenant panel's sign-in page is not installable.** It has no tenant, so there is no app to name. A tenant's panel installs as "{name} Dashboard", apart from its guest app, which installs under the bare name.
+- **A switched-off tenant's panel is still installable.** The panel does not check `is_active`, so neither does its manifest; only the guest app's does. An unknown subdomain is a 404.
+
+Tests: `tests/Feature/PanelProgressiveWebAppTest.php`.
 
 ## No theming in the panel
 A tenant chooses no colours and no light/dark default. `App\Enums\Appearance` has two cases and lives on the phone. Do not add a theme section back without asking.

@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\FilamentPanel;
+use App\Http\Controllers\PanelProgressiveWebAppController;
 use App\Http\Controllers\PanelSignInController;
 use App\Http\Controllers\Preferences\UpdateLanguageController;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +17,15 @@ Route::inertia('/', 'welcome')->name('home');
  * they are already signed in. See PanelSignInController.
  */
 Route::get('login', [PanelSignInController::class, 'platform'])->name('platform.login');
+
+/*
+ * What makes the product team's panel installable, under the panel's own path so
+ * the worker's scope is the panel. See PanelProgressiveWebAppController.
+ */
+Route::name('platform.')->prefix(FilamentPanel::Platform->path())->group(function (): void {
+    Route::get('manifest.webmanifest', [PanelProgressiveWebAppController::class, 'platformManifest'])->name('manifest');
+    Route::get('service-worker.js', [PanelProgressiveWebAppController::class, 'platformServiceWorker'])->name('service-worker');
+});
 
 /*
  * Switching language from the product team's panel, which is the one surface

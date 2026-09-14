@@ -42,7 +42,11 @@ The invariant that an item leaving a menu stops being featured lives in `MenuIte
 `QuoteBasket` is what `POST /menus/{menu}/basket-quotes` answers (`Guest\BasketQuoteController`, shape checked by `QuoteBasketRequest`). The basket is the guest's claim, so every line is read again against the menu as it is now — orderable items on this menu with their linked groups and available options, and orderable combos — and priced only if it still stands. Arithmetic and rules are here and not in the browser, which only formats the answer.
 
 - A line comes back **`unavailable`** when its item or combo is gone, sold out, on another menu or another tenant's, or when a required group's available options can no longer meet its minimum — the same decision `Guest\MenuController` makes to leave the item off the menu.
-- It comes back **`invalid`** when an option is not an available option of one of the item's groups, when more of one is asked for than its `max_quantity`, or when a group's picks, each counted by quantity, fall outside its minimum and maximum.
+- It comes back **`invalid`** when an option is not an available option of one of the item's groups, when more of one is asked for than its group allows (`MenuAddOnGroup::quantityAllowedFor()`: the option's `max_quantity` while the group allows quantities, and one otherwise), or when a group's picks, each counted by quantity, fall outside its minimum and maximum.
 - A flagged line is priced at nothing and the rest of the basket is still priced.
 
-GST is worked out part by part — the item at its rate, each option at its own, a combo at its own — and rounded once per part per line. With `prices_include_tax` it is the share already inside the price and is not added to the total. Charges are `Charge::amountOn()` on the subtotal, and an empty basket carries none. The queries do not grow with the basket. When orders arrive they are checked by these same rules. Tests: `tests/Feature/Tenant/BasketQuoteTest.php`.
+GST is worked out part by part and rounded once per part per line:
+- **Items:** every part of an item's line is taxed at the item's rate, its options included. An add-on is part of the item it is added to, a composite supply taxed at the rate of its principal supply (CGST Act, s. 8(a)).
+- **Combos:** taxed at their own rate.
+
+With `prices_include_tax` it is the share already inside the price and is not added to the total. Charges are `Charge::amountOn()` on the subtotal, and an empty basket carries none. The queries do not grow with the basket. When orders arrive they are checked by these same rules. Tests: `tests/Feature/Tenant/BasketQuoteTest.php`.

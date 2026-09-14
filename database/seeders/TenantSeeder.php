@@ -146,7 +146,7 @@ class TenantSeeder extends Seeder
      * two of. `items` is the order a group is linked in, and a group earlier in
      * this list comes first on an item that has several.
      *
-     * @var list<array{name: array<string, string>, min_selections: int, max_selections: int|null, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_preselected?: bool}>, items: list<string>}>
+     * @var list<array{name: array<string, string>, min_selections: int, max_selections: int|null, allows_quantities?: bool, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_default?: bool}>, items: list<string>}>
      */
     public const array ADD_ON_GROUPS = [
         [
@@ -154,7 +154,7 @@ class TenantSeeder extends Seeder
             'min_selections' => 1,
             'max_selections' => 1,
             'options' => [
-                ['name' => ['en' => 'Half', 'ta' => 'அரை'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Half', 'ta' => 'அரை'], 'price_minor_units' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Full', 'ta' => 'முழு'], 'price_minor_units' => 15000],
             ],
             'items' => ['Hyderabadi Chicken Biryani', 'Chicken 65 Biryani', 'Mutton Dum Biryani', 'Vegetable Dum Biryani', 'Paneer Biryani', 'Egg Biryani'],
@@ -165,7 +165,7 @@ class TenantSeeder extends Seeder
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Mild', 'ta' => 'குறைவு'], 'price_minor_units' => 0],
-                ['name' => ['en' => 'Medium', 'ta' => 'நடுத்தரம்'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Medium', 'ta' => 'நடுத்தரம்'], 'price_minor_units' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Hot', 'ta' => 'அதிகம்'], 'price_minor_units' => 0],
             ],
             'items' => ['Paneer Tikka', 'Gobi Manchurian', 'Chicken 65', 'Chettinad Chicken', 'Egg Bhurji'],
@@ -185,6 +185,7 @@ class TenantSeeder extends Seeder
             'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
             'min_selections' => 0,
             'max_selections' => 3,
+            'allows_quantities' => true,
             'options' => [
                 ['name' => ['en' => 'Extra cheese', 'ta' => 'கூடுதல் சீஸ்'], 'price_minor_units' => 4000, 'max_quantity' => 2],
                 ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price_minor_units' => 6000],
@@ -196,6 +197,7 @@ class TenantSeeder extends Seeder
             'name' => ['en' => 'Dosa sides', 'ta' => 'தோசை துணைகள்'],
             'min_selections' => 0,
             'max_selections' => 4,
+            'allows_quantities' => true,
             'options' => [
                 ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price_minor_units' => 1500, 'max_quantity' => 2],
                 ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price_minor_units' => 1500, 'max_quantity' => 2],
@@ -208,7 +210,7 @@ class TenantSeeder extends Seeder
             'min_selections' => 1,
             'max_selections' => 1,
             'options' => [
-                ['name' => ['en' => 'Regular', 'ta' => 'வழக்கம்'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Regular', 'ta' => 'வழக்கம்'], 'price_minor_units' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Less sugar', 'ta' => 'குறைந்த சர்க்கரை'], 'price_minor_units' => 0],
                 ['name' => ['en' => 'No sugar', 'ta' => 'சர்க்கரை இல்லை'], 'price_minor_units' => 0],
             ],
@@ -228,7 +230,7 @@ class TenantSeeder extends Seeder
             'min_selections' => 1,
             'max_selections' => 1,
             'options' => [
-                ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Salted', 'ta' => 'உப்பு'], 'price_minor_units' => 0],
             ],
             'items' => ['Fresh Lime Soda'],
@@ -1104,6 +1106,7 @@ class TenantSeeder extends Seeder
                 fn (): MenuAddOnGroup => new MenuAddOnGroup([
                     'min_selections' => $definition['min_selections'],
                     'max_selections' => $definition['max_selections'],
+                    'allows_quantities' => $definition['allows_quantities'] ?? false,
                 ]),
                 ['tenant_id' => $tenant->getKey()],
             );
@@ -1115,7 +1118,7 @@ class TenantSeeder extends Seeder
                     fn (): MenuAddOnOption => new MenuAddOnOption([
                         'price_minor_units' => $option['price_minor_units'],
                         'max_quantity' => $option['max_quantity'] ?? 1,
-                        'is_preselected' => $option['is_preselected'] ?? false,
+                        'is_default' => $option['is_default'] ?? false,
                         'is_available' => true,
                         'position' => $optionPosition,
                     ]),

@@ -16,17 +16,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A set of choices items are customised with — a spice level, a bread, extras — kept once and linked to every item that offers it.
  * A guest makes at least `min_selections` picks (0 is optional) and at most `max_selections` (null is no limit), each option counted by its quantity.
+ * Only a group that `allows_quantities` lets a guest take one option more than once ("Extra cheese × 2").
  *
  * @property int $id
  * @property int $tenant_id
  * @property string $name
  * @property int $min_selections
  * @property int|null $max_selections
+ * @property bool $allows_quantities
  * @property-read Collection<int, MenuAddOnOption> $options
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'min_selections', 'max_selections'])]
+#[Fillable(['name', 'min_selections', 'max_selections', 'allows_quantities'])]
 class MenuAddOnGroup extends Model
 {
     /** @use HasFactory<MenuAddOnGroupFactory> */
@@ -41,6 +43,7 @@ class MenuAddOnGroup extends Model
     #[\Override]
     protected $attributes = [
         'min_selections' => 0,
+        'allows_quantities' => false,
     ];
 
     /**
@@ -88,6 +91,22 @@ class MenuAddOnGroup extends Model
     }
 
     /**
+     * How many of one option a guest may take here: its own cap, or one while the group does not allow quantities.
+     */
+    public function quantityAllowedFor(MenuAddOnOption $option): int
+    {
+        return $this->allows_quantities ? $option->max_quantity : 1;
+    }
+
+    /**
+     * The most picks the loaded options can add up to — what a required group's minimum is checked against.
+     */
+    public function picksOffered(): int
+    {
+        return (int) $this->options->sum(fn (MenuAddOnOption $option): int => $this->quantityAllowedFor($option));
+    }
+
+    /**
      * @param  Builder<$this>  $query
      */
     public function scopeByName(Builder $query): void
@@ -103,6 +122,7 @@ class MenuAddOnGroup extends Model
         return [
             'min_selections' => 'integer',
             'max_selections' => 'integer',
+            'allows_quantities' => 'boolean',
         ];
     }
 }

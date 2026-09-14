@@ -116,11 +116,12 @@ class QuoteBasket
 
         $offered = $item->addOnGroupLinks
             ->map(fn (MenuItemAddOnGroup $link): ?MenuAddOnGroup => $groups->get($link->menu_add_on_group_id))
-            ->filter();
+            ->filter()
+            ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());
 
         // The decision the menu screen makes: a required group that its
         // available options can no longer meet takes the item off the menu.
-        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy((int) $group->options->sum('max_quantity')))) {
+        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered()))) {
             return self::UNAVAILABLE;
         }
 
@@ -134,20 +135,30 @@ class QuoteBasket
             $quantities[$choice['optionId']] = ($quantities[$choice['optionId']] ?? 0) + $choice['quantity'];
         }
 
-        $parts = [['amount' => $item->price_minor_units, 'rate' => $item->taxRateBasisPoints($tenantRate)]];
+        // Every part of the line is taxed at the item's rate. An add-on is part of
+        // the item it is added to — a composite supply, taxed at the rate of its
+        // principal supply (CGST Act, s. 8(a)) — so an option has no rate of its own.
+        $rate = $item->taxRateBasisPoints($tenantRate);
+        $parts = [['amount' => $item->price_minor_units, 'rate' => $rate]];
         $picks = [];
 
         foreach ($quantities as $optionId => $quantity) {
             $option = $options->get($optionId);
 
-            // Not an available option of one of this item's groups, or more of
-            // it than a guest may take.
-            if (! $option instanceof MenuAddOnOption || $quantity > $option->max_quantity) {
+            // Not an available option of one of this item's groups.
+            if (! $option instanceof MenuAddOnOption) {
                 return self::INVALID;
             }
 
-            $picks[$option->menu_add_on_group_id] = ($picks[$option->menu_add_on_group_id] ?? 0) + $quantity;
-            $parts[] = ['amount' => $option->price_minor_units * $quantity, 'rate' => $option->taxRateBasisPoints($tenantRate)];
+            $group = $offered->get($option->menu_add_on_group_id);
+
+            // Or more of it than its group lets a guest take.
+            if (! $group instanceof MenuAddOnGroup || $quantity > $group->quantityAllowedFor($option)) {
+                return self::INVALID;
+            }
+
+            $picks[$group->getKey()] = ($picks[$group->getKey()] ?? 0) + $quantity;
+            $parts[] = ['amount' => $option->price_minor_units * $quantity, 'rate' => $rate];
         }
 
         foreach ($offered as $group) {
@@ -225,11 +236,11 @@ class QuoteBasket
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'tenant_id', 'min_selections', 'max_selections'])
+            ->select(['id', 'tenant_id', 'min_selections', 'max_selections', 'allows_quantities'])
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price_minor_units', 'tax_rate_basis_points', 'max_quantity'])
+                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price_minor_units', 'max_quantity'])
                 ->available()])
             ->get()
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());

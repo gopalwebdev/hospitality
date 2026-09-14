@@ -13,6 +13,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -25,16 +26,19 @@ use Illuminate\Support\Once;
 use LogicException;
 
 /**
- * An add-on group: what a guest reads above it, how many picks it asks for, and the options they pick from.
+ * An add-on group: what a guest reads above it, the rule their picks follow, and the options they pick from.
  *
- * The rule belongs to the group wherever it is linked: at least `min_selections`
- * picks (none makes the group optional) and at most `max_selections` (blank is
- * no limit), each option counted by its quantity — two of "Extra cheese" are two
- * picks toward "up to 3". An option's own `max_quantity` caps how many of it one
- * item takes.
+ * The form asks what Toast, Square and DoorDash ask, in their order, and each
+ * question only once it applies: is it required; can a guest pick only one or
+ * more than one; and, for more than one, the minimum, the maximum, and whether
+ * the same option may be taken twice. The two questions are form state. What
+ * is stored is what they mean — `min_selections`, `max_selections` and
+ * `allows_quantities` — and the numbers are worked out from the answers on the
+ * way out, so a box hidden by one answer can never leak a value typed under
+ * another (.ai/rules/add-on-groups.md).
  *
- * Prices are typed in major units and rates as a percentage, converted row by
- * row on the way in and out through PricingFields, as an item's are.
+ * An option has a price and no tax rate: an add-on is part of the item it is
+ * added to, taxed at that item's rate.
  */
 class MenuAddOnGroupForm
 {
@@ -45,9 +49,21 @@ class MenuAddOnGroupForm
      */
     public const array TRANSLATED = ['name'];
 
+    /** "Is it required?" — no. */
+    public const string OPTIONAL = 'optional';
+
+    /** "Is it required?" — yes. */
+    public const string REQUIRED = 'required';
+
+    /** "How many can a guest pick?" — radio buttons for the guest. */
+    public const string ONLY_ONE = 'only_one';
+
+    /** "How many can a guest pick?" — checkboxes for the guest. */
+    public const string MORE_THAN_ONE = 'more_than_one';
+
     /**
-     * The group's own fields on top, its options table below — stacked, so the
-     * table gets the modal's full width rather than sharing it with a sidebar.
+     * The group's questions on top, its options table below — stacked, so the
+     * table gets the modal's full width.
      */
     public static function configure(Schema $schema): Schema
     {
@@ -63,7 +79,7 @@ class MenuAddOnGroupForm
     }
 
     /**
-     * The group's name and the rule a guest's picks have to meet, in one row.
+     * The group's name and the rule a guest's picks have to meet.
      */
     private static function groupSection(): Section
     {
@@ -73,7 +89,7 @@ class MenuAddOnGroupForm
             ->columns(6)
             ->schema([
                 ...array_map(
-                    static fn (TextInput $field): TextInput => $field->columnSpan(3),
+                    static fn (TextInput $field): TextInput => $field->columnSpanFull(),
                     TranslatedFields::text(
                         'name',
                         __('panel.shared.name'),
@@ -86,44 +102,79 @@ class MenuAddOnGroupForm
                     ),
                 ),
 
-                // Not a column: min_selections is, and this is the way an admin
-                // thinks of it. Switching it on asks for one pick, and off makes
-                // the group optional again.
-                Toggle::make('is_required')
-                    ->label(__('panel.add_on_groups.is_required'))
-                    ->inline(false)
+                ToggleButtons::make('requirement')
+                    ->label(__('panel.add_on_groups.requirement'))
+                    ->options([
+                        self::OPTIONAL => __('panel.add_on_groups.optional'),
+                        self::REQUIRED => __('panel.add_on_groups.required'),
+                    ])
+                    ->inline()
+                    ->grouped()
+                    ->default(self::OPTIONAL)
                     ->live()
                     ->dehydrated(false)
-                    ->afterStateHydrated(fn (Toggle $component, Get $get): Toggle => $component->state((int) $get('min_selections') >= 1))
-                    ->afterStateUpdated(fn (bool $state, Set $set): mixed => $set('min_selections', $state ? 1 : 0))
-                    ->columnSpan(1),
+                    ->afterStateHydrated(fn (ToggleButtons $component, Get $get): ToggleButtons => $component->state(self::requirementOf($get)))
+                    ->columnSpan(3),
 
-                // Hidden while the group is optional and saved all the same:
-                // that is when it holds the 0 that makes it optional. A field
-                // saved while hidden is validated while hidden too, so its
-                // floor follows the toggle rather than being a flat 1.
+                ToggleButtons::make('selection')
+                    ->label(__('panel.add_on_groups.selection'))
+                    ->options([
+                        self::ONLY_ONE => __('panel.add_on_groups.only_one'),
+                        self::MORE_THAN_ONE => __('panel.add_on_groups.more_than_one'),
+                    ])
+                    ->inline()
+                    ->grouped()
+                    ->default(self::ONLY_ONE)
+                    ->live()
+                    ->dehydrated(false)
+                    ->afterStateHydrated(fn (ToggleButtons $component, Get $get): ToggleButtons => $component->state(self::selectionOf($get)))
+                    // A maximum of one is "only one"; switching to more than one
+                    // starts from no limit rather than from a refusal.
+                    ->afterStateUpdated(fn (?string $state, Get $get, Set $set): mixed => $state === self::MORE_THAN_ONE && (int) $get('max_selections') === 1
+                        ? $set('max_selections', null)
+                        : null)
+                    ->columnSpan(3),
+
+                // Only asked for a required group of more than one: "only one"
+                // is a minimum of one when required and none when optional.
+                // Saved while hidden, so its floor follows the same answers as
+                // its visibility (.ai/rules/filament.md).
                 TextInput::make('min_selections')
                     ->label(__('panel.add_on_groups.min_selections'))
                     ->integer()
-                    ->minValue(fn (Get $get): int => (bool) $get('is_required') ? 1 : 0)
+                    ->minValue(fn (Get $get): int => self::asksForMinimum($get) ? 1 : 0)
                     ->maxValue(99)
                     ->default(0)
                     ->required()
-                    ->visible(fn (Get $get): bool => (bool) $get('is_required'))
+                    ->visible(fn (Get $get): bool => self::asksForMinimum($get))
                     ->dehydratedWhenHidden()
-                    ->dehydrateStateUsing(fn (mixed $state): int => (int) $state)
+                    ->dehydrateStateUsing(fn (Get $get): int => self::minimum($get))
                     ->rule(fn (Get $get): Closure => self::minimumRule($get))
-                    ->columnSpan(1),
+                    ->columnSpan(2),
 
                 TextInput::make('max_selections')
                     ->label(__('panel.add_on_groups.max_selections'))
                     ->integer()
-                    ->minValue(1)
+                    ->minValue(fn (Get $get): int => self::allowsMoreThanOne($get) ? 2 : 1)
                     ->maxValue(99)
+                    ->default(1)
                     ->placeholder(__('panel.add_on_groups.no_limit'))
-                    ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state)
+                    ->validationMessages(['min' => __('panel.add_on_groups.max_below_two')])
+                    ->visible(fn (Get $get): bool => self::allowsMoreThanOne($get))
+                    ->dehydratedWhenHidden()
+                    ->dehydrateStateUsing(fn (Get $get): ?int => self::maximum($get))
                     ->rule(fn (Get $get): Closure => self::maximumRule($get))
-                    ->columnSpan(1),
+                    ->columnSpan(2),
+
+                Toggle::make('allows_quantities')
+                    ->label(__('panel.add_on_groups.allows_quantities'))
+                    ->inline(false)
+                    ->default(false)
+                    ->live()
+                    ->visible(fn (Get $get): bool => self::allowsMoreThanOne($get))
+                    ->dehydratedWhenHidden()
+                    ->dehydrateStateUsing(fn (Get $get): bool => self::allowsQuantities($get))
+                    ->columnSpan(2),
             ]);
     }
 
@@ -131,10 +182,10 @@ class MenuAddOnGroupForm
      * What a guest picks from, in the order they read it.
      *
      * A repeater bound to the relationship, so the options are written in the
-     * same save as the group. Each field below is one table column and no
-     * more: a translated name is two inputs, so it goes through
-     * `TranslatedFields::textCell()` rather than a bare `text()`, which would
-     * split across two cells and push every field after it one column right.
+     * same save as the group. Max qty is a column only while the same option may
+     * be taken twice, and the row's fields follow the same answer, so there is
+     * always exactly one cell per column — a translated name included, through
+     * `TranslatedFields::textCell()` (.ai/rules/filament.md).
      */
     private static function optionsSection(Currency $currency): Section
     {
@@ -145,47 +196,47 @@ class MenuAddOnGroupForm
                 Repeater::make('options')
                     ->relationship()
                     ->hiddenLabel()
-                    ->table([
+                    ->table(fn (Get $get): array => self::withoutNulls([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
-                        TableColumn::make(__('panel.add_on_groups.price'))->width('8rem'),
-                        TableColumn::make(__('panel.add_on_groups.max_quantity'))->width('6rem'),
-                        TableColumn::make(__('panel.add_on_groups.tax_rate'))->width('6rem'),
-                        TableColumn::make(__('panel.add_on_groups.is_preselected'))->width('6rem')->alignment(Alignment::Center),
-                        TableColumn::make(__('panel.add_on_groups.is_available'))->width('6rem')->alignment(Alignment::Center),
-                    ])
-                    ->schema([
+                        TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
+                        self::allowsQuantities($get)
+                            ? TableColumn::make(__('panel.add_on_groups.max_quantity'))->width('7rem')
+                            : null,
+                        TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
+                        TableColumn::make(__('panel.add_on_groups.is_available'))->width('7rem')->alignment(Alignment::Center),
+                    ]))
+                    ->schema(fn (Get $get): array => self::withoutNulls([
                         TranslatedFields::textCell('name', __('panel.add_on_groups.option'), maxLength: 64),
 
-                        // Zero is a real price: a spice level costs nothing extra.
+                        // Blank is free: a spice level costs nothing extra.
                         TextInput::make('price')
                             ->label(__('panel.add_on_groups.price'))
-                            ->required()
                             ->numeric()
                             ->minValue(0)
                             ->maxValue(99999)
                             ->step(0.01)
-                            ->default(0)
-                            ->prefix($currency->symbol()),
+                            ->prefix('+ '.$currency->symbol())
+                            ->placeholder(__('panel.add_on_groups.free')),
 
-                        TextInput::make('max_quantity')
-                            ->label(__('panel.add_on_groups.max_quantity'))
-                            ->required()
-                            ->integer()
-                            ->minValue(1)
-                            ->maxValue(99)
-                            ->default(1)
-                            ->rule(fn (Get $get): Closure => self::maxQuantityRule($get)),
+                        self::allowsQuantities($get)
+                            ? TextInput::make('max_quantity')
+                                ->label(__('panel.add_on_groups.max_quantity'))
+                                ->required()
+                                ->integer()
+                                ->minValue(1)
+                                ->maxValue(99)
+                                ->default(1)
+                                ->rule(fn (Get $get): Closure => self::maxQuantityRule($get))
+                            : null,
 
-                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
-
-                        Toggle::make('is_preselected')
-                            ->label(__('panel.add_on_groups.is_preselected'))
+                        Toggle::make('is_default')
+                            ->label(__('panel.add_on_groups.is_default'))
                             ->default(false),
 
                         Toggle::make('is_available')
                             ->label(__('panel.add_on_groups.is_available'))
                             ->default(true),
-                    ])
+                    ]))
                     ->orderColumn('position')
                     // A group with nothing in it offers a guest nothing to pick.
                     ->minItems(1)
@@ -193,44 +244,121 @@ class MenuAddOnGroupForm
                     ->addActionLabel(__('panel.add_on_groups.add_option'))
                     ->reorderable()
                     ->rule(fn (Get $get): Closure => self::defaultsRule($get))
-                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::storeOption($data, $currency))
-                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::storeOption($data, $currency))
+                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data, Get $get): array => self::storeOption($data, $currency, self::allowsQuantities($get)))
+                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data, Get $get): array => self::storeOption($data, $currency, self::allowsQuantities($get)))
                     ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => self::fillOption($data, $currency))
                     ->columnSpanFull(),
             ]);
     }
 
     /**
-     * Refuse a minimum the options could never add up to, however many of each a guest took.
+     * "Required" when the stored minimum asks for a pick, and "Optional" otherwise — a new group included.
+     */
+    private static function requirementOf(Get $get): string
+    {
+        return (int) $get('min_selections') >= 1 ? self::REQUIRED : self::OPTIONAL;
+    }
+
+    /**
+     * "Only one" for a new group or a stored maximum of one, and "More than one" otherwise.
+     *
+     * A new group's minimum may not have its default yet when this runs, which
+     * is what tells it apart from a stored group with no limit.
+     */
+    private static function selectionOf(Get $get): string
+    {
+        if ($get('min_selections') === null) {
+            return self::ONLY_ONE;
+        }
+
+        return (int) $get('max_selections') === 1 ? self::ONLY_ONE : self::MORE_THAN_ONE;
+    }
+
+    private static function isRequired(Get $get, string $path = ''): bool
+    {
+        return $get($path.'requirement') === self::REQUIRED;
+    }
+
+    private static function allowsMoreThanOne(Get $get, string $path = ''): bool
+    {
+        return $get($path.'selection') === self::MORE_THAN_ONE;
+    }
+
+    /**
+     * Whether the Minimum box is asked at all: only for a required group of more than one.
+     */
+    private static function asksForMinimum(Get $get): bool
+    {
+        return self::isRequired($get) && self::allowsMoreThanOne($get);
+    }
+
+    /**
+     * The minimum the answers mean: none when optional, one for a required "only one", else what was typed.
+     */
+    private static function minimum(Get $get, string $path = ''): int
+    {
+        if (! self::isRequired($get, $path)) {
+            return 0;
+        }
+
+        return self::allowsMoreThanOne($get, $path) ? max((int) $get($path.'min_selections'), 1) : 1;
+    }
+
+    /**
+     * The maximum the answers mean: one for "only one", else what was typed, and null for no limit.
+     */
+    private static function maximum(Get $get, string $path = ''): ?int
+    {
+        if (! self::allowsMoreThanOne($get, $path)) {
+            return 1;
+        }
+
+        $maximum = $get($path.'max_selections');
+
+        return blank($maximum) ? null : (int) $maximum;
+    }
+
+    /**
+     * Whether one option may be taken more than once — only ever for a group of more than one.
+     */
+    private static function allowsQuantities(Get $get, string $path = ''): bool
+    {
+        return self::allowsMoreThanOne($get, $path) && (bool) $get($path.'allows_quantities');
+    }
+
+    /**
+     * Refuse a minimum the options could never add up to, however many of each a guest may take.
      */
     private static function minimumRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-            $picks = collect((array) $get('options'))
-                ->sum(static fn (mixed $option): int => is_array($option) ? max((int) ($option['max_quantity'] ?? 1), 1) : 0);
+            $countsQuantities = self::allowsQuantities($get);
 
-            if ((int) $value > $picks) {
+            $picks = collect((array) $get('options'))
+                ->sum(static fn (mixed $option): int => match (true) {
+                    ! is_array($option) => 0,
+                    $countsQuantities => max((int) ($option['max_quantity'] ?? 1), 1),
+                    default => 1,
+                });
+
+            if (self::minimum($get) > $picks) {
                 $fail(__('panel.add_on_groups.min_above_options'));
             }
         };
     }
 
     /**
-     * Refuse a maximum below the minimum, and never below one.
+     * Refuse a maximum below the minimum.
      *
      * The database states this as a CHECK; this is the message an admin reads
-     * instead of it. The other half of the old rule here — too many options set
-     * as the default — moved to `defaultsRule()`, so it reads under the options
-     * table rather than under this field.
+     * instead of it. "Only one" is never refused here: its maximum is one.
      */
     private static function maximumRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-            if (blank($value)) {
-                return;
-            }
+            $maximum = self::maximum($get);
 
-            if ((int) $value < max((int) $get('min_selections'), 1)) {
+            if (self::allowsMoreThanOne($get) && $maximum !== null && $maximum < self::minimum($get)) {
                 $fail(__('panel.add_on_groups.max_below_min'));
             }
         };
@@ -239,24 +367,24 @@ class MenuAddOnGroupForm
     /**
      * Refuse more options set as the default than a guest may pick.
      *
-     * Attached to the repeater itself rather than to Max choices, so the
-     * message lands under the options it is actually about.
+     * Attached to the repeater itself, so the message lands under the options
+     * it is about.
      */
     private static function defaultsRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-            $max = $get('max_selections');
+            $maximum = self::maximum($get);
 
-            if (blank($max)) {
+            if ($maximum === null) {
                 return;
             }
 
-            $preselected = collect((array) $value)
-                ->filter(static fn (mixed $option): bool => is_array($option) && (bool) ($option['is_preselected'] ?? false))
+            $defaults = collect((array) $value)
+                ->filter(static fn (mixed $option): bool => is_array($option) && (bool) ($option['is_default'] ?? false))
                 ->count();
 
-            if ($preselected > (int) $max) {
-                $fail(__('panel.add_on_groups.preselected_above_max'));
+            if ($defaults > $maximum) {
+                $fail(__('panel.add_on_groups.defaults_above_max'));
             }
         };
     }
@@ -264,16 +392,16 @@ class MenuAddOnGroupForm
     /**
      * Refuse more of one option than the group's own maximum allows.
      *
-     * A guest cannot take three of an option when the group limits the whole
-     * pick to one — a required bread with "Up to 3" garlic naan would let a
-     * guest "choose 1" and walk away with three.
+     * A guest who may pick two things in all cannot take three extra cheese. Read
+     * from inside a row of the options table, so the group's answers are two
+     * levels up.
      */
     private static function maxQuantityRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-            $max = $get('../../max_selections');
+            $maximum = self::maximum($get, '../../');
 
-            if (filled($max) && (int) $value > (int) $max) {
+            if ($maximum !== null && (int) $value > $maximum) {
                 $fail(__('panel.add_on_groups.max_quantity_above_max'));
             }
         };
@@ -353,39 +481,50 @@ class MenuAddOnGroupForm
     }
 
     /**
-     * One option's typed price and rate as what gets stored.
+     * One option's typed price as what gets stored, and one of each while quantities are not allowed.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private static function storeOption(array $data, Currency $currency): array
+    private static function storeOption(array $data, Currency $currency, bool $allowsQuantities): array
     {
-        $data['price_minor_units'] = $currency->toMinorUnits($data['price'] ?? 0);
+        $data['price_minor_units'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
-        $data['tax_rate_basis_points'] = blank($data['tax_rate_percentage'] ?? null)
-            ? null
-            : PricingFields::toBasisPoints($data['tax_rate_percentage']);
+        if (! $allowsQuantities) {
+            $data['max_quantity'] = 1;
+        }
 
-        unset($data['price'], $data['tax_rate_percentage']);
+        unset($data['price']);
 
         return $data;
     }
 
     /**
-     * One option's stored price and rate as what the form edits.
+     * One option's stored price as what the form edits — blank when free, so the box reads "Free".
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private static function fillOption(array $data, Currency $currency): array
     {
-        $data['price'] = $currency->toMajorUnits((int) ($data['price_minor_units'] ?? 0));
+        $minorUnits = (int) ($data['price_minor_units'] ?? 0);
 
-        $data['tax_rate_percentage'] = blank($data['tax_rate_basis_points'] ?? null)
-            ? null
-            : PricingFields::toPercentage((int) $data['tax_rate_basis_points']);
+        $data['price'] = $minorUnits === 0 ? null : $currency->toMajorUnits($minorUnits);
 
         return $data;
+    }
+
+    /**
+     * A list of components with the ones an answer leaves out removed.
+     *
+     * @template TComponent of object
+     *
+     * @param  list<TComponent|null>  $components
+     * @return list<TComponent>
+     */
+    private static function withoutNulls(array $components): array
+    {
+        return array_values(array_filter($components, static fn (?object $component): bool => $component !== null));
     }
 
     /**

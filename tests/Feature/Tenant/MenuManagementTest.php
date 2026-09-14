@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Menus\QuoteBasket;
 use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
@@ -897,25 +898,30 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->and(PricingFields::toBasisPoints('12.5'))->toBe(1250);
 });
 
-it('taxes an option at its own rate, never at the rate of the item it is chosen on', function (): void {
+it('taxes an option at the rate of the item it is added to', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500]);
+    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => false]);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $menuItem = MenuItem::factory()
-        ->inCategory(MenuCategory::factory()->inMenu(
-            Menu::factory()->create(['tenant_id' => $tenant->getKey()])
-        )->create())
+        ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
         ->taxedAt(1200)
-        ->create();
+        ->create(['price_minor_units' => 10000]);
     $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
     MenuItemAddOnGroup::factory()->linking($menuItem, $group)->create();
+    $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price_minor_units' => 5000]);
 
-    $following = MenuAddOnOption::factory()->inGroup($group)->create();
-    $overriding = MenuAddOnOption::factory()->inGroup($group)->taxedAt(1800)->create();
+    // An add-on is part of the item it is added to — a composite supply, taxed
+    // at the rate of its principal supply (CGST Act, s. 8(a)) — so the cheese
+    // pays the item's 12%, not the tenant's 5%.
+    $quote = app(QuoteBasket::class)($tenant, $menu, [[
+        'key' => 'tikka',
+        'type' => QuoteBasket::ITEM,
+        'id' => $menuItem->getKey(),
+        'quantity' => 1,
+        'choices' => [['optionId' => $cheese->getKey(), 'quantity' => 1]],
+    ]]);
 
-    // One group is offered on items taxed at different rates, so an option
-    // that sets no rate of its own follows the tenant, not the item's 12%.
-    expect($following->taxRateBasisPoints())->toBe(500)
-        ->and($overriding->taxRateBasisPoints())->toBe(1800);
+    expect($quote['taxMinorUnits'])->toBe(1200 + 600);
 });
 
 /*

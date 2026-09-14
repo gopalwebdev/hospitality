@@ -26,6 +26,8 @@ A guest who comes back keeps the tenant on their home screen, so the app is a PW
 
 The worker is deliberately thin. Hashed `/build/` assets are answered from the cache once fetched; a page navigation goes to the network and falls back to the last good copy; **Inertia's own requests are never cached**, because the same URL answers HTML to a navigation and JSON to Inertia and handing one to the other breaks both. There is still no offline requirement: the PWA buys a home-screen icon and standalone chrome, not an offline menu.
 
+The panels on the same subdomain are installable too, with a worker under `/dashboard` that does nothing, so they never replace or share this one (`.ai/rules/filament.md`).
+
 ## The app carries a theme toggle and a language toggle, and no logo
 `components/preference-toggles.tsx` pairs the two things a visitor can change for themselves, and rides in `components/app-bar.tsx` on every screen.
 
@@ -65,13 +67,13 @@ The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charg
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
-The menu is sent `addOnGroups` once — `{id, name, minSelections, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isPreselected}]}`, only available options and only the groups an item on the page offers — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
+The menu is sent `addOnGroups` once — `{id, name, minSelections, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, with `maxQuantity` already 1 for an option whose group does not allow quantities — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
 
 Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
 - a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
 - an optional pick-one moves its tick rather than locking
 - a full group stops offering the options not picked
-- pre-selected options start ticked
+- default options (`isDefault`) start ticked
 - Add reads "Choose 1 more from Bread" until every minimum is met
 
 `lib/add-on-rules.ts` holds those rules as pure functions and counts picks as the server does, each option by its quantity. It only shapes the sheet: nothing it decides is trusted.

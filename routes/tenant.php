@@ -1,10 +1,12 @@
 <?php
 
+use App\Enums\FilamentPanel;
 use App\Http\Controllers\Guest\BasketQuoteController;
 use App\Http\Controllers\Guest\HomeController;
 use App\Http\Controllers\Guest\MenuController;
 use App\Http\Controllers\Guest\ProgressiveWebAppController;
 use App\Http\Controllers\Guest\TileController;
+use App\Http\Controllers\PanelProgressiveWebAppController;
 use App\Http\Controllers\PanelSignInController;
 use App\Http\Controllers\Preferences\UpdateLanguageController;
 use App\Http\Middleware\HandleGuestAppRequests;
@@ -77,6 +79,16 @@ Route::domain('{tenant}.'.config('app.domain'))->group(function (): void {
      * to the dashboard when they are already signed in.
      */
     Route::get('login', [PanelSignInController::class, 'tenant'])->name('tenant.login');
+
+    /*
+     * What makes this tenant's panel installable. Under the panel's own path,
+     * not the root where the guest app's are: a worker scoped to /dashboard
+     * takes over the panel's pages and leaves the guest app's worker alone.
+     */
+    Route::name('tenant.')->prefix(FilamentPanel::Tenant->path())->group(function (): void {
+        Route::get('manifest.webmanifest', [PanelProgressiveWebAppController::class, 'tenantManifest'])->name('manifest');
+        Route::get('service-worker.js', [PanelProgressiveWebAppController::class, 'tenantServiceWorker'])->name('service-worker');
+    });
 
     /*
      * Switching language, from the guest app and from the tenant's panel.

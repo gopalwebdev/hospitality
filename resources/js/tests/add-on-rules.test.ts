@@ -19,7 +19,7 @@ function option(overrides: Partial<AddOnOption> & { id: number }): AddOnOption {
         name: `Option ${String(overrides.id)}`,
         priceMinorUnits: 0,
         maxQuantity: 1,
-        isPreselected: false,
+        isDefault: false,
         ...overrides,
     };
 }
@@ -46,7 +46,7 @@ const garlicNaan = option({
     id: 22,
     name: 'Garlic naan',
     priceMinorUnits: 2000,
-    isPreselected: true,
+    isDefault: true,
 });
 
 const bread: AddOnGroup = {
@@ -114,7 +114,7 @@ describe('add-on rules', () => {
         expect(toggle(bread, butterNaan, { 22: 1 })).toEqual({ 21: 1 });
     });
 
-    it('starts with what is pre-selected, and says what is still missing', () => {
+    it('starts with the default options ticked, and says what is still missing', () => {
         expect(initialPicks([bread, extras])).toEqual({ 22: 1 });
         expect(firstShortfall([extras, bread], {})).toEqual({
             group: bread,

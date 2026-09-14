@@ -34,9 +34,8 @@ class MenuAddOnOptionFactory extends Factory
                 ->value('tenant_id'),
             'name' => [Locale::English->value => $name],
             'price_minor_units' => fake()->numberBetween(0, 10000),
-            'tax_rate_basis_points' => null,
             'max_quantity' => 1,
-            'is_preselected' => false,
+            'is_default' => false,
             'is_available' => true,
             'position' => fake()->numberBetween(0, 10),
         ];
@@ -64,7 +63,7 @@ class MenuAddOnOptionFactory extends Factory
     }
 
     /**
-     * An option a guest may take more than one of.
+     * An option a guest may take more than one of — while its group allows quantities.
      */
     public function upTo(int $quantity): static
     {
@@ -74,12 +73,12 @@ class MenuAddOnOptionFactory extends Factory
     }
 
     /**
-     * Ticked before the guest touches anything.
+     * Ticked for the guest when they open the item.
      */
-    public function preselected(): static
+    public function asDefault(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'is_preselected' => true,
+            'is_default' => true,
         ]);
     }
 
@@ -90,18 +89,6 @@ class MenuAddOnOptionFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'is_available' => false,
-        ]);
-    }
-
-    /**
-     * An option taxed at a rate of its own rather than the tenant's.
-     *
-     * Basis points, as stored: 1800 is 18%.
-     */
-    public function taxedAt(int $basisPoints): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'tax_rate_basis_points' => $basisPoints,
         ]);
     }
 

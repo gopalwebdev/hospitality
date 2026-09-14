@@ -36,7 +36,7 @@ const extras: AddOnGroup = {
             name: 'Extra cheese',
             priceMinorUnits: 4000,
             maxQuantity: 2,
-            isPreselected: false,
+            isDefault: false,
         },
     ],
 };
@@ -52,7 +52,7 @@ const bread: AddOnGroup = {
             name: 'Garlic naan',
             priceMinorUnits: 2000,
             maxQuantity: 1,
-            isPreselected: false,
+            isDefault: false,
         },
     ],
 };
