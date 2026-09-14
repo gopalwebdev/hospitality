@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 
-import { DietMark, type Diet } from '@/components/diet-mark';
+import { ItemMark, type Diet } from '@/components/item-mark';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ export interface CustomisableItem {
     name: string;
     description: string | null;
     priceMinorUnits: number;
+    isServiceRequest: boolean;
     diet: Diet | null;
 }
 
@@ -115,7 +116,11 @@ function Customiser({
         <>
             <SheetHeader className="border-b px-5 pt-5 pb-4 text-left">
                 <div className="flex items-start gap-3 pr-8">
-                    <DietMark diet={item.diet} className="mt-1.5" />
+                    <ItemMark
+                        diet={item.diet}
+                        isServiceRequest={item.isServiceRequest}
+                        className="mt-1.5"
+                    />
 
                     <div className="min-w-0">
                         <SheetTitle className="text-lg leading-snug">

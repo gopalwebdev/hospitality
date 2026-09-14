@@ -177,7 +177,7 @@ describe('guest menu', () => {
         expect(screen.getByLabelText('Vegetarian')).toBeInTheDocument();
     });
 
-    it('lists a service request without a diet mark, and names a zero price rather than pricing it', () => {
+    it('marks a service request with a bell rather than a diet, and names a zero price rather than pricing it', () => {
         renderMenu({
             sections: [
                 {
@@ -198,7 +198,10 @@ describe('guest menu', () => {
         });
 
         expect(screen.getByText('Extra Pillow')).toBeInTheDocument();
-        // A pillow has no diet to declare.
+        // A pillow has no diet to declare, and is marked as what it is instead.
+        expect(
+            screen.getByRole('img', { name: 'Service request' }),
+        ).toBeInTheDocument();
         expect(
             screen.queryByLabelText(/vegetarian|egg/i),
         ).not.toBeInTheDocument();

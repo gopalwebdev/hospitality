@@ -125,3 +125,14 @@ export function StarIcon(props: IconProps) {
         </svg>
     );
 }
+
+/** Beside a service request: the bell on a front desk. */
+export function BellIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M10 6h4M12 6v4" />
+            <path d="M4 18a8 8 0 0 1 16 0" />
+            <path d="M2 18h20" />
+        </svg>
+    );
+}

@@ -1,5 +1,5 @@
-import { DietMark, type Diet } from '@/components/diet-mark';
 import { XIcon } from '@/components/icons';
+import { ItemMark, type Diet } from '@/components/item-mark';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ import { useTranslations } from '@/hooks/use-translations';
 export interface LineDescription {
     name: string;
     diet: Diet | null;
+    isServiceRequest: boolean;
     /** Each picked option, "2 × Extra cheese" where more than one was taken. */
     choices: string[];
 }
@@ -139,7 +140,11 @@ function LineRow({
 
     return (
         <li className="flex items-start gap-3 px-5 py-4">
-            <DietMark diet={description.diet} className="mt-1" />
+            <ItemMark
+                diet={description.diet}
+                isServiceRequest={description.isServiceRequest}
+                className="mt-1"
+            />
 
             <div className="min-w-0 flex-1">
                 <p className="leading-snug font-medium">{description.name}</p>
@@ -187,13 +192,16 @@ function LineRow({
                 </div>
             </div>
 
-            {quoted?.status === 'ok' && (
-                <p className="shrink-0 font-semibold tabular-nums">
-                    {quoted.totalMinorUnits === 0
-                        ? t('menu.complimentary')
-                        : money(quoted.totalMinorUnits)}
-                </p>
-            )}
+            {quoted?.status === 'ok' &&
+                (quoted.totalMinorUnits === 0 ? (
+                    <p className="text-muted-foreground shrink-0 text-sm font-medium">
+                        {t('menu.complimentary')}
+                    </p>
+                ) : (
+                    <p className="shrink-0 font-semibold tabular-nums">
+                        {money(quoted.totalMinorUnits)}
+                    </p>
+                ))}
         </li>
     );
 }

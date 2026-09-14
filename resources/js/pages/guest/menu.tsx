@@ -5,8 +5,8 @@ import { AppBar } from '@/components/app-bar';
 import { BasketBar } from '@/components/basket-bar';
 import { BasketSheet, type LineDescription } from '@/components/basket-sheet';
 import { CustomiseSheet } from '@/components/customise-sheet';
-import { DietMark, type Diet } from '@/components/diet-mark';
 import { PlusIcon, StarIcon } from '@/components/icons';
+import { ItemMark, type Diet } from '@/components/item-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -29,7 +29,7 @@ export interface MenuItem {
     compareAtPriceMinorUnits: number | null;
     /** A service request — an extra pillow — rather than something to order. */
     isServiceRequest: boolean;
-    /** Null for a service request, which carries no diet mark. */
+    /** Null for a service request, which carries a bell mark instead. */
     diet: Diet | null;
     /**
      * The add-on groups it is customised with, in the order a guest reads them.
@@ -387,6 +387,7 @@ function describeLine({
         return {
             name: item?.name ?? combo?.name ?? line.name,
             diet: item?.diet ?? null,
+            isServiceRequest: item?.isServiceRequest ?? false,
             choices: line.choices.flatMap((choice) => {
                 const option = optionsById.get(choice.optionId);
 
@@ -425,7 +426,7 @@ function FeaturedRail({ items }: { items: MenuItem[] }) {
                 {items.map((item) => (
                     <li
                         key={item.id}
-                        className="bg-card w-64 shrink-0 snap-start rounded-xl border"
+                        className="bg-card w-72 shrink-0 snap-start rounded-xl border"
                     >
                         <Item item={item} />
                     </li>
@@ -482,7 +483,9 @@ function SectionBlock({ section }: { section: Section }) {
                 <ul className="mt-2">
                     {section.items.map((item, index) => (
                         <li key={item.id}>
-                            {index > 0 && <Separator className="ml-5" />}
+                            {index > 0 && (
+                                <Separator className="mx-5 data-[orientation=horizontal]:w-auto" />
+                            )}
                             <Item item={item} />
                         </li>
                     ))}
@@ -501,7 +504,9 @@ function SectionBlock({ section }: { section: Section }) {
                     <ul className="mt-1">
                         {subSection.items.map((item, index) => (
                             <li key={item.id}>
-                                {index > 0 && <Separator className="ml-5" />}
+                                {index > 0 && (
+                                    <Separator className="mx-5 data-[orientation=horizontal]:w-auto" />
+                                )}
                                 <Item item={item} headingLevel={4} />
                             </li>
                         ))}
@@ -580,7 +585,10 @@ function ComboCard({ combo }: { combo: Combo }) {
                                 key={content.id}
                                 className="text-muted-foreground flex items-center gap-2 text-sm"
                             >
-                                <DietMark diet={content.diet} />
+                                <ItemMark
+                                    diet={content.diet}
+                                    isServiceRequest={content.isServiceRequest}
+                                />
                                 <span>
                                     {content.quantity > 1 &&
                                         `${String(content.quantity)} × `}
@@ -620,7 +628,9 @@ function ComboCard({ combo }: { combo: Combo }) {
  * than what is charged, so there is no case here for one that is not.
  *
  * Zero is a real price — an extra pillow, a glass of water — and "₹0.00"
- * reads as a mistake, so it is named instead, with nothing struck through.
+ * reads as a mistake, so it is named instead, with nothing struck through, and
+ * quietly: on a card of room requests nearly every row is complimentary, and
+ * the word in bold on each one outshouted the names.
  */
 function Price({
     priceMinorUnits,
@@ -636,10 +646,10 @@ function Price({
 
     if (priceMinorUnits === 0) {
         return (
-            <p className={`flex items-baseline gap-1.5 ${className}`}>
-                <span className="text-primary font-semibold">
-                    {t('menu.complimentary')}
-                </span>
+            <p
+                className={`text-muted-foreground text-sm font-medium ${className}`}
+            >
+                {t('menu.complimentary')}
             </p>
         );
     }
@@ -704,12 +714,26 @@ function Item({
 
     return (
         <article className="flex items-start gap-3 px-5 py-4">
-            <DietMark diet={item.diet} className="mt-1" />
+            <ItemMark
+                diet={item.diet}
+                isServiceRequest={item.isServiceRequest}
+                className="mt-1"
+            />
 
+            {/* Name, price and description read down the left, the way a
+                guest already reads a delivery app, which leaves the right to
+                Add alone. With the price stacked under Add as well, a row with
+                no description was four lines tall beside a one-line name. */}
             <div className="min-w-0 flex-1">
                 <Heading className="leading-snug font-medium">
                     {item.name}
                 </Heading>
+
+                <Price
+                    priceMinorUnits={item.priceMinorUnits}
+                    compareAtPriceMinorUnits={item.compareAtPriceMinorUnits}
+                    className="mt-0.5"
+                />
 
                 {item.description !== null && (
                     <p className="text-muted-foreground mt-1 text-sm leading-snug">
@@ -718,33 +742,22 @@ function Item({
                 )}
             </div>
 
-            {/* Stacked rather than side by side: a struck-through price beside
-                the real one on a phone pushes a long item name into a third
-                line, and the price column is the narrowest thing here. */}
-            <div className="flex shrink-0 flex-col items-end gap-2">
-                <Price
-                    priceMinorUnits={item.priceMinorUnits}
-                    compareAtPriceMinorUnits={item.compareAtPriceMinorUnits}
-                    className="flex-col items-end gap-0"
-                />
+            {ordering !== null && (
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                    <AddButton
+                        name={item.name}
+                        onAdd={() => {
+                            ordering.addItem(item);
+                        }}
+                    />
 
-                {ordering !== null && (
-                    <>
-                        <AddButton
-                            name={item.name}
-                            onAdd={() => {
-                                ordering.addItem(item);
-                            }}
-                        />
-
-                        {item.addOnGroupIds.length > 0 && (
-                            <span className="text-muted-foreground text-xs">
-                                {t('menu.customisable')}
-                            </span>
-                        )}
-                    </>
-                )}
-            </div>
+                    {item.addOnGroupIds.length > 0 && (
+                        <span className="text-muted-foreground text-xs">
+                            {t('menu.customisable')}
+                        </span>
+                    )}
+                </div>
+            )}
         </article>
     );
 }

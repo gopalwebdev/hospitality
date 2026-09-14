@@ -1,3 +1,4 @@
+import { BellIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 /** The veg / egg / non-veg mark an item carries. */
@@ -22,23 +23,42 @@ const LABEL: Record<Diet, string> = {
 };
 
 /**
- * The square-and-dot mark Indian menus carry beside an item.
+ * The mark beside an item's name: what it is, at a glance.
  *
- * Deliberately not themed: this is a regulatory mark that guests read at a
- * glance, and its colours mean a fixed thing. It must not follow the tenant's
- * brand colour.
+ * Something to order carries the square-and-dot diet mark Indian menus use. It
+ * is deliberately not themed: guests read it at a glance, and its colours mean
+ * a fixed thing.
  *
- * A service request has no diet to declare, and gets the mark's empty space
- * instead: leaving the space out would start its name further left than every
- * item around it. The space is hidden from screen readers.
+ * A service request has no diet, and carries a bell in the same square instead,
+ * in a colour none of the diets use so it is never read as one. A basket line
+ * the menu no longer lists carries neither and keeps the space, hidden from
+ * screen readers, so its name still starts at the same edge.
  */
-export function DietMark({
+export function ItemMark({
     diet,
+    isServiceRequest,
     className,
 }: {
     diet: Diet | null;
+    isServiceRequest: boolean;
     className?: string;
 }) {
+    if (isServiceRequest) {
+        return (
+            <span
+                role="img"
+                aria-label="Service request"
+                title="Service request"
+                className={cn(
+                    'inline-flex size-4 shrink-0 items-center justify-center rounded-[3px] border-2 border-sky-600 text-sky-600',
+                    className,
+                )}
+            >
+                <BellIcon className="size-2.5" strokeWidth={3} />
+            </span>
+        );
+    }
+
     if (diet === null) {
         return (
             <span
