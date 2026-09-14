@@ -1,19 +1,23 @@
 import { Head } from '@inertiajs/react';
+import { createContext, useContext, useState } from 'react';
 
 import { AppBar } from '@/components/app-bar';
+import { BasketBar } from '@/components/basket-bar';
+import { BasketSheet, type LineDescription } from '@/components/basket-sheet';
+import { CustomiseSheet } from '@/components/customise-sheet';
 import { DietMark, type Diet } from '@/components/diet-mark';
-import { StarIcon } from '@/components/icons';
+import { PlusIcon, StarIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import {
+    type BasketLine,
+    basketStorageKey,
+    useBasket,
+} from '@/hooks/use-basket';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
-
-export interface AddOn {
-    id: number;
-    name: string;
-    /** An integer count of the currency's minor unit; 0 means free. */
-    priceMinorUnits: number;
-}
+import type { AddOnGroup } from '@/lib/add-on-rules';
 
 export interface MenuItem {
     id: number;
@@ -27,7 +31,11 @@ export interface MenuItem {
     isServiceRequest: boolean;
     /** Null for a service request, which carries no diet mark. */
     diet: Diet | null;
-    additions: AddOn[];
+    /**
+     * The add-on groups it is customised with, in the order a guest reads them.
+     * Each is one of the page's `addOnGroups`.
+     */
+    addOnGroupIds: number[];
 }
 
 interface ComboContent {
@@ -105,12 +113,29 @@ interface MenuProps {
      * assembled here.
      */
     order: (number | 'featured' | 'combos')[];
+    /** Every add-on group the page's items offer, sent once however many items share it. */
+    addOnGroups: AddOnGroup[];
     tax: Tax;
     /** Only the charges this menu carries, switched on, in the tenant's order. */
     charges: Charge[];
     acceptingOrders: boolean;
+    /** Where the basket is priced. */
+    quoteUrl: string;
     homeUrl: string;
 }
+
+/**
+ * What an Add button does, wherever the item or combo sits on the page.
+ *
+ * Null while nothing can be ordered — the tenant is closed, or this menu is not
+ * being served right now — and then no Add button is drawn at all.
+ */
+interface Ordering {
+    addItem: (item: MenuItem) => void;
+    addCombo: (combo: Combo) => void;
+}
+
+const OrderingContext = createContext<Ordering | null>(null);
 
 /**
  * Turn basis points into the percentage a guest reads: 500 becomes "5%".
@@ -132,6 +157,11 @@ function percentage(basisPoints: number): string {
  * greyed out to scroll past — and the back arrow returns to the tiles they came
  * in through.
  *
+ * While the tenant takes orders and the menu is being served, each item and
+ * combo can be added to a basket kept on the phone. An item with add-on groups
+ * opens a sheet to customise it first. The basket is priced by the server, and
+ * is shown to a member of staff: nothing is ordered from here yet.
+ *
  * Every name on this page is already in the guest's language: the server picked
  * the translation, falling back to English where a tenant has not filled
  * one in. Prices arrive as integers and are formatted here, so they follow that
@@ -144,12 +174,17 @@ export default function Menu({
     combos,
     sections,
     order,
+    addOnGroups,
     tax,
     charges,
     acceptingOrders,
+    quoteUrl,
     homeUrl,
 }: MenuProps) {
     const { t } = useTranslations();
+    const basket = useBasket(basketStorageKey(tenant?.slug ?? '', menu.id));
+    const [customising, setCustomising] = useState<MenuItem | null>(null);
+    const [isBasketOpen, setBasketOpen] = useState(false);
 
     const isEmpty =
         sections.length === 0 && featured.length === 0 && combos.length === 0;
@@ -158,8 +193,47 @@ export default function Menu({
         sections.map((section) => [section.id, section]),
     );
 
+    const groupsById = new Map(addOnGroups.map((group) => [group.id, group]));
+
+    const groupsOf = (item: MenuItem): AddOnGroup[] =>
+        item.addOnGroupIds.flatMap((id) => {
+            const group = groupsById.get(id);
+
+            return group === undefined ? [] : [group];
+        });
+
+    const ordering: Ordering | null =
+        acceptingOrders && menu.isBeingServed
+            ? {
+                  addItem: (item) => {
+                      if (item.addOnGroupIds.length > 0) {
+                          setCustomising(item);
+
+                          return;
+                      }
+
+                      basket.add({
+                          type: 'item',
+                          id: item.id,
+                          name: item.name,
+                          choices: [],
+                          quantity: 1,
+                      });
+                  },
+                  addCombo: (combo) => {
+                      basket.add({
+                          type: 'combo',
+                          id: combo.id,
+                          name: combo.name,
+                          choices: [],
+                          quantity: 1,
+                      });
+                  },
+              }
+            : null;
+
     return (
-        <>
+        <OrderingContext.Provider value={ordering}>
             <Head title={menu.name} />
 
             <AppBar title={menu.name} eyebrow={tenant?.name} backHref={homeUrl}>
@@ -227,8 +301,107 @@ export default function Menu({
 
                 {!isEmpty && <ChargesNote tax={tax} charges={charges} />}
             </main>
-        </>
+
+            {basket.count > 0 && (
+                <BasketBar
+                    count={basket.count}
+                    onOpen={() => {
+                        setBasketOpen(true);
+                    }}
+                />
+            )}
+
+            <CustomiseSheet
+                item={customising}
+                groups={customising === null ? [] : groupsOf(customising)}
+                onClose={() => {
+                    setCustomising(null);
+                }}
+                onAdd={(choices, quantity) => {
+                    if (customising !== null) {
+                        basket.add({
+                            type: 'item',
+                            id: customising.id,
+                            name: customising.name,
+                            choices,
+                            quantity,
+                        });
+                    }
+
+                    setCustomising(null);
+                }}
+            />
+
+            <BasketSheet
+                open={isBasketOpen}
+                onOpenChange={setBasketOpen}
+                basket={basket}
+                quoteUrl={quoteUrl}
+                describe={describeLine({
+                    items: [
+                        ...featured,
+                        ...sections.flatMap((section) => [
+                            ...section.items,
+                            ...section.subSections.flatMap(
+                                (subSection) => subSection.items,
+                            ),
+                        ]),
+                    ],
+                    combos,
+                    addOnGroups,
+                })}
+            />
+        </OrderingContext.Provider>
     );
+}
+
+/**
+ * How a basket line reads, in the guest's language.
+ *
+ * The basket keeps ids, so its names come from this page's props — which
+ * follow a language switch — and fall back to the name it was added under for
+ * a line the menu no longer lists.
+ */
+function describeLine({
+    items,
+    combos,
+    addOnGroups,
+}: {
+    items: MenuItem[];
+    combos: Combo[];
+    addOnGroups: AddOnGroup[];
+}): (line: BasketLine) => LineDescription {
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const combosById = new Map(combos.map((combo) => [combo.id, combo]));
+    const optionsById = new Map(
+        addOnGroups
+            .flatMap((group) => group.options)
+            .map((option) => [option.id, option]),
+    );
+
+    return (line) => {
+        const item = line.type === 'item' ? itemsById.get(line.id) : undefined;
+        const combo =
+            line.type === 'combo' ? combosById.get(line.id) : undefined;
+
+        return {
+            name: item?.name ?? combo?.name ?? line.name,
+            diet: item?.diet ?? null,
+            choices: line.choices.flatMap((choice) => {
+                const option = optionsById.get(choice.optionId);
+
+                if (option === undefined) {
+                    return [];
+                }
+
+                return [
+                    choice.quantity > 1
+                        ? `${String(choice.quantity)} × ${option.name}`
+                        : option.name,
+                ];
+            }),
+        };
+    };
 }
 
 /**
@@ -383,6 +556,7 @@ function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
  */
 function ComboCard({ combo }: { combo: Combo }) {
     const { t } = useTranslations();
+    const ordering = useContext(OrderingContext);
 
     return (
         <article className="px-5 py-4">
@@ -418,11 +592,21 @@ function ComboCard({ combo }: { combo: Combo }) {
                 </div>
             )}
 
-            <Price
-                priceMinorUnits={combo.priceMinorUnits}
-                compareAtPriceMinorUnits={combo.compareAtPriceMinorUnits}
-                className="mt-3"
-            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+                <Price
+                    priceMinorUnits={combo.priceMinorUnits}
+                    compareAtPriceMinorUnits={combo.compareAtPriceMinorUnits}
+                />
+
+                {ordering !== null && (
+                    <AddButton
+                        name={combo.name}
+                        onAdd={() => {
+                            ordering.addCombo(combo);
+                        }}
+                    />
+                )}
+            </div>
         </article>
     );
 }
@@ -475,13 +659,37 @@ function Price({
 }
 
 /**
- * One item and the add-ons it can be ordered with.
+ * Put something in the basket, named for screen readers: "Add Paneer Tikka".
+ */
+function AddButton({ name, onAdd }: { name: string; onAdd: () => void }) {
+    const { t } = useTranslations();
+
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-primary min-w-16 font-semibold"
+            aria-label={t('menu.add_named', { name })}
+            onClick={onAdd}
+        >
+            <PlusIcon />
+            {t('menu.add')}
+        </Button>
+    );
+}
+
+/**
+ * One item, and a way to add it while the menu can be ordered from.
  *
  * The heading level is a prop because the same item is rendered at two depths:
  * straight under a category it is an h3, and inside one of that category's
  * subdivisions — which is itself an h3 — it is an h4. Hard-coding one would
  * either put two different things at the same level or skip one, and a guest
  * reading the menu with a screen reader navigates by exactly this structure.
+ *
+ * An item with add-on groups says it can be customised under its Add button,
+ * which opens the sheet rather than adding it straight away.
  */
 function Item({
     item,
@@ -491,7 +699,7 @@ function Item({
     headingLevel?: 3 | 4;
 }) {
     const { t } = useTranslations();
-    const money = useMoney();
+    const ordering = useContext(OrderingContext);
     const Heading = headingLevel === 4 ? 'h4' : 'h3';
 
     return (
@@ -508,40 +716,35 @@ function Item({
                         {item.description}
                     </p>
                 )}
-
-                {item.additions.length > 0 && (
-                    <div className="mt-2">
-                        <p className="text-muted-foreground text-xs font-medium">
-                            {t('menu.add_ons')}
-                        </p>
-
-                        <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            {item.additions.map((addOn) => (
-                                <li
-                                    key={addOn.id}
-                                    className="text-muted-foreground text-sm"
-                                >
-                                    {addOn.name}{' '}
-                                    <span className="text-foreground/70 tabular-nums">
-                                        {addOn.priceMinorUnits === 0
-                                            ? t('menu.free')
-                                            : `+ ${money(addOn.priceMinorUnits)}`}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
             </div>
 
             {/* Stacked rather than side by side: a struck-through price beside
                 the real one on a phone pushes a long item name into a third
                 line, and the price column is the narrowest thing here. */}
-            <Price
-                priceMinorUnits={item.priceMinorUnits}
-                compareAtPriceMinorUnits={item.compareAtPriceMinorUnits}
-                className="shrink-0 flex-col items-end gap-0"
-            />
+            <div className="flex shrink-0 flex-col items-end gap-2">
+                <Price
+                    priceMinorUnits={item.priceMinorUnits}
+                    compareAtPriceMinorUnits={item.compareAtPriceMinorUnits}
+                    className="flex-col items-end gap-0"
+                />
+
+                {ordering !== null && (
+                    <>
+                        <AddButton
+                            name={item.name}
+                            onAdd={() => {
+                                ordering.addItem(item);
+                            }}
+                        />
+
+                        {item.addOnGroupIds.length > 0 && (
+                            <span className="text-muted-foreground text-xs">
+                                {t('menu.customisable')}
+                            </span>
+                        )}
+                    </>
+                )}
+            </div>
         </article>
     );
 }

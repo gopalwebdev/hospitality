@@ -12,12 +12,13 @@ use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\RelationManagers\CategoryItemsRelationManager;
 use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationManager;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
 use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -1113,17 +1114,19 @@ it('starts a sub-category under the category its button was pressed on, showing'
         ->and($chicken->is_active)->toBeTrue();
 });
 
-it('edits an item in its category\'s table, keeping the add-ons and tax nobody touched', function (): void {
+it('edits an item in its category\'s table, keeping the add-on groups and tax nobody touched', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $menuItem = MenuItem::factory()->inCategory($category)->taxedAt(1200)->create(['price_minor_units' => 10000]);
-    $addOn = MenuItemAddition::factory()->onItem($menuItem)->create(['price_minor_units' => 4000]);
+    $link = MenuItemAddOnGroup::factory()
+        ->linking($menuItem, MenuAddOnGroup::factory()->ofTenant($tenant)->create())
+        ->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The add-ons are a repeater bound to a relationship. Saving a new price
-    // must write the item and leave the add-on it already has alone.
+    // The add-on groups are a repeater bound to the item's links. Saving a new
+    // price must write the item and leave the links it already has alone.
     itemsOf($category)
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'price' => '150',
@@ -1132,30 +1135,30 @@ it('edits an item in its category\'s table, keeping the add-ons and tax nobody t
 
     expect($menuItem->refresh()->price_minor_units)->toBe(15000)
         ->and($menuItem->tax_rate_basis_points)->toBe(1200)
-        ->and($menuItem->additions()->pluck('id')->all())->toBe([$addOn->getKey()])
-        ->and($addOn->refresh()->price_minor_units)->toBe(4000);
+        ->and($menuItem->addOnGroupLinks()->pluck('id')->all())->toBe([$link->getKey()]);
 });
 
-it('adds an add-on to an item from its category\'s table', function (): void {
+it('offers an add-on group on an item from its category\'s table', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $menuItem = MenuItem::factory()->inCategory($category)->create();
+    $spice = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     itemsOf($category)
         ->callAction(TestAction::make('edit')->table($menuItem), [
-            'additions' => [
-                ['name' => [Locale::English->value => 'Extra cheese'], 'price' => '40', 'is_available' => true],
+            'addOnGroupLinks' => [
+                ['menu_add_on_group_id' => $spice->getKey()],
             ],
         ])
         ->assertHasNoActionErrors();
 
-    $addOn = $menuItem->additions()->sole();
+    $link = $menuItem->addOnGroupLinks()->sole();
 
-    expect($addOn->price_minor_units)->toBe(4000)
-        ->and($addOn->tenant_id)->toBe($tenant->getKey());
+    expect($link->menu_add_on_group_id)->toBe($spice->getKey())
+        ->and($link->tenant_id)->toBe($tenant->getKey());
 });
 
 it('deletes an item from its category\'s table', function (): void {

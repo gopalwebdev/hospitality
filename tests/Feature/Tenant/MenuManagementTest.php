@@ -12,9 +12,11 @@ use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
 use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationManager;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -32,9 +34,9 @@ beforeEach(function (): void {
  * lookup here — matching the whole JSON document would only find a record whose
  * every language happened to agree.
  *
- * @param  class-string<Menu|MenuCategory|MenuItem|MenuItemAddition>  $model
+ * @param  class-string<Menu|MenuCategory|MenuItem>  $model
  */
-function byEnglishName(string $model, string $name): Menu|MenuCategory|MenuItem|MenuItemAddition
+function byEnglishName(string $model, string $name): Menu|MenuCategory|MenuItem
 {
     return $model::query()
         ->withoutGlobalScopes()
@@ -173,18 +175,21 @@ it('lists menus by name rather than in an order kept by hand', function (): void
     expect($page->instance()->getTable()->isReorderable())->toBeFalse();
 });
 
-it('takes a menu\'s sections and their items with it when it is deleted', function (): void {
+it('takes a menu\'s sections and their items with it when it is deleted, and leaves its add-on groups', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $item = MenuItem::factory()->inCategory($category)->create();
-    $addition = MenuItemAddition::factory()->onItem($item)->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    $link = MenuItemAddOnGroup::factory()->linking($item, $group)->create();
 
     $menu->delete();
 
     expect(MenuCategory::query()->whereKey($category->getKey())->exists())->toBeFalse()
         ->and(MenuItem::query()->whereKey($item->getKey())->exists())->toBeFalse()
-        ->and(MenuItemAddition::query()->whereKey($addition->getKey())->exists())->toBeFalse();
+        ->and(MenuItemAddOnGroup::query()->whereKey($link->getKey())->exists())->toBeFalse()
+        // A group is the tenant's, and may be offered on another menu's items.
+        ->and(MenuAddOnGroup::query()->whereKey($group->getKey())->exists())->toBeTrue();
 });
 
 /*
@@ -425,59 +430,78 @@ it('offers no grouping control on the items page', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Additions
+| Add-on groups on an item
 |--------------------------------------------------------------------------
+|
+| An item names groups from the tenant's library. The rows it keeps are only
+| the links and their order; the groups and their options are edited on the
+| Add-on groups page.
+|
 */
 
-it('saves an item\'s additions in the same save as the item', function (): void {
+it('offers an item the add-on groups picked for it, in the order they were put in', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['currency' => Currency::IndianRupee]);
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListMenuItems::class)
         ->callAction('create', [
-            'name' => [Locale::English->value => 'Paneer Tikka'],
+            'name' => [Locale::English->value => 'Paneer Butter Masala'],
             'menu_category_id' => $category->getKey(),
             'diet' => Diet::Vegetarian->value,
-            'price' => '249.50',
+            'price' => '289',
             'availability' => ItemAvailability::Available->value,
-            'additions' => [
-                [
-                    'name' => [Locale::English->value => 'Extra paneer', Locale::Tamil->value => 'கூடுதல் பன்னீர்'],
-                    'price' => '50',
-                    'is_available' => true,
-                ],
-                [
-                    'name' => [Locale::English->value => 'Less spicy'],
-                    'price' => '0',
-                    'is_available' => true,
-                ],
+            'addOnGroupLinks' => [
+                ['menu_add_on_group_id' => $bread->getKey()],
+                ['menu_add_on_group_id' => $extras->getKey()],
             ],
         ])
         ->assertHasNoActionErrors();
 
-    $item = byEnglishName(MenuItem::class, 'Paneer Tikka');
-    $additions = $item->additions()->inMenuOrder()->get();
+    $item = byEnglishName(MenuItem::class, 'Paneer Butter Masala');
 
-    expect($additions)->toHaveCount(2);
-
-    $extra = byEnglishName(MenuItemAddition::class, 'Extra paneer');
-    $free = byEnglishName(MenuItemAddition::class, 'Less spicy');
-
-    expect($extra->price_minor_units)->toBe(5000)
-        ->and($extra->tenant_id)->toBe($tenant->getKey())
-        ->and($extra->menu_item_id)->toBe($item->getKey())
-        ->and($extra->getTranslation('name', Locale::Tamil->value))->toBe('கூடுதல் பன்னீர்')
-        // Zero is a real price: "no onions" costs nothing and is still listed.
-        ->and($free->price_minor_units)->toBe(0)
-        ->and($free->isFree())->toBeTrue();
+    expect($item->addOnGroupLinks()->inMenuOrder()->pluck('menu_add_on_group_id')->all())
+        ->toBe([$bread->getKey(), $extras->getKey()])
+        ->and($item->addOnGroupLinks()->pluck('tenant_id')->unique()->all())->toBe([$tenant->getKey()]);
 });
 
-it('lets an item be saved with no additions at all', function (): void {
+it('refuses the same group twice on one item, and a group this tenant does not have', function (array $pick): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+    $spice = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    $theirs = MenuAddOnGroup::factory()->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Gobi Manchurian'],
+            'menu_category_id' => $category->getKey(),
+            'diet' => Diet::Vegetarian->value,
+            'price' => '210',
+            'availability' => ItemAvailability::Available->value,
+            'addOnGroupLinks' => array_map(
+                fn (string $group): array => ['menu_add_on_group_id' => ($group === 'mine' ? $spice : $theirs)->getKey()],
+                $pick,
+            ),
+        ])
+        ->assertHasActionErrors();
+
+    expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
+})->with([
+    'the same group twice' => [['mine', 'mine']],
+    "another tenant's group" => [['theirs']],
+]);
+
+it('lets an item be saved with no add-on groups at all', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -497,32 +521,21 @@ it('lets an item be saved with no additions at all', function (): void {
         ])
         ->assertHasNoActionErrors();
 
-    expect(byEnglishName(MenuItem::class, 'Tandoori Roti')->additions)->toBeEmpty();
+    expect(byEnglishName(MenuItem::class, 'Tandoori Roti')->addOnGroupLinks()->exists())->toBeFalse();
 });
 
-it('takes an item\'s additions with it when it is deleted', function (): void {
+it('takes an item\'s links with it when it is deleted, and leaves the groups for other items', function (): void {
     $tenant = Tenant::factory()->create();
     $item = MenuItem::factory()->inCategory(
         MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create(),
     )->create();
-    $addition = MenuItemAddition::factory()->onItem($item)->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    $link = MenuItemAddOnGroup::factory()->linking($item, $group)->create();
 
     $item->delete();
 
-    expect(MenuItemAddition::query()->whereKey($addition->getKey())->exists())->toBeFalse();
-});
-
-it('refuses an addition on another tenant\'s item, even around the form', function (): void {
-    $mine = Tenant::factory()->create();
-    $theirs = Tenant::factory()->create();
-    $theirItem = MenuItem::factory()->inCategory(
-        MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $theirs->getKey()]))->create(),
-    )->create();
-
-    expect(fn () => MenuItemAddition::factory()->create([
-        'tenant_id' => $mine->getKey(),
-        'menu_item_id' => $theirItem->getKey(),
-    ]))->toThrow(LogicException::class, 'another tenant');
+    expect(MenuItemAddOnGroup::query()->whereKey($link->getKey())->exists())->toBeFalse()
+        ->and(MenuAddOnGroup::query()->whereKey($group->getKey())->exists())->toBeTrue();
 });
 
 /*
@@ -884,7 +897,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->and(PricingFields::toBasisPoints('12.5'))->toBe(1250);
 });
 
-it('taxes an addition at its own rate rather than the item it sits on', function (): void {
+it('taxes an option at its own rate, never at the rate of the item it is chosen on', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['tax_rate_basis_points' => 500]);
     $menuItem = MenuItem::factory()
@@ -893,12 +906,14 @@ it('taxes an addition at its own rate rather than the item it sits on', function
         )->create())
         ->taxedAt(1200)
         ->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    MenuItemAddOnGroup::factory()->linking($menuItem, $group)->create();
 
-    $following = MenuItemAddition::factory()->onItem($menuItem)->create();
-    $overriding = MenuItemAddition::factory()->onItem($menuItem)->taxedAt(1800)->create();
+    $following = MenuAddOnOption::factory()->inGroup($group)->create();
+    $overriding = MenuAddOnOption::factory()->inGroup($group)->taxedAt(1800)->create();
 
-    // An addition that overrides is overriding because it differs from the
-    // item, so inheriting the item's 12% would be inheriting the wrong number.
+    // One group is offered on items taxed at different rates, so an option
+    // that sets no rate of its own follows the tenant, not the item's 12%.
     expect($following->taxRateBasisPoints())->toBe(500)
         ->and($overriding->taxRateBasisPoints())->toBe(1800);
 });

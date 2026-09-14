@@ -62,6 +62,61 @@ export function LanguagesIcon(props: IconProps) {
     );
 }
 
+/** One more of something. */
+export function PlusIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M12 5v14M5 12h14" />
+        </svg>
+    );
+}
+
+/** One fewer of something. */
+export function MinusIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M5 12h14" />
+        </svg>
+    );
+}
+
+/** Closes a sheet, or takes a line out of the basket. */
+export function XIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+    );
+}
+
+/** Inside a ticked checkbox. */
+export function CheckIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M20 6 9 17l-5-5" />
+        </svg>
+    );
+}
+
+/** The dot inside a chosen radio. */
+export function CircleIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <circle cx="12" cy="12" r="6" fill="currentColor" />
+        </svg>
+    );
+}
+
+/** The basket bar. */
+export function BagIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M6 7h12l1 13H5z" />
+            <path d="M9 7a3 3 0 0 1 6 0" />
+        </svg>
+    );
+}
+
 /** Marks the row of items a menu leads with. */
 export function StarIcon(props: IconProps) {
     return (

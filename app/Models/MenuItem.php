@@ -99,13 +99,13 @@ class MenuItem extends Model
     }
 
     /**
-     * The add-ons this item can be ordered with.
+     * The add-on groups a guest customises this item with, one link per group in this item's own order.
      *
-     * @return HasMany<MenuItemAddition, $this>
+     * @return HasMany<MenuItemAddOnGroup, $this>
      */
-    public function additions(): HasMany
+    public function addOnGroupLinks(): HasMany
     {
-        return $this->hasMany(MenuItemAddition::class);
+        return $this->hasMany(MenuItemAddOnGroup::class);
     }
 
     /**

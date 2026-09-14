@@ -71,7 +71,9 @@ final class PricingFields
      * do so again — a hardcoded list is one notification from being wrong.
      *
      * The placeholder is the tenant's own rate, so leaving it empty visibly
-     * means "whatever settings says" without a sentence explaining it.
+     * means "whatever settings says" without a sentence explaining it. The bare
+     * number rather than `formatRate()`'s "5%": the field already carries its
+     * own '%' suffix, and a placeholder of "5%" beside it read as "5%%".
      */
     public static function taxRatePercentage(int $tenantRateBasisPoints): TextInput
     {
@@ -82,7 +84,7 @@ final class PricingFields
             ->maxValue(100)
             ->step(0.01)
             ->suffix('%')
-            ->placeholder(self::formatRate($tenantRateBasisPoints));
+            ->placeholder(self::formattedPercentage($tenantRateBasisPoints));
     }
 
     /**
@@ -182,12 +184,22 @@ final class PricingFields
 
     /**
      * Stored basis points as a rate to read: 500 becomes "5%", 1250 "12.5%".
-     *
-     * Trailing zeros are trimmed, so a whole-number rate does not read "5.00%".
      */
     public static function formatRate(int $basisPoints): string
     {
-        return rtrim(rtrim(number_format(self::toPercentage($basisPoints), 2), '0'), '.').'%';
+        return self::formattedPercentage($basisPoints).'%';
+    }
+
+    /**
+     * The bare number a rate reads as, with no percent sign: 500 becomes "5", 1250 "12.5".
+     *
+     * Trailing zeros are trimmed, so a whole-number rate does not read "5.00".
+     * Shared by `formatRate()` and by a placeholder that sits beside a field
+     * which already carries its own '%' suffix.
+     */
+    private static function formattedPercentage(int $basisPoints): string
+    {
+        return rtrim(rtrim(number_format(self::toPercentage($basisPoints), 2), '0'), '.');
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Guest\BasketQuoteController;
 use App\Http\Controllers\Guest\HomeController;
 use App\Http\Controllers\Guest\MenuController;
 use App\Http\Controllers\Guest\ProgressiveWebAppController;
@@ -37,6 +38,13 @@ Route::domain('{tenant}.'.config('app.domain'))->group(function (): void {
         Route::get('/', HomeController::class)->name('home');
 
         Route::get('menus/{menu}', MenuController::class)->name('menus.show');
+
+        // What a basket kept on the phone comes to. JSON the menu screen reads
+        // back rather than a page, and throttled because anyone at a table can
+        // reach it.
+        Route::post('menus/{menu}/basket-quotes', BasketQuoteController::class)
+            ->middleware('throttle:60,1')
+            ->name('menus.basket-quotes.store');
 
         // A tile's own page exists only for the ones that open a PDF: the file
         // is embedded there so the app keeps its header and its back arrow.

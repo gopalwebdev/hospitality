@@ -14,6 +14,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -71,6 +72,8 @@ class CategoryItemsRelationManager extends RelationManager
                     ->label(__('panel.items.create'))
                     ->icon(Heroicon::OutlinedPlus)
                     ->slideOver()
+                    // The item form is laid out in columns for the whole width.
+                    ->modalWidth(Width::Full)
                     // Filed where the form says, which is this category unless it
                     // was changed. Created through the relationship instead, a
                     // different choice in that select would be quietly overruled.
@@ -141,7 +144,7 @@ class CategoryItemsRelationManager extends RelationManager
     }
 
     /**
-     * An item edited in a slide-over, add-ons and tax included — the featured items' table edits the same way.
+     * An item edited in a full-width slide-over, add-on groups and tax included — the featured items' table edits the same way.
      */
     public static function editAction(): EditAction
     {
@@ -150,6 +153,7 @@ class CategoryItemsRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedPencilSquare)
             ->tooltip(__('panel.arrangement.edit'))
             ->slideOver()
+            ->modalWidth(Width::Full)
             ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fillTranslations(
                 MenuItemForm::fillPricing($data),
                 $record,

@@ -6,16 +6,18 @@ use App\Enums\ItemAvailability;
 use App\Http\Controllers\Controller;
 use App\Models\Charge;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
-use Closure;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,18 +25,23 @@ use Inertia\Response;
  * One of a tenant's menus, read at the table or in the room.
  *
  * The whole menu comes down together — the sections, their subdivisions, the
- * items in each and every item's add-ons, the combos the menu leads with and
- * the charges a bill from it carries — because that is one screen a guest
- * scrolls, and fetching it in layers would be a round trip per layer for one
- * page. Both levels of section are rows of menu_categories, so the subdivisions
- * are simply the `children` of a top-level one. Each query names the columns it
- * needs, so a long menu does not carry timestamps and foreign keys nobody
- * renders.
+ * items in each, the add-on groups those items are customised with, the combos
+ * the menu leads with and the charges a bill from it carries — because that is
+ * one screen a guest scrolls, and fetching it in layers would be a round trip per
+ * layer for one page. Both levels of section are rows of menu_categories, so the
+ * subdivisions are simply the `children` of a top-level one. Each query names
+ * the columns it needs, so a long menu does not carry timestamps and foreign
+ * keys nobody renders.
+ *
+ * An add-on group is sent once for the whole menu and each item names the groups
+ * it offers, in its own order: a spice level on twenty items is one group on the
+ * wire, not twenty copies of it.
  *
  * Only what is actually orderable is sent: a hidden category, a hidden
- * sub-category, a sold-out item and an add-on that has run out are all absent
+ * sub-category, a sold-out item and an option that has run out are all absent
  * rather than greyed out, because a guest reading a menu on a phone should not
- * be scrolling past things they cannot have. The *reason* an item is off never
+ * be scrolling past things they cannot have. So is an item whose required group
+ * its available options can no longer meet. The *reason* an item is off never
  * reaches the guest either — App\Enums\ItemAvailability is for the tenant, and
  * "temporarily unavailable" beside an item is a worse read than the item simply
  * not being listed.
@@ -57,15 +64,9 @@ class MenuController extends Controller
 
         $orderable = ItemAvailability::orderableValues();
 
-        $additions = fn ($additions) => $additions
-            ->select(['id', 'menu_item_id', 'name', 'price_minor_units'])
-            ->available()
-            ->inMenuOrder();
-
         $items = fn ($items) => $items
             ->select($this->itemColumns())
             ->whereIn('availability', $orderable)
-            ->with(['additions' => $additions])
             ->inMenuOrder();
 
         $sections = MenuCategory::query()
@@ -87,8 +88,7 @@ class MenuController extends Controller
                     ->inMenuOrder(),
             ])
             ->inMenuOrder()
-            ->get()
-            ->filter(fn (MenuCategory $category): bool => $this->hasAnythingToRead($category));
+            ->get();
 
         // The items this menu leads with, above its sections. A separate query
         // rather than a flag read off the sections above: featuring has its own
@@ -102,7 +102,33 @@ class MenuController extends Controller
             ->inFeaturedOrder()
             ->get();
 
-        $this->attachAdditions($featured, $sections, $additions);
+        $groupIdsByItem = $this->addOnGroupIdsByItem($sections, $featured);
+        $groups = $this->addOnGroups($groupIdsByItem);
+
+        $canBeOrdered = fn (MenuItem $item): bool => $this->requiredGroupsCanBeMet($item, $groupIdsByItem, $groups);
+
+        foreach ($sections as $category) {
+            $category->setRelation('menuItems', $category->menuItems->filter($canBeOrdered)->values());
+
+            foreach ($category->children as $child) {
+                $child->setRelation('menuItems', $child->menuItems->filter($canBeOrdered)->values());
+            }
+        }
+
+        $sections = $sections
+            ->filter(fn (MenuCategory $category): bool => $this->hasAnythingToRead($category))
+            ->values();
+
+        $featured = $featured->filter($canBeOrdered)->values();
+
+        // The groups an item offers, in its own order: those with at least one
+        // option a guest can have.
+        $offeredGroupIds = fn (MenuItem $item): array => array_values(array_filter(
+            $groupIdsByItem[$item->getKey()] ?? [],
+            fn (int $groupId): bool => $groups->get($groupId)?->options->isNotEmpty() ?? false,
+        ));
+
+        $present = fn (MenuItem $item): array => $this->presentItem($item, $offeredGroupIds($item));
 
         $combos = MenuCombo::query()
             ->select(['id', 'name', 'description', 'price_minor_units', 'compare_at_price_minor_units'])
@@ -126,9 +152,7 @@ class MenuController extends Controller
                 'servedUntil' => $menu->servedUntil(),
                 'isBeingServed' => $menu->isBeingServedAt(),
             ],
-            'featured' => $featured->map(
-                fn (MenuItem $item): array => $this->presentItem($item),
-            )->values()->all(),
+            'featured' => $featured->map($present)->values()->all(),
             'combos' => $combos->map(fn (MenuCombo $combo): array => [
                 'id' => $combo->getKey(),
                 'name' => $combo->name,
@@ -157,59 +181,156 @@ class MenuController extends Controller
             'sections' => $sections->map(fn (MenuCategory $category): array => [
                 'id' => $category->getKey(),
                 'name' => $category->name,
-                'items' => $category->menuItems->map(
-                    fn (MenuItem $item): array => $this->presentItem($item),
-                )->values()->all(),
+                'items' => $category->menuItems->map($present)->values()->all(),
                 'subSections' => $category->children
                     ->filter(fn (MenuCategory $child): bool => $child->menuItems->isNotEmpty())
                     ->map(fn (MenuCategory $child): array => [
                         'id' => $child->getKey(),
                         'name' => $child->name,
-                        'items' => $child->menuItems->map(
-                            fn (MenuItem $item): array => $this->presentItem($item),
-                        )->values()->all(),
+                        'items' => $child->menuItems->map($present)->values()->all(),
                     ])->values()->all(),
             ])->values()->all(),
+            'addOnGroups' => $this->presentAddOnGroups($groups, $this->shownItems($sections, $featured)->flatMap($offeredGroupIds)),
             'tax' => $this->tax($tenant),
             'charges' => $this->charges($tenant, $menu),
             'acceptingOrders' => $tenant->isAcceptingOrders(),
+            'quoteUrl' => route('guest.menus.basket-quotes.store', ['tenant' => $tenant->slug, 'menu' => $menu->getKey()]),
             'homeUrl' => route('guest.home', ['tenant' => $tenant->slug]),
         ]);
     }
 
     /**
-     * Give each featured item the add-ons its section has already loaded.
+     * The add-on groups each item on the page offers, in that item's own order.
      *
-     * A featured item is nearly always also listed under its own section, where
-     * its add-ons have just been read, so reading them again for the rail was
-     * the same query twice. Only a featured item that no section being shown
-     * lists has its add-ons fetched here.
+     * One query for every item, featured ones included.
      *
-     * @param  EloquentCollection<int, MenuItem>  $featured
      * @param  EloquentCollection<int, MenuCategory>  $sections
+     * @param  EloquentCollection<int, MenuItem>  $featured
+     * @return array<int, non-empty-list<int>> group ids, keyed by item id
      */
-    private function attachAdditions(EloquentCollection $featured, EloquentCollection $sections, Closure $additions): void
+    private function addOnGroupIdsByItem(EloquentCollection $sections, EloquentCollection $featured): array
     {
-        $listed = $sections
-            ->flatMap(fn (MenuCategory $category): array => [
-                ...$category->menuItems->all(),
-                ...$category->children->flatMap(fn (MenuCategory $child): array => $child->menuItems->all())->all(),
-            ])
-            ->keyBy(fn (MenuItem $item): int => $item->getKey());
+        $itemIds = $this->shownItems($sections, $featured)
+            ->map(fn (MenuItem $item): int => $item->getKey())
+            ->unique()
+            ->values()
+            ->all();
 
-        $unlisted = $featured->reject(fn (MenuItem $item): bool => $listed->has($item->getKey()));
-
-        if ($unlisted->isNotEmpty()) {
-            $unlisted->load(['additions' => $additions]);
+        if ($itemIds === []) {
+            return [];
         }
 
-        foreach ($featured as $item) {
-            $inSection = $listed->get($item->getKey());
+        $links = MenuItemAddOnGroup::query()
+            ->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'position'])
+            ->whereIn('menu_item_id', $itemIds)
+            ->inMenuOrder()
+            ->get();
 
-            if ($inSection instanceof MenuItem) {
-                $item->setRelation('additions', $inSection->additions);
+        $groupIds = [];
+
+        foreach ($links as $link) {
+            $groupIds[$link->menu_item_id][] = $link->menu_add_on_group_id;
+        }
+
+        return $groupIds;
+    }
+
+    /**
+     * Every group those items offer, with only the options a guest can have right now.
+     *
+     * @param  array<int, non-empty-list<int>>  $groupIdsByItem
+     * @return EloquentCollection<int, MenuAddOnGroup> keyed by id
+     */
+    private function addOnGroups(array $groupIdsByItem): EloquentCollection
+    {
+        $groupIds = array_values(array_unique(array_merge(...array_values($groupIdsByItem))));
+
+        if ($groupIds === []) {
+            return new EloquentCollection;
+        }
+
+        return MenuAddOnGroup::query()
+            ->select(['id', 'name', 'min_selections', 'max_selections'])
+            ->whereKey($groupIds)
+            ->with(['options' => fn ($options) => $options
+                ->select(['id', 'menu_add_on_group_id', 'name', 'price_minor_units', 'max_quantity', 'is_preselected'])
+                ->available()
+                ->inMenuOrder()])
+            ->get()
+            ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());
+    }
+
+    /**
+     * Whether a guest could still complete every group an item makes them choose from.
+     *
+     * @param  array<int, non-empty-list<int>>  $groupIdsByItem
+     * @param  EloquentCollection<int, MenuAddOnGroup>  $groups
+     */
+    private function requiredGroupsCanBeMet(MenuItem $item, array $groupIdsByItem, EloquentCollection $groups): bool
+    {
+        foreach ($groupIdsByItem[$item->getKey()] ?? [] as $groupId) {
+            $group = $groups->get($groupId);
+
+            if ($group instanceof MenuAddOnGroup && ! $group->canBeMetBy((int) $group->options->sum('max_quantity'))) {
+                return false;
             }
         }
+
+        return true;
+    }
+
+    /**
+     * The groups the page's items actually offer, each with its options.
+     *
+     * @param  EloquentCollection<int, MenuAddOnGroup>  $groups
+     * @param  Collection<int, int>  $offeredIds
+     * @return list<array<string, mixed>>
+     */
+    private function presentAddOnGroups(EloquentCollection $groups, Collection $offeredIds): array
+    {
+        $offered = $offeredIds->unique()->flip();
+
+        return array_values($groups
+            ->filter(fn (MenuAddOnGroup $group): bool => $offered->has($group->getKey()))
+            ->map(fn (MenuAddOnGroup $group): array => [
+                'id' => $group->getKey(),
+                'name' => $group->name,
+                'minSelections' => $group->min_selections,
+                // Null is no limit, and the app reads it that way.
+                'maxSelections' => $group->max_selections,
+                'options' => $group->options->map(fn (MenuAddOnOption $option): array => [
+                    'id' => $option->getKey(),
+                    'name' => $option->name,
+                    // Zero is a real price, and the app says "Free" rather
+                    // than "+ ₹0.00" — which reads as a mistake.
+                    'priceMinorUnits' => $option->price_minor_units,
+                    'maxQuantity' => $option->max_quantity,
+                    'isPreselected' => $option->is_preselected,
+                ])->values()->all(),
+            ])
+            ->all());
+    }
+
+    /**
+     * Every item the page shows: the featured rail, and every section's own and its subdivisions'.
+     *
+     * @param  EloquentCollection<int, MenuCategory>  $sections
+     * @param  EloquentCollection<int, MenuItem>  $featured
+     * @return Collection<int, MenuItem>
+     */
+    private function shownItems(EloquentCollection $sections, EloquentCollection $featured): Collection
+    {
+        $items = collect($featured->all());
+
+        foreach ($sections as $category) {
+            $items->push(...$category->menuItems->all());
+
+            foreach ($category->children as $child) {
+                $items->push(...$child->menuItems->all());
+            }
+        }
+
+        return $items;
     }
 
     /**
@@ -313,11 +434,12 @@ class MenuController extends Controller
     }
 
     /**
-     * One item and the add-ons it can be ordered with.
+     * One item, and the add-on groups a guest customises it with.
      *
+     * @param  list<int>  $addOnGroupIds
      * @return array<string, mixed>
      */
-    private function presentItem(MenuItem $item): array
+    private function presentItem(MenuItem $item, array $addOnGroupIds): array
     {
         return [
             'id' => $item->getKey(),
@@ -331,13 +453,9 @@ class MenuController extends Controller
             'isServiceRequest' => $item->is_service_request,
             // Null for a service request, which carries no diet mark.
             'diet' => $item->diet?->value,
-            'additions' => $item->additions->map(fn (MenuItemAddition $addition): array => [
-                'id' => $addition->getKey(),
-                'name' => $addition->name,
-                // Zero is a real price, and the guest app says "Free" rather
-                // than "+ ₹0.00" — which reads as a mistake.
-                'priceMinorUnits' => $addition->price_minor_units,
-            ])->values()->all(),
+            // In the order the guest reads them; each id is one of the menu's
+            // `addOnGroups`.
+            'addOnGroupIds' => $addOnGroupIds,
         ];
     }
 }

@@ -103,10 +103,10 @@ class MenuItemsTable
                     ->color(fn (MenuItem $record): string => $record->overridesTaxRate() ? 'info' : 'gray')
                     ->toggleable(),
 
-                TextColumn::make('additions_count')
-                    ->label(__('panel.add_ons.count'))
-                    ->icon(Heroicon::OutlinedPlusCircle)
-                    ->counts('additions')
+                TextColumn::make('add_on_group_links_count')
+                    ->label(__('panel.add_on_groups.plural'))
+                    ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+                    ->counts('addOnGroupLinks')
                     ->sortable()
                     ->toggleable(),
 
@@ -205,6 +205,8 @@ class MenuItemsTable
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)
                     ->tooltip(__('panel.arrangement.edit'))
+                    // The item form is laid out in columns for the whole width.
+                    ->modalWidth(Width::Full)
                     ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fillTranslations(
                         MenuItemForm::fillPricing($data),
                         $record,

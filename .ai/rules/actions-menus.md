@@ -28,7 +28,7 @@ A record's parent is chosen on its own form. There is no `MoveSubCategoryToParen
 
 - A **sub-category** is re-parented by editing it and picking another category. The form offers only this menu's top-level categories, so "same menu" and "no third level" are enforced by the options rather than by a guard, and the uniqueness rule is scoped to the chosen parent so changing it revalidates the name against where it is going.
 - An **item** is re-filed by editing it and picking another category. That select offers both levels of every menu in the tenant, so an item can cross menus; its uniqueness rule is scoped to the chosen category the same way.
-- An **add-on** cannot move at all. It is edited in a repeater inside the item that owns it, and `MenuItemAdditionObserver` refuses one whose item belongs to another tenant.
+- An **option** cannot move between add-on groups. It is edited in the options repeater of the group that owns it, and `MenuAddOnOptionObserver` refuses one whose group belongs to another tenant.
 - A **combo's contents** likewise: a repeater inside one combo, never dragged to another.
 
 `MoveCategoryToMenu` survives because it is the one case a form cannot express. Categories are edited on the menu page, so there is no "which menu" select to change — the page *is* the menu. It also does something no edit does: it unfeatures every item in the branch, subdivisions included.
@@ -37,3 +37,12 @@ A record's parent is chosen on its own form. There is no `MoveSubCategoryToParen
 `menu_items.is_featured` is set by the item form's Featured toggle and by **Feature items** and **Remove from featured** in `FeaturedItemsRelationManager` — the table the menu page's Featured items row opens — and nowhere else. The old featured tab carried its own `feature` and `unfeature` actions and they were deleted as a second mechanism for one flag; the project owner later asked to feature items from the menu page, and that table is the one other place. Those actions write the flag and `featured_position` and nothing else.
 
 The invariant that an item leaving a menu stops being featured lives in `MenuItemObserver` rather than in whatever writes the item, because it has to hold however the item is written — including from a form that has just been told `is_featured` is true. `MoveCategoryToMenu` still unfeatures its branch itself, because moving a category changes no item's `menu_category_id` and the observer cannot see it.
+
+## QuoteBasket prices a basket kept on the phone
+`QuoteBasket` is what `POST /menus/{menu}/basket-quotes` answers (`Guest\BasketQuoteController`, shape checked by `QuoteBasketRequest`). The basket is the guest's claim, so every line is read again against the menu as it is now — orderable items on this menu with their linked groups and available options, and orderable combos — and priced only if it still stands. Arithmetic and rules are here and not in the browser, which only formats the answer.
+
+- A line comes back **`unavailable`** when its item or combo is gone, sold out, on another menu or another tenant's, or when a required group's available options can no longer meet its minimum — the same decision `Guest\MenuController` makes to leave the item off the menu.
+- It comes back **`invalid`** when an option is not an available option of one of the item's groups, when more of one is asked for than its `max_quantity`, or when a group's picks, each counted by quantity, fall outside its minimum and maximum.
+- A flagged line is priced at nothing and the rest of the basket is still priced.
+
+GST is worked out part by part — the item at its rate, each option at its own, a combo at its own — and rounded once per part per line. With `prices_include_tax` it is the share already inside the price and is not added to the total. Charges are `Charge::amountOn()` on the subtotal, and an empty basket carries none. The queries do not grow with the basket. When orders arrive they are checked by these same rules. Tests: `tests/Feature/Tenant/BasketQuoteTest.php`.

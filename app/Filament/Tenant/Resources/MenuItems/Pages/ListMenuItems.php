@@ -12,6 +12,7 @@ use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -26,6 +27,8 @@ class ListMenuItems extends ListRecords
             CreateAction::make()
                 ->label(__('panel.items.create'))
                 ->icon(Heroicon::OutlinedPlus)
+                // The item form is laid out in columns for the whole width.
+                ->modalWidth(Width::Full)
                 // An item has to go in a section, and a section on a menu, so
                 // there is nothing useful to do until one exists. Saying so
                 // beats an empty select.

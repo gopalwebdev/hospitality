@@ -7,6 +7,7 @@ use Closure;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -101,6 +102,11 @@ final class TranslatedFields
      * be handed in — without it, saving a category under its own name is
      * refused as a clash with itself.
      *
+     * `inRepeaterRow` is for a name typed in each row of a repeater, an add-on
+     * group's options. A relative path resolves inside the row, where there is
+     * no switcher, so without it every row showed the panel's language whatever
+     * the switcher at the top of the form said.
+     *
      * @param  (Closure(Get): Builder<covariant Model>)|null  $uniqueWithin
      * @return list<TextInput>
      */
@@ -111,14 +117,16 @@ final class TranslatedFields
         ?Closure $uniqueWithin = null,
         string $uniqueMessage = 'Something here already has that name.',
         ?Model $editing = null,
+        bool $inRepeaterRow = false,
     ): array {
         return array_map(
-            static function (Locale $locale) use ($name, $label, $maxLength, $uniqueWithin, $uniqueMessage, $editing): TextInput {
+            static function (Locale $locale) use ($name, $label, $maxLength, $uniqueWithin, $uniqueMessage, $editing, $inRepeaterRow): TextInput {
                 $field = self::configure(
                     TextInput::make("{$name}.{$locale->value}")->maxLength($maxLength),
                     $locale,
                     $name,
                     $label,
+                    inRepeaterRow: $inRepeaterRow,
                 );
 
                 if (! $uniqueWithin instanceof Closure) {
@@ -133,7 +141,7 @@ final class TranslatedFields
                     // Every language's input carries the rule, but they all ask
                     // the same question about the English value, so only the
                     // input for the language on screen asks the database.
-                    fn (Get $get, mixed $record): Closure => $locale === self::editingLocale($get)
+                    fn (Get $get, mixed $record): Closure => $locale === self::editingLocale($get, $inRepeaterRow)
                         ? self::uniqueFallbackValue(
                             fn (): Builder => $uniqueWithin($get),
                             $editing ?? ($record instanceof Model ? $record : null),
@@ -146,6 +154,32 @@ final class TranslatedFields
             },
             Locale::cases(),
         );
+    }
+
+    /**
+     * A translated name as one cell of a table repeater's row.
+     *
+     * `->table()` gives a row's schema one cell per top-level component, hidden
+     * fields included — so `text()`'s array of one input per language, spread
+     * directly into the row, became two cells (English and Tamil) and pushed
+     * every field after them one column to the right. The add-on group options
+     * table showed a price under "Extra price" only by coincidence of column
+     * count; a narrower table showed it under the wrong header entirely.
+     *
+     * Wrapping the inputs in a `Group` makes them one component. `Group` adds no
+     * state-path segment of its own, so this still passes `inRepeaterRow: true`
+     * and the switcher lookup still finds it two levels up.
+     *
+     * @param  (Closure(Get): Builder<covariant Model>)|null  $uniqueWithin
+     */
+    public static function textCell(
+        string $name,
+        string $label,
+        int $maxLength = 120,
+        ?Closure $uniqueWithin = null,
+        string $uniqueMessage = 'Something here already has that name.',
+    ): Group {
+        return Group::make(self::text($name, $label, $maxLength, $uniqueWithin, $uniqueMessage, inRepeaterRow: true));
     }
 
     /**
@@ -321,10 +355,13 @@ final class TranslatedFields
      * like any other and can arrive as anything. The fallback is the language
      * the panel is being worked in, so a form whose switcher has not been set
      * yet agrees with the one that has.
+     *
+     * From a repeater row the switcher is two levels up: out of the row, then
+     * out of the repeater.
      */
-    private static function editingLocale(Get $get): Locale
+    private static function editingLocale(Get $get, bool $inRepeaterRow = false): Locale
     {
-        $value = $get(self::LOCALE_KEY);
+        $value = $get(($inRepeaterRow ? '../../' : '').self::LOCALE_KEY);
 
         return (is_string($value) ? Locale::tryFrom($value) : null) ?? self::workingLocale();
     }
@@ -357,12 +394,13 @@ final class TranslatedFields
         string $name,
         string $label,
         bool $requireFallback = true,
+        bool $inRepeaterRow = false,
     ): TextInput|Textarea {
         $isFallback = $locale === Locale::default();
 
         $field = $field
             ->label($label)
-            ->visible(fn (Get $get): bool => self::editingLocale($get) === $locale)
+            ->visible(fn (Get $get): bool => self::editingLocale($get, $inRepeaterRow) === $locale)
             // The languages not on screen still travel with the save, or
             // editing one would blank the others.
             ->dehydratedWhenHidden()

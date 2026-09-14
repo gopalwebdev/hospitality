@@ -16,11 +16,13 @@ use App\Models\Charge;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use App\Models\User;
 use Closure;
@@ -134,6 +136,127 @@ class TenantSeeder extends Seeder
     ];
 
     /**
+     * The add-on groups items are customised with, and the items each is offered on.
+     *
+     * A group is a tenant's, so each tenant gets the groups whose items it has,
+     * matched by English name wherever those items sit — a hotel's in-room card
+     * and a restaurant's main card are the same card here. Each group reads
+     * like the real thing: a required single choice (a spice level, a portion,
+     * which pillow), an optional handful of extras, and options a guest may take
+     * two of. `items` is the order a group is linked in, and a group earlier in
+     * this list comes first on an item that has several.
+     *
+     * @var list<array{name: array<string, string>, min_selections: int, max_selections: int|null, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_preselected?: bool}>, items: list<string>}>
+     */
+    public const array ADD_ON_GROUPS = [
+        [
+            'name' => ['en' => 'Portion', 'ta' => 'அளவு'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Half', 'ta' => 'அரை'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Full', 'ta' => 'முழு'], 'price_minor_units' => 15000],
+            ],
+            'items' => ['Hyderabadi Chicken Biryani', 'Chicken 65 Biryani', 'Mutton Dum Biryani', 'Vegetable Dum Biryani', 'Paneer Biryani', 'Egg Biryani'],
+        ],
+        [
+            'name' => ['en' => 'Spice level', 'ta' => 'காரம்'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Mild', 'ta' => 'குறைவு'], 'price_minor_units' => 0],
+                ['name' => ['en' => 'Medium', 'ta' => 'நடுத்தரம்'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Hot', 'ta' => 'அதிகம்'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Paneer Tikka', 'Gobi Manchurian', 'Chicken 65', 'Chettinad Chicken', 'Egg Bhurji'],
+        ],
+        [
+            'name' => ['en' => 'Choose your bread', 'ta' => 'ரொட்டியைத் தேர்ந்தெடுக்கவும்'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Butter naan', 'ta' => 'பட்டர் நான்'], 'price_minor_units' => 0],
+                ['name' => ['en' => 'Garlic naan', 'ta' => 'பூண்டு நான்'], 'price_minor_units' => 2000],
+                ['name' => ['en' => 'Tandoori roti', 'ta' => 'தந்தூரி ரொட்டி'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Paneer Butter Masala', 'Dal Tadka', 'Butter Chicken', 'Mutton Rogan Josh'],
+        ],
+        [
+            'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
+            'min_selections' => 0,
+            'max_selections' => 3,
+            'options' => [
+                ['name' => ['en' => 'Extra cheese', 'ta' => 'கூடுதல் சீஸ்'], 'price_minor_units' => 4000, 'max_quantity' => 2],
+                ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price_minor_units' => 6000],
+                ['name' => ['en' => 'Raita', 'ta' => 'ராய்தா'], 'price_minor_units' => 3000],
+            ],
+            'items' => ['Paneer Tikka', 'Paneer Butter Masala', 'Hyderabadi Chicken Biryani', 'Vegetable Dum Biryani'],
+        ],
+        [
+            'name' => ['en' => 'Dosa sides', 'ta' => 'தோசை துணைகள்'],
+            'min_selections' => 0,
+            'max_selections' => 4,
+            'options' => [
+                ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price_minor_units' => 1500, 'max_quantity' => 2],
+                ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price_minor_units' => 1500, 'max_quantity' => 2],
+                ['name' => ['en' => 'Ghee', 'ta' => 'நெய்'], 'price_minor_units' => 2500],
+            ],
+            'items' => ['Masala Dosa', 'Ghee Roast', 'Idli Plate'],
+        ],
+        [
+            'name' => ['en' => 'Sugar', 'ta' => 'சர்க்கரை'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Regular', 'ta' => 'வழக்கம்'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Less sugar', 'ta' => 'குறைந்த சர்க்கரை'], 'price_minor_units' => 0],
+                ['name' => ['en' => 'No sugar', 'ta' => 'சர்க்கரை இல்லை'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Filter Coffee', 'Masala Chai', 'Badam Milk'],
+        ],
+        [
+            'name' => ['en' => 'Strength', 'ta' => 'கடுமை'],
+            'min_selections' => 0,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Extra strong', 'ta' => 'கூடுதல் கடுமையான'], 'price_minor_units' => 1000],
+            ],
+            'items' => ['Filter Coffee'],
+        ],
+        [
+            'name' => ['en' => 'Sweet or salted', 'ta' => 'இனிப்பு அல்லது உப்பு'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0, 'is_preselected' => true],
+                ['name' => ['en' => 'Salted', 'ta' => 'உப்பு'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Fresh Lime Soda'],
+        ],
+        [
+            // A service request customised like anything else: which pillow.
+            'name' => ['en' => 'Pillow type', 'ta' => 'தலையணை வகை'],
+            'min_selections' => 1,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Feather', 'ta' => 'இறகு'], 'price_minor_units' => 0],
+                ['name' => ['en' => 'Memory foam', 'ta' => 'மெமரி ஃபோம்'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Extra Pillow'],
+        ],
+        [
+            'name' => ['en' => 'Delivery time', 'ta' => 'கொண்டுவரும் நேரம்'],
+            'min_selections' => 0,
+            'max_selections' => 1,
+            'options' => [
+                ['name' => ['en' => 'Now', 'ta' => 'இப்போது'], 'price_minor_units' => 0],
+                ['name' => ['en' => 'In 30 minutes', 'ta' => '30 நிமிடங்களில்'], 'price_minor_units' => 0],
+            ],
+            'items' => ['Extra Blanket', 'Bedsheet Change', 'Towel Set'],
+        ],
+    ];
+
+    /**
      * The restaurant's main card, in both languages.
      *
      * Seeded copy is bilingual on purpose: it is the only way to see that the
@@ -200,10 +323,6 @@ class TenantSeeder extends Seeder
                     'price_minor_units' => 0,
                     'is_featured' => true,
                     'featured_position' => 1,
-                    'additions' => [
-                        ['name' => ['en' => 'Feather', 'ta' => 'இறகு'], 'price_minor_units' => 0],
-                        ['name' => ['en' => 'Memory foam', 'ta' => 'மெமரி ஃபோம்'], 'price_minor_units' => 0],
-                    ],
                 ],
                 [
                     'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
@@ -274,10 +393,6 @@ class TenantSeeder extends Seeder
                             'diet' => Diet::Vegetarian,
                             'is_featured' => true,
                             'featured_position' => 1,
-                            'additions' => [
-                                ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price_minor_units' => 1500],
-                                ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price_minor_units' => 1500],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Ghee Roast', 'ta' => 'நெய் ரோஸ்ட்'],
@@ -404,10 +519,6 @@ class TenantSeeder extends Seeder
                     'diet' => Diet::Vegetarian,
                     'is_featured' => true,
                     'featured_position' => 1,
-                    'additions' => [
-                        ['name' => ['en' => 'Less sugar', 'ta' => 'குறைந்த சர்க்கரை'], 'price_minor_units' => 0],
-                        ['name' => ['en' => 'Extra strong', 'ta' => 'கூடுதல் கடுமையான'], 'price_minor_units' => 1000],
-                    ],
                 ],
                 [
                     'name' => ['en' => 'Masala Chai', 'ta' => 'மசாலா டீ'],
@@ -431,10 +542,6 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Fresh Lime Soda', 'ta' => 'ஃபிரெஷ் லைம் சோடா'],
                             'price_minor_units' => 8000,
                             'diet' => Diet::Vegetarian,
-                            'additions' => [
-                                ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0],
-                                ['name' => ['en' => 'Salted', 'ta' => 'உப்பு'], 'price_minor_units' => 0],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Watermelon Juice', 'ta' => 'தர்பூசணி ஜூஸ்'],
@@ -497,20 +604,11 @@ class TenantSeeder extends Seeder
                             'diet' => Diet::Vegetarian,
                             'is_featured' => true,
                             'featured_position' => 1,
-                            'additions' => [
-                                ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price_minor_units' => 5000],
-                                ['name' => ['en' => 'Less spicy', 'ta' => 'குறைந்த காரம்'], 'price_minor_units' => 0],
-                                ['name' => ['en' => 'Extra mint chutney', 'ta' => 'கூடுதல் புதினா சட்னி'], 'price_minor_units' => 2000],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Gobi Manchurian', 'ta' => 'கோபி மஞ்சூரியன்'],
                             'price_minor_units' => 21000,
                             'diet' => Diet::Vegetarian,
-                            'additions' => [
-                                ['name' => ['en' => 'Make it dry', 'ta' => 'உலர்ந்ததாக'], 'price_minor_units' => 0],
-                                ['name' => ['en' => 'Extra gravy', 'ta' => 'கூடுதல் கிரேவி'], 'price_minor_units' => 3000],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Mushroom 65', 'ta' => 'காளான் 65'],
@@ -529,10 +627,6 @@ class TenantSeeder extends Seeder
                             'diet' => Diet::NonVegetarian,
                             'is_featured' => true,
                             'featured_position' => 2,
-                            'additions' => [
-                                ['name' => ['en' => 'Boneless', 'ta' => 'எலும்பு இல்லாமல்'], 'price_minor_units' => 4000],
-                                ['name' => ['en' => 'Extra curry leaves', 'ta' => 'கூடுதல் கறிவேப்பிலை'], 'price_minor_units' => 0],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Apollo Fish', 'ta' => 'அப்பல்லோ மீன்'],
@@ -566,9 +660,6 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Hot and Sour Soup', 'ta' => 'ஹாட் அண்ட் சார் சூப்'],
                     'price_minor_units' => 15900,
                     'diet' => Diet::Vegetarian,
-                    'additions' => [
-                        ['name' => ['en' => 'Add chicken', 'ta' => 'சிக்கன் சேர்க்க'], 'price_minor_units' => 5000],
-                    ],
                 ],
                 [
                     'name' => ['en' => 'Mutton Paya Soup', 'ta' => 'மட்டன் பாயா சூப்'],
@@ -599,12 +690,6 @@ class TenantSeeder extends Seeder
                             'diet' => Diet::NonVegetarian,
                             'is_featured' => true,
                             'featured_position' => 3,
-                            'additions' => [
-                                ['name' => ['en' => 'Extra raita', 'ta' => 'கூடுதல் ராய்தா'], 'price_minor_units' => 3000],
-                                ['name' => ['en' => 'Boiled egg', 'ta' => 'வேகவைத்த முட்டை'], 'price_minor_units' => 2500],
-                                ['name' => ['en' => 'Extra gravy', 'ta' => 'கூடுதல் கிரேவி'], 'price_minor_units' => 3500],
-                                ['name' => ['en' => 'No raita', 'ta' => 'ராய்தா வேண்டாம்'], 'price_minor_units' => 0],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Chicken 65 Biryani', 'ta' => 'சிக்கன் 65 பிரியாணி'],
@@ -620,9 +705,6 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Mutton Dum Biryani', 'ta' => 'மட்டன் தம் பிரியாணி'],
                             'price_minor_units' => 46000,
                             'diet' => Diet::NonVegetarian,
-                            'additions' => [
-                                ['name' => ['en' => 'Extra mutton', 'ta' => 'கூடுதல் மட்டன்'], 'price_minor_units' => 12000],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Mutton Keema Biryani', 'ta' => 'மட்டன் கீமா பிரியாணி'],
@@ -659,9 +741,6 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Paneer Butter Masala', 'ta' => 'பன்னீர் பட்டர் மசாலா'],
                             'price_minor_units' => 28900,
                             'diet' => Diet::Vegetarian,
-                            'additions' => [
-                                ['name' => ['en' => 'Extra butter', 'ta' => 'கூடுதல் வெண்ணெய்'], 'price_minor_units' => 2000],
-                            ],
                         ],
                         [
                             'name' => ['en' => 'Dal Tadka', 'ta' => 'தால் தட்கா'],
@@ -701,10 +780,6 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Butter Naan', 'ta' => 'பட்டர் நான்'],
                     'price_minor_units' => 8000,
                     'diet' => Diet::Vegetarian,
-                    'additions' => [
-                        ['name' => ['en' => 'Extra butter', 'ta' => 'கூடுதல் வெண்ணெய்'], 'price_minor_units' => 2000],
-                        ['name' => ['en' => 'Add garlic', 'ta' => 'பூண்டு சேர்க்க'], 'price_minor_units' => 2500],
-                    ],
                 ],
                 [
                     'name' => ['en' => 'Tandoori Roti', 'ta' => 'தந்தூரி ரொட்டி'],
@@ -808,6 +883,9 @@ class TenantSeeder extends Seeder
 
             $menus = $this->seedMenus($tenant, $definition['menus']);
 
+            // After the menus, because a group is linked to items that have to exist.
+            $this->seedAddOnGroups($tenant);
+
             $this->seedCharges($tenant, self::CHARGES[$definition['slug']], $menus);
         }
     }
@@ -900,7 +978,7 @@ class TenantSeeder extends Seeder
     }
 
     /**
-     * One menu's categories, their items, and each item's add-ons.
+     * One menu's categories and the items in each.
      *
      * @param  list<array<string, mixed>>  $card
      */
@@ -961,7 +1039,7 @@ class TenantSeeder extends Seeder
     }
 
     /**
-     * One item, its offer if it has one, and its add-ons.
+     * One item, and its offer if it has one.
      *
      * The category may be a section or one of its subdivisions; an item is filed
      * under exactly one either way. An item is something to order unless its card
@@ -975,7 +1053,7 @@ class TenantSeeder extends Seeder
         array $item,
         int $position,
     ): void {
-        $menuItem = $this->firstOrCreateByEnglishName(
+        $this->firstOrCreateByEnglishName(
             MenuItem::query()->where('menu_category_id', $category->getKey()),
             $item['name'],
             fn (): MenuItem => new MenuItem([
@@ -996,18 +1074,61 @@ class TenantSeeder extends Seeder
                 'menu_category_id' => $category->getKey(),
             ],
         );
+    }
 
-        foreach ($item['additions'] ?? [] as $additionPosition => $addition) {
-            $this->firstOrCreateByEnglishName(
-                MenuItemAddition::query()->where('menu_item_id', $menuItem->getKey()),
-                $addition['name'],
-                fn (): MenuItemAddition => new MenuItemAddition([
-                    'price_minor_units' => $addition['price_minor_units'],
-                    'is_available' => true,
-                    'position' => $additionPosition,
+    /**
+     * The tenant's add-on groups, their options, and the items each is offered on.
+     *
+     * A group is only seeded for a tenant that has at least one of its items, so
+     * a restaurant's library does not fill up with pillow types. Everything is
+     * matched rather than inserted — a group and an option on the English name,
+     * a link on its item and group — so seeding again adds nothing. Items are
+     * found by English name across all of the tenant's menus: the breakfast card
+     * both tenants share gets its groups on each.
+     */
+    private function seedAddOnGroups(Tenant $tenant): void
+    {
+        foreach (self::ADD_ON_GROUPS as $position => $definition) {
+            $itemIds = MenuItem::query()
+                ->where('tenant_id', $tenant->getKey())
+                ->whereIn('name->'.Locale::English->value, $definition['items'])
+                ->pluck('id');
+
+            if ($itemIds->isEmpty()) {
+                continue;
+            }
+
+            $group = $this->firstOrCreateByEnglishName(
+                MenuAddOnGroup::query()->where('tenant_id', $tenant->getKey()),
+                $definition['name'],
+                fn (): MenuAddOnGroup => new MenuAddOnGroup([
+                    'min_selections' => $definition['min_selections'],
+                    'max_selections' => $definition['max_selections'],
                 ]),
-                ['tenant_id' => $tenant->getKey(), 'menu_item_id' => $menuItem->getKey()],
+                ['tenant_id' => $tenant->getKey()],
             );
+
+            foreach ($definition['options'] as $optionPosition => $option) {
+                $this->firstOrCreateByEnglishName(
+                    MenuAddOnOption::query()->where('menu_add_on_group_id', $group->getKey()),
+                    $option['name'],
+                    fn (): MenuAddOnOption => new MenuAddOnOption([
+                        'price_minor_units' => $option['price_minor_units'],
+                        'max_quantity' => $option['max_quantity'] ?? 1,
+                        'is_preselected' => $option['is_preselected'] ?? false,
+                        'is_available' => true,
+                        'position' => $optionPosition,
+                    ]),
+                    ['tenant_id' => $tenant->getKey(), 'menu_add_on_group_id' => $group->getKey()],
+                );
+            }
+
+            foreach ($itemIds as $itemId) {
+                MenuItemAddOnGroup::query()->firstOrCreate(
+                    ['menu_item_id' => $itemId, 'menu_add_on_group_id' => $group->getKey()],
+                    ['tenant_id' => $tenant->getKey(), 'position' => $position],
+                );
+            }
         }
     }
 
@@ -1111,7 +1232,7 @@ class TenantSeeder extends Seeder
     /**
      * Find a record by the English half of a translated column, or make it.
      *
-     * @template TModel of Menu|MenuCategory|MenuItem|MenuItemAddition|MenuCombo|HomeTile|Charge
+     * @template TModel of Menu|MenuCategory|MenuItem|MenuAddOnGroup|MenuAddOnOption|MenuCombo|HomeTile|Charge
      *
      * @param  Builder<TModel>  $query  already narrowed to the right parent
      * @param  array<string, string>  $translations  the name in every language

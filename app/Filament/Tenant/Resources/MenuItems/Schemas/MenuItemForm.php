@@ -6,7 +6,9 @@ use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas\MenuAddOnGroupForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
+use App\Models\MenuAddOnGroup;
 use App\Models\MenuItem;
 use App\Models\Tenant;
 use Filament\Facades\Filament;
@@ -16,10 +18,10 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -34,6 +36,12 @@ class MenuItemForm
 
     /**
      * `$categoryId` is where a new item is filed unless changed: the category whose table it is added from.
+     *
+     * Laid out for the full-width modal every item opens in: what the item is
+     * across two thirds, its price and tax stacked in the last third, and the
+     * add-on groups it is customised with in a row of their own underneath. The
+     * grid answers to the width of its container rather than the screen, so the
+     * same form stacks into one column wherever it is given less room.
      */
     public static function configure(Schema $schema, ?int $categoryId = null): Schema
     {
@@ -44,240 +52,196 @@ class MenuItemForm
             ->components([
                 TranslatedFields::localeSwitcher(),
 
-                Section::make(__('panel.items.item'))
-                    ->icon(Heroicon::OutlinedListBullet)
+                Grid::make(['default' => 1, '@4xl' => 3])
+                    ->gridContainer()
                     ->schema([
-                        // One select, because an item is filed under exactly one
-                        // category — a section or one of its subdivisions, both
-                        // offered here as "Lunch · Biryani › Chicken". Only this
-                        // tenant's are listed, and MenuItemObserver refuses
-                        // anything else even if the id is tampered with.
-                        Select::make('menu_category_id')
-                            ->label(__('panel.items.section'))
-                            ->options(fn (): array => self::sectionOptions())
-                            ->default($categoryId)
-                            ->required()
-                            ->searchable()
-                            ->preload()
-                            ->prefixIcon(Heroicon::OutlinedRectangleStack),
+                        self::itemSection($categoryId)
+                            ->columnSpan(['default' => 1, '@4xl' => 2]),
 
-                        // Live, because it decides whether the diet below is
-                        // asked for at all.
-                        Toggle::make('is_service_request')
-                            ->label(__('panel.items.is_service_request'))
-                            ->default(false)
-                            ->inline(false)
-                            ->live(),
+                        Grid::make(1)
+                            ->columnSpan(1)
+                            ->schema([
+                                self::priceSection($currency),
+                                self::taxSection(),
+                            ]),
 
-                        ...self::spanningFull(TranslatedFields::text(
-                            'name',
-                            __('panel.shared.name'),
-                            maxLength: 120,
-                            // Unique within the category rather than the whole
-                            // tenant: a lunch and a dinner menu may both list a
-                            // "Paneer Tikka", and so may two sub-categories of
-                            // one category.
-                            uniqueWithin: fn (Get $get): Builder => MenuItem::query()
-                                ->where('menu_category_id', $get('menu_category_id')),
-                            uniqueMessage: __('panel.items.unique'),
-                        )),
-
-                        // Everything but a service request carries the veg /
-                        // egg / non-veg mark. A hidden field is not saved, and
-                        // MenuItemObserver clears the diet of an item that has
-                        // just become a service request.
-                        Select::make('diet')
-                            ->label(__('panel.items.diet'))
-                            ->options(Diet::options())
-                            ->default(Diet::Vegetarian->value)
-                            ->native(false)
-                            ->visible(fn (Get $get): bool => ! (bool) $get('is_service_request'))
-                            ->required(fn (Get $get): bool => ! (bool) $get('is_service_request')),
-
-                        ...self::spanningFull(TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 500, rows: 3)),
-                    ])
-                    ->columns(2),
-
-                Section::make(__('panel.items.price_section'))
-                    ->icon(Heroicon::OutlinedBanknotes)
-                    ->schema([
-                        // Typed and shown in major units, stored as an integer
-                        // count of minor units — PricingFields does the
-                        // conversion in one place for this form and the combo
-                        // one, so no float ever reaches the database. Zero is
-                        // a real price, and the guest app reads it as
-                        // complimentary.
-                        PricingFields::price($currency),
-                        PricingFields::compareAtPrice($currency),
-                        PricingFields::availability(),
-
-                        // Featuring puts an item in the row above the sections
-                        // on the guest's menu screen. The order those are read
-                        // in is dragged on the menu's own page, not typed here.
-                        Toggle::make('is_featured')
-                            ->label(__('panel.items.is_featured'))
-                            ->default(false)
-                            ->inline(false),
-                    ])
-                    ->columns(2),
-
-                // The two sections most items never open render their fields
-                // only once opened (deferLoading). Only the rendering waits:
-                // their state is filled and saved with the rest of the form.
-                Section::make(__('panel.items.tax_section'))
-                    ->key('taxSection')
-                    ->icon(Heroicon::OutlinedReceiptPercent)
-                    ->schema(Schema::make()
-                        ->components([
-                            PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
-                            PricingFields::hsnCode(),
-                        ])
-                        ->columns(2)
-                        ->deferLoading())
-                    // Almost every item is taxed at the tenant's own rate
-                    // and carries no code, so this opens closed and is expanded
-                    // by the items that genuinely differ.
-                    ->collapsed(fn (?MenuItem $record): bool => blank($record?->tax_rate_basis_points) && blank($record?->hsn_code)),
-
-                Section::make(__('panel.add_ons.section'))
-                    ->key('addOnsSection')
-                    ->icon(Heroicon::OutlinedPlusCircle)
-                    ->schema(Schema::make()
-                        ->components([
-                            self::additions($currency),
-                        ])
-                        ->deferLoading())
-                    ->collapsed(fn (?MenuItem $record): bool => $record?->additions()->doesntExist() ?? true),
+                        self::addOnGroupsSection()
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 
     /**
-     * Make a set of translated inputs span the section they sit in.
+     * What the item is: its name and diet mark, where it is filed, and what a guest reads under it.
+     */
+    private static function itemSection(?int $categoryId): Section
+    {
+        return Section::make(__('panel.items.item'))
+            ->icon(Heroicon::OutlinedListBullet)
+            ->compact()
+            ->columns(6)
+            ->schema([
+                ...self::spanning(TranslatedFields::text(
+                    'name',
+                    __('panel.shared.name'),
+                    maxLength: 120,
+                    // Unique within the category rather than the whole
+                    // tenant: a lunch and a dinner menu may both list a
+                    // "Paneer Tikka", and so may two sub-categories of
+                    // one category.
+                    uniqueWithin: fn (Get $get): Builder => MenuItem::query()
+                        ->where('menu_category_id', $get('menu_category_id')),
+                    uniqueMessage: __('panel.items.unique'),
+                ), 4),
+
+                // Everything but a service request carries the veg /
+                // egg / non-veg mark. A hidden field is not saved, and
+                // MenuItemObserver clears the diet of an item that has
+                // just become a service request.
+                Select::make('diet')
+                    ->label(__('panel.items.diet'))
+                    ->options(Diet::options())
+                    ->default(Diet::Vegetarian->value)
+                    ->native(false)
+                    ->visible(fn (Get $get): bool => ! (bool) $get('is_service_request'))
+                    ->required(fn (Get $get): bool => ! (bool) $get('is_service_request'))
+                    ->columnSpan(2),
+
+                // One select, because an item is filed under exactly one
+                // category — a section or one of its subdivisions, both
+                // offered here as "Lunch · Biryani › Chicken". Only this
+                // tenant's are listed, and MenuItemObserver refuses
+                // anything else even if the id is tampered with.
+                Select::make('menu_category_id')
+                    ->label(__('panel.items.section'))
+                    ->options(fn (): array => self::sectionOptions())
+                    ->default($categoryId)
+                    ->required()
+                    ->searchable()
+                    ->preload()
+                    ->prefixIcon(Heroicon::OutlinedRectangleStack)
+                    ->columnSpan(4),
+
+                // Live, because it decides whether the diet is asked for at all.
+                Toggle::make('is_service_request')
+                    ->label(__('panel.items.is_service_request'))
+                    ->default(false)
+                    ->inline(false)
+                    ->live()
+                    ->columnSpan(2),
+
+                ...self::spanning(TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 500, rows: 2), 6),
+            ]);
+    }
+
+    /**
+     * What a guest pays, whether they can have it now, and whether the menu leads with it.
+     */
+    private static function priceSection(Currency $currency): Section
+    {
+        return Section::make(__('panel.items.price_section'))
+            ->icon(Heroicon::OutlinedBanknotes)
+            ->compact()
+            ->columns(2)
+            ->schema([
+                // Typed and shown in major units, stored as an integer count of
+                // minor units — PricingFields does the conversion in one place for
+                // this form and the combo one, so no float ever reaches the
+                // database. Zero is a real price, and the guest app reads it as
+                // complimentary.
+                PricingFields::price($currency),
+                PricingFields::compareAtPrice($currency),
+                PricingFields::availability(),
+
+                // Featuring puts an item in the row above the sections on the
+                // guest's menu screen. The order those are read in is dragged on
+                // the menu's own page, not typed here.
+                Toggle::make('is_featured')
+                    ->label(__('panel.items.is_featured'))
+                    ->default(false)
+                    ->inline(false),
+            ]);
+    }
+
+    /**
+     * The GST rate and code, open beside the price rather than folded away.
+     */
+    private static function taxSection(): Section
+    {
+        return Section::make(__('panel.items.tax_section'))
+            ->icon(Heroicon::OutlinedReceiptPercent)
+            ->compact()
+            ->columns(2)
+            ->schema([
+                PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
+                PricingFields::hsnCode(),
+            ]);
+    }
+
+    /**
+     * The add-on groups a guest customises this item with, in the order they read them.
      *
-     * Only one language is on screen at a time now, so a translated field is a
-     * single box — and a single box in a two-column grid would leave the other
-     * half of the line empty.
+     * Each row names a group from the tenant's library — the Add-on groups page —
+     * so a group offered on twenty items is edited once. A row is only the link
+     * and its place on this item, which is why the repeater is bound to the links
+     * rather than to the groups. A group that does not exist yet can be made from
+     * the select without leaving the item.
+     *
+     * A repeater bound to the relationship, so the links are written in the same
+     * save as the item. The rule in .ai/rules/filament.md against
+     * `->relationship()` is about Spatie roles and permissions, whose cache is
+     * only flushed by syncRoles()/syncPermissions(); this is a plain hasMany.
+     */
+    private static function addOnGroupsSection(): Section
+    {
+        return Section::make(__('panel.add_on_groups.plural'))
+            ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+            ->compact()
+            ->schema([
+                Repeater::make('addOnGroupLinks')
+                    ->relationship()
+                    ->hiddenLabel()
+                    ->table([
+                        TableColumn::make(__('panel.add_on_groups.section'))->markAsRequired(),
+                    ])
+                    ->schema([
+                        Select::make('menu_add_on_group_id')
+                            ->label(__('panel.add_on_groups.section'))
+                            ->options(fn (): array => MenuAddOnGroupForm::groupOptions())
+                            ->required()
+                            ->searchable()
+                            // A group is offered on an item once; nothing but this
+                            // refuses a second row.
+                            ->distinct()
+                            ->validationMessages(['distinct' => __('panel.add_on_groups.duplicate')])
+                            ->createOptionForm(fn (Schema $schema): Schema => MenuAddOnGroupForm::configure($schema->model(MenuAddOnGroup::class)))
+                            ->createOptionUsing(fn (array $data, Schema $schema): int => MenuAddOnGroupForm::createFromItemForm($data, $schema)),
+                    ])
+                    ->orderColumn('position')
+                    // Most items have none, and a blank row waiting to be filled
+                    // in would make every save fail validation until it was deleted.
+                    ->defaultItems(0)
+                    ->addActionLabel(__('panel.add_on_groups.link'))
+                    ->reorderable()
+                    ->columnSpanFull(),
+            ]);
+    }
+
+    /**
+     * Make a set of translated inputs span as many columns of their section as given.
+     *
+     * Only one language is on screen at a time, so a translated field is a
+     * single box, and it is sized like one.
      *
      * @param  list<TextInput|Textarea>  $fields
      * @return list<TextInput|Textarea>
      */
-    private static function spanningFull(array $fields): array
+    private static function spanning(array $fields, int $columns): array
     {
         return array_map(
-            static fn (TextInput|Textarea $field): TextInput|Textarea => $field->columnSpanFull(),
+            static fn (TextInput|Textarea $field): TextInput|Textarea => $field->columnSpan($columns),
             $fields,
         );
-    }
-
-    /**
-     * The add-ons an item can be ordered with, as a table.
-     *
-     * A table rather than a stack of collapsible cards: every add-on is a
-     * name, a price and two small settings, so a row says everything a card
-     * did in a fraction of the height — an item with eight add-ons used to be a
-     * page of accordions. Reordering and the per-row delete are unchanged.
-     *
-     * A repeater bound to the relationship, so add-ons are written in the
-     * same save as the item they belong to. The rule in .ai/rules/filament.md
-     * against `->relationship()` is about Spatie roles and permissions, whose
-     * cache is only flushed by syncRoles()/syncPermissions(); this is a plain
-     * hasMany with no cache behind it, and the rule does not apply.
-     *
-     * Add-ons cannot be dragged from one item to another: they are edited
-     * inside the item that owns them.
-     */
-    private static function additions(Currency $currency): Repeater
-    {
-        return Repeater::make('additions')
-            ->relationship()
-            ->hiddenLabel()
-            ->table([
-                TableColumn::make(__('panel.add_ons.label'))->markAsRequired(),
-                TableColumn::make(__('panel.add_ons.price'))->width('10rem'),
-                TableColumn::make(__('panel.items.tax_rate'))->width('9rem'),
-                TableColumn::make(__('panel.add_ons.is_available'))->width('7rem')->alignment(Alignment::Center),
-            ])
-            ->schema([
-                // Only the switched-to language is on screen, exactly as
-                // everywhere else — an add-on's name is guest-facing text and
-                // is translated like the item above it.
-                ...TranslatedFields::text('name', __('panel.add_ons.label'), maxLength: 64),
-
-                TextInput::make('price')
-                    ->label(__('panel.add_ons.price'))
-                    ->required()
-                    ->numeric()
-                    ->minValue(0)
-                    ->maxValue(99999)
-                    ->step(0.01)
-                    ->default(0)
-                    ->prefix($currency->symbol()),
-
-                TextInput::make('tax_rate_percentage')
-                    ->label(__('panel.items.tax_rate'))
-                    ->numeric()
-                    ->minValue(0)
-                    ->maxValue(100)
-                    ->step(0.01)
-                    ->suffix('%')
-                    ->placeholder(PricingFields::formatRate(PricingFields::tenantTaxRateBasisPoints())),
-
-                Toggle::make('is_available')
-                    ->label(__('panel.add_ons.is_available'))
-                    ->default(true),
-            ])
-            ->orderColumn('position')
-            // Most items have none, and a blank row waiting to be filled in
-            // would make every save fail validation until it was deleted.
-            ->defaultItems(0)
-            ->addActionLabel(__('panel.add_ons.add'))
-            ->reorderable()
-            ->columnSpanFull()
-            // The repeater edits a major-unit price the same way the item above
-            // does, and each row is converted on its own way in and out.
-            ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): array => self::storeAddition($data, $currency))
-            ->mutateRelationshipDataBeforeSaveUsing(fn (array $data): array => self::storeAddition($data, $currency))
-            ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => self::fillAddition($data, $currency));
-    }
-
-    /**
-     * Turn an add-on's typed price and rate into what gets stored.
-     *
-     * An add-on has no compare-at price — it is a delta on the item, and
-     * "was +₹40, now +₹30" is not something a menu says — so this is its own
-     * small conversion rather than PricingFields::store().
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    private static function storeAddition(array $data, Currency $currency): array
-    {
-        $data['price_minor_units'] = $currency->toMinorUnits($data['price'] ?? 0);
-
-        $data['tax_rate_basis_points'] = blank($data['tax_rate_percentage'] ?? null)
-            ? null
-            : PricingFields::toBasisPoints($data['tax_rate_percentage']);
-
-        unset($data['price'], $data['tax_rate_percentage']);
-
-        return $data;
-    }
-
-    /**
-     * Turn a stored add-on back into the values the form edits.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    private static function fillAddition(array $data, Currency $currency): array
-    {
-        $data['price'] = $currency->toMajorUnits((int) ($data['price_minor_units'] ?? 0));
-
-        $data['tax_rate_percentage'] = blank($data['tax_rate_basis_points'] ?? null)
-            ? null
-            : PricingFields::toPercentage((int) $data['tax_rate_basis_points']);
-
-        return $data;
     }
 
     /**

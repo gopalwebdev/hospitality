@@ -7,14 +7,18 @@ use App\Enums\Locale;
 use App\Enums\MenuBlockType;
 use App\Models\Charge;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
 
@@ -73,8 +77,11 @@ it('leaves out what a guest cannot order', function (): void {
     $soldOut = MenuItem::factory()->inCategory($showing)->unavailable()->create();
     $inHidden = MenuItem::factory()->inCategory($hidden)->create();
 
-    $offered = MenuItemAddition::factory()->onItem($available)->create();
-    $runOut = MenuItemAddition::factory()->onItem($available)->unavailable()->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    MenuItemAddOnGroup::factory()->linking($available, $extras)->create();
+
+    $offered = MenuAddOnOption::factory()->inGroup($extras)->create();
+    $runOut = MenuAddOnOption::factory()->inGroup($extras)->unavailable()->create();
 
     // A phone menu should not make someone scroll past things they cannot
     // have, so these are absent rather than greyed out.
@@ -664,27 +671,121 @@ it('sends the menu in the order the tenant dragged it into', function (): void {
         );
 });
 
-it('sends an item\'s additions in the order they were dragged into', function (): void {
+/*
+|--------------------------------------------------------------------------
+| Add-on groups
+|--------------------------------------------------------------------------
+*/
+
+it('sends each add-on group once, and each item the groups it offers in its own order', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $menuItem = MenuItem::factory()->inCategory($category)->create();
+    $curry = MenuItem::factory()->inCategory($category)->create(['position' => 0]);
+    $dal = MenuItem::factory()->inCategory($category)->create(['position' => 1]);
 
-    $second = MenuItemAddition::factory()->onItem($menuItem)->create([
-        'name' => [Locale::English->value => 'A Second'],
-        'position' => 1,
-    ]);
-    $first = MenuItemAddition::factory()->onItem($menuItem)->create([
-        'name' => [Locale::English->value => 'Z First'],
-        'position' => 0,
-    ]);
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
 
-    // Additions are dragged inside the item that owns them, and a guest reads
-    // them in that order — the same rule as every other list on the menu.
+    $garlic = MenuAddOnOption::factory()->inGroup($bread)->preselected()->create(['position' => 1, 'price_minor_units' => 2000]);
+    $butter = MenuAddOnOption::factory()->inGroup($bread)->free()->create(['position' => 0]);
+    MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create();
+
+    // The curry reads its extras before its bread; the dal offers the bread alone.
+    MenuItemAddOnGroup::factory()->linking($curry, $bread)->create(['position' => 1]);
+    MenuItemAddOnGroup::factory()->linking($curry, $extras)->create(['position' => 0]);
+    MenuItemAddOnGroup::factory()->linking($dal, $bread)->create(['position' => 0]);
+
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('sections.0.items.0.additions.0.id', $first->getKey())
-            ->where('sections.0.items.0.additions.1.id', $second->getKey()),
+            ->where('sections.0.items.0.addOnGroupIds', [$extras->getKey(), $bread->getKey()])
+            ->where('sections.0.items.1.addOnGroupIds', [$bread->getKey()])
+            // Offered on two items, sent once.
+            ->has('addOnGroups', 2)
+            ->where('addOnGroups', fn (Collection $groups): bool => $groups->firstWhere('id', $bread->getKey()) === [
+                'id' => $bread->getKey(),
+                'name' => $bread->name,
+                'minSelections' => 1,
+                'maxSelections' => 1,
+                // In the order they were dragged into.
+                'options' => [
+                    ['id' => $butter->getKey(), 'name' => $butter->name, 'priceMinorUnits' => 0, 'maxQuantity' => 1, 'isPreselected' => false],
+                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'priceMinorUnits' => 2000, 'maxQuantity' => 1, 'isPreselected' => true],
+                ],
+            ])
+            ->where('quoteUrl', guestMenuUrl($tenant, $menu).'/basket-quotes'),
         );
+});
+
+it('leaves out an item whose required group has nothing left to pick, and a group with nothing left to offer', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+    $curry = MenuItem::factory()->inCategory($category)->create(['position' => 0]);
+    $dal = MenuItem::factory()->inCategory($category)->create(['position' => 1]);
+
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    MenuAddOnOption::factory()->inGroup($bread)->unavailable()->create();
+
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    MenuAddOnOption::factory()->inGroup($extras)->unavailable()->create();
+
+    MenuItemAddOnGroup::factory()->linking($curry, $bread)->create();
+    MenuItemAddOnGroup::factory()->linking($dal, $extras)->create();
+
+    // A curry that needs a bread nobody can bring cannot be ordered, like a
+    // sold-out item. The dal still can: its extras were only ever optional.
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->has('sections.0.items', 1)
+            ->where('sections.0.items.0.id', $dal->getKey())
+            ->where('sections.0.items.0.addOnGroupIds', [])
+            ->where('addOnGroups', []),
+        );
+});
+
+it('builds the add-on groups in the same number of queries however many items offer them', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    MenuAddOnOption::factory()->count(2)->inGroup($bread)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    MenuAddOnOption::factory()->count(3)->inGroup($extras)->create();
+
+    $addItem = function () use ($category, $bread, $extras): MenuItem {
+        $item = MenuItem::factory()->inCategory($category)->create();
+        MenuItemAddOnGroup::factory()->linking($item, $bread)->create();
+        MenuItemAddOnGroup::factory()->linking($item, $extras)->create();
+
+        return $item;
+    };
+
+    $queriesToRender = function () use ($tenant, $menu): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->get(guestMenuUrl($tenant, $menu))->assertOk();
+
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+
+    $addItem();
+    $queriesToRender();
+    $one = $queriesToRender();
+
+    $addItem();
+    $addItem();
+
+    // And a third group, on one of them.
+    $sides = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
+    MenuAddOnOption::factory()->inGroup($sides)->create();
+    MenuItemAddOnGroup::factory()->linking($addItem(), $sides)->create();
+
+    expect($queriesToRender())->toBe($one);
 });

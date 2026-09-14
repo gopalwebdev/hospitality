@@ -8,9 +8,11 @@ use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
 use App\Http\Middleware\SetLocale;
 use App\Models\HomeTile;
 use App\Models\Menu;
+use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
-use App\Models\MenuItemAddition;
+use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -23,9 +25,9 @@ beforeEach(function (): void {
 });
 
 /**
- * A tenant with one bilingual item on one bilingual menu.
+ * A tenant with one bilingual item on one bilingual menu, customised with one bilingual add-on group.
  *
- * @return array{Tenant, Menu, MenuCategory, MenuItem, MenuItemAddition}
+ * @return array{Tenant, Menu, MenuCategory, MenuItem, MenuAddOnGroup, MenuAddOnOption}
  */
 function seedBilingualMenu(): array
 {
@@ -45,11 +47,17 @@ function seedBilingualMenu(): array
         'description' => ['en' => 'Charred in the tandoor.', 'ta' => 'தந்தூரில் சுடப்பட்டது.'],
     ]);
 
-    $addition = MenuItemAddition::factory()->onItem($item)->create([
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create([
+        'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
+    ]);
+
+    $option = MenuAddOnOption::factory()->inGroup($group)->create([
         'name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'],
     ]);
 
-    return [$tenant, $menu, $category, $item, $addition];
+    MenuItemAddOnGroup::factory()->linking($item, $group)->create();
+
+    return [$tenant, $menu, $category, $item, $group, $option];
 }
 
 function menuUrl(Tenant $tenant, Menu $menu): string
@@ -128,7 +136,7 @@ it('remembers the chosen language in an unencrypted cookie', function (): void {
 });
 
 it('answers in Tamil once the language has been chosen', function (): void {
-    [$tenant, $menu, $category, $item, $addition] = seedBilingualMenu();
+    [$tenant, $menu, $category, $item, $group, $option] = seedBilingualMenu();
 
     // Read through the props rather than the HTML: Inertia serialises its
     // payload as JSON, which escapes non-ASCII, so assertSee() would be looking
@@ -144,7 +152,8 @@ it('answers in Tamil once the language has been chosen', function (): void {
             ->where('sections.0.name', $category->getTranslation('name', 'ta'))
             ->where('sections.0.items.0.name', $item->getTranslation('name', 'ta'))
             ->where('sections.0.items.0.description', $item->getTranslation('description', 'ta'))
-            ->where('sections.0.items.0.additions.0.name', $addition->getTranslation('name', 'ta'))
+            ->where('addOnGroups.0.name', $group->getTranslation('name', 'ta'))
+            ->where('addOnGroups.0.options.0.name', $option->getTranslation('name', 'ta'))
             // ...while the chrome this application supplies stays English,
             // because lang/en is the only language directory there is.
             ->where('translations.status.open', 'Open'),

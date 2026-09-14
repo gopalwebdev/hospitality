@@ -40,7 +40,7 @@ There is deliberately **no logo** in the app's chrome. The tenant's name is text
 
 There is **one** language directory, deliberately: this application's words are English, and what gets translated is what a tenant wrote (`.ai/rules/lang.md`). A guest who switches to Tamil gets their menu in Tamil and this chrome unchanged. A missing key falls back to the path itself, so a typo reads as `menu.empy` rather than as nothing.
 
-Everything a tenant wrote — menu, category, item, add-on, charge and tile names — arrives on the page's own props, already in the right language. Never translate those in React.
+Everything a tenant wrote — menu, category, item, add-on group, option, charge and tile names — arrives on the page's own props, already in the right language. Never translate those in React.
 
 A chrome string that names the business says "tenant", whatever the tenant's type. The guest app is sent no type at all.
 
@@ -54,15 +54,37 @@ Two layers, and both are needed because they cover different gaps:
 The panels have the same from their own stack: `->spa(hasPrefetching: true)` makes a click a Livewire visit with a progress bar, prefetched on hover (`.ai/rules/filament.md`).
 
 ## The guest app has three screens
-`pages/guest` holds `home` (the tiles a guest lands on), `menu` (one menu: its featured rail, its combos, its sections with their subdivisions, the items in each and their add-ons, and the small print about tax and charges) and `document` (a tile's PDF, embedded so the app keeps its back arrow).
+`pages/guest` holds `home` (the tiles a guest lands on), `menu` (one menu: its featured rail, its combos, its sections with their subdivisions, the items in each, the sheet an item is customised in, the basket, and the small print about tax and charges) and `document` (a tile's PDF, embedded so the app keeps its back arrow).
 
 Things about the menu screen worth knowing before editing it. It renders **the order it is sent**: `order` is a list of `'featured' | 'combos' | <section id>` built by `Menu::readingOrder()` on the server from the menu's categories and its `menu_blocks`, and the page maps over it picking `FeaturedRail`, `CombosRail` or `SectionBlock` — because where a menu leads with its combos is a tenant's decision, and decisions stay in PHP (`.ai/rules/general.md`). Headings are nested for real — category `h2`, sub-category `h3`, item `h3` when filed straight under a category and `h4` inside a subdivision — which is why `Item` takes a `headingLevel`; someone navigating by headings is reading the menu's actual structure. And a rate arrives as **basis points** (500 is 5%), not a percentage, because that is how it is stored so the arithmetic behind a bill stays in integers — the `percentage()` helper turns it into something to read, beside the money formatting and for the same reason. The rule above still holds: component names are relative to the app's own directory.
 
-An item is something to order or a service request: it arrives with `isServiceRequest`, and `diet` is null for a service request. `components/diet-mark.tsx` draws the regulatory veg / egg / non-veg mark, labelled for screen readers, and keeps the mark's empty space (hidden from them) for a service request so every name starts at the same edge. A price of 0 reads "Complimentary"; an add-on at 0 reads "Free". The server sends the zero and never a word.
+An item is something to order or a service request: it arrives with `isServiceRequest`, and `diet` is null for a service request. `components/diet-mark.tsx` draws the regulatory veg / egg / non-veg mark, labelled for screen readers, and keeps the mark's empty space (hidden from them) for a service request so every name starts at the same edge. A price of 0 reads "Complimentary"; an option at 0 shows no price at all, because "Free" beside Mild, Medium and Hot is noise. The server sends the zero and never a word.
 
 The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charges`: only the switched-on charges this menu carries, in the tenant's order, each with exactly one of `rateBasisPoints` or `amountMinorUnits` set. Which charges apply is decided in PHP; the page only words them, one line each.
 
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
+
+## An item is customised in a sheet, and the basket lives on the phone
+The menu is sent `addOnGroups` once — `{id, name, minSelections, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isPreselected}]}`, only available options and only the groups an item on the page offers — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
+
+Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
+- a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
+- an optional pick-one moves its tick rather than locking
+- a full group stops offering the options not picked
+- pre-selected options start ticked
+- Add reads "Choose 1 more from Bread" until every minimum is met
+
+`lib/add-on-rules.ts` holds those rules as pure functions and counts picks as the server does, each option by its quantity. It only shapes the sheet: nothing it decides is trusted.
+
+`hooks/use-basket.ts` keeps the lines in localStorage under `basket:{tenant slug}:{menu id}`, read through `useSyncExternalStore` with an empty server snapshot, because SSR is on and the first render has to match a page painted without the phone's storage. The same item with the same choices is one line. A line keeps ids and the name it was added under; the basket sheet names its lines from the page's props, so a language switch renames them.
+
+Every number in `components/basket-sheet.tsx` is the server's. `hooks/use-basket-quote.ts` posts the lines to `quoteUrl` with Inertia's `useHttp` whenever the sheet is open and the basket changes (`App\Actions\Menus\QuoteBasket`, see `.ai/rules/actions-menus.md`). Two traps in that hook:
+- `useHttp` hands back new helpers on every render, so the hook reads them through a ref; listing them as effect dependencies re-posts on every render.
+- It calls `transform()` before `post()`, because `post()` sends from a ref that a `setData()` in the same tick has not updated yet.
+
+Nothing is ordered from here: the sheet tells the guest to show it to a member of staff. `guest-basket.test.tsx` mocks `use-basket-quote`, so the basket is tested against a fixed answer.
+
+`components/ui/sheet.tsx`, `radio-group.tsx` and `checkbox.tsx` were written from the shadcn registry with two changes: `cn` comes from `@/lib/utils`, and the icons come from `components/icons.tsx`. The registry imports `lucide-react`, which this app deliberately does not depend on, so do not let the CLI add it.
 
 ## Money is formatted here, never in PHP
 Prices cross the wire as an integer count of the currency's minor unit — ₹249.50 is `priceMinorUnits: 24950` — exactly as the database stores them, and the tenant's currency arrives once in the shared `currency` prop as a code and a scale. `useMoney()` turns the two into a string.

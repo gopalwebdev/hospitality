@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vite-plus/test';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vite-plus/test';
 
+import type { AddOnGroup } from '@/lib/add-on-rules';
 import Menu, { type MenuItem } from '@/pages/guest/menu';
 
 const tenant = { name: 'Spice Garden', slug: 'spice' };
@@ -36,10 +37,65 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         compareAtPriceMinorUnits: null,
         isServiceRequest: false,
         diet: 'vegetarian',
-        additions: [],
+        addOnGroupIds: [],
         ...overrides,
     };
 }
+
+/** A required pick-one, which reads as radios. */
+const bread: AddOnGroup = {
+    id: 2,
+    name: 'Bread',
+    minSelections: 1,
+    maxSelections: 1,
+    options: [
+        {
+            id: 21,
+            name: 'Butter naan',
+            priceMinorUnits: 0,
+            maxQuantity: 1,
+            isPreselected: false,
+        },
+        {
+            id: 22,
+            name: 'Garlic naan',
+            priceMinorUnits: 2000,
+            maxQuantity: 1,
+            isPreselected: false,
+        },
+    ],
+};
+
+/** Up to three picks, with cheese allowed twice. */
+const extras: AddOnGroup = {
+    id: 1,
+    name: 'Extras',
+    minSelections: 0,
+    maxSelections: 3,
+    options: [
+        {
+            id: 11,
+            name: 'Extra cheese',
+            priceMinorUnits: 4000,
+            maxQuantity: 2,
+            isPreselected: false,
+        },
+        {
+            id: 12,
+            name: 'Extra paneer',
+            priceMinorUnits: 6000,
+            maxQuantity: 1,
+            isPreselected: false,
+        },
+        {
+            id: 13,
+            name: 'Raita',
+            priceMinorUnits: 3000,
+            maxQuantity: 1,
+            isPreselected: false,
+        },
+    ],
+};
 
 /**
  * Render the page with everything empty but the parts a test names.
@@ -63,9 +119,11 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
                 'combos',
                 ...sections.map((section) => section.id),
             ]}
+            addOnGroups={[]}
             tax={tax}
             charges={[]}
             acceptingOrders
+            quoteUrl={`${homeUrl}/menus/1/basket-quotes`}
             homeUrl={homeUrl}
             {...overrides}
         />,
@@ -73,6 +131,11 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
 }
 
 describe('guest menu', () => {
+    // The basket is kept on the phone, so one test's would be the next one's.
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
     it('names the menu and says whether the tenant is taking orders', () => {
         renderMenu();
 
@@ -144,38 +207,148 @@ describe('guest menu', () => {
         expect(screen.queryByText(/0\.00/)).not.toBeInTheDocument();
     });
 
-    it("lists an item's add-ons, and names the free ones rather than pricing them", () => {
+    it('offers Add only while the tenant takes orders and the menu is being served', () => {
+        const sections = [
+            { id: 1, name: 'Starters', items: [item()], subSections: [] },
+        ];
+
+        const open = renderMenu({ sections });
+        expect(
+            screen.getByRole('button', { name: 'Add Paneer Tikka' }),
+        ).toBeInTheDocument();
+        open.unmount();
+
+        const closed = renderMenu({ sections, acceptingOrders: false });
+        expect(
+            screen.queryByRole('button', { name: 'Add Paneer Tikka' }),
+        ).not.toBeInTheDocument();
+        closed.unmount();
+
+        renderMenu({ sections, menu: { ...menu, isBeingServed: false } });
+        expect(
+            screen.queryByRole('button', { name: 'Add Paneer Tikka' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('puts an item with no choices straight in the basket, and the same item again on the same line', () => {
+        renderMenu({
+            sections: [
+                { id: 1, name: 'Starters', items: [item()], subSections: [] },
+            ],
+        });
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add Paneer Tikka' }),
+        );
+        expect(
+            screen.getByRole('button', { name: /1 item/ }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add Paneer Tikka' }),
+        );
+        expect(
+            screen.getByRole('button', { name: /2 items/ }),
+        ).toBeInTheDocument();
+
+        // Kept on the phone for this tenant's menu, so a reload finds it.
+        expect(
+            JSON.parse(localStorage.getItem('basket:spice:1') ?? '[]'),
+        ).toEqual([
+            expect.objectContaining({
+                type: 'item',
+                id: 10,
+                choices: [],
+                quantity: 2,
+            }),
+        ]);
+    });
+
+    it('customises an item before adding it: Add waits for a required group, and a full group offers nothing more', () => {
         renderMenu({
             sections: [
                 {
                     id: 1,
-                    name: 'Starters',
+                    name: 'Curries',
                     items: [
                         item({
-                            additions: [
-                                {
-                                    id: 100,
-                                    name: 'Extra paneer',
-                                    priceMinorUnits: 5000,
-                                },
-                                {
-                                    id: 101,
-                                    name: 'Less spicy',
-                                    priceMinorUnits: 0,
-                                },
-                            ],
+                            id: 30,
+                            name: 'Paneer Butter Masala',
+                            priceMinorUnits: 28900,
+                            // The item's own order, not the order the menu
+                            // sent the groups in.
+                            addOnGroupIds: [2, 1],
                         }),
                     ],
                     subSections: [],
                 },
             ],
+            addOnGroups: [extras, bread],
         });
 
-        expect(screen.getByText('Add-ons')).toBeInTheDocument();
-        expect(screen.getByText(/\+\s*₹?50\.00/)).toBeInTheDocument();
-        // "₹0.00" beside a choice that simply costs nothing reads as a mistake.
-        expect(screen.getByText('Free')).toBeInTheDocument();
-        expect(screen.queryByText(/₹0\.00/)).not.toBeInTheDocument();
+        expect(screen.getByText('Customisable')).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add Paneer Butter Masala' }),
+        );
+
+        const sheet = screen.getByRole('dialog');
+
+        expect(
+            within(sheet)
+                .getAllByRole('heading', { level: 3 })
+                .map((heading) => heading.textContent),
+        ).toEqual(['Bread', 'Extras']);
+        expect(within(sheet).getByText('Choose 1')).toBeInTheDocument();
+        expect(within(sheet).getByText('Required')).toBeInTheDocument();
+        expect(within(sheet).getByText('Choose up to 3')).toBeInTheDocument();
+
+        // Nothing chosen from Bread yet, so Add says what is missing.
+        expect(
+            within(sheet).getByRole('button', {
+                name: 'Choose 1 more from Bread',
+            }),
+        ).toBeDisabled();
+
+        fireEvent.click(
+            within(sheet).getByRole('radio', { name: 'Garlic naan' }),
+        );
+        fireEvent.click(
+            within(sheet).getByRole('checkbox', { name: 'Extra cheese' }),
+        );
+        fireEvent.click(
+            within(sheet).getByRole('button', {
+                name: 'One more Extra cheese',
+            }),
+        );
+        fireEvent.click(
+            within(sheet).getByRole('checkbox', { name: 'Extra paneer' }),
+        );
+
+        // Two cheese and a paneer are the three picks "up to 3" allows.
+        expect(
+            within(sheet).getByRole('checkbox', { name: 'Raita' }),
+        ).toBeDisabled();
+
+        // ₹289.00, a garlic naan at ₹20.00, two cheese at ₹40.00 and a paneer at ₹60.00.
+        fireEvent.click(
+            within(sheet).getByRole('button', { name: /Add · ₹?449\.00/ }),
+        );
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            JSON.parse(localStorage.getItem('basket:spice:1') ?? '[]'),
+        ).toEqual([
+            expect.objectContaining({
+                id: 30,
+                choices: [
+                    { optionId: 22, quantity: 1 },
+                    { optionId: 11, quantity: 2 },
+                    { optionId: 12, quantity: 1 },
+                ],
+                quantity: 1,
+            }),
+        ]);
     });
 
     it('reads a category, then its subdivisions, each under its own heading', () => {

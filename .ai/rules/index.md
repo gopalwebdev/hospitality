@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Menus/** | .ai/rules/actions-menus.md |
+| app/Filament/Tenant/Resources/MenuAddOnGroups/**, app/Models/MenuAddOnGroup.php, app/Models/MenuAddOnOption.php, app/Models/MenuItemAddOnGroup.php | .ai/rules/add-on-groups.md |
 | app/** | .ai/rules/app.md |
 | app/Filament/Tenant/Resources/Charges/** | .ai/rules/charges.md |
 | config/**, config/tenants.php | .ai/rules/config.md |

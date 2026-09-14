@@ -15,13 +15,13 @@ There were four. Featured items and Combos were tabs of their own (`ManageMenuFe
 
 | Row | Table in the modal | Ordered by |
 | --- | --- | --- |
-| a category or sub-category | `CategoryItemsRelationManager`: its items — create, edit in a slide-over (add-ons and tax included), delete | `position` |
+| a category or sub-category | `CategoryItemsRelationManager`: its items — create and edit in a full-width slide-over (add-on groups and tax included), delete | `position` |
 | Featured items | `FeaturedItemsRelationManager`: Feature items, edit, Remove from featured | `featured_position` |
 | Combos | `CombosRelationManager`: create, edit, delete | `position` |
 
 This replaced one table of every row on the menu, items, featured items and combos included. The project owner asked for it: a featured item could be dragged in among a category's items and looked filed there, and the note explaining why a drop was refused was one more thing on screen. **Do not put item rows back on the outline.**
 
-The three are relation managers in `Menus/RelationManagers/` that **no resource lists**. They are deliberately not in `MenuResource::getRelations()`, which would draw them under the Edit tab too. A relation manager is exactly Filament's table of one record's related rows, with create, edit, delete and drag already bound to the model and its policy, so a relationship repeater (an item's add-ons, a combo's contents) works in them with no special handling. `MenuArrangementTable::contentsOf()` renders one through `Filament\Schemas\Components\Livewire`, keyed per row.
+The three are relation managers in `Menus/RelationManagers/` that **no resource lists**. They are deliberately not in `MenuResource::getRelations()`, which would draw them under the Edit tab too. A relation manager is exactly Filament's table of one record's related rows, with create, edit, delete and drag already bound to the model and its policy, so a relationship repeater (an item's add-on groups, a combo's contents) works in them with no special handling. `MenuArrangementTable::contentsOf()` renders one through `Filament\Schemas\Components\Livewire`, keyed per row.
 
 What the modal needs, all in `contentsModal()`:
 - **`formWrapper(false)`.** Filament makes every action modal a `<form>`. The table inside opens modals of its own, which are forms too, and a browser's parser drops a form nested in a form — their save buttons would have submitted the outer modal instead.
@@ -44,6 +44,11 @@ The outline is a Filament **custom data** table (`->records()`), because its row
 **Three queries build the outline, however big the menu**: categories at both levels with a count of their items, the menu's placed blocks, and one query counting its combos and its featured items. `MenuCategoryTreeTest` asserts neither the page's query count nor the featured items table's grows with the menu.
 
 The items table creates through `MenuItem::query()->create()` rather than through the relationship, because the item form keeps its category select: created through the relationship, a different choice there would be silently overruled.
+
+## The item form is laid out for the full width
+Every modal an item is created or edited in is `Width::Full` — on the Items page, in a category's table and in the featured items table — because the project owner found the stacked form wasted the screen. `MenuItemForm` is a grid container (`'@4xl' => 3`): what the item is across two thirds (name and diet, category and service request, description), its price and its tax stacked in compact sections in the last third, and the add-on groups it offers in a full-width row underneath. The container breakpoint stacks the same form into one column wherever it is given less room.
+
+The add-on groups row is a table repeater on `addOnGroupLinks`: one searchable select per row, listing the tenant's groups labelled with their rule ("Choose your bread — Required · Choose 1"), `distinct()`, dragged into the order a guest reads them, and able to make a new group without leaving the item. See `.ai/rules/add-on-groups.md`.
 
 ## Rows are tinted by kind, and a drag is refused outside a row's own list
 `recordClasses()` puts `menu-row--<kind>` (`featured`, `combos`, `category`, `sub_category`) and `menu-list--<list>` on every row. `resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php` holds what reads them, inline because a panel ships no CSS of ours: a tint per kind on the row and a coloured edge on its first cell, mixed from Filament's colour variables so dark mode follows, with the row's Kind badge in the same colour.

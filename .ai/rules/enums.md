@@ -31,7 +31,7 @@ What a role *grants* is not owned by the code. `App\Enums\Role::permissions()` i
 ## A tax rate is a number, not an enum — this was tried and reverted
 GST rates are **not** a fixed value set, and modelling them as one was a mistake worth recording. `App\Enums\TaxRate` existed briefly with cases for the 0/5/12/18/28 slabs; India's GST 2.0 reform of 22 September 2025 collapsed those to 0/5/18 plus a 40% demerit rate, so the enum was wrong on the day it was written. Rates also vary by choice, not just by law — a standalone outlet may elect 5% without input tax credit or 18% with it.
 
-So `tax_rate_basis_points` is a plain nullable integer on `menu_items`, `menu_item_additions` and `menu_combos`, and a non-nullable one on `tenant_settings`. A tenant types the percentage its accountant gives it.
+So `tax_rate_basis_points` is a plain nullable integer on `menu_items`, `menu_add_on_options` and `menu_combos`, and a non-nullable one on `tenant_settings`. A tenant types the percentage its accountant gives it.
 
 Basis points rather than a percentage float, though — 5% is `500`. That keeps every rate an exact integer, exactly as money is an exact integer in minor units, so nothing between the database and a payment provider ever sees a float. `App\Filament\Schemas\PricingFields` is the only place a typed percentage becomes basis points and back, so the rounding happens once; `TenantSetting::BASIS_POINTS_PER_WHOLE` is the unit and `::DEFAULT_TAX_RATE_BASIS_POINTS` the starting point. A charge's rate is basis points for the same reason.
 
