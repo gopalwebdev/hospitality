@@ -66,13 +66,15 @@ const masala: MenuItem = {
     isServiceRequest: false,
     diet: 'vegetarian',
     addOnGroupIds: [2, 1],
+    minQuantity: 1,
+    maxQuantity: null,
 };
 
 function keep(lines: BasketLine[]): void {
     localStorage.setItem('basket:spice:1', JSON.stringify(lines));
 }
 
-function renderMenu() {
+function renderMenu(items: MenuItem[] = [masala]) {
     return render(
         <Menu
             tenant={{ name: 'Spice Garden', slug: 'spice' }}
@@ -86,9 +88,7 @@ function renderMenu() {
             }}
             featured={[]}
             combos={[]}
-            sections={[
-                { id: 1, name: 'Curries', items: [masala], subSections: [] },
-            ]}
+            sections={[{ id: 1, name: 'Curries', items, subSections: [] }]}
             order={[1]}
             addOnGroups={[extras, bread]}
             tax={{ rateBasisPoints: 500, pricesIncludeTax: false }}
@@ -250,5 +250,44 @@ describe('guest basket', () => {
             within(sheet).getByText('Nothing in your basket yet.'),
         ).toBeInTheDocument();
         expect(localStorage.getItem('basket:spice:1')).toBeNull();
+    });
+
+    it("stops a line at what one order may hold, counting the item's other lines, and says so", () => {
+        keep([
+            {
+                key: 'item:30:22x1',
+                type: 'item',
+                id: 30,
+                name: 'Paneer Butter Masala',
+                choices: [{ optionId: 22, quantity: 1 }],
+                quantity: 1,
+            },
+            {
+                key: 'item:30:22x1:11x1',
+                type: 'item',
+                id: 30,
+                name: 'Paneer Butter Masala',
+                choices: [
+                    { optionId: 22, quantity: 1 },
+                    { optionId: 11, quantity: 1 },
+                ],
+                quantity: 1,
+            },
+        ]);
+
+        renderMenu([{ ...masala, maxQuantity: 2 }]);
+        fireEvent.click(screen.getByRole('button', { name: /2 items/ }));
+
+        const sheet = screen.getByRole('dialog');
+        const steppers = within(sheet).getAllByRole('button', {
+            name: 'One more Paneer Butter Masala',
+        });
+
+        // One on each line is the two one order may hold.
+        expect(steppers).toHaveLength(2);
+        steppers.forEach((more) => {
+            expect(more).toBeDisabled();
+        });
+        expect(within(sheet).getAllByText('Up to 2 per order')).toHaveLength(2);
     });
 });

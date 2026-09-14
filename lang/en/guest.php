@@ -74,6 +74,14 @@ return [
         'clear' => 'Empty basket',
     ],
 
+    'limits' => [
+        'up_to' => 'Up to :max per order',
+        'at_least' => 'At least :min per order',
+        'between' => ':min to :max per order',
+        'exactly' => ':count per order',
+        'reached' => 'Limit reached',
+    ],
+
     'document' => [
         'unavailable' => 'This document could not be opened.',
         'open' => 'Open in a new tab',

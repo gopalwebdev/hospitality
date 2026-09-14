@@ -40,6 +40,8 @@ class MenuItemFactory extends Factory
             'is_service_request' => false,
             'diet' => fake()->randomElement(Diet::cases()),
             'availability' => ItemAvailability::Available,
+            'min_quantity' => 1,
+            'max_quantity' => null,
             'position' => fake()->numberBetween(0, 20),
         ];
     }
@@ -87,6 +89,17 @@ class MenuItemFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'tax_rate_basis_points' => $basisPoints,
+        ]);
+    }
+
+    /**
+     * An item one order holds at least $min of, and at most $max unless it is null.
+     */
+    public function limitedPerOrder(int $min, ?int $max): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'min_quantity' => $min,
+            'max_quantity' => $max,
         ]);
     }
 

@@ -14,7 +14,6 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { MAX_LINE_QUANTITY } from '@/hooks/use-basket';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 import {
@@ -35,9 +34,15 @@ import {
     toggle,
     unitPrice,
 } from '@/lib/add-on-rules';
+import {
+    type OrderLimits,
+    fewestToAdd,
+    limitsRule,
+    roomFor,
+} from '@/lib/order-limits';
 
 /** What the sheet needs of the item being customised. */
-export interface CustomisableItem {
+export interface CustomisableItem extends OrderLimits {
     id: number;
     name: string;
     description: string | null;
@@ -51,6 +56,8 @@ interface CustomiseSheetProps {
     item: CustomisableItem | null;
     /** The groups it offers, in the order the item lists them. */
     groups: AddOnGroup[];
+    /** How many of it the basket already holds, which counts towards its limits. */
+    held: number;
     onClose: () => void;
     onAdd: (choices: Choice[], quantity: number) => void;
 }
@@ -65,6 +72,7 @@ interface CustomiseSheetProps {
 export function CustomiseSheet({
     item,
     groups,
+    held,
     onClose,
     onAdd,
 }: CustomiseSheetProps) {
@@ -87,6 +95,7 @@ export function CustomiseSheet({
                         key={item.id}
                         item={item}
                         groups={groups}
+                        held={held}
                         onAdd={onAdd}
                     />
                 )}
@@ -98,16 +107,24 @@ export function CustomiseSheet({
 function Customiser({
     item,
     groups,
+    held,
     onAdd,
 }: {
     item: CustomisableItem;
     groups: AddOnGroup[];
+    held: number;
     onAdd: CustomiseSheetProps['onAdd'];
 }) {
     const { t } = useTranslations();
     const money = useMoney();
+    // What the basket already holds counts towards the item's limits, so another
+    // line of it starts at what the minimum still asks for and stops where the
+    // maximum does.
+    const room = roomFor(item, held);
+    const fewest = Math.min(fewestToAdd(item, held), Math.max(room, 1));
+    const rule = limitsRule(item);
     const [picks, setPicks] = useState<Picks>(() => initialPicks(groups));
-    const [quantity, setQuantity] = useState(1);
+    const [quantity, setQuantity] = useState(fewest);
 
     const shortfall = firstShortfall(groups, picks);
     const total = unitPrice(item.priceMinorUnits, groups, picks) * quantity;
@@ -154,12 +171,18 @@ function Customiser({
             </div>
 
             <SheetFooter className="border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {rule !== null && (
+                    <p className="text-muted-foreground text-xs">
+                        {t(rule.path, rule.replacements)}
+                    </p>
+                )}
+
                 <div className="flex items-center gap-3">
                     <QuantityStepper
                         value={quantity}
                         name={item.name}
-                        canDecrease={quantity > 1}
-                        canIncrease={quantity < MAX_LINE_QUANTITY}
+                        canDecrease={quantity > fewest}
+                        canIncrease={quantity < room}
                         onDecrease={() => {
                             setQuantity(quantity - 1);
                         }}
@@ -172,7 +195,7 @@ function Customiser({
                         type="button"
                         size="lg"
                         className="h-auto min-h-12 flex-1 whitespace-normal"
-                        disabled={shortfall !== null}
+                        disabled={shortfall !== null || quantity > room}
                         onClick={() => {
                             onAdd(choicesOf(groups, picks), quantity);
                         }}

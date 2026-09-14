@@ -22,6 +22,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -830,6 +831,34 @@ it('refuses a struck-through price that is not above what is charged', function 
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasActionErrors(['compare_at_price']);
+});
+
+it('keeps how many of an item one order may hold, and refuses a maximum below the minimum', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    $create = fn (string $minimum, string $maximum): Testable => Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Idli'],
+            'menu_category_id' => $category->getKey(),
+            'diet' => Diet::Vegetarian->value,
+            'price' => '60',
+            'availability' => ItemAvailability::Available->value,
+            'min_quantity' => $minimum,
+            'max_quantity' => $maximum,
+        ]);
+
+    $create('3', '2')->assertHasActionErrors(['max_quantity']);
+    $create('2', '')->assertHasNoActionErrors();
+
+    // A blank maximum is no limit, not a limit of nothing.
+    expect(byEnglishName(MenuItem::class, 'Idli'))
+        ->min_quantity->toBe(2)
+        ->max_quantity->toBeNull();
 });
 
 it('leaves an item that is not on offer with no compare-at price at all', function (): void {

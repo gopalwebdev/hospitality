@@ -158,6 +158,47 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         ->and($response->json('subtotalMinorUnits'))->toBe(28900 + 8000 + 6000);
 });
 
+it('flags every line of an item or combo the basket holds more or fewer of than one order may, counting across its lines', function (): void {
+    [
+        'tenant' => $tenant, 'menu' => $menu, 'category' => $category, 'curry' => $curry,
+        'butterNaan' => $butterNaan, 'garlicNaan' => $garlicNaan,
+    ] = seedCurryWithChoices();
+
+    $curry->update(['max_quantity' => 2]);
+    $idli = MenuItem::factory()->inCategory($category)->limitedPerOrder(2, null)->create();
+    $platter = MenuCombo::factory()->onMenu($menu)->limitedPerOrder(1, 1)->create();
+
+    $statuses = fn (array $lines): array => collect($this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => $lines])->assertOk()->json('lines'))
+        ->pluck('status', 'key')
+        ->all();
+
+    // A curry with butter naan and one with garlic naan are two lines, and two
+    // curries: as many as one order may hold.
+    expect($statuses([
+        basketLine('butter', $curry, choices: [[$butterNaan, 1]]),
+        basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
+        basketLine('two-idli', $idli, quantity: 2),
+        basketLine('one-platter', $platter),
+    ]))->toBe([
+        'butter' => QuoteBasket::OK,
+        'garlic' => QuoteBasket::OK,
+        'two-idli' => QuoteBasket::OK,
+        'one-platter' => QuoteBasket::OK,
+    ])
+        // A third curry on either line is one too many for both lines.
+        ->and($statuses([
+            basketLine('butter', $curry, quantity: 2, choices: [[$butterNaan, 1]]),
+            basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
+            basketLine('one-idli', $idli),
+            basketLine('two-platters', $platter, quantity: 2),
+        ]))->toBe([
+            'butter' => QuoteBasket::INVALID,
+            'garlic' => QuoteBasket::INVALID,
+            'one-idli' => QuoteBasket::INVALID,
+            'two-platters' => QuoteBasket::INVALID,
+        ]);
+});
+
 it('flags a line the menu can no longer offer, whatever was chosen', function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'category' => $category] = seedCurryWithChoices();
 

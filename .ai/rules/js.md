@@ -84,6 +84,14 @@ Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An
 
 `hooks/use-basket.ts` keeps the lines in localStorage under `basket:{tenant slug}:{menu id}`, read through `useSyncExternalStore` with an empty server snapshot, because SSR is on and the first render has to match a page painted without the phone's storage. The same item with the same choices is one line. A line keeps ids and the name it was added under; the basket sheet names its lines from the page's props, so a language switch renames them.
 
+**Items and combos carry limits per order**, sent as `minQuantity` and `maxQuantity` (null is no limit) and counted across every basket line the item or combo is on. The project owner asked for them after a guest could ask for 27 pillows. `lib/order-limits.ts` holds the arithmetic:
+- **Quick Add:** puts in what the minimum still asks for.
+- **Customise sheet:** starts there, and its stepper stops at what the maximum leaves.
+- **Basket line:** + stops at the maximum and − at the minimum.
+- **A full basket:** Add stays on screen, greyed, with "Limit reached" under it. Hiding it would read as sold out.
+
+The limit is worded under the sheet's stepper and each basket line ("Up to 2 per order"). On a line the server refused for it, the limit replaces "Choices need changing". The server is what refuses (`.ai/rules/actions-menus.md`).
+
 Every number in `components/basket-sheet.tsx` is the server's. `hooks/use-basket-quote.ts` posts the lines to `quoteUrl` with Inertia's `useHttp` whenever the sheet is open and the basket changes (`App\Actions\Menus\QuoteBasket`, see `.ai/rules/actions-menus.md`). Two traps in that hook:
 - `useHttp` hands back new helpers on every render, so the hook reads them through a ref; listing them as effect dependencies re-posts on every render.
 - It calls `transform()` before `post()`, because `post()` sends from a ref that a `setData()` in the same tick has not updated yet.

@@ -30,6 +30,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $compare_at_price_minor_units
  * @property int|null $tax_rate_basis_points
  * @property ItemAvailability $availability
+ * @property int $min_quantity
+ * @property int|null $max_quantity
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -42,6 +44,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'compare_at_price_minor_units',
     'tax_rate_basis_points',
     'availability',
+    'min_quantity',
+    'max_quantity',
     'position',
 ])]
 #[ObservedBy([MenuComboObserver::class])]
@@ -61,6 +65,7 @@ class MenuCombo extends Model
     protected $attributes = [
         'position' => 0,
         'availability' => ItemAvailability::Available->value,
+        'min_quantity' => 1,
     ];
 
     /**
@@ -135,6 +140,8 @@ class MenuCombo extends Model
             'compare_at_price_minor_units' => 'integer',
             'tax_rate_basis_points' => 'integer',
             'availability' => ItemAvailability::class,
+            'min_quantity' => 'integer',
+            'max_quantity' => 'integer',
             'position' => 'integer',
         ];
     }

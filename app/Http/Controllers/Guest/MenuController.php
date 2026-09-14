@@ -131,7 +131,7 @@ class MenuController extends Controller
         $present = fn (MenuItem $item): array => $this->presentItem($item, $offeredGroupIds($item));
 
         $combos = MenuCombo::query()
-            ->select(['id', 'name', 'description', 'price_minor_units', 'compare_at_price_minor_units'])
+            ->select(['id', 'name', 'description', 'price_minor_units', 'compare_at_price_minor_units', 'min_quantity', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', $orderable)
             ->with(['comboItems' => fn ($comboItems) => $comboItems
@@ -159,6 +159,8 @@ class MenuController extends Controller
                 'description' => $combo->description,
                 'priceMinorUnits' => $combo->price_minor_units,
                 'compareAtPriceMinorUnits' => $combo->hasComparePrice() ? $combo->compare_at_price_minor_units : null,
+                'minQuantity' => $combo->min_quantity,
+                'maxQuantity' => $combo->max_quantity,
                 'contents' => $combo->comboItems->map(fn (MenuComboItem $comboItem): array => [
                     'id' => $comboItem->getKey(),
                     'name' => $comboItem->menuItem->name,
@@ -368,6 +370,8 @@ class MenuController extends Controller
             'compare_at_price_minor_units',
             'is_service_request',
             'diet',
+            'min_quantity',
+            'max_quantity',
         ];
     }
 
@@ -453,8 +457,12 @@ class MenuController extends Controller
             // has to decide whether what it was handed is believable.
             'compareAtPriceMinorUnits' => $item->hasComparePrice() ? $item->compare_at_price_minor_units : null,
             'isServiceRequest' => $item->is_service_request,
-            // Null for a service request, which carries no diet mark.
+            // Null for a service request, which the app marks with a bell instead.
             'diet' => $item->diet?->value,
+            // How many one order may hold, counted across every basket line it
+            // is on. A null maximum is no limit.
+            'minQuantity' => $item->min_quantity,
+            'maxQuantity' => $item->max_quantity,
             // In the order the guest reads them; each id is one of the menu's
             // `addOnGroups`.
             'addOnGroupIds' => $addOnGroupIds,

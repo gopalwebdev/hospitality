@@ -135,7 +135,7 @@ class MenuItemForm
     }
 
     /**
-     * What a guest pays, whether they can have it now, and whether the menu leads with it.
+     * What a guest pays, whether they can have it now, whether the menu leads with it, and how many one order may hold.
      */
     private static function priceSection(Currency $currency): Section
     {
@@ -160,6 +160,8 @@ class MenuItemForm
                     ->label(__('panel.items.is_featured'))
                     ->default(false)
                     ->inline(false),
+
+                ...PricingFields::quantityLimits(),
             ]);
     }
 

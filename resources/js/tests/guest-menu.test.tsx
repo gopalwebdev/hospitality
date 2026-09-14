@@ -38,6 +38,8 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         isServiceRequest: false,
         diet: 'vegetarian',
         addOnGroupIds: [],
+        minQuantity: 1,
+        maxQuantity: null,
         ...overrides,
     };
 }
@@ -354,6 +356,104 @@ describe('guest menu', () => {
         ]);
     });
 
+    it('stops offering an item once the basket holds as many as one order may, and adds what a minimum asks for', () => {
+        renderMenu({
+            sections: [
+                {
+                    id: 1,
+                    name: 'Housekeeping',
+                    items: [
+                        item({
+                            id: 20,
+                            name: 'Extra Blanket',
+                            isServiceRequest: true,
+                            diet: null,
+                            priceMinorUnits: 0,
+                            maxQuantity: 2,
+                        }),
+                        item({ id: 21, name: 'Idli', minQuantity: 2 }),
+                    ],
+                    subSections: [],
+                },
+            ],
+        });
+
+        const addBlanket = screen.getByRole('button', {
+            name: 'Add Extra Blanket',
+        });
+
+        fireEvent.click(addBlanket);
+        fireEvent.click(addBlanket);
+
+        // Greyed where it was rather than gone, which would read as sold out.
+        expect(addBlanket).toBeDisabled();
+        expect(screen.getByText('Limit reached')).toBeInTheDocument();
+
+        // A minimum of two goes in as two, not as one the server would refuse.
+        fireEvent.click(screen.getByRole('button', { name: 'Add Idli' }));
+
+        expect(
+            JSON.parse(localStorage.getItem('basket:spice:1') ?? '[]'),
+        ).toEqual([
+            expect.objectContaining({ id: 20, quantity: 2 }),
+            expect.objectContaining({ id: 21, quantity: 2 }),
+        ]);
+    });
+
+    it('starts a customised item where the basket leaves off, and stops it at what one order may hold', () => {
+        localStorage.setItem(
+            'basket:spice:1',
+            JSON.stringify([
+                {
+                    key: 'item:30:21x1',
+                    type: 'item',
+                    id: 30,
+                    name: 'Paneer Butter Masala',
+                    choices: [{ optionId: 21, quantity: 1 }],
+                    quantity: 1,
+                },
+            ]),
+        );
+
+        renderMenu({
+            sections: [
+                {
+                    id: 1,
+                    name: 'Curries',
+                    items: [
+                        item({
+                            id: 30,
+                            name: 'Paneer Butter Masala',
+                            addOnGroupIds: [2],
+                            maxQuantity: 3,
+                        }),
+                    ],
+                    subSections: [],
+                },
+            ],
+            addOnGroups: [bread],
+        });
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add Paneer Butter Masala' }),
+        );
+
+        const sheet = screen.getByRole('dialog');
+
+        expect(
+            within(sheet).getByText('Up to 3 per order'),
+        ).toBeInTheDocument();
+
+        const more = within(sheet).getByRole('button', {
+            name: 'One more Paneer Butter Masala',
+        });
+
+        fireEvent.click(more);
+
+        // One already in the basket and two here are the three one order holds.
+        expect(more).toBeDisabled();
+    });
+
     it('reads a category, then its subdivisions, each under its own heading', () => {
         renderMenu({
             sections: [
@@ -410,6 +510,8 @@ describe('guest menu', () => {
                     description: null,
                     priceMinorUnits: 99900,
                     compareAtPriceMinorUnits: null,
+                    minQuantity: 1,
+                    maxQuantity: null,
                     contents: [],
                 },
             ],
@@ -460,6 +562,8 @@ describe('guest menu', () => {
                     description: 'Enough for four.',
                     priceMinorUnits: 99900,
                     compareAtPriceMinorUnits: 120000,
+                    minQuantity: 1,
+                    maxQuantity: null,
                     contents: [
                         {
                             id: 30,

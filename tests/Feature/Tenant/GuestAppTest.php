@@ -498,6 +498,28 @@ it('sends a struck-through price only when there is a real offer', function (): 
         );
 });
 
+it('sends how many of an item or a combo one order may hold', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+
+    $pillow = MenuItem::factory()->inCategory($category)->service()->limitedPerOrder(1, 2)->create(['position' => 0]);
+    MenuItem::factory()->inCategory($category)->create(['position' => 1]);
+    MenuCombo::factory()->onMenu($menu)->limitedPerOrder(2, 4)->create();
+
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('sections.0.items.0.id', $pillow->getKey())
+            ->where('sections.0.items.0.minQuantity', 1)
+            ->where('sections.0.items.0.maxQuantity', 2)
+            // Null is no limit, and the app reads it that way.
+            ->where('sections.0.items.1.maxQuantity', null)
+            ->where('combos.0.minQuantity', 2)
+            ->where('combos.0.maxQuantity', 4),
+        );
+});
+
 it('tells a guest what the prices do not include before they order', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update([

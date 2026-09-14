@@ -63,6 +63,13 @@ const DEFAULT_TRANSLATIONS: Translations = {
         hint: 'Show this to a member of staff to place your order.',
         clear: 'Empty basket',
     },
+    limits: {
+        up_to: 'Up to :max per order',
+        at_least: 'At least :min per order',
+        between: ':min to :max per order',
+        exactly: ':count per order',
+        reached: 'Limit reached',
+    },
     document: { open: 'Open in a new tab', unavailable: 'Not available.' },
     status: { open: 'Open', closed: 'Closed' },
     item: { sold_out: 'Sold out', hidden: 'Hidden', free: 'Free' },

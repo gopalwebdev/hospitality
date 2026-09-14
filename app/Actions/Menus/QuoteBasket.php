@@ -42,7 +42,7 @@ class QuoteBasket
     /** Sold out, hidden, or no longer on this menu. */
     public const string UNAVAILABLE = 'unavailable';
 
-    /** Still on the menu, but its choices no longer meet the rules of its groups. */
+    /** Still on the menu, but its choices break the rules of its groups, or the basket holds more or fewer of it than one order may. */
     public const string INVALID = 'invalid';
 
     /**
@@ -58,6 +58,7 @@ class QuoteBasket
         $items = $this->items($tenant, $menu, $this->idsOf($lines, self::ITEM));
         $groups = $this->groups($tenant, $items);
         $combos = $this->combos($menu, $this->idsOf($lines, self::COMBO));
+        $held = $this->heldIn($lines);
 
         $priced = [];
         $subtotal = 0;
@@ -65,8 +66,8 @@ class QuoteBasket
 
         foreach ($lines as $line) {
             $parts = $line['type'] === self::COMBO
-                ? $this->comboParts($combos->get($line['id']), $tenantRate)
-                : $this->itemParts($items->get($line['id']), $groups, $line['choices'] ?? [], $tenantRate);
+                ? $this->comboParts($combos->get($line['id']), $held[self::COMBO][$line['id']], $tenantRate)
+                : $this->itemParts($items->get($line['id']), $groups, $line['choices'] ?? [], $held[self::ITEM][$line['id']], $tenantRate);
 
             if (is_string($parts)) {
                 $priced[] = ['key' => $line['key'], 'status' => $parts, 'unitPriceMinorUnits' => 0, 'totalMinorUnits' => 0];
@@ -77,8 +78,8 @@ class QuoteBasket
             $unit = array_sum(array_column($parts, 'amount'));
             $lineTotal = $unit * $line['quantity'];
 
-            // Taxed part by part, because an option may carry a rate the item
-            // does not, and rounded once for the whole line rather than per unit.
+            // Taxed part by part, and rounded once for the whole line rather
+            // than per unit.
             foreach ($parts as $part) {
                 $tax += $this->taxOn($part['amount'] * $line['quantity'], $part['rate'], $pricesIncludeTax);
             }
@@ -108,7 +109,7 @@ class QuoteBasket
      * @param  list<array{optionId: int, quantity: int}>  $choices
      * @return list<PricedPart>|string
      */
-    private function itemParts(?MenuItem $item, EloquentCollection $groups, array $choices, int $tenantRate): array|string
+    private function itemParts(?MenuItem $item, EloquentCollection $groups, array $choices, int $held, int $tenantRate): array|string
     {
         if (! $item instanceof MenuItem) {
             return self::UNAVAILABLE;
@@ -123,6 +124,12 @@ class QuoteBasket
         // available options can no longer meet takes the item off the menu.
         if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered()))) {
             return self::UNAVAILABLE;
+        }
+
+        // However it was chosen, one order holds only as many of an item as the
+        // tenant allows, counted across every line it is on.
+        if (! $this->isWithinLimits($item, $held)) {
+            return self::INVALID;
         }
 
         $options = $offered
@@ -177,11 +184,43 @@ class QuoteBasket
      *
      * @return list<PricedPart>|string
      */
-    private function comboParts(?MenuCombo $combo, int $tenantRate): array|string
+    private function comboParts(?MenuCombo $combo, int $held, int $tenantRate): array|string
     {
-        return $combo instanceof MenuCombo
-            ? [['amount' => $combo->price_minor_units, 'rate' => $combo->taxRateBasisPoints($tenantRate)]]
-            : self::UNAVAILABLE;
+        if (! $combo instanceof MenuCombo) {
+            return self::UNAVAILABLE;
+        }
+
+        if (! $this->isWithinLimits($combo, $held)) {
+            return self::INVALID;
+        }
+
+        return [['amount' => $combo->price_minor_units, 'rate' => $combo->taxRateBasisPoints($tenantRate)]];
+    }
+
+    /**
+     * Whether the basket holds as many of an item or a combo as one order may: its minimum, and no more than its maximum when it has one.
+     */
+    private function isWithinLimits(MenuItem|MenuCombo $thing, int $held): bool
+    {
+        return $held >= $thing->min_quantity
+            && ($thing->max_quantity === null || $held <= $thing->max_quantity);
+    }
+
+    /**
+     * How many of each item and each combo the basket holds, across every line it is on.
+     *
+     * @param  list<BasketLine>  $lines
+     * @return array<string, array<int, int>> by line type, then by id
+     */
+    private function heldIn(array $lines): array
+    {
+        $held = [];
+
+        foreach ($lines as $line) {
+            $held[$line['type']][$line['id']] = ($held[$line['type']][$line['id']] ?? 0) + $line['quantity'];
+        }
+
+        return $held;
     }
 
     /**
@@ -207,7 +246,7 @@ class QuoteBasket
         }
 
         return MenuItem::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points'])
+            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'min_quantity', 'max_quantity'])
             ->where('tenant_id', $tenant->getKey())
             ->onMenu($menu->getKey())
             ->orderable()
@@ -259,7 +298,7 @@ class QuoteBasket
         }
 
         return MenuCombo::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points'])
+            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'min_quantity', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', ItemAvailability::orderableValues())
             ->whereKey($ids)

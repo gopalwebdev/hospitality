@@ -85,6 +85,12 @@ Featuring belongs to **one menu**, so an item that leaves a menu stops being fea
 
 Prices carry an optional `compare_at_price_minor_units` — the higher "was" price shown struck through — which is null on almost every row, because null is how an item says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option. A price of zero is complimentary.
 
+An item and a combo each say how many one order may hold, counted across every basket line it is on:
+- **`min_quantity`:** 1 unless set.
+- **`max_quantity`:** null for no limit.
+
+A feather pillow and a memory foam one are two towards a maximum of two. The item and combo forms ask for both, and `QuoteBasket` refuses a basket outside them. An option's `max_quantity` is a different limit: how many of it one item takes.
+
 `menu_items` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as a served drink, a laundry pickup taxed as a service — override it. The Settings page holds only the global rate and `prices_include_tax`. An add-on option carries no rate: it is taxed at the rate of the item it is added to (`.ai/rules/add-on-groups.md`).
 
 ## Charges are their own module, on every menu or only some

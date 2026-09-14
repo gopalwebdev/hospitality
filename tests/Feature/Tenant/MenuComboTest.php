@@ -115,6 +115,26 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
     expect(comboNamed('Lunch Box')->compare_at_price_minor_units)->toBeNull();
 });
 
+it('keeps how many of a combo one order may hold', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    combosOf($menu)
+        ->callAction(TestAction::make('create')->table(), [
+            'name' => [Locale::English->value => 'Party Platter'],
+            'price' => '1200',
+            'availability' => ItemAvailability::Available->value,
+            'max_quantity' => '1',
+        ])
+        ->assertHasNoActionErrors();
+
+    expect(comboNamed('Party Platter'))
+        ->min_quantity->toBe(1)
+        ->max_quantity->toBe(1);
+});
+
 it('refuses a compare-at price that is not above what is charged', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);

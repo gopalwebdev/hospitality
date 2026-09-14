@@ -35,6 +35,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_service_request
  * @property Diet|null $diet
  * @property ItemAvailability $availability
+ * @property int $min_quantity
+ * @property int|null $max_quantity
  * @property bool $is_featured
  * @property int $featured_position
  * @property int $position
@@ -52,6 +54,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'is_service_request',
     'diet',
     'availability',
+    'min_quantity',
+    'max_quantity',
     'is_featured',
     'featured_position',
     'position',
@@ -78,6 +82,7 @@ class MenuItem extends Model
         'position' => 0,
         'is_service_request' => false,
         'availability' => ItemAvailability::Available->value,
+        'min_quantity' => 1,
         'is_featured' => false,
         'featured_position' => 0,
     ];
@@ -200,6 +205,8 @@ class MenuItem extends Model
             'is_service_request' => 'boolean',
             'diet' => Diet::class,
             'availability' => ItemAvailability::class,
+            'min_quantity' => 'integer',
+            'max_quantity' => 'integer',
             'is_featured' => 'boolean',
             'featured_position' => 'integer',
             'position' => 'integer',

@@ -22,12 +22,21 @@ import {
 } from '@/hooks/use-basket-quote';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
+import {
+    type OrderLimits,
+    isWithinLimits,
+    limitsRule,
+    quantityHeld,
+    roomFor,
+} from '@/lib/order-limits';
 
 /** How a basket line reads: its name, its diet mark, and what it was customised with. */
 export interface LineDescription {
     name: string;
     diet: Diet | null;
     isServiceRequest: boolean;
+    /** How many of the item or combo one order may hold. */
+    limits: OrderLimits;
     /** Each picked option, "2 × Extra cheese" where more than one was taken. */
     choices: string[];
 }
@@ -131,11 +140,19 @@ function LineRow({
     const { t } = useTranslations();
     const money = useMoney();
 
+    // Counted across every line the item or combo is on, as the server counts.
+    const held = quantityHeld(basket.lines, line.type, line.id);
+    const rule = limitsRule(description.limits);
+
+    // A line refused for holding too many or too few says how many one order
+    // may hold, which is what the guest has to change.
     const problem =
         quoted?.status === 'unavailable'
             ? t('basket.unavailable')
             : quoted?.status === 'invalid'
-              ? t('basket.invalid')
+              ? rule !== null && !isWithinLimits(description.limits, held)
+                  ? t(rule.path, rule.replacements)
+                  : t('basket.invalid')
               : null;
 
     return (
@@ -155,10 +172,16 @@ function LineRow({
                     </p>
                 )}
 
-                {problem !== null && (
+                {problem !== null ? (
                     <p className="text-destructive mt-1 text-sm font-medium">
                         {problem}
                     </p>
+                ) : (
+                    rule !== null && (
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                            {t(rule.path, rule.replacements)}
+                        </p>
+                    )
                 )}
 
                 <div className="mt-2 flex items-center gap-1">
@@ -166,8 +189,14 @@ function LineRow({
                         compact
                         value={line.quantity}
                         name={description.name}
-                        canDecrease={line.quantity > 1}
-                        canIncrease={line.quantity < MAX_LINE_QUANTITY}
+                        canDecrease={
+                            line.quantity > 1 &&
+                            held > description.limits.minQuantity
+                        }
+                        canIncrease={
+                            line.quantity < MAX_LINE_QUANTITY &&
+                            roomFor(description.limits, held) > 0
+                        }
                         onDecrease={() => {
                             basket.setQuantity(line.key, line.quantity - 1);
                         }}

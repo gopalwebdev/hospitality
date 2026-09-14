@@ -323,6 +323,8 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
                     'is_service_request' => true,
                     'price_minor_units' => 0,
+                    // Two to an order, however they are split between kinds.
+                    'max_quantity' => 2,
                     'is_featured' => true,
                     'featured_position' => 1,
                 ],
@@ -330,11 +332,13 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
                     'is_service_request' => true,
                     'price_minor_units' => 0,
+                    'max_quantity' => 2,
                 ],
                 [
                     'name' => ['en' => 'Bedsheet Change', 'ta' => 'படுக்கை விரிப்பு மாற்றம்'],
                     'is_service_request' => true,
                     'price_minor_units' => 0,
+                    'max_quantity' => 1,
                 ],
                 [
                     'name' => ['en' => 'Towel Set', 'ta' => 'துண்டு தொகுப்பு'],
@@ -1066,6 +1070,9 @@ class TenantSeeder extends Seeder
                 'is_service_request' => $item['is_service_request'] ?? false,
                 'diet' => $item['diet'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
+                'min_quantity' => $item['min_quantity'] ?? 1,
+                // Null is no limit.
+                'max_quantity' => $item['max_quantity'] ?? null,
                 'is_featured' => $item['is_featured'] ?? false,
                 'featured_position' => $item['featured_position'] ?? 0,
                 'tax_rate_basis_points' => $item['tax_rate_basis_points'] ?? null,

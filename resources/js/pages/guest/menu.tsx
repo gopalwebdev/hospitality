@@ -12,14 +12,21 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
     type BasketLine,
+    type BasketLineType,
     basketStorageKey,
     useBasket,
 } from '@/hooks/use-basket';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 import type { AddOnGroup } from '@/lib/add-on-rules';
+import {
+    type OrderLimits,
+    fewestToAdd,
+    quantityHeld,
+    roomFor,
+} from '@/lib/order-limits';
 
-export interface MenuItem {
+export interface MenuItem extends OrderLimits {
     id: number;
     name: string;
     description: string | null;
@@ -46,7 +53,7 @@ interface ComboContent {
     quantity: number;
 }
 
-export interface Combo {
+export interface Combo extends OrderLimits {
     id: number;
     name: string;
     description: string | null;
@@ -133,6 +140,8 @@ interface MenuProps {
 interface Ordering {
     addItem: (item: MenuItem) => void;
     addCombo: (combo: Combo) => void;
+    /** Whether the basket already holds as many of it as one order may. */
+    isFull: (type: BasketLineType, thing: MenuItem | Combo) => boolean;
 }
 
 const OrderingContext = createContext<Ordering | null>(null);
@@ -202,6 +211,9 @@ export default function Menu({
             return group === undefined ? [] : [group];
         });
 
+    const heldOf = (type: BasketLineType, id: number): number =>
+        quantityHeld(basket.lines, type, id);
+
     const ordering: Ordering | null =
         acceptingOrders && menu.isBeingServed
             ? {
@@ -212,12 +224,14 @@ export default function Menu({
                           return;
                       }
 
+                      // An item with a minimum goes in at it, rather than as
+                      // one the server would refuse.
                       basket.add({
                           type: 'item',
                           id: item.id,
                           name: item.name,
                           choices: [],
-                          quantity: 1,
+                          quantity: fewestToAdd(item, heldOf('item', item.id)),
                       });
                   },
                   addCombo: (combo) => {
@@ -226,9 +240,14 @@ export default function Menu({
                           id: combo.id,
                           name: combo.name,
                           choices: [],
-                          quantity: 1,
+                          quantity: fewestToAdd(
+                              combo,
+                              heldOf('combo', combo.id),
+                          ),
                       });
                   },
+                  isFull: (type, thing) =>
+                      roomFor(thing, heldOf(type, thing.id)) === 0,
               }
             : null;
 
@@ -314,6 +333,7 @@ export default function Menu({
             <CustomiseSheet
                 item={customising}
                 groups={customising === null ? [] : groupsOf(customising)}
+                held={customising === null ? 0 : heldOf('item', customising.id)}
                 onClose={() => {
                     setCustomising(null);
                 }}
@@ -388,6 +408,7 @@ function describeLine({
             name: item?.name ?? combo?.name ?? line.name,
             diet: item?.diet ?? null,
             isServiceRequest: item?.isServiceRequest ?? false,
+            limits: item ?? combo ?? { minQuantity: 1, maxQuantity: null },
             choices: line.choices.flatMap((choice) => {
                 const option = optionsById.get(choice.optionId);
 
@@ -607,8 +628,9 @@ function ComboCard({ combo }: { combo: Combo }) {
                 />
 
                 {ordering !== null && (
-                    <AddButton
+                    <AddControl
                         name={combo.name}
+                        isFull={ordering.isFull('combo', combo)}
                         onAdd={() => {
                             ordering.addCombo(combo);
                         }}
@@ -670,22 +692,48 @@ function Price({
 
 /**
  * Put something in the basket, named for screen readers: "Add Paneer Tikka".
+ *
+ * Once the basket holds as many as one order may, the button stays where it
+ * is, greyed, with "Limit reached" under it. Hidden, it would read as sold out.
  */
-function AddButton({ name, onAdd }: { name: string; onAdd: () => void }) {
+function AddControl({
+    name,
+    isFull,
+    isCustomisable = false,
+    onAdd,
+}: {
+    name: string;
+    isFull: boolean;
+    isCustomisable?: boolean;
+    onAdd: () => void;
+}) {
     const { t } = useTranslations();
 
+    const caption = isFull
+        ? t('limits.reached')
+        : isCustomisable
+          ? t('menu.customisable')
+          : null;
+
     return (
-        <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-primary min-w-16 font-semibold"
-            aria-label={t('menu.add_named', { name })}
-            onClick={onAdd}
-        >
-            <PlusIcon />
-            {t('menu.add')}
-        </Button>
+        <div className="flex shrink-0 flex-col items-center gap-1">
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-primary min-w-16 font-semibold"
+                aria-label={t('menu.add_named', { name })}
+                disabled={isFull}
+                onClick={onAdd}
+            >
+                <PlusIcon />
+                {t('menu.add')}
+            </Button>
+
+            {caption !== null && (
+                <span className="text-muted-foreground text-xs">{caption}</span>
+            )}
+        </div>
     );
 }
 
@@ -708,7 +756,6 @@ function Item({
     item: MenuItem;
     headingLevel?: 3 | 4;
 }) {
-    const { t } = useTranslations();
     const ordering = useContext(OrderingContext);
     const Heading = headingLevel === 4 ? 'h4' : 'h3';
 
@@ -743,20 +790,14 @@ function Item({
             </div>
 
             {ordering !== null && (
-                <div className="flex shrink-0 flex-col items-center gap-1">
-                    <AddButton
-                        name={item.name}
-                        onAdd={() => {
-                            ordering.addItem(item);
-                        }}
-                    />
-
-                    {item.addOnGroupIds.length > 0 && (
-                        <span className="text-muted-foreground text-xs">
-                            {t('menu.customisable')}
-                        </span>
-                    )}
-                </div>
+                <AddControl
+                    name={item.name}
+                    isFull={ordering.isFull('item', item)}
+                    isCustomisable={item.addOnGroupIds.length > 0}
+                    onAdd={() => {
+                        ordering.addItem(item);
+                    }}
+                />
             )}
         </article>
     );
