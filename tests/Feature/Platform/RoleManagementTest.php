@@ -13,7 +13,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -271,7 +271,7 @@ it('sets a built-in role\'s permissions like any other', function (): void {
 |
 */
 
-it('offers a checkbox list for every category that has permissions', function (PermissionGroup $group): void {
+it('offers a permissions select for every category that has permissions', function (PermissionGroup $group): void {
     enterProductTeamPanel();
 
     $expected = Permission::query()->get()
@@ -289,7 +289,7 @@ it('offers a checkbox list for every category that has permissions', function (P
     // are ordered by name, so compare as sets rather than by position.
     $page->assertFormFieldExists(
         RoleForm::statePathFor($group),
-        function (CheckboxList $field) use ($expected): bool {
+        function (Select $field) use ($expected): bool {
             $offered = array_keys($field->getOptions());
             sort($offered);
 
@@ -324,7 +324,7 @@ it('files a permission added from the panel under Other, and then offers it', fu
     Livewire::test(CreateRole::class)
         ->assertFormFieldExists(
             RoleForm::statePathFor(PermissionGroup::Other),
-            fn (CheckboxList $field): bool => array_key_exists((string) $custom->getKey(), $field->getOptions()),
+            fn (Select $field): bool => array_key_exists((string) $custom->getKey(), $field->getOptions()),
         );
 });
 

@@ -28,8 +28,7 @@ return new class extends Migration
             // Null exactly for a service request; see MenuItemObserver.
             $table->string('diet', 32)->nullable();
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
-            // How many one order may hold, across every basket line it is on; a null maximum is no limit.
-            $table->smallInteger('min_quantity')->default(1);
+            // The most one order may hold, across every basket line it is on; null is no limit.
             $table->smallInteger('max_quantity')->nullable();
             $table->boolean('is_featured')->default(false);
             $table->integer('featured_position')->default(0);
@@ -42,7 +41,7 @@ return new class extends Migration
             ADD CONSTRAINT menu_items_prices_not_negative CHECK (price_minor_units >= 0 AND (compare_at_price_minor_units IS NULL OR compare_at_price_minor_units >= 0)),
             ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_items_diet_matches_service_request CHECK (is_service_request = (diet IS NULL)),
-            ADD CONSTRAINT menu_items_quantities_in_range CHECK (min_quantity BETWEEN 1 AND 99 AND (max_quantity IS NULL OR max_quantity BETWEEN min_quantity AND 99))');
+            ADD CONSTRAINT menu_items_max_quantity_in_range CHECK (max_quantity IS NULL OR max_quantity BETWEEN 1 AND 99)');
     }
 
     public function down(): void

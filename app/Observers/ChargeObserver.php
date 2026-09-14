@@ -31,19 +31,4 @@ class ChargeObserver
             sprintf('A %s charge needs a %s.', $charge->calculation->value, $required),
         );
     }
-
-    /**
-     * A charge on every menu keeps no list of menus.
-     *
-     * So a menu added later is covered without anyone ticking it, and a list
-     * left over from when the charge was limited cannot quietly come back.
-     * Cleared after the save, because a list chosen on the form is written
-     * after the charge itself.
-     */
-    public function saved(Charge $charge): void
-    {
-        if ($charge->applies_to_all_menus) {
-            $charge->menus()->detach();
-        }
-    }
 }

@@ -218,6 +218,22 @@ it('accepts a GST rate no fixed list of slabs would have held', function (): voi
     expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
 });
 
+it('keeps opening hours as the clock picker sets them, and opens the form with them', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Owner);
+
+    Livewire::test(Settings::class)
+        ->fillForm(['opens_at' => '09:30', 'closes_at' => '23:00'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    // A time column hands the seconds back; the picker is filled with hours and
+    // minutes, which is what it shows.
+    Livewire::test(Settings::class)
+        ->assertFormSet(['opens_at' => '09:30', 'closes_at' => '23:00'])
+        ->assertSeeHtml('clock-picker');
+});
+
 it('round-trips the GST rate through the form without drift', function (): void {
     $tenant = Tenant::factory()->create();
     $tenant->settings->update(['tax_rate_basis_points' => 1250]);

@@ -3,7 +3,6 @@
 use App\Enums\Locale;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\MenuAddOnGroups\Pages\ManageMenuAddOnGroups;
-use App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas\MenuAddOnGroupForm;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
@@ -28,10 +27,9 @@ beforeEach(function (): void {
 |--------------------------------------------------------------------------
 |
 | A tenant's library of choices — a spice level, a bread, extras — each with
-| its options and a rule for how many a guest picks, offered on as many items
-| as need it. The form asks what Toast, Square and DoorDash ask: is it
-| required, only one or more than one, and for more than one the minimum, the
-| maximum and whether the same option may be taken twice.
+| its options and a rule for what a guest picks, offered on as many items as
+| need it. The form asks three things: is it required, the most a guest may
+| pick, and whether the same option may be taken twice.
 |
 */
 
@@ -108,15 +106,15 @@ function addOnOptionsTableShape(Testable $page): array
     ];
 }
 
-it('makes a required group of only one: exactly one pick, one of each option', function (): void {
+it('makes a required group of one pick, one of each option', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Choose your bread', Locale::Tamil->value => 'ரொட்டியைத் தேர்ந்தெடுக்கவும்'],
-            'requirement' => MenuAddOnGroupForm::REQUIRED,
-            'selection' => MenuAddOnGroupForm::ONLY_ONE,
+            'is_required' => true,
+            'max_selections' => 1,
             'options' => [
                 addOnOptionRow('Butter naan', default: true),
                 addOnOptionRow('Garlic naan', '20.50'),
@@ -128,7 +126,7 @@ it('makes a required group of only one: exactly one pick, one of each option', f
     $options = $group->options()->inMenuOrder()->get();
 
     expect($group->tenant_id)->toBe($tenant->getKey())
-        ->and($group->min_selections)->toBe(1)
+        ->and($group->is_required)->toBeTrue()
         ->and($group->max_selections)->toBe(1)
         ->and($group->allows_quantities)->toBeFalse()
         ->and($group->getTranslation('name', Locale::Tamil->value))->toBe('ரொட்டியைத் தேர்ந்தெடுக்கவும்')
@@ -140,39 +138,14 @@ it('makes a required group of only one: exactly one pick, one of each option', f
         ->and($options->pluck('tenant_id')->unique()->all())->toBe([$tenant->getKey()]);
 });
 
-it('saves an optional group of only one as at most one pick, whatever the hidden boxes still hold', function (): void {
-    enterTenantPanel(Tenant::factory()->create(), RoleEnum::Owner);
-
-    // Typed while the group was "more than one", then switched back.
-    Livewire::test(ManageMenuAddOnGroups::class)
-        ->callAction('create', [
-            'name' => [Locale::English->value => 'Strength'],
-            'requirement' => MenuAddOnGroupForm::OPTIONAL,
-            'selection' => MenuAddOnGroupForm::ONLY_ONE,
-            'min_selections' => 2,
-            'max_selections' => 5,
-            'allows_quantities' => true,
-            'options' => [addOnOptionRow('Extra strong', '10', upTo: 3)],
-        ])
-        ->assertHasNoActionErrors();
-
-    $strength = addOnGroupNamed('Strength');
-
-    expect($strength->min_selections)->toBe(0)
-        ->and($strength->max_selections)->toBe(1)
-        ->and($strength->allows_quantities)->toBeFalse()
-        ->and($strength->options()->sole()->max_quantity)->toBe(1);
-});
-
-it('makes an optional group of more than one, with the same option allowed twice', function (): void {
+it('makes an optional group with no limit, the same option allowed twice', function (): void {
     enterTenantPanel(Tenant::factory()->create(), RoleEnum::Owner);
 
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extras'],
-            'requirement' => MenuAddOnGroupForm::OPTIONAL,
-            'selection' => MenuAddOnGroupForm::MORE_THAN_ONE,
-            'max_selections' => 3,
+            'is_required' => false,
+            'max_selections' => '',
             'allows_quantities' => true,
             'options' => [addOnOptionRow('Extra cheese', '40', upTo: 2), addOnOptionRow('Raita', '30')],
         ])
@@ -180,10 +153,31 @@ it('makes an optional group of more than one, with the same option allowed twice
 
     $extras = addOnGroupNamed('Extras');
 
-    expect($extras->min_selections)->toBe(0)
-        ->and($extras->max_selections)->toBe(3)
+    // Blank is any number of picks, not a limit of none.
+    expect($extras->is_required)->toBeFalse()
+        ->and($extras->max_selections)->toBeNull()
         ->and($extras->allows_quantities)->toBeTrue()
         ->and($extras->options()->inMenuOrder()->pluck('max_quantity')->all())->toBe([2, 1]);
+});
+
+it('never lets one option be taken twice while a guest may pick only one', function (): void {
+    enterTenantPanel(Tenant::factory()->create(), RoleEnum::Owner);
+
+    // Switched on while the maximum was higher, then the maximum set to one.
+    Livewire::test(ManageMenuAddOnGroups::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Strength'],
+            'max_selections' => 1,
+            'allows_quantities' => true,
+            'options' => [addOnOptionRow('Extra strong', '10', upTo: 3)],
+        ])
+        ->assertHasNoActionErrors();
+
+    $strength = addOnGroupNamed('Strength');
+
+    expect($strength->max_selections)->toBe(1)
+        ->and($strength->allows_quantities)->toBeFalse()
+        ->and($strength->options()->sole()->max_quantity)->toBe(1);
 });
 
 it('refuses a rule no guest could meet', function (array $rule, array $options, string $refused): void {
@@ -199,25 +193,15 @@ it('refuses a rule no guest could meet', function (array $rule, array $options, 
 
     expect(MenuAddOnGroup::query()->withoutGlobalScopes()->exists())->toBeFalse();
 })->with([
-    'a maximum below the minimum' => [
-        ['requirement' => MenuAddOnGroupForm::REQUIRED, 'selection' => MenuAddOnGroupForm::MORE_THAN_ONE, 'min_selections' => 3, 'max_selections' => 2],
-        [addOnOptionRow('Mild'), addOnOptionRow('Medium'), addOnOptionRow('Hot')],
-        'max_selections',
-    ],
-    'a minimum the options cannot add up to' => [
-        ['requirement' => MenuAddOnGroupForm::REQUIRED, 'selection' => MenuAddOnGroupForm::MORE_THAN_ONE, 'min_selections' => 3, 'max_selections' => null],
-        [addOnOptionRow('Mild'), addOnOptionRow('Hot')],
-        'min_selections',
-    ],
-    'more than one with a maximum of one' => [
-        ['requirement' => MenuAddOnGroupForm::OPTIONAL, 'selection' => MenuAddOnGroupForm::MORE_THAN_ONE, 'max_selections' => 1],
+    'a maximum of none' => [
+        ['max_selections' => 0],
         [addOnOptionRow('Mild'), addOnOptionRow('Hot')],
         'max_selections',
     ],
     'two defaults where only one may be picked' => [
-        ['requirement' => MenuAddOnGroupForm::OPTIONAL, 'selection' => MenuAddOnGroupForm::ONLY_ONE],
+        ['max_selections' => 1],
         [addOnOptionRow('Mild', default: true), addOnOptionRow('Hot', default: true)],
-        // Under the options it is about, not under a hidden maximum.
+        // Under the options it is about, not under the maximum.
         'options',
     ],
     'no options at all' => [[], [], 'options'],
@@ -230,8 +214,6 @@ it('refuses more of one option than the group\'s own maximum', function (): void
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extras'],
-            'requirement' => MenuAddOnGroupForm::OPTIONAL,
-            'selection' => MenuAddOnGroupForm::MORE_THAN_ONE,
             'max_selections' => 2,
             'allows_quantities' => true,
             'options' => [addOnOptionRow('Extra cheese', '40', upTo: 3)],
@@ -243,7 +225,7 @@ it('refuses more of one option than the group\'s own maximum', function (): void
 
 it('draws one cell per column, adding Max qty as a column and a field together', function (): void {
     $tenant = Tenant::factory()->create();
-    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
     MenuAddOnOption::factory()->inGroup($group)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -270,7 +252,7 @@ it('draws one cell per column, adding Max qty as a column and a field together',
 
 it('opens a group with its answers, and each option as stored, a free one blank', function (): void {
     $tenant = Tenant::factory()->create();
-    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->allowingQuantities()->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->allowingQuantities()->create();
     $cheese = MenuAddOnOption::factory()->inGroup($group)->asDefault()->create(['price_minor_units' => 2050, 'max_quantity' => 2]);
     $raita = MenuAddOnOption::factory()->inGroup($group)->free()->create();
 
@@ -286,8 +268,9 @@ it('opens a group with its answers, and each option as stored, a free one blank'
     // column — pins the bug where a narrower preview left these blank.
     $cheeseRow = $state['options']['record-'.$cheese->getKey()];
 
-    expect($state['requirement'])->toBe(MenuAddOnGroupForm::OPTIONAL)
-        ->and($state['selection'])->toBe(MenuAddOnGroupForm::MORE_THAN_ONE)
+    expect($state['is_required'])->toBeFalse()
+        ->and($state['max_selections'])->toBe(3)
+        ->and($state['allows_quantities'])->toBeTrue()
         ->and($cheeseRow['price'])->toBe(20.5)
         ->and($cheeseRow['max_quantity'])->toBe(2)
         ->and($cheeseRow['is_default'])->toBeTrue()
@@ -297,9 +280,9 @@ it('opens a group with its answers, and each option as stored, a free one blank'
         ->and($cheeseRow)->not->toHaveKey('tax_rate_percentage');
 });
 
-it('edits a group from only one to more than one, writing its options back exactly as they were stored', function (): void {
+it('edits a group from one pick to two, writing its options back exactly as they were stored', function (): void {
     $tenant = Tenant::factory()->create();
-    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 1)->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 1)->create();
     $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price_minor_units' => 4050, 'position' => 0]);
     $raita = MenuAddOnOption::factory()->inGroup($group)->free()->create(['position' => 1]);
 
@@ -309,13 +292,12 @@ it('edits a group from only one to more than one, writing its options back exact
     // other way, so a save that only touched the rule must round-trip them.
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction(TestAction::make('edit')->table($group), [
-            'selection' => MenuAddOnGroupForm::MORE_THAN_ONE,
             'max_selections' => 2,
         ])
         ->assertHasNoActionErrors();
 
     expect($group->refresh()->max_selections)->toBe(2)
-        ->and($group->min_selections)->toBe(0)
+        ->and($group->is_required)->toBeFalse()
         ->and($group->options()->inMenuOrder()->pluck('id')->all())->toBe([$cheese->getKey(), $raita->getKey()])
         ->and($cheese->refresh()->price_minor_units)->toBe(4050)
         ->and($raita->refresh()->price_minor_units)->toBe(0);
@@ -477,8 +459,8 @@ it('makes a group from an item\'s form without leaving the item', function (): v
         ])
         ->setActionData([
             'name' => [Locale::English->value => 'Spice level'],
-            'requirement' => MenuAddOnGroupForm::REQUIRED,
-            'selection' => MenuAddOnGroupForm::ONLY_ONE,
+            'is_required' => true,
+            'max_selections' => 1,
             'options' => [addOnOptionRow('Mild'), addOnOptionRow('Hot')],
         ])
         ->callMountedAction()
@@ -489,7 +471,7 @@ it('makes a group from an item\'s form without leaving the item', function (): v
     // Made outside its own page, so the tenant is stamped by hand, and the
     // options are saved by the repeater nested in the select's modal.
     expect($spice->tenant_id)->toBe($tenant->getKey())
-        ->and($spice->min_selections)->toBe(1)
+        ->and($spice->is_required)->toBeTrue()
         ->and($spice->max_selections)->toBe(1)
         ->and($spice->options()->pluck('tenant_id')->all())->toBe([$tenant->getKey(), $tenant->getKey()]);
 

@@ -71,23 +71,22 @@ The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charg
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
-The menu is sent `addOnGroups` once — `{id, name, minSelections, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, with `maxQuantity` already 1 for an option whose group does not allow quantities — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
+The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, with `maxQuantity` already 1 for an option whose group does not allow quantities — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
 
 Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
 - a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
 - an optional pick-one moves its tick rather than locking
 - a full group stops offering the options not picked
 - default options (`isDefault`) start ticked
-- Add reads "Choose 1 more from Bread" until every minimum is met
+- Add reads "Choose 1 more from Bread" until every required group has a pick
 
 `lib/add-on-rules.ts` holds those rules as pure functions and counts picks as the server does, each option by its quantity. It only shapes the sheet: nothing it decides is trusted.
 
 `hooks/use-basket.ts` keeps the lines in localStorage under `basket:{tenant slug}:{menu id}`, read through `useSyncExternalStore` with an empty server snapshot, because SSR is on and the first render has to match a page painted without the phone's storage. The same item with the same choices is one line. A line keeps ids and the name it was added under; the basket sheet names its lines from the page's props, so a language switch renames them.
 
-**Items and combos carry limits per order**, sent as `minQuantity` and `maxQuantity` (null is no limit) and counted across every basket line the item or combo is on. The project owner asked for them after a guest could ask for 27 pillows. `lib/order-limits.ts` holds the arithmetic:
-- **Quick Add:** puts in what the minimum still asks for.
-- **Customise sheet:** starts there, and its stepper stops at what the maximum leaves.
-- **Basket line:** + stops at the maximum and − at the minimum.
+**Items and combos carry a maximum per order**, sent as `maxQuantity` (null is no limit) and counted across every basket line the item or combo is on. The project owner asked for it after a guest could ask for 27 pillows; a minimum per order was built beside it and taken out again. `lib/order-limits.ts` holds the arithmetic:
+- **Customise sheet:** starts at one, and its stepper stops at what the maximum leaves.
+- **Basket line:** + stops at the maximum.
 - **A full basket:** Add stays on screen, greyed, with "Limit reached" under it. Hiding it would read as sold out.
 
 The limit is worded under the sheet's stepper and each basket line ("Up to 2 per order"). On a line the server refused for it, the limit replaces "Choices need changing". The server is what refuses (`.ai/rules/actions-menus.md`).

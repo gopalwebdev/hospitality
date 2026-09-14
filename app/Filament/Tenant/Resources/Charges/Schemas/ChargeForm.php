@@ -7,10 +7,11 @@ use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Models\Charge;
+use App\Models\Menu;
 use Closure;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -96,13 +97,6 @@ class ChargeForm
                 Section::make(__('panel.charges.where_section'))
                     ->icon(Heroicon::OutlinedBookOpen)
                     ->schema([
-                        // Live, because it decides whether menus are picked.
-                        Toggle::make('applies_to_all_menus')
-                            ->label(__('panel.charges.applies_to_all_menus'))
-                            ->default(true)
-                            ->inline(false)
-                            ->live(),
-
                         // Bound to the relationship, so the list is written in
                         // the same save as the charge. The rule in
                         // .ai/rules/filament.md against ->relationship() is
@@ -110,11 +104,21 @@ class ChargeForm
                         // belongsToMany. The options are this tenant's menus,
                         // and the rule below refuses any other id even if the
                         // request is tampered with — charge_menu carries no
-                        // tenant of its own for an observer to check.
-                        CheckboxList::make('menus')
+                        // tenant of its own for an observer to check. A charge
+                        // is on exactly these menus, so a new one starts on
+                        // every menu and is taken off the ones it is not for.
+                        Select::make('menus')
                             ->label(__('panel.charges.menus'))
+                            ->multiple()
                             ->relationship('menus', 'name')
                             ->options(fn (): array => MenuCategoryForm::menuOptions())
+                            // A menu's name is a translated column; its accessor
+                            // answers in the panel's language, as the options do.
+                            ->getOptionLabelFromRecordUsing(fn (Menu $record): string => $record->name)
+                            ->default(fn (): array => array_keys(MenuCategoryForm::menuOptions()))
+                            ->searchable()
+                            ->preload()
+                            ->required()
                             ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
                                 $offered = array_keys(MenuCategoryForm::menuOptions());
 
@@ -125,10 +129,7 @@ class ChargeForm
                                         return;
                                     }
                                 }
-                            })
-                            ->visible(fn (Get $get): bool => ! (bool) $get('applies_to_all_menus'))
-                            ->required(fn (Get $get): bool => ! (bool) $get('applies_to_all_menus'))
-                            ->columns(2),
+                            }),
 
                         Toggle::make('is_active')
                             ->label(__('panel.charges.is_active'))

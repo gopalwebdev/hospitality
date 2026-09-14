@@ -124,6 +124,24 @@ it('creates a menu against the tenant whose panel it is', function (): void {
         ]);
 });
 
+it('keeps a menu\'s serving hours as the clock picker sets them', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenus::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Breakfast'],
+            'available_from' => '07:00',
+            'available_until' => '11:30',
+        ])
+        ->assertHasNoActionErrors();
+
+    $breakfast = byEnglishName(Menu::class, 'Breakfast');
+
+    expect($breakfast->servedFrom())->toBe('07:00')
+        ->and($breakfast->servedUntil())->toBe('11:30');
+});
+
 it('lets a menu be created in English alone', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -448,7 +466,7 @@ it('offers an item the add-on groups picked for it, in the order they were put i
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
-    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -833,7 +851,7 @@ it('refuses a struck-through price that is not above what is charged', function 
         ->assertHasActionErrors(['compare_at_price']);
 });
 
-it('keeps how many of an item one order may hold, and refuses a maximum below the minimum', function (): void {
+it('keeps the most of an item one order may hold, blank for no limit', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -841,24 +859,22 @@ it('keeps how many of an item one order may hold, and refuses a maximum below th
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    $create = fn (string $minimum, string $maximum): Testable => Livewire::test(ListMenuItems::class)
+    $create = fn (string $maximum): Testable => Livewire::test(ListMenuItems::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Idli'],
             'menu_category_id' => $category->getKey(),
             'diet' => Diet::Vegetarian->value,
             'price' => '60',
             'availability' => ItemAvailability::Available->value,
-            'min_quantity' => $minimum,
             'max_quantity' => $maximum,
         ]);
 
-    $create('3', '2')->assertHasActionErrors(['max_quantity']);
-    $create('2', '')->assertHasNoActionErrors();
+    // A maximum of none would keep the item out of every basket.
+    $create('0')->assertHasActionErrors(['max_quantity']);
+    $create('')->assertHasNoActionErrors();
 
     // A blank maximum is no limit, not a limit of nothing.
-    expect(byEnglishName(MenuItem::class, 'Idli'))
-        ->min_quantity->toBe(2)
-        ->max_quantity->toBeNull();
+    expect(byEnglishName(MenuItem::class, 'Idli')->max_quantity)->toBeNull();
 });
 
 it('leaves an item that is not on offer with no compare-at price at all', function (): void {
@@ -896,9 +912,7 @@ it('falls back to the tenant GST rate on an item, and overrides it when told', f
     $bottle = MenuItem::factory()->inCategory($category)->taxedAt(1800)->create();
 
     expect($standard->taxRateBasisPoints())->toBe(500)
-        ->and($standard->overridesTaxRate())->toBeFalse()
-        ->and($bottle->taxRateBasisPoints())->toBe(1800)
-        ->and($bottle->overridesTaxRate())->toBeTrue();
+        ->and($bottle->taxRateBasisPoints())->toBe(1800);
 });
 
 it('accepts a rate no fixed list of GST slabs would have held', function (): void {

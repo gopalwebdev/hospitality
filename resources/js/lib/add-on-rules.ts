@@ -20,8 +20,8 @@ export interface AddOnOption {
 export interface AddOnGroup {
     id: number;
     name: string;
-    /** 0 makes the group optional; 1 or more makes it required. */
-    minSelections: number;
+    /** Whether a guest has to pick at least one option. */
+    isRequired: boolean;
     /** Null is no limit. */
     maxSelections: number | null;
     options: AddOnOption[];
@@ -54,38 +54,29 @@ export interface Phrase {
  */
 
 export function isRequired(group: AddOnGroup): boolean {
-    return group.minSelections >= 1;
+    return group.isRequired;
 }
 
 /**
  * The group's rule in words, the same cases as MenuAddOnGroupForm::ruleSummary() in the panel.
  */
 export function ruleOf(group: AddOnGroup): Phrase {
-    const { minSelections: min, maxSelections: max } = group;
+    const { isRequired: required, maxSelections: max } = group;
 
-    if (max !== null && max === min) {
+    if (required && max === 1) {
         return {
             path: 'customise.choose_exactly',
-            replacements: { count: max },
+            replacements: { count: 1 },
         };
-    }
-
-    if (max !== null && min === 0) {
-        return { path: 'customise.choose_up_to', replacements: { count: max } };
     }
 
     if (max !== null) {
-        return { path: 'customise.choose_between', replacements: { min, max } };
+        return { path: 'customise.choose_up_to', replacements: { count: max } };
     }
 
-    if (min >= 1) {
-        return {
-            path: 'customise.choose_at_least',
-            replacements: { count: min },
-        };
-    }
-
-    return { path: 'customise.choose_any' };
+    return required
+        ? { path: 'customise.choose_at_least', replacements: { count: 1 } }
+        : { path: 'customise.choose_any' };
 }
 
 /**
@@ -95,7 +86,7 @@ export function ruleOf(group: AddOnGroup): Phrase {
  */
 export function isSingleChoice(group: AddOnGroup): boolean {
     return (
-        group.minSelections === 1 &&
+        group.isRequired &&
         group.maxSelections === 1 &&
         group.options.every((option) => option.maxQuantity === 1)
     );
@@ -188,13 +179,14 @@ export function initialPicks(groups: AddOnGroup[]): Picks {
     return picks;
 }
 
-/** The first group still short of its minimum, and by how many — what Add says instead of adding. */
+/** The first required group with nothing picked yet — what Add says instead of adding. */
 export function firstShortfall(
     groups: AddOnGroup[],
     picks: Picks,
 ): { group: AddOnGroup; missing: number } | null {
     for (const group of groups) {
-        const missing = group.minSelections - pickedIn(group, picks);
+        const missing =
+            group.isRequired && pickedIn(group, picks) === 0 ? 1 : 0;
 
         if (missing > 0) {
             return { group, missing };

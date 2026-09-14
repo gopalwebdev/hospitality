@@ -130,9 +130,7 @@ it('keeps how many of a combo one order may hold', function (): void {
         ])
         ->assertHasNoActionErrors();
 
-    expect(comboNamed('Party Platter'))
-        ->min_quantity->toBe(1)
-        ->max_quantity->toBe(1);
+    expect(comboNamed('Party Platter')->max_quantity)->toBe(1);
 });
 
 it('refuses a compare-at price that is not above what is charged', function (): void {

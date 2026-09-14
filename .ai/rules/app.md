@@ -71,7 +71,7 @@ There is deliberately no third level. `MenuCategoryObserver` refuses a parent th
 
 Alongside the sections, a menu carries `menu_combos` — bundles sold at one price, each listing existing items in `menu_combo_items` with a quantity. A combo hangs off the **menu** rather than a category, because it is something the menu leads with rather than something in a section, and its price is its own: a combo exists precisely because it costs less than the sum of its parts, so nothing derives one from the other.
 
-Items are customised with **add-on groups** from the tenant's library — `menu_add_on_groups` → `menu_add_on_options`, offered on items through `menu_item_add_on_groups` — each group saying whether a pick is required, whether a guest picks one or several (at least, at most) and whether one option may be taken twice, and each option how many of it one item takes. They replaced `menu_item_additions`, a flat list per item that could not say "pick exactly one bread" or "up to three extras" and was retyped on every item. A variant — half or full, a size — is a required group of one pick, so there is no variant table. Zero is a real price on an option: a spice level costs nothing, and so does "memory foam" on a pillow. See `.ai/rules/add-on-groups.md`.
+Items are customised with **add-on groups** from the tenant's library — `menu_add_on_groups` → `menu_add_on_options`, offered on items through `menu_item_add_on_groups` — each group saying whether a pick is required, the most a guest may pick, and whether one option may be taken twice, and each option how many of it one item takes. They replaced `menu_item_additions`, a flat list per item that could not say "pick exactly one bread" or "up to three extras" and was retyped on every item. A variant — half or full, a size — is a required group of one pick, so there is no variant table. Zero is a real price on an option: a spice level costs nothing, and so does "memory foam" on a pillow. See `.ai/rules/add-on-groups.md`.
 
 What a guest sees first is `home_rows`, each holding its own `home_tiles`. The **row** owns the layout — `App\Enums\HomeRowLayout` is `Banner` (full-width rectangles), `Carousel` (a swipeable rail of pictures) or `Links` (small circles for Instagram, WhatsApp, a phone number) — and every tile in it is drawn that way, which is why there is no shape column on a tile. The **tile** owns its destination: a menu, an uploaded PDF, or an external link. That is why `/` is the home screen and a menu lives at `/menus/{menu}`.
 
@@ -85,16 +85,17 @@ Featuring belongs to **one menu**, so an item that leaves a menu stops being fea
 
 Prices carry an optional `compare_at_price_minor_units` — the higher "was" price shown struck through — which is null on almost every row, because null is how an item says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option. A price of zero is complimentary.
 
-An item and a combo each say how many one order may hold, counted across every basket line it is on:
-- **`min_quantity`:** 1 unless set.
-- **`max_quantity`:** null for no limit.
+An item and a combo each say the most one order may hold (`max_quantity`, null for no limit), counted across every basket line it is on:
+- **Counting:** a feather pillow and a memory foam one are two towards a maximum of two.
+- **Where it is set and checked:** the item and combo forms ask for it, and `QuoteBasket` refuses a basket over it.
+- **No minimum:** one was built beside it and taken out on the project owner's instruction.
 
-A feather pillow and a memory foam one are two towards a maximum of two. The item and combo forms ask for both, and `QuoteBasket` refuses a basket outside them. An option's `max_quantity` is a different limit: how many of it one item takes.
+An option's `max_quantity` is a different limit: how many of it one item takes.
 
 `menu_items` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as a served drink, a laundry pickup taxed as a service — override it. The Settings page holds only the global rate and `prices_include_tax`. An add-on option carries no rate: it is taxed at the rate of the item it is added to (`.ai/rules/add-on-groups.md`).
 
 ## Charges are their own module, on every menu or only some
-What is added to a bill beyond the price — a service charge, a packing charge, a room-service fee — is `charges`, managed on its own Charges page in the tenant panel rather than as settings: a tenant may levy any number, each is a share of the bill or a fixed amount, and each applies to every menu or only the menus ticked (a room-service fee on in-room dining and not on housekeeping requests). Two fixed switches on `tenant_settings` existed and were replaced, because they could say a service charge and a packing charge and nothing else, and could not say which menus either belonged on.
+What is added to a bill beyond the price — a service charge, a packing charge, a room-service fee — is `charges`, managed on its own Charges page in the tenant panel rather than as settings: a tenant may levy any number, each is a share of the bill or a fixed amount, and each applies to the menus picked for it (a room-service fee on in-room dining and not on housekeeping requests). Two fixed switches on `tenant_settings` existed and were replaced, because they could say a service charge and a packing charge and nothing else, and could not say which menus either belonged on.
 
 The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Menus\QuoteBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
 

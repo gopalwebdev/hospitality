@@ -47,7 +47,6 @@ return [
         'choose_exactly' => 'Choose :count',
         'choose_up_to' => 'Choose up to :count',
         'choose_at_least' => 'Choose at least :count',
-        'choose_between' => 'Choose :min to :max',
         'choose_any' => 'Choose any',
         'choose_more' => 'Choose :count more from :group',
         'add' => 'Add · :price',
@@ -76,9 +75,6 @@ return [
 
     'limits' => [
         'up_to' => 'Up to :max per order',
-        'at_least' => 'At least :min per order',
-        'between' => ':min to :max per order',
-        'exactly' => ':count per order',
         'reached' => 'Limit reached',
     ],
 

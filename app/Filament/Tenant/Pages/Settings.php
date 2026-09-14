@@ -3,6 +3,7 @@
 namespace App\Filament\Tenant\Pages;
 
 use App\Enums\Permission;
+use App\Filament\Forms\Components\ClockTimePicker;
 use App\Filament\Schemas\PricingFields;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -11,7 +12,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -19,8 +19,10 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use LogicException;
 
 /**
@@ -86,54 +88,66 @@ class Settings extends Page
     {
         return $schema
             ->components([
-                Section::make('Contact')
+                // Three compact sections side by side where the page has room,
+                // and stacked where it has not: the grid answers to its own
+                // width, the MenuForm pattern. Three full-width sections left
+                // most of a laptop screen empty.
+                Grid::make(['default' => 1, '@4xl' => 3])
+                    ->gridContainer()
                     ->schema([
-                        TextInput::make('contact_email')
-                            ->label('Contact email')
-                            ->email()
-                            ->maxLength(255),
-                        TextInput::make('contact_phone')
-                            ->label('Contact phone')
-                            ->tel()
-                            ->maxLength(32),
-                    ])
-                    ->columns(2),
+                        Section::make('Contact')
+                            ->icon(Heroicon::OutlinedEnvelope)
+                            ->compact()
+                            ->schema([
+                                TextInput::make('contact_email')
+                                    ->label('Contact email')
+                                    ->email()
+                                    ->maxLength(255)
+                                    ->prefixIcon(Heroicon::OutlinedEnvelope),
+                                TextInput::make('contact_phone')
+                                    ->label('Contact phone')
+                                    ->tel()
+                                    ->maxLength(32)
+                                    ->prefixIcon(Heroicon::OutlinedPhone),
+                            ]),
 
-                Section::make('Trading')
-                    ->schema([
-                        TimePicker::make('opens_at')
-                            ->label('Opens at')
-                            ->seconds(false),
-                        TimePicker::make('closes_at')
-                            ->label('Closes at')
-                            ->seconds(false),
-                        Toggle::make('accepts_orders')
-                            ->label('Accepting orders')
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2),
+                        Section::make('Trading')
+                            ->icon(Heroicon::OutlinedClock)
+                            ->compact()
+                            ->columns(2)
+                            ->schema([
+                                ClockTimePicker::make('opens_at')
+                                    ->label('Opens at'),
+                                ClockTimePicker::make('closes_at')
+                                    ->label('Closes at'),
+                                Toggle::make('accepts_orders')
+                                    ->label('Accepting orders')
+                                    ->columnSpanFull(),
+                            ]),
 
-                Section::make('Tax')
-                    ->schema([
-                        TextInput::make('gstin')
-                            ->label('GSTIN')
-                            ->maxLength(15),
+                        Section::make('Tax')
+                            ->icon(Heroicon::OutlinedReceiptPercent)
+                            ->compact()
+                            ->columns(2)
+                            ->schema([
+                                TextInput::make('gstin')
+                                    ->label('GSTIN')
+                                    ->maxLength(15),
 
-                        TextInput::make('tax_rate_percentage')
-                            ->label('Default GST rate')
-                            ->required()
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->step(0.01)
-                            ->suffix('%'),
+                                TextInput::make('tax_rate_percentage')
+                                    ->label('Default GST rate')
+                                    ->required()
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->step(0.01)
+                                    ->suffix('%'),
 
-                        Toggle::make('prices_include_tax')
-                            ->label('Menu prices already include GST')
-                            ->inline(false)
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2),
+                                Toggle::make('prices_include_tax')
+                                    ->label('Menu prices already include GST')
+                                    ->columnSpanFull(),
+                            ]),
+                    ]),
             ]);
     }
 

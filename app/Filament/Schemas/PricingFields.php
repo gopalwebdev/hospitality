@@ -9,7 +9,6 @@ use App\Models\TenantSetting;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Get;
 
 /**
  * The inputs behind a price: what it costs, what it used to, its GST rate, and how many one order may hold.
@@ -112,33 +111,20 @@ final class PricingFields
     }
 
     /**
-     * How many of it one order may hold, counted across every basket line it is on.
+     * The most of it one order may hold, counted across every basket line it is on.
      *
      * A feather pillow and a memory foam one are two towards a maximum of two. A
      * blank maximum is no limit, stored as null rather than as a limit of nothing.
-     *
-     * @return list<TextInput>
      */
-    public static function quantityLimits(): array
+    public static function maxQuantity(): TextInput
     {
-        return [
-            TextInput::make('min_quantity')
-                ->label(__('panel.items.min_quantity'))
-                ->integer()
-                ->minValue(1)
-                ->maxValue(99)
-                ->default(1)
-                ->required(),
-
-            TextInput::make('max_quantity')
-                ->label(__('panel.items.max_quantity'))
-                ->integer()
-                ->minValue(fn (Get $get): int => max(1, (int) $get('min_quantity')))
-                ->maxValue(99)
-                ->placeholder(__('panel.items.no_limit'))
-                ->validationMessages(['min' => __('panel.items.max_quantity_below_min')])
-                ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state),
-        ];
+        return TextInput::make('max_quantity')
+            ->label(__('panel.items.max_quantity'))
+            ->integer()
+            ->minValue(1)
+            ->maxValue(99)
+            ->placeholder(__('panel.items.no_limit'))
+            ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state);
     }
 
     /**

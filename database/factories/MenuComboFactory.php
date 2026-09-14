@@ -40,7 +40,6 @@ class MenuComboFactory extends Factory
             'compare_at_price_minor_units' => null,
             'tax_rate_basis_points' => null,
             'availability' => ItemAvailability::Available,
-            'min_quantity' => 1,
             'max_quantity' => null,
             'position' => fake()->numberBetween(0, 20),
         ];
@@ -97,12 +96,11 @@ class MenuComboFactory extends Factory
     }
 
     /**
-     * A combo one order holds at least $min of, and at most $max unless it is null.
+     * A combo one order holds at most $max of.
      */
-    public function limitedPerOrder(int $min, ?int $max): static
+    public function limitedPerOrder(int $max): static
     {
         return $this->state(fn (array $attributes): array => [
-            'min_quantity' => $min,
             'max_quantity' => $max,
         ]);
     }

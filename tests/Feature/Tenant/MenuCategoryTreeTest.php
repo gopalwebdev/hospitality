@@ -419,21 +419,24 @@ it('filters items by menu, and by a category within it', function (): void {
         ->assertCanNotSeeTableRecords([$inStarters, $inDrinks]);
 });
 
-it('splits the items page into tabs by kind, by stock and by diet mark', function (): void {
+it('splits the items page into tabs by kind, by stock, by featuring and by diet mark', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
-    $water = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian]);
+    $water = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian, 'is_featured' => true]);
     $omelette = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Egg, 'availability' => ItemAvailability::OutOfStock]);
     $chicken = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::NonVegetarian]);
     $pillow = MenuItem::factory()->inCategory($category)->service()->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // Whether an item is a service request is what its tab says, so the table
-    // no longer spends a column on it.
+    // Whether an item is a service request, or featured, is what its tab says,
+    // so the table spends no column on either; nor on the GST rate, which the
+    // project owner had taken off the list.
     $page = Livewire::test(ListMenuItems::class)
         ->assertCanSeeTableRecords([$water, $omelette, $chicken, $pillow])
-        ->assertTableColumnDoesNotExist('is_service_request');
+        ->assertTableColumnDoesNotExist('is_service_request')
+        ->assertTableColumnDoesNotExist('is_featured')
+        ->assertTableColumnDoesNotExist('tax_rate_basis_points');
 
     $page->set('activeTab', 'items')
         ->assertCanSeeTableRecords([$water, $omelette, $chicken])
@@ -446,6 +449,10 @@ it('splits the items page into tabs by kind, by stock and by diet mark', functio
     $page->set('activeTab', 'out_of_stock')
         ->assertCanSeeTableRecords([$omelette])
         ->assertCanNotSeeTableRecords([$water, $chicken, $pillow]);
+
+    $page->set('activeTab', 'featured')
+        ->assertCanSeeTableRecords([$water])
+        ->assertCanNotSeeTableRecords([$omelette, $chicken, $pillow]);
 
     $page->set('activeTab', 'veg')
         ->assertCanSeeTableRecords([$water])
@@ -465,6 +472,7 @@ it('splits the items page into tabs by kind, by stock and by diet mark', functio
         'items' => 3,
         'service_requests' => 1,
         'out_of_stock' => 1,
+        'featured' => 1,
         'veg' => 1,
         'egg' => 1,
         'non_veg' => 1,
@@ -1143,7 +1151,7 @@ it('offers an add-on group on an item from its category\'s table', function (): 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $menuItem = MenuItem::factory()->inCategory($category)->create();
-    $spice = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $spice = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 

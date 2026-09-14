@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Something added to a guest's bill beyond what they order: a service charge, a packing charge,
- * a room-service fee. A share of the bill or a fixed amount, on every menu or only the ones attached.
+ * a room-service fee. A share of the bill or a fixed amount, on the menus attached to it.
  *
  * @property int $id
  * @property int $tenant_id
@@ -25,7 +25,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property ChargeCalculation $calculation
  * @property int|null $rate_basis_points
  * @property int|null $amount_minor_units
- * @property bool $applies_to_all_menus
  * @property bool $is_active
  * @property int $position
  * @property CarbonImmutable|null $created_at
@@ -36,7 +35,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
     'calculation',
     'rate_basis_points',
     'amount_minor_units',
-    'applies_to_all_menus',
     'is_active',
     'position',
 ])]
@@ -54,7 +52,6 @@ class Charge extends Model
     /** @var array<string, mixed> */
     #[\Override]
     protected $attributes = [
-        'applies_to_all_menus' => true,
         'is_active' => true,
         'position' => 0,
     ];
@@ -68,7 +65,7 @@ class Charge extends Model
     }
 
     /**
-     * The menus this charge is limited to; empty while it applies to every menu.
+     * The menus whose bills this charge is added to.
      *
      * @return BelongsToMany<Menu, $this>
      */
@@ -102,15 +99,13 @@ class Charge extends Model
     }
 
     /**
-     * The charges a bill from this menu carries: the ones on every menu, and the ones attached to it.
+     * The charges a bill from this menu carries: the ones attached to it.
      *
      * @param  Builder<$this>  $query
      */
     public function scopeForMenu(Builder $query, int $menuId): void
     {
-        $query->where(fn (Builder $onThisMenu): Builder => $onThisMenu
-            ->where('applies_to_all_menus', true)
-            ->orWhereHas('menus', fn (Builder $menus): Builder => $menus->whereKey($menuId)));
+        $query->whereHas('menus', fn (Builder $menus): Builder => $menus->whereKey($menuId));
     }
 
     /**
@@ -130,7 +125,6 @@ class Charge extends Model
             'calculation' => ChargeCalculation::class,
             'rate_basis_points' => 'integer',
             'amount_minor_units' => 'integer',
-            'applies_to_all_menus' => 'boolean',
             'is_active' => 'boolean',
             'position' => 'integer',
         ];

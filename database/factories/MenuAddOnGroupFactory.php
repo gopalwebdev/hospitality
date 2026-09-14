@@ -27,7 +27,7 @@ class MenuAddOnGroupFactory extends Factory
         return [
             'tenant_id' => Tenant::factory(),
             'name' => [Locale::English->value => $name],
-            'min_selections' => 0,
+            'is_required' => false,
             'max_selections' => null,
             'allows_quantities' => false,
         ];
@@ -56,12 +56,12 @@ class MenuAddOnGroupFactory extends Factory
     }
 
     /**
-     * A group a guest picks at least $min and at most $max from; a null $max is no limit.
+     * A group a guest must or may pick from, at most $max times; a null $max is no limit.
      */
-    public function choosing(int $min, ?int $max): static
+    public function choosing(bool $required, ?int $max): static
     {
         return $this->state(fn (array $attributes): array => [
-            'min_selections' => $min,
+            'is_required' => $required,
             'max_selections' => $max,
         ]);
     }

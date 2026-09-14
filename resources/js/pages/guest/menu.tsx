@@ -19,12 +19,7 @@ import {
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 import type { AddOnGroup } from '@/lib/add-on-rules';
-import {
-    type OrderLimits,
-    fewestToAdd,
-    quantityHeld,
-    roomFor,
-} from '@/lib/order-limits';
+import { type OrderLimits, quantityHeld, roomFor } from '@/lib/order-limits';
 
 export interface MenuItem extends OrderLimits {
     id: number;
@@ -224,14 +219,12 @@ export default function Menu({
                           return;
                       }
 
-                      // An item with a minimum goes in at it, rather than as
-                      // one the server would refuse.
                       basket.add({
                           type: 'item',
                           id: item.id,
                           name: item.name,
                           choices: [],
-                          quantity: fewestToAdd(item, heldOf('item', item.id)),
+                          quantity: 1,
                       });
                   },
                   addCombo: (combo) => {
@@ -240,10 +233,7 @@ export default function Menu({
                           id: combo.id,
                           name: combo.name,
                           choices: [],
-                          quantity: fewestToAdd(
-                              combo,
-                              heldOf('combo', combo.id),
-                          ),
+                          quantity: 1,
                       });
                   },
                   isFull: (type, thing) =>
@@ -408,7 +398,7 @@ function describeLine({
             name: item?.name ?? combo?.name ?? line.name,
             diet: item?.diet ?? null,
             isServiceRequest: item?.isServiceRequest ?? false,
-            limits: item ?? combo ?? { minQuantity: 1, maxQuantity: null },
+            limits: item ?? combo ?? { maxQuantity: null },
             choices: line.choices.flatMap((choice) => {
                 const option = optionsById.get(choice.optionId);
 

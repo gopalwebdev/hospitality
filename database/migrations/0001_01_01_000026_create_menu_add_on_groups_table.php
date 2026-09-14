@@ -14,19 +14,18 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             // What a guest reads above the options: "Choose your bread".
             $table->jsonb('name');
-            // The fewest picks a guest makes; zero is optional, one or more is required.
-            $table->smallInteger('min_selections')->default(0);
+            // Whether a guest has to pick at least one option before the item goes in.
+            $table->boolean('is_required')->default(false);
             // The most picks a guest may make; null is no limit.
             $table->smallInteger('max_selections')->nullable();
             // Whether a guest may take one option more than once ("Extra cheese × 2").
-            // Square calls it allow_quantities; only a group of more than one can.
+            // Square calls it allow_quantities; a group of one pick cannot.
             $table->boolean('allows_quantities')->default(false);
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE menu_add_on_groups
-            ADD CONSTRAINT menu_add_on_groups_min_not_negative CHECK (min_selections >= 0),
-            ADD CONSTRAINT menu_add_on_groups_max_covers_min CHECK (max_selections IS NULL OR max_selections >= GREATEST(min_selections, 1)),
+            ADD CONSTRAINT menu_add_on_groups_max_in_range CHECK (max_selections IS NULL OR max_selections BETWEEN 1 AND 99),
             ADD CONSTRAINT menu_add_on_groups_quantities_need_more_than_one CHECK (NOT allows_quantities OR max_selections IS NULL OR max_selections >= 2)');
     }
 

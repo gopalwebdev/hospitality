@@ -18,8 +18,6 @@ return new class extends Migration
             // Exactly one of these is filled: the one ChargeCalculation::valueColumn() names.
             $table->smallInteger('rate_basis_points')->nullable();
             $table->integer('amount_minor_units')->nullable();
-            // False limits the charge to the menus in charge_menu.
-            $table->boolean('applies_to_all_menus')->default(true);
             $table->boolean('is_active')->default(true);
             $table->integer('position')->default(0);
             $table->timestamps();

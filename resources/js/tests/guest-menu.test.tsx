@@ -38,7 +38,6 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         isServiceRequest: false,
         diet: 'vegetarian',
         addOnGroupIds: [],
-        minQuantity: 1,
         maxQuantity: null,
         ...overrides,
     };
@@ -48,7 +47,7 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
 const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
-    minSelections: 1,
+    isRequired: true,
     maxSelections: 1,
     options: [
         {
@@ -72,7 +71,7 @@ const bread: AddOnGroup = {
 const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
-    minSelections: 0,
+    isRequired: false,
     maxSelections: 3,
     options: [
         {
@@ -356,7 +355,7 @@ describe('guest menu', () => {
         ]);
     });
 
-    it('stops offering an item once the basket holds as many as one order may, and adds what a minimum asks for', () => {
+    it('stops offering an item once the basket holds as many as one order may', () => {
         renderMenu({
             sections: [
                 {
@@ -371,7 +370,6 @@ describe('guest menu', () => {
                             priceMinorUnits: 0,
                             maxQuantity: 2,
                         }),
-                        item({ id: 21, name: 'Idli', minQuantity: 2 }),
                     ],
                     subSections: [],
                 },
@@ -388,16 +386,9 @@ describe('guest menu', () => {
         // Greyed where it was rather than gone, which would read as sold out.
         expect(addBlanket).toBeDisabled();
         expect(screen.getByText('Limit reached')).toBeInTheDocument();
-
-        // A minimum of two goes in as two, not as one the server would refuse.
-        fireEvent.click(screen.getByRole('button', { name: 'Add Idli' }));
-
         expect(
             JSON.parse(localStorage.getItem('basket:spice:1') ?? '[]'),
-        ).toEqual([
-            expect.objectContaining({ id: 20, quantity: 2 }),
-            expect.objectContaining({ id: 21, quantity: 2 }),
-        ]);
+        ).toEqual([expect.objectContaining({ id: 20, quantity: 2 })]);
     });
 
     it('starts a customised item where the basket leaves off, and stops it at what one order may hold', () => {
@@ -510,7 +501,6 @@ describe('guest menu', () => {
                     description: null,
                     priceMinorUnits: 99900,
                     compareAtPriceMinorUnits: null,
-                    minQuantity: 1,
                     maxQuantity: null,
                     contents: [],
                 },
@@ -562,7 +552,6 @@ describe('guest menu', () => {
                     description: 'Enough for four.',
                     priceMinorUnits: 99900,
                     compareAtPriceMinorUnits: 120000,
-                    minQuantity: 1,
                     maxQuantity: null,
                     contents: [
                         {

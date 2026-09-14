@@ -503,19 +503,17 @@ it('sends how many of an item or a combo one order may hold', function (): void 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    $pillow = MenuItem::factory()->inCategory($category)->service()->limitedPerOrder(1, 2)->create(['position' => 0]);
+    $pillow = MenuItem::factory()->inCategory($category)->service()->limitedPerOrder(2)->create(['position' => 0]);
     MenuItem::factory()->inCategory($category)->create(['position' => 1]);
-    MenuCombo::factory()->onMenu($menu)->limitedPerOrder(2, 4)->create();
+    MenuCombo::factory()->onMenu($menu)->limitedPerOrder(4)->create();
 
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $pillow->getKey())
-            ->where('sections.0.items.0.minQuantity', 1)
             ->where('sections.0.items.0.maxQuantity', 2)
             // Null is no limit, and the app reads it that way.
             ->where('sections.0.items.1.maxQuantity', null)
-            ->where('combos.0.minQuantity', 2)
             ->where('combos.0.maxQuantity', 4),
         );
 });
@@ -544,7 +542,7 @@ it('sends only the charges a menu carries, switched on, in the order arranged', 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $service = Charge::factory()->ofTenant($tenant)->percentage(1000)->create([
+    $service = Charge::factory()->percentage(1000)->onMenus($menu)->create([
         'name' => [Locale::English->value => 'Service Charge'],
         'position' => 0,
     ]);
@@ -556,7 +554,7 @@ it('sends only the charges a menu carries, switched on, in the order arranged', 
     // Limited to another menu, switched off, and another tenant's: none of
     // these belongs on this bill.
     Charge::factory()->fixedAmount(5000)->onMenus($otherMenu)->create();
-    Charge::factory()->ofTenant($tenant)->inactive()->create();
+    Charge::factory()->onMenus($menu)->inactive()->create();
     Charge::factory()->create();
 
     $this->get(guestMenuUrl($tenant, $menu))
@@ -706,8 +704,8 @@ it('sends each add-on group once, and each item the groups it offers in its own 
     $curry = MenuItem::factory()->inCategory($category)->create(['position' => 0]);
     $dal = MenuItem::factory()->inCategory($category)->create(['position' => 1]);
 
-    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
-    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
 
     $garlic = MenuAddOnOption::factory()->inGroup($bread)->asDefault()->create(['position' => 1, 'price_minor_units' => 2000]);
     $butter = MenuAddOnOption::factory()->inGroup($bread)->free()->create(['position' => 0]);
@@ -728,7 +726,7 @@ it('sends each add-on group once, and each item the groups it offers in its own 
             ->where('addOnGroups', fn (Collection $groups): bool => $groups->firstWhere('id', $bread->getKey()) === [
                 'id' => $bread->getKey(),
                 'name' => $bread->name,
-                'minSelections' => 1,
+                'isRequired' => true,
                 'maxSelections' => 1,
                 // In the order they were dragged into.
                 'options' => [
@@ -750,10 +748,10 @@ it('leaves out an item whose required group has nothing left to pick, and a grou
     $curry = MenuItem::factory()->inCategory($category)->create(['position' => 0]);
     $dal = MenuItem::factory()->inCategory($category)->create(['position' => 1]);
 
-    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     MenuAddOnOption::factory()->inGroup($bread)->unavailable()->create();
 
-    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
     MenuAddOnOption::factory()->inGroup($extras)->unavailable()->create();
 
     MenuItemAddOnGroup::factory()->linking($curry, $bread)->create();
@@ -776,7 +774,7 @@ it('builds the add-on groups in the same number of queries however many items of
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
-    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     MenuAddOnOption::factory()->count(2)->inGroup($bread)->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
     MenuAddOnOption::factory()->count(3)->inGroup($extras)->create();

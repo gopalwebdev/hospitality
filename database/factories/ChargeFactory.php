@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class ChargeFactory extends Factory
 {
     /**
-     * A 10% charge on every menu, switched on — the shape of a service charge.
+     * A 10% charge, switched on — the shape of a service charge. It is on no bill until onMenus() puts it on some.
      *
      * @return array<string, mixed>
      */
@@ -27,7 +27,6 @@ class ChargeFactory extends Factory
             'calculation' => ChargeCalculation::Percentage,
             'rate_basis_points' => 1000,
             'amount_minor_units' => null,
-            'applies_to_all_menus' => true,
             'is_active' => true,
             'position' => fake()->numberBetween(0, 10),
         ];
@@ -68,7 +67,7 @@ class ChargeFactory extends Factory
     }
 
     /**
-     * Limited to these menus, and on their tenant.
+     * Added to bills from these menus, and on their tenant.
      */
     public function onMenus(Menu $menu, Menu ...$more): static
     {
@@ -77,7 +76,6 @@ class ChargeFactory extends Factory
         return $this
             ->state(fn (array $attributes): array => [
                 'tenant_id' => $menu->tenant_id,
-                'applies_to_all_menus' => false,
             ])
             ->afterCreating(fn (Charge $charge) => $charge->menus()->attach(
                 array_map(static fn (Menu $each): int => $each->getKey(), $menus),

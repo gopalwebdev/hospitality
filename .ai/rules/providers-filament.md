@@ -17,7 +17,7 @@ TenantPanelProvider::brandName() resolves per request: the signed-in tenant's ow
 ->tenantMenu(false) is also set: a tenant owner has nowhere to switch to (the panel is scoped to one tenant), and an admin supporting one opens it from the "Open dashboard" row action on the platform panel's Tenants table instead (TenantsTable.php), which links to Tenant::signInUrl(). Sessions are per-domain (.ai/rules/middleware.md), so this was never a same-session switch even when the tenant menu was on — removing it loses no real capability.
 
 ## Both panels hang their install tags on HEAD_END
-Both providers render `filament.progressive-web-app` through `PanelsRenderHook::HEAD_END`. The platform panel renders it on every page. `TenantPanelProvider::progressiveWebApp()` renders nothing until `Filament::getTenant()` is known, for the same reason as `brandName()`: the sign-in page has no tenant. See `.ai/rules/filament.md`.
+Both providers render `filament.progressive-web-app` through `PanelsRenderHook::HEAD_END`. The platform panel renders it on every page. `TenantPanelProvider::progressiveWebApp()` renders nothing until `Filament::getTenant()` is known, for the same reason as `brandName()`: the sign-in page has no tenant. Both also render `filament.number-inputs` there on every page, sign-in included. See `.ai/rules/filament.md`.
 
 ## PlatformPanelProvider registers before TenantPanelProvider
 Both panels are served under `/dashboard`, and the order in `bootstrap/providers.php` decides which one the root domain's `/dashboard/login` belongs to — see `.ai/rules/filament.md`. Both providers also run `->spa(hasPrefetching: true)`.

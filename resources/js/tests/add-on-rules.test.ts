@@ -36,7 +36,7 @@ const raita = option({ id: 13, name: 'Raita', priceMinorUnits: 3000 });
 const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
-    minSelections: 0,
+    isRequired: false,
     maxSelections: 3,
     options: [cheese, paneer, raita],
 };
@@ -52,7 +52,7 @@ const garlicNaan = option({
 const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
-    minSelections: 1,
+    isRequired: true,
     maxSelections: 1,
     options: [butterNaan, garlicNaan],
 };
@@ -67,14 +67,13 @@ describe('add-on rules', () => {
             path: 'customise.choose_up_to',
             replacements: { count: 3 },
         });
-        expect(
-            ruleOf({ ...extras, minSelections: 2, maxSelections: 4 }),
-        ).toEqual({
-            path: 'customise.choose_between',
-            replacements: { min: 2, max: 4 },
+        // Required with a maximum above one is still "up to"; the badge says required.
+        expect(ruleOf({ ...extras, isRequired: true })).toEqual({
+            path: 'customise.choose_up_to',
+            replacements: { count: 3 },
         });
         expect(
-            ruleOf({ ...extras, minSelections: 1, maxSelections: null }),
+            ruleOf({ ...extras, isRequired: true, maxSelections: null }),
         ).toEqual({
             path: 'customise.choose_at_least',
             replacements: { count: 1 },
@@ -86,7 +85,7 @@ describe('add-on rules', () => {
 
     it('reads a required pick-one as radios, and an optional one as a checkbox that can be unticked', () => {
         expect(isSingleChoice(bread)).toBe(true);
-        expect(isSingleChoice({ ...bread, minSelections: 0 })).toBe(false);
+        expect(isSingleChoice({ ...bread, isRequired: false })).toBe(false);
         expect(isSingleChoice(extras)).toBe(false);
     });
 

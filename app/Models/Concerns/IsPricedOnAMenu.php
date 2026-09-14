@@ -84,17 +84,6 @@ trait IsPricedOnAMenu
     }
 
     /**
-     * Whether this sets its own rate rather than following the tenant's.
-     *
-     * What the panel colours a badge on, so the exceptions stand out down a
-     * long list of items that all follow the default.
-     */
-    public function overridesTaxRate(): bool
-    {
-        return $this->tax_rate_basis_points !== null;
-    }
-
-    /**
      * Whether a higher price is shown struck through beside the real one.
      */
     public function hasComparePrice(): bool

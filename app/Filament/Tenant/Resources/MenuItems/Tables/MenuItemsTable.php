@@ -23,7 +23,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -31,10 +30,9 @@ class MenuItemsTable
 {
     public static function configure(Table $table): Table
     {
+        // Resolved once for the page rather than per row: every item here
+        // belongs to the same tenant and shares its currency.
         $currency = PricingFields::currency();
-        // Both resolved once for the page rather than per row: every item here
-        // belongs to the same tenant and shares its answers.
-        $tenantTaxRate = PricingFields::tenantTaxRateBasisPoints();
         $complimentary = (string) __('panel.items.complimentary');
 
         return $table
@@ -91,18 +89,6 @@ class MenuItemsTable
                     ->sortable()
                     ->alignEnd(),
 
-                TextColumn::make('tax_rate_basis_points')
-                    ->label(__('panel.items.tax_rate'))
-                    ->formatStateUsing(fn (MenuItem $record): string => PricingFields::formatRate(
-                        $record->taxRateBasisPoints($tenantTaxRate),
-                    ))
-                    // An item following the tenant's rate is shown in grey
-                    // and one that overrides it in colour, so the exceptions
-                    // stand out down a long list.
-                    ->badge()
-                    ->color(fn (MenuItem $record): string => $record->overridesTaxRate() ? 'info' : 'gray')
-                    ->toggleable(),
-
                 TextColumn::make('add_on_group_links_count')
                     ->label(__('panel.add_on_groups.plural'))
                     ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
@@ -115,16 +101,6 @@ class MenuItemsTable
                     ->badge()
                     ->formatStateUsing(fn (ItemAvailability $state): string => $state->label())
                     ->color(fn (ItemAvailability $state): string => $state->color())
-                    ->sortable(),
-
-                // In words rather than an icon, so the column answers the
-                // question its heading asks.
-                TextColumn::make('is_featured')
-                    ->label(__('panel.items.featured_column'))
-                    ->formatStateUsing(fn (bool $state): string => self::yesOrNo($state))
-                    ->badge()
-                    ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedStar : Heroicon::OutlinedMinusSmall)
-                    ->color(fn (bool $state): string => $state ? 'warning' : 'gray')
                     ->sortable(),
             ])
             ->filters([
@@ -187,8 +163,6 @@ class MenuItemsTable
                     ->label(__('panel.items.availability'))
                     ->options(ItemAvailability::options()),
 
-                TernaryFilter::make('is_featured')->label(__('panel.items.is_featured')),
-
                 Filter::make('on_offer')
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
@@ -196,8 +170,9 @@ class MenuItemsTable
             ])
             // Behind the table's filter button rather than laid out above it,
             // where they took half the screen before the first row. The cuts
-            // made most often — service requests, what has run out, each diet
-            // mark — are the tabs instead (ListMenuItems::getTabs()).
+            // made most often — service requests, what has run out, what is
+            // featured, each diet mark — are the tabs instead
+            // (ListMenuItems::getTabs()).
             ->filtersFormColumns(2)
             ->filtersFormWidth(Width::ThreeExtraLarge)
             ->recordActions([
@@ -258,14 +233,6 @@ class MenuItemsTable
         $tenant = Filament::getTenant();
 
         return $tenant instanceof Tenant ? $tenant->getKey() : null;
-    }
-
-    /**
-     * A true-or-false column in words.
-     */
-    private static function yesOrNo(bool $state): string
-    {
-        return (string) ($state ? __('panel.shared.yes') : __('panel.shared.no'));
     }
 
     /**

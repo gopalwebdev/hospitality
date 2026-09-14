@@ -161,7 +161,7 @@ class MenuItemForm
                     ->default(false)
                     ->inline(false),
 
-                ...PricingFields::quantityLimits(),
+                PricingFields::maxQuantity(),
             ]);
     }
 

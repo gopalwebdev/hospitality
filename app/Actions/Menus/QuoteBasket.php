@@ -42,7 +42,7 @@ class QuoteBasket
     /** Sold out, hidden, or no longer on this menu. */
     public const string UNAVAILABLE = 'unavailable';
 
-    /** Still on the menu, but its choices break the rules of its groups, or the basket holds more or fewer of it than one order may. */
+    /** Still on the menu, but its choices break the rules of its groups, or the basket holds more of it than one order may. */
     public const string INVALID = 'invalid';
 
     /**
@@ -171,7 +171,7 @@ class QuoteBasket
         foreach ($offered as $group) {
             $count = $picks[$group->getKey()] ?? 0;
 
-            if ($count < $group->min_selections || ($group->max_selections !== null && $count > $group->max_selections)) {
+            if (($group->is_required && $count === 0) || ($group->max_selections !== null && $count > $group->max_selections)) {
                 return self::INVALID;
             }
         }
@@ -198,12 +198,11 @@ class QuoteBasket
     }
 
     /**
-     * Whether the basket holds as many of an item or a combo as one order may: its minimum, and no more than its maximum when it has one.
+     * Whether the basket holds no more of an item or a combo than one order may.
      */
     private function isWithinLimits(MenuItem|MenuCombo $thing, int $held): bool
     {
-        return $held >= $thing->min_quantity
-            && ($thing->max_quantity === null || $held <= $thing->max_quantity);
+        return $thing->max_quantity === null || $held <= $thing->max_quantity;
     }
 
     /**
@@ -246,7 +245,7 @@ class QuoteBasket
         }
 
         return MenuItem::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'min_quantity', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'max_quantity'])
             ->where('tenant_id', $tenant->getKey())
             ->onMenu($menu->getKey())
             ->orderable()
@@ -275,7 +274,7 @@ class QuoteBasket
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'tenant_id', 'min_selections', 'max_selections', 'allows_quantities'])
+            ->select(['id', 'tenant_id', 'is_required', 'max_selections', 'allows_quantities'])
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options
@@ -298,7 +297,7 @@ class QuoteBasket
         }
 
         return MenuCombo::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'min_quantity', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', ItemAvailability::orderableValues())
             ->whereKey($ids)

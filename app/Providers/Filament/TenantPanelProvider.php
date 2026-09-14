@@ -88,6 +88,12 @@ class TenantPanelProvider extends PanelProvider
                 PanelsRenderHook::HEAD_END,
                 fn (): View|string => $this->progressiveWebApp(),
             )
+            // No number here is negative, and none carries the browser's
+            // arrows. See .ai/rules/filament.md.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View => view('filament.number-inputs'),
+            )
             // The language this panel is worked in. Menu names come out of
             // translated columns, so this has to be a server round trip.
             ->renderHook(

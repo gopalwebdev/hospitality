@@ -34,12 +34,7 @@ import {
     toggle,
     unitPrice,
 } from '@/lib/add-on-rules';
-import {
-    type OrderLimits,
-    fewestToAdd,
-    limitsRule,
-    roomFor,
-} from '@/lib/order-limits';
+import { type OrderLimits, limitsRule, roomFor } from '@/lib/order-limits';
 
 /** What the sheet needs of the item being customised. */
 export interface CustomisableItem extends OrderLimits {
@@ -56,7 +51,7 @@ interface CustomiseSheetProps {
     item: CustomisableItem | null;
     /** The groups it offers, in the order the item lists them. */
     groups: AddOnGroup[];
-    /** How many of it the basket already holds, which counts towards its limits. */
+    /** How many of it the basket already holds, which counts towards its maximum. */
     held: number;
     onClose: () => void;
     onAdd: (choices: Choice[], quantity: number) => void;
@@ -117,14 +112,12 @@ function Customiser({
 }) {
     const { t } = useTranslations();
     const money = useMoney();
-    // What the basket already holds counts towards the item's limits, so another
-    // line of it starts at what the minimum still asks for and stops where the
-    // maximum does.
+    // What the basket already holds counts towards the item's maximum, so
+    // another line of it stops where the maximum does.
     const room = roomFor(item, held);
-    const fewest = Math.min(fewestToAdd(item, held), Math.max(room, 1));
     const rule = limitsRule(item);
     const [picks, setPicks] = useState<Picks>(() => initialPicks(groups));
-    const [quantity, setQuantity] = useState(fewest);
+    const [quantity, setQuantity] = useState(1);
 
     const shortfall = firstShortfall(groups, picks);
     const total = unitPrice(item.priceMinorUnits, groups, picks) * quantity;
@@ -181,7 +174,7 @@ function Customiser({
                     <QuantityStepper
                         value={quantity}
                         name={item.name}
-                        canDecrease={quantity > fewest}
+                        canDecrease={quantity > 1}
                         canIncrease={quantity < room}
                         onDecrease={() => {
                             setQuantity(quantity - 1);

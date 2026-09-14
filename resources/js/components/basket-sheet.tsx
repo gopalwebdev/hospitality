@@ -35,7 +35,7 @@ export interface LineDescription {
     name: string;
     diet: Diet | null;
     isServiceRequest: boolean;
-    /** How many of the item or combo one order may hold. */
+    /** The most of the item or combo one order may hold. */
     limits: OrderLimits;
     /** Each picked option, "2 × Extra cheese" where more than one was taken. */
     choices: string[];
@@ -144,8 +144,8 @@ function LineRow({
     const held = quantityHeld(basket.lines, line.type, line.id);
     const rule = limitsRule(description.limits);
 
-    // A line refused for holding too many or too few says how many one order
-    // may hold, which is what the guest has to change.
+    // A line refused for holding too many says how many one order may hold,
+    // which is what the guest has to change.
     const problem =
         quoted?.status === 'unavailable'
             ? t('basket.unavailable')
@@ -189,10 +189,7 @@ function LineRow({
                         compact
                         value={line.quantity}
                         name={description.name}
-                        canDecrease={
-                            line.quantity > 1 &&
-                            held > description.limits.minQuantity
-                        }
+                        canDecrease={line.quantity > 1}
                         canIncrease={
                             line.quantity < MAX_LINE_QUANTITY &&
                             roomFor(description.limits, held) > 0

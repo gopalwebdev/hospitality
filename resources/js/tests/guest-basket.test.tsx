@@ -28,7 +28,7 @@ const quoteUrl = 'http://spice.hospitality.test/menus/1/basket-quotes';
 const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
-    minSelections: 0,
+    isRequired: false,
     maxSelections: 3,
     options: [
         {
@@ -44,7 +44,7 @@ const extras: AddOnGroup = {
 const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
-    minSelections: 1,
+    isRequired: true,
     maxSelections: 1,
     options: [
         {
@@ -66,7 +66,6 @@ const masala: MenuItem = {
     isServiceRequest: false,
     diet: 'vegetarian',
     addOnGroupIds: [2, 1],
-    minQuantity: 1,
     maxQuantity: null,
 };
 

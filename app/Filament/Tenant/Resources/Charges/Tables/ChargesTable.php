@@ -46,14 +46,12 @@ class ChargesTable
                     ->badge()
                     ->color('gray'),
 
-                // A charge on every menu keeps no list, so the placeholder is
-                // what it shows.
                 TextColumn::make('menus.name')
                     ->label(__('panel.charges.menus'))
                     ->icon(Heroicon::OutlinedBookOpen)
                     ->badge()
                     ->color('gray')
-                    ->placeholder(__('panel.charges.every_menu')),
+                    ->placeholder('—'),
 
                 IconColumn::make('is_active')
                     ->label(__('panel.charges.is_active'))

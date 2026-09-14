@@ -5,9 +5,11 @@ namespace App\Filament\Platform\Resources\Roles\Schemas;
 use App\Enums\PermissionGroup;
 use App\Models\Permission;
 use App\Models\Role;
-use Filament\Forms\Components\CheckboxList;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
@@ -48,10 +50,11 @@ class RoleForm
     }
 
     /**
-     * One section per category, each with its own checkbox list.
+     * One section per category, each with its own multi-select.
      *
      * A flat list of every permission says nothing about what a role does, so
-     * they are split by PermissionGroup and each list gets its own select-all.
+     * they are split by PermissionGroup and each select gets its own
+     * "Select all", which the checkbox lists these replaced had.
      * A category with nothing in it is left out rather than shown empty.
      *
      * The lists are deliberately not bound with ->relationship(): Filament would
@@ -78,13 +81,15 @@ class RoleForm
                     ->icon($group->icon())
                     ->collapsible()
                     ->schema([
-                        CheckboxList::make(self::statePathFor($group))
-                            ->hiddenLabel()
+                        Select::make(self::statePathFor($group))
+                            ->label('Permissions')
+                            ->multiple()
                             ->options($options)
-                            ->bulkToggleable()
-                            ->searchable(count($options) > 6)
-                            ->columns(2)
-                            ->columnSpanFull(),
+                            ->searchable()
+                            ->columnSpanFull()
+                            ->hintAction(Action::make('selectAll')
+                                ->label('Select all')
+                                ->action(fn (Set $set): mixed => $set(self::statePathFor($group), array_keys($options)))),
                     ]);
             },
             PermissionGroup::ordered(),

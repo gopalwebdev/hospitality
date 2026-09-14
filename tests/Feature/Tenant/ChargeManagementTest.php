@@ -21,7 +21,7 @@ beforeEach(function (): void {
 |--------------------------------------------------------------------------
 |
 | What a tenant adds to a guest's bill beyond the price: a share of the bill
-| or a fixed amount, on every menu or only the menus chosen. These replaced two
+| or a fixed amount, on the menus chosen for it. These replaced two
 | fixed switches on the Settings page, which could say a service charge and a
 | packing charge and nothing else.
 |
@@ -40,6 +40,7 @@ function chargeNamed(string $name): Charge
 
 it('types a share of the bill as a percentage and stores it as basis points', function (): void {
     $tenant = Tenant::factory()->create();
+    $menus = Menu::factory()->count(2)->create(['tenant_id' => $tenant->getKey()]);
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListCharges::class)
@@ -47,7 +48,6 @@ it('types a share of the bill as a percentage and stores it as basis points', fu
             'name' => [Locale::English->value => 'Service Charge'],
             'calculation' => ChargeCalculation::Percentage->value,
             'rate_percentage' => '10',
-            'applies_to_all_menus' => true,
             'is_active' => true,
         ])
         ->assertHasNoActionErrors();
@@ -59,11 +59,14 @@ it('types a share of the bill as a percentage and stores it as basis points', fu
     expect($charge->tenant_id)->toBe($tenant->getKey())
         ->and($charge->rate_basis_points)->toBe(1000)
         ->and($charge->amount_minor_units)->toBeNull()
-        ->and($charge->amountOn(50000))->toBe(5000);
+        ->and($charge->amountOn(50000))->toBe(5000)
+        // No menu was unpicked, so it starts on every menu the tenant has.
+        ->and($charge->menus()->orderBy('menus.id')->pluck('menus.id')->all())->toBe($menus->pluck('id')->sort()->values()->all());
 });
 
 it('types a fixed amount as money and stores it in minor units', function (): void {
     $tenant = Tenant::factory()->create();
+    Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListCharges::class)
@@ -71,7 +74,6 @@ it('types a fixed amount as money and stores it in minor units', function (): vo
             'name' => [Locale::English->value => 'Packing Charge'],
             'calculation' => ChargeCalculation::FixedAmount->value,
             'amount' => '20.50',
-            'applies_to_all_menus' => true,
             'is_active' => true,
         ])
         ->assertHasNoActionErrors();
@@ -97,7 +99,6 @@ it('limits a charge to the menus chosen for it', function (): void {
             'name' => [Locale::English->value => 'Room Service Fee'],
             'calculation' => ChargeCalculation::FixedAmount->value,
             'amount' => '50',
-            'applies_to_all_menus' => false,
             'menus' => [$inRoomDining->getKey()],
             'is_active' => true,
         ])
@@ -105,13 +106,12 @@ it('limits a charge to the menus chosen for it', function (): void {
 
     $charge = chargeNamed('Room Service Fee');
 
-    expect($charge->applies_to_all_menus)->toBeFalse()
-        ->and($charge->menus()->pluck('menus.id')->all())->toBe([$inRoomDining->getKey()])
+    expect($charge->menus()->pluck('menus.id')->all())->toBe([$inRoomDining->getKey()])
         ->and(Charge::query()->withoutGlobalScopes()->forMenu($inRoomDining->getKey())->pluck('id')->all())->toBe([$charge->getKey()])
         ->and(Charge::query()->withoutGlobalScopes()->forMenu($roomRequests->getKey())->exists())->toBeFalse();
 });
 
-it('asks which menus a charge is limited to', function (): void {
+it('asks which menus a charge is added to', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -120,7 +120,6 @@ it('asks which menus a charge is limited to', function (): void {
             'name' => [Locale::English->value => 'Room Service Fee'],
             'calculation' => ChargeCalculation::FixedAmount->value,
             'amount' => '50',
-            'applies_to_all_menus' => false,
             'menus' => [],
             'is_active' => true,
         ])
@@ -141,7 +140,6 @@ it('refuses another tenant\'s menu for a charge', function (): void {
             'name' => [Locale::English->value => 'Room Service Fee'],
             'calculation' => ChargeCalculation::FixedAmount->value,
             'amount' => '50',
-            'applies_to_all_menus' => false,
             'menus' => [$theirMenu->getKey()],
             'is_active' => true,
         ])
@@ -150,20 +148,12 @@ it('refuses another tenant\'s menu for a charge', function (): void {
     expect(Charge::query()->withoutGlobalScopes()->exists())->toBeFalse();
 });
 
-it('forgets the chosen menus once a charge is on every menu', function (): void {
-    $menu = Menu::factory()->create();
-    $charge = Charge::factory()->fixedAmount()->onMenus($menu)->create();
-
-    $charge->update(['applies_to_all_menus' => true]);
-
-    // A list left behind would quietly come back the moment the charge was
-    // limited again.
-    expect($charge->menus()->count())->toBe(0);
-});
-
 it('clears the number a charge stops using when its calculation changes', function (): void {
     $tenant = Tenant::factory()->create();
-    $charge = Charge::factory()->ofTenant($tenant)->percentage(1000)->create();
+    $charge = Charge::factory()
+        ->percentage(1000)
+        ->onMenus(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -172,7 +162,6 @@ it('clears the number a charge stops using when its calculation changes', functi
             'name' => $charge->getTranslations('name'),
             'calculation' => ChargeCalculation::FixedAmount->value,
             'amount' => '50',
-            'applies_to_all_menus' => true,
             'is_active' => true,
         ])
         ->assertHasNoActionErrors();

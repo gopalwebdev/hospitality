@@ -146,12 +146,12 @@ class TenantSeeder extends Seeder
      * two of. `items` is the order a group is linked in, and a group earlier in
      * this list comes first on an item that has several.
      *
-     * @var list<array{name: array<string, string>, min_selections: int, max_selections: int|null, allows_quantities?: bool, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_default?: bool}>, items: list<string>}>
+     * @var list<array{name: array<string, string>, is_required: bool, max_selections: int|null, allows_quantities?: bool, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_default?: bool}>, items: list<string>}>
      */
     public const array ADD_ON_GROUPS = [
         [
             'name' => ['en' => 'Portion', 'ta' => 'அளவு'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Half', 'ta' => 'அரை'], 'price_minor_units' => 0, 'is_default' => true],
@@ -161,7 +161,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Spice level', 'ta' => 'காரம்'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Mild', 'ta' => 'குறைவு'], 'price_minor_units' => 0],
@@ -172,7 +172,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Choose your bread', 'ta' => 'ரொட்டியைத் தேர்ந்தெடுக்கவும்'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Butter naan', 'ta' => 'பட்டர் நான்'], 'price_minor_units' => 0],
@@ -183,7 +183,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
-            'min_selections' => 0,
+            'is_required' => false,
             'max_selections' => 3,
             'allows_quantities' => true,
             'options' => [
@@ -195,7 +195,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Dosa sides', 'ta' => 'தோசை துணைகள்'],
-            'min_selections' => 0,
+            'is_required' => false,
             'max_selections' => 4,
             'allows_quantities' => true,
             'options' => [
@@ -207,7 +207,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Sugar', 'ta' => 'சர்க்கரை'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Regular', 'ta' => 'வழக்கம்'], 'price_minor_units' => 0, 'is_default' => true],
@@ -218,7 +218,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Strength', 'ta' => 'கடுமை'],
-            'min_selections' => 0,
+            'is_required' => false,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Extra strong', 'ta' => 'கூடுதல் கடுமையான'], 'price_minor_units' => 1000],
@@ -227,7 +227,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Sweet or salted', 'ta' => 'இனிப்பு அல்லது உப்பு'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price_minor_units' => 0, 'is_default' => true],
@@ -238,7 +238,7 @@ class TenantSeeder extends Seeder
         [
             // A service request customised like anything else: which pillow.
             'name' => ['en' => 'Pillow type', 'ta' => 'தலையணை வகை'],
-            'min_selections' => 1,
+            'is_required' => true,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Feather', 'ta' => 'இறகு'], 'price_minor_units' => 0],
@@ -248,7 +248,7 @@ class TenantSeeder extends Seeder
         ],
         [
             'name' => ['en' => 'Delivery time', 'ta' => 'கொண்டுவரும் நேரம்'],
-            'min_selections' => 0,
+            'is_required' => false,
             'max_selections' => 1,
             'options' => [
                 ['name' => ['en' => 'Now', 'ta' => 'இப்போது'], 'price_minor_units' => 0],
@@ -958,7 +958,8 @@ class TenantSeeder extends Seeder
     private function seedCharges(Tenant $tenant, array $charges, array $menus): void
     {
         foreach ($charges as $position => $definition) {
-            $limitedTo = $definition['menus'] ?? [];
+            // A charge that names no menus goes on every menu this tenant has.
+            $limitedTo = $definition['menus'] ?? array_keys($menus);
 
             $charge = $this->firstOrCreateByEnglishName(
                 Charge::query()->where('tenant_id', $tenant->getKey()),
@@ -969,7 +970,6 @@ class TenantSeeder extends Seeder
                         : ChargeCalculation::FixedAmount,
                     'rate_basis_points' => $definition['rate_basis_points'] ?? null,
                     'amount_minor_units' => $definition['amount_minor_units'] ?? null,
-                    'applies_to_all_menus' => $limitedTo === [],
                     'is_active' => true,
                     'position' => $position,
                 ]),
@@ -1070,7 +1070,6 @@ class TenantSeeder extends Seeder
                 'is_service_request' => $item['is_service_request'] ?? false,
                 'diet' => $item['diet'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
-                'min_quantity' => $item['min_quantity'] ?? 1,
                 // Null is no limit.
                 'max_quantity' => $item['max_quantity'] ?? null,
                 'is_featured' => $item['is_featured'] ?? false,
@@ -1111,7 +1110,7 @@ class TenantSeeder extends Seeder
                 MenuAddOnGroup::query()->where('tenant_id', $tenant->getKey()),
                 $definition['name'],
                 fn (): MenuAddOnGroup => new MenuAddOnGroup([
-                    'min_selections' => $definition['min_selections'],
+                    'is_required' => $definition['is_required'],
                     'max_selections' => $definition['max_selections'],
                     'allows_quantities' => $definition['allows_quantities'] ?? false,
                 ]),

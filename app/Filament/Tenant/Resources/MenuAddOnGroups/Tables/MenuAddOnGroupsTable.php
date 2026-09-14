@@ -41,12 +41,6 @@ class MenuAddOnGroupsTable
                         ->map(fn (MenuAddOnOption $option): string => $option->name)
                         ->join(' · ')),
 
-                TextColumn::make('min_selections')
-                    ->label(__('panel.add_on_groups.rule'))
-                    ->formatStateUsing(fn (MenuAddOnGroup $record): string => MenuAddOnGroupForm::ruleSummary($record->min_selections, $record->max_selections))
-                    ->badge()
-                    ->color(fn (MenuAddOnGroup $record): string => $record->isRequired() ? 'warning' : 'gray'),
-
                 TextColumn::make('options_count')
                     ->label(__('panel.add_on_groups.options'))
                     ->counts('options')

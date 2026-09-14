@@ -43,11 +43,11 @@ The guest app is the opposite — see .ai/rules/js.md, which is phone-only. A st
 Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes.
 
 ## Never bind roles or permissions with Filament's ->relationship()
-A `CheckboxList::make('permissions')->relationship(...)` writes the pivot table directly, which bypasses Spatie's `syncRoles()` / `syncPermissions()` and so never calls `forgetCachedPermissions()`. The registrar then answers every `can()` check for the rest of the request from the set that was there before the save.
+A `Select::make('permissions')->multiple()->relationship(...)` writes the pivot table directly, which bypasses Spatie's `syncRoles()` / `syncPermissions()` and so never calls `forgetCachedPermissions()`. The registrar then answers every `can()` check for the rest of the request from the set that was there before the save.
 
 Use plain `->options()` instead, and hand the ids to an action on the page: SetRolePermissions (roles) or SetUserRoles (users). Both go through Spatie, which flushes the cache. Edit pages fill the field back in `mutateFormDataBeforeFill()`.
 
-This is about **Spatie roles and permissions specifically**, because of that cache — it is not a ban on `->relationship()`. An ordinary relationship has no cache behind it: `MenuItemForm`'s add-on groups repeater (bound to the item's links) and `MenuAddOnGroupForm`'s options repeater use `->relationship()` on purpose so a record and its rows are written in one save, and `ChargeForm`'s menus checklist does too — with its options overridden to this tenant's menus and a rule refusing any other id, because `charge_menu` has no tenant to check.
+This is about **Spatie roles and permissions specifically**, because of that cache — it is not a ban on `->relationship()`. An ordinary relationship has no cache behind it: `MenuItemForm`'s add-on groups repeater (bound to the item's links) and `MenuAddOnGroupForm`'s options repeater use `->relationship()` on purpose so a record and its rows are written in one save, and `ChargeForm`'s menus select does too — with its options overridden to this tenant's menus and a rule refusing any other id, because `charge_menu` has no tenant to check.
 
 **A relationship repeater fills from a relation that is already loaded.** Filament reuses the record's loaded relation instead of querying it again, so a table that eager-loads that relation with a column list hands its edit form rows missing every other column. The add-on groups table loaded `options` with four columns for its preview, and editing a group filled every option's price as nothing and refused a blank quantity. Eager-load such a relation with all its columns, or preview through something else.
 
@@ -73,7 +73,7 @@ Four things the switcher costs, all handled inside `TranslatedFields` and none o
 
 A translated field in each row of a repeater — an add-on group's options — passes `inRepeaterRow: true`. A relative `$get()` resolves inside the row, where there is no switcher, so without it every row showed the panel's language whatever the switcher said; the add-ons repeater before it did exactly that.
 
-A field that is hidden but `dehydratedWhenHidden()` is **validated while hidden** too. Give its rules the same condition as its visibility. An add-on group's Minimum floors at 1 only while the group is required and of more than one, which is the only time it is shown; hidden, it may hold anything, and the save works the real minimum out from the answers.
+A field that is hidden but `dehydratedWhenHidden()` is **validated while hidden** too. Give its rules the same condition as its visibility, and save what the other answers mean rather than what the box holds. An add-on group's "Same option more than once" is hidden while its Maximum is 1, and saved as off then, whatever it was left at.
 
 Table columns must still go through `TranslatedFields::sort()` / `::search()` — both answer in the panel's language, with English for anything untranslated — and every edit action still needs `->mutateRecordDataUsing(fn (array $data, Model $record) => XForm::fillTranslations($data, $record))` — Spatie hands back one language, and a form editing all of them needs the whole document.
 
@@ -124,4 +124,25 @@ A form that fits the screen beats a column of full-width sections. Put related f
 
 Every icon-only action carries a `tooltip()` naming it; `iconButton()` alone leaves a pencil and a bin to be guessed at. On the menu page a row's actions are separate icon buttons, each with its tooltip and a colour for what it does. An `ActionGroup::buttonGroup()` strip was tried there first, and it drew misaligned icons and a solid red delete button (`.ai/rules/menus.md`).
 
-Time pickers are configured once, for every form (`.ai/rules/providers.md`), so a form gives a picker only its label and its rules.
+A time of day is `App\Filament\Forms\Components\ClockTimePicker`: hour, minute and AM/PM columns in Filament's own dropdown, its state `HH:MM`.
+- **Why not the alternatives:** Filament's `TimePicker` drew three small number boxes, and the browser's own picker looked different in every browser. The project owner asked for a clock picker.
+- **Rule:** use it for any new time field.
+- **Styling:** inline, from Filament's colour variables.
+
+## Several choices are a multi-select dropdown
+The project owner's standing instruction: a field that takes several values is `Select::make()->multiple()`, never a `CheckboxList`. Today that is:
+- **A charge's menus.**
+- **An account's roles,** in both panels.
+- **A role's permissions:** one select per category, with a **Select all** hint action standing in for the checkbox list's bulk toggle.
+
+The state is the same array as before, so the actions that save it did not change.
+
+## No number is negative, and none carries arrows
+Every numeric field declares `minValue()` of 0 or more. Filament renders it as the input's `min`, and the server refuses on it.
+
+Both panels also hang `resources/views/filament/number-inputs.blade.php` on `HEAD_END`:
+- **Arrows:** inline CSS hides the browser's spin buttons.
+- **Typing and pasting:** one listener on the page refuses `-`, `+` and `e`, typed or pasted.
+- **Wheel:** it stops the mouse wheel turning a focused number.
+
+The project owner asked for both. A new numeric field needs only its `minValue()`.

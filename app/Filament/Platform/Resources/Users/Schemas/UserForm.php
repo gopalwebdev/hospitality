@@ -6,7 +6,6 @@ use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -95,14 +94,13 @@ class UserForm
                         // permission: deciding that is exactly what this panel
                         // is for. A tenant panel is offered a filtered list
                         // instead, by SetTenantUserRoles.
-                        CheckboxList::make('roles')
+                        Select::make('roles')
+                            ->multiple()
                             ->options(fn (): array => once(fn (): array => Role::query()
                                 ->orderBy('name')
                                 ->pluck('name', 'name')
                                 ->all()))
                             ->searchable()
-                            ->bulkToggleable()
-                            ->columns(2)
                             ->columnSpanFull()
                             ->helperText('Roles are held per account, not per tenant: someone staffing two tenants carries these at both.'),
                     ]),

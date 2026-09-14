@@ -24,6 +24,8 @@ The shape follows the aggregators it will one day have to speak to:
 - **UrbanPiper:** `min_selectable` / `max_selectable`.
 - **Uber Eats:** `quantity_info.min_permitted` / `max_permitted`.
 
+Where one of them asks for a minimum, a required group is a minimum of one.
+
 **A variant is a required group of one pick**, with each option's price added to the item's. "Portion: Half / Full +₹150" needs no variant table.
 
 What a group does not do yet, deliberately:
@@ -33,52 +35,45 @@ What a group does not do yet, deliberately:
 
 The schema can add each later without a rewrite.
 
-## The questions the form asks, and what it stores
-The form asks what Toast, Square and DoorDash ask, in their order, each question only once it applies. A "Guest must choose" toggle beside Min and Max boxes said "required" twice and showed Max qty and GST on every group; the project owner found it confusing and asked for this.
+## Three answers: Required, Maximum, and the same option twice
+The form asks three things, and the columns are named for them:
 
-| Question | Answers | Stored as |
+| Field | Stored as | Means |
 | --- | --- | --- |
-| Is it required? | Optional / Required | `min_selections` 0, or 1 and up |
-| How many can a guest pick? | Only one / More than one | `max_selections` 1, or blank (no limit) or 2 and up |
-| Minimum — required and more than one only | a number | `min_selections` |
-| Maximum — more than one only | a number; blank is no limit | `max_selections` |
-| Same option more than once — more than one only | on / off | `allows_quantities` |
+| Required | `is_required` | a guest picks at least one option before the item goes in |
+| Maximum | `max_selections` | the most picks; blank is no limit, 1 is one pick |
+| Same option more than once | `allows_quantities` | a guest may take one option twice ("Extra cheese × 2"); hidden while Maximum is 1 |
 
-What each platform calls these:
-- **Toast:** modifier behavior Optional / Required; "Allow guests to select more than one modifier?"; "Can the same modifier be added more than once?"
-- **Square:** "Customer must only select one option"; `allow_quantities`.
-- **DoorDash:** `min_num_options`, `max_num_options`, `max_option_choice_quantity`.
+It used to ask more:
+- **Button groups:** Optional / Required and Only one / More than one.
+- **Fields after them:** a Minimum, the Maximum and the toggle, after what Toast, Square and DoorDash ask.
 
-**The two questions are form state, not columns.** `requirement` and `selection` are filled from the stored numbers when the form opens. They are filled before Minimum has its default, so a minimum that is still null means a new group, which opens as Optional and Only one. A stored group always has a minimum.
+The project owner found that confusing and had it cut to these three, and `min_selections` became `is_required`. **Do not bring a minimum back** without asking.
 
-**What is saved comes from the answers, not the boxes.** It is worked out on the way out (`dehydrateStateUsing`):
-- "Only one" saves a maximum of one and no quantities, whatever the hidden Minimum, Maximum and toggle still hold.
-- An optional group saves a minimum of none.
+How a guest sees it:
+- **Required with a maximum of one:** radios.
+- **Optional with a maximum of one:** a checkbox that moves its tick.
 
 - **Counting:** picks are counted by quantity, as Square counts them, so two of "Extra cheese" are two picks toward "up to 3".
 - **`max_quantity`:** caps how many of one option a single item takes. It is only read while the group `allows_quantities`. `MenuAddOnGroup::quantityAllowedFor()` is the one place that says so (otherwise it is one), and `picksOffered()` adds the options up with it. `Guest\MenuController` and `QuoteBasket` both go through them.
 
 **Stated three times over:**
 - **CHECK constraints:**
-  - `menu_add_on_groups_min_not_negative`
-  - `menu_add_on_groups_max_covers_min`: max null, or at least `GREATEST(min, 1)`
+  - `menu_add_on_groups_max_in_range`: max null or 1–99
   - `menu_add_on_groups_quantities_need_more_than_one`: a group that allows quantities has no maximum, or one of at least two
   - `max_quantity BETWEEN 1 AND 99` on options
 - **Form validation in `MenuAddOnGroupForm`:**
-  - More than one needs a maximum of at least two, or none.
-  - The maximum is not below the minimum.
-  - The minimum is not more than the options can add up to.
+  - The maximum is 1–99, or blank.
   - No more options are set as the default than the maximum. This rule sits on the options repeater, so its message reads under the table.
   - An option's Max qty is not more than the maximum.
   - A group has at least one option.
-- **Pricing:** the same rules again in `QuoteBasket`.
+  - Same option more than once is saved off while the maximum is 1, whatever its box was left at: what it saves reads the Maximum.
+- **Pricing:** `QuoteBasket` refuses a line as `invalid` when a required group has nothing picked or a group's picks go over its maximum.
 
-Minimum, Maximum and the toggle are saved while hidden, so their validation takes the same condition as their visibility (`.ai/rules/filament.md`).
-
-`MenuAddOnGroupForm::ruleSummary()` words a rule for the panel ("Required · Choose 1", "Optional · Up to 3"), and `resources/js/lib/add-on-rules.ts` `ruleOf()` words the same cases for a guest. Change one, change the other.
+`MenuAddOnGroupForm::ruleSummary()` words a rule for the panel's item form ("Required · Choose 1", "Optional · Up to 3", "Required · At least 1"). `resources/js/lib/add-on-rules.ts` `ruleOf()` words the same cases for a guest. Change one, change the other.
 
 ## Where groups are edited, and where they are linked
-`MenuAddOnGroupResource` lists the library under Menu, after Items. Groups are created and edited in 7xl modals, stacked so the options table gets the full width: the name and the questions on top, then the options, dragged into the order a guest reads them.
+`MenuAddOnGroupResource` lists the library under Menu, after Items. Groups are created and edited in 7xl modals, stacked so the options table gets the full width: the name and the three answers on top, then the options, dragged into the order a guest reads them.
 
 An option's columns:
 - **Option:** its translated name, through `TranslatedFields::textCell()`.
@@ -93,9 +88,10 @@ There is no GST column; see below.
 
 The list reads by name (`TranslatedFields::sort()`) and is not dragged. Each row shows:
 - the options under the name
-- the rule as a badge
 - how many options the group has
 - how many items it is used on (grey when none)
+
+It showed the rule as a "Guest picks" badge too, until the project owner had that column removed.
 
 Row actions:
 - **Attach to items** offers the tenant's items that do not offer the group yet, under "Menu · Category › Sub-category" headings, and adds the group after the groups each item already has.
@@ -111,7 +107,7 @@ An item links its groups in its own form: a table repeater on `addOnGroupLinks`,
 
 **The groups table loads `options` with every column.** The edit form's options repeater fills from the relation the table already loaded, and a column list there filled every price as nothing (`.ai/rules/filament.md`).
 
-**The options table uses `TranslatedFields::textCell()`, never a bare `text()`.** A `->table()` repeater gives a row one cell per top-level component, so a translated name spread as two inputs split into two cells and shifted every column after it — this is what put a price under the since-removed GST column and dropped "Available" off the end before it was fixed. See `.ai/rules/filament.md`.
+**The options table uses `TranslatedFields::textCell()`, never a bare `text()`.** A `->table()` repeater gives a row one cell per top-level component, so a translated name spread as two inputs split into two cells and shifted every column after it. That put a price under the since-removed GST column and dropped "Available" off the end before it was fixed. See `.ai/rules/filament.md`.
 
 ## An add-on is taxed at its item's rate
 An option has no `tax_rate_basis_points`. Section 8(a) of the CGST Act taxes a composite supply at the rate of its principal supply, and extra cheese on a paneer tikka is part of the paneer tikka. So `QuoteBasket` taxes every part of an item's line at the item's rate.
@@ -124,7 +120,9 @@ This replaced two things:
 `Guest\MenuController` reads the page's links and then its groups with their available options, in two queries whatever the menu's size:
 - **Unavailable options:** never sent.
 - **Groups with nothing left:** a group with no available option is dropped from every item that offered it.
-- **Items whose required group can't be met:** an item is left off the menu, like a sold-out one, when a required group's available options cannot add up to its minimum. `QuoteBasket` calls the same line `unavailable`.
+- **Items whose required group can't be met:** an item is left off the menu, like a sold-out one, when a required group has no available option left. `QuoteBasket` calls the same line `unavailable`.
+
+A group arrives as `{id, name, isRequired, maxSelections, options}` (`.ai/rules/js.md`).
 
 The seeded tenants get realistic groups from `TenantSeeder::ADD_ON_GROUPS`: portion, spice level, bread, extras, dosa sides, sugar, strength, sweet or salted, pillow type and delivery time. They are linked to items by English name, and seeded only for a tenant that has at least one of those items.
 

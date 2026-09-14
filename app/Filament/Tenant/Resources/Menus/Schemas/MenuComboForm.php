@@ -70,7 +70,7 @@ class MenuComboForm
                         PricingFields::compareAtPrice($currency),
                         PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
                         PricingFields::availability(),
-                        ...PricingFields::quantityLimits(),
+                        PricingFields::maxQuantity(),
                     ])
                     ->columns(2),
 

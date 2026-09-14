@@ -15,20 +15,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A set of choices items are customised with — a spice level, a bread, extras — kept once and linked to every item that offers it.
- * A guest makes at least `min_selections` picks (0 is optional) and at most `max_selections` (null is no limit), each option counted by its quantity.
+ * A guest must pick at least one when it `is_required`, and at most `max_selections` (null is no limit), each option counted by its quantity.
  * Only a group that `allows_quantities` lets a guest take one option more than once ("Extra cheese × 2").
  *
  * @property int $id
  * @property int $tenant_id
  * @property string $name
- * @property int $min_selections
+ * @property bool $is_required
  * @property int|null $max_selections
  * @property bool $allows_quantities
  * @property-read Collection<int, MenuAddOnOption> $options
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'min_selections', 'max_selections', 'allows_quantities'])]
+#[Fillable(['name', 'is_required', 'max_selections', 'allows_quantities'])]
 class MenuAddOnGroup extends Model
 {
     /** @use HasFactory<MenuAddOnGroupFactory> */
@@ -42,7 +42,7 @@ class MenuAddOnGroup extends Model
     /** @var array<string, mixed> */
     #[\Override]
     protected $attributes = [
-        'min_selections' => 0,
+        'is_required' => false,
         'allows_quantities' => false,
     ];
 
@@ -75,19 +75,11 @@ class MenuAddOnGroup extends Model
     }
 
     /**
-     * Whether a guest has to pick from it before the item can be added.
-     */
-    public function isRequired(): bool
-    {
-        return $this->min_selections >= 1;
-    }
-
-    /**
-     * Whether options adding up to this many picks can still meet the minimum.
+     * Whether options adding up to this many picks still leave a guest something to pick, when they must pick one.
      */
     public function canBeMetBy(int $availablePicks): bool
     {
-        return $availablePicks >= $this->min_selections;
+        return ! $this->is_required || $availablePicks >= 1;
     }
 
     /**
@@ -99,7 +91,7 @@ class MenuAddOnGroup extends Model
     }
 
     /**
-     * The most picks the loaded options can add up to — what a required group's minimum is checked against.
+     * The most picks the loaded options can add up to — what a required group is checked against.
      */
     public function picksOffered(): int
     {
@@ -120,7 +112,7 @@ class MenuAddOnGroup extends Model
     protected function casts(): array
     {
         return [
-            'min_selections' => 'integer',
+            'is_required' => 'boolean',
             'max_selections' => 'integer',
             'allows_quantities' => 'boolean',
         ];

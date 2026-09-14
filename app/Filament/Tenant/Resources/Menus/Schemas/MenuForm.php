@@ -2,9 +2,9 @@
 
 namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
+use App\Filament\Forms\Components\ClockTimePicker;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
-use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -73,14 +73,12 @@ class MenuForm
                                 // Both or neither: a window with one end is not a
                                 // window, so each requires the other rather than the
                                 // missing half being guessed at.
-                                TimePicker::make('available_from')
+                                ClockTimePicker::make('available_from')
                                     ->label(__('panel.menus.available_from'))
-                                    ->live(onBlur: true)
                                     ->requiredWith('available_until'),
 
-                                TimePicker::make('available_until')
+                                ClockTimePicker::make('available_until')
                                     ->label(__('panel.menus.available_until'))
-                                    ->live(onBlur: true)
                                     ->requiredWith('available_from'),
                             ]),
                     ]),

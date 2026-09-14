@@ -39,10 +39,11 @@ class ListMenuItems extends ListRecords
     }
 
     /**
-     * Things to order and service requests, then the cuts the list is most often made by: what has run out, and each diet mark.
+     * Things to order and service requests, then the cuts the list is most often made by: what has run out, what is featured, and each diet mark.
      *
-     * The project owner asked for Out of stock and the diet marks beside the
-     * kind rather than behind the filter button. A tab combines with whatever
+     * The project owner asked for Out of stock, Featured and the diet marks
+     * beside the kind rather than behind the filter button; Featured replaced
+     * a column and a filter. A tab combines with whatever
      * filters are set. Every badge loads after the page has rendered, from one
      * query.
      *
@@ -75,6 +76,13 @@ class ListMenuItems extends ListRecords
                 ->deferBadge()
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('availability', ItemAvailability::OutOfStock->value)),
 
+            'featured' => Tab::make(__('panel.items.featured_tab'))
+                ->icon(Heroicon::OutlinedStar)
+                ->badge(fn (): int => $this->counts()['featured'])
+                ->badgeColor('warning')
+                ->deferBadge()
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('is_featured', true)),
+
             'veg' => $this->dietTab(Diet::Vegetarian, 'veg', __('panel.items.veg_tab')),
             'egg' => $this->dietTab(Diet::Egg, 'egg', __('panel.items.egg_tab')),
             'non_veg' => $this->dietTab(Diet::NonVegetarian, 'non_veg', __('panel.items.non_veg_tab')),
@@ -99,7 +107,7 @@ class ListMenuItems extends ListRecords
      * One query of conditional counts for every badge; the panel's tenancy
      * scope keeps it to this tenant's items.
      *
-     * @return array{all: int, items: int, service_requests: int, out_of_stock: int, veg: int, egg: int, non_veg: int}
+     * @return array{all: int, items: int, service_requests: int, out_of_stock: int, featured: int, veg: int, egg: int, non_veg: int}
      */
     private function counts(): array
     {
@@ -111,6 +119,7 @@ class ListMenuItems extends ListRecords
                     .', sum(case when is_service_request then 0 else 1 end) as items'
                     .', sum(case when is_service_request then 1 else 0 end) as service_requests'
                     .', sum(case when availability = ? then 1 else 0 end) as out_of_stock'
+                    .', sum(case when is_featured then 1 else 0 end) as featured'
                     .', sum(case when diet = ? then 1 else 0 end) as veg'
                     .', sum(case when diet = ? then 1 else 0 end) as egg'
                     .', sum(case when diet = ? then 1 else 0 end) as non_veg',
@@ -128,6 +137,7 @@ class ListMenuItems extends ListRecords
                 'items' => (int) ($row->items ?? 0),
                 'service_requests' => (int) ($row->service_requests ?? 0),
                 'out_of_stock' => (int) ($row->out_of_stock ?? 0),
+                'featured' => (int) ($row->featured ?? 0),
                 'veg' => (int) ($row->veg ?? 0),
                 'egg' => (int) ($row->egg ?? 0),
                 'non_veg' => (int) ($row->non_veg ?? 0),

@@ -12,7 +12,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -213,7 +213,7 @@ it('offers only the roles a tenant may hand out', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(CreateUser::class)
-        ->assertFormFieldExists('roles', function (CheckboxList $field) use ($productTeamRole): bool {
+        ->assertFormFieldExists('roles', function (Select $field) use ($productTeamRole): bool {
             $offered = array_keys($field->getOptions());
 
             expect($offered)->toContain(RoleEnum::Staff->value)

@@ -42,8 +42,8 @@ function seedCurryWithChoices(): array
     $category = MenuCategory::factory()->inMenu($menu)->create();
     $curry = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 28900]);
 
-    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
-    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->allowingQuantities()->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->allowingQuantities()->create();
 
     MenuItemAddOnGroup::factory()->linking($curry, $bread)->create(['position' => 0]);
     MenuItemAddOnGroup::factory()->linking($curry, $extras)->create(['position' => 1]);
@@ -87,11 +87,11 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
 
     $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 59900, 'tax_rate_basis_points' => null]);
 
-    $service = Charge::factory()->ofTenant($tenant)->percentage(1000)->create(['position' => 0]);
+    $service = Charge::factory()->percentage(1000)->onMenus($menu)->create(['position' => 0]);
     $packing = Charge::factory()->ofTenant($tenant)->fixedAmount(2000)->onMenus($menu)->create(['position' => 1]);
     // Neither a charge on another menu nor one switched off is on this bill.
     Charge::factory()->ofTenant($tenant)->fixedAmount(5000)->onMenus(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
-    Charge::factory()->ofTenant($tenant)->fixedAmount(7000)->inactive()->create();
+    Charge::factory()->fixedAmount(7000)->onMenus($menu)->inactive()->create();
 
     $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
         basketLine('curry', $curry, quantity: 2, choices: [[$garlicNaan, 1], [$cheese, 2]]),
@@ -129,7 +129,7 @@ it('flags a line whose choices break the rules of its groups, and prices the res
 
     // Offered on the curry, and capped at three, but its group does not allow
     // the same option twice: one of each at most.
-    $sides = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(0, 3)->create();
+    $sides = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
     MenuItemAddOnGroup::factory()->linking($curry, $sides)->create(['position' => 2]);
     $chutney = MenuAddOnOption::factory()->inGroup($sides)->upTo(3)->create();
 
@@ -158,15 +158,14 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         ->and($response->json('subtotalMinorUnits'))->toBe(28900 + 8000 + 6000);
 });
 
-it('flags every line of an item or combo the basket holds more or fewer of than one order may, counting across its lines', function (): void {
+it('flags every line of an item or combo the basket holds more of than one order may, counting across its lines', function (): void {
     [
-        'tenant' => $tenant, 'menu' => $menu, 'category' => $category, 'curry' => $curry,
+        'tenant' => $tenant, 'menu' => $menu, 'curry' => $curry,
         'butterNaan' => $butterNaan, 'garlicNaan' => $garlicNaan,
     ] = seedCurryWithChoices();
 
     $curry->update(['max_quantity' => 2]);
-    $idli = MenuItem::factory()->inCategory($category)->limitedPerOrder(2, null)->create();
-    $platter = MenuCombo::factory()->onMenu($menu)->limitedPerOrder(1, 1)->create();
+    $platter = MenuCombo::factory()->onMenu($menu)->limitedPerOrder(1)->create();
 
     $statuses = fn (array $lines): array => collect($this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => $lines])->assertOk()->json('lines'))
         ->pluck('status', 'key')
@@ -177,24 +176,20 @@ it('flags every line of an item or combo the basket holds more or fewer of than 
     expect($statuses([
         basketLine('butter', $curry, choices: [[$butterNaan, 1]]),
         basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
-        basketLine('two-idli', $idli, quantity: 2),
         basketLine('one-platter', $platter),
     ]))->toBe([
         'butter' => QuoteBasket::OK,
         'garlic' => QuoteBasket::OK,
-        'two-idli' => QuoteBasket::OK,
         'one-platter' => QuoteBasket::OK,
     ])
         // A third curry on either line is one too many for both lines.
         ->and($statuses([
             basketLine('butter', $curry, quantity: 2, choices: [[$butterNaan, 1]]),
             basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
-            basketLine('one-idli', $idli),
             basketLine('two-platters', $platter, quantity: 2),
         ]))->toBe([
             'butter' => QuoteBasket::INVALID,
             'garlic' => QuoteBasket::INVALID,
-            'one-idli' => QuoteBasket::INVALID,
             'two-platters' => QuoteBasket::INVALID,
         ]);
 });
@@ -211,7 +206,7 @@ it('flags a line the menu can no longer offer, whatever was chosen', function ()
 
     // A required group whose every option has run out takes its item off the menu.
     $dal = MenuItem::factory()->inCategory($category)->create();
-    $rice = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(1, 1)->create();
+    $rice = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     $noRiceLeft = MenuAddOnOption::factory()->inGroup($rice)->unavailable()->create();
     MenuItemAddOnGroup::factory()->linking($dal, $rice)->create();
 
