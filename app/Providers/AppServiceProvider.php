@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Exceptions\DuplicateQueryException;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Filament\Forms\Components\TimePicker;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\DevCommands;
@@ -47,6 +49,23 @@ class AppServiceProvider extends ServiceProvider
         $this->configureQueryGuards();
         $this->configureAuthorization();
         $this->configureDevProcesses();
+        $this->configureTimePickers();
+    }
+
+    /**
+     * Pick times with Filament's own picker rather than the browser's.
+     *
+     * The native time input opens a different, unstyled dropdown in every
+     * browser, and nothing here — a menu's hours, a tenant's opening times —
+     * needs seconds. Set once, so a time picker added later matches the rest.
+     */
+    protected function configureTimePickers(): void
+    {
+        TimePicker::configureUsing(static fn (TimePicker $picker): TimePicker => $picker
+            ->native(false)
+            ->seconds(false)
+            ->displayFormat('h:i A')
+            ->prefixIcon(Heroicon::OutlinedClock));
     }
 
     /**

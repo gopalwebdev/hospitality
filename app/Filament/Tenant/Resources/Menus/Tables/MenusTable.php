@@ -52,6 +52,7 @@ class MenusTable
                 EditAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)
+                    ->tooltip(__('panel.arrangement.edit'))
                     // Spatie hands back one language for a translated column;
                     // this form edits them all, so the whole document is put
                     // back before the fields are filled.
@@ -60,6 +61,7 @@ class MenusTable
                 DeleteAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedTrash)
+                    ->tooltip(__('panel.arrangement.delete'))
                     // Deleting a menu takes its sections, their items and
                     // those items' add-ons with it, by the cascades on the
                     // foreign keys. Say so before it happens.

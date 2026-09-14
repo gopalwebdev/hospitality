@@ -74,6 +74,17 @@ class MenuArrangementTable
 
     private const string ITEM = 'item';
 
+    /**
+     * The lists a row is dragged within, mirroring ApplyMenuArrangement: the top
+     * level, the featured items, the combos, and — keyed by their parent — the
+     * sub-categories of a category (`sub-<id>`) and the items of one (`items-<id>`).
+     */
+    private const string TOP_LEVEL_LIST = 'top';
+
+    private const string FEATURED_LIST = 'featured';
+
+    private const string COMBO_LIST = 'combos';
+
     public static function configure(Table $table, Menu $menu): Table
     {
         // Asked once for the page rather than per row per action: every
@@ -101,6 +112,7 @@ class MenuArrangementTable
                 TextColumn::make('type')
                     ->label(__('panel.arrangement.type'))
                     ->badge()
+                    ->icon(fn (array $record): Heroicon => $record['type_icon'])
                     ->color(fn (array $record): string => $record['type_color']),
 
                 TextColumn::make('meta')
@@ -115,46 +127,52 @@ class MenuArrangementTable
                     // has something in it.
                     ->placeholder(''),
             ])
+            // What each row is, and the list it is dragged within, as classes for
+            // the menu page's own styles and its drag guard to read — see
+            // resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php.
+            ->recordClasses(fn (array $record): array => [
+                'menu-row',
+                'menu-row--'.$record['kind'],
+                'menu-list--'.$record['list'],
+            ])
             ->headerActions([
                 self::createCategoryAction('createCategory', $menu)->visible($mayManage),
                 self::createComboAction('createCombo', $menu)->color('gray')->visible($mayManage),
                 self::featureItemsAction('featureItems', $menu)->color('gray')->visible($mayManage),
             ])
+            // Every action a row has, as one strip of icon buttons named on
+            // hover: nothing hides behind a menu, and each row shows only the
+            // buttons that apply to it.
             ->recordActions([
-                // What a row is mostly for sits on the row itself; everything
-                // else about it is under the ⋯.
-                self::createItemAction()
-                    ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
-                self::featureItemsAction('addFeaturedItems', $menu)
-                    ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Featured)),
-                self::createComboAction('addCombo', $menu)
-                    ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Combos)),
-                self::editItemAction($menu)
-                    ->visible(fn (array $record): bool => $mayManage && self::isItemRow($record)),
-                self::editComboAction($menu)
-                    ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::COMBO),
-
                 ActionGroup::make([
-                    self::renameAction($menu)
+                    self::iconButton(self::createItemAction())
                         ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
-                    self::createSubCategoryAction($menu)
+                    self::iconButton(self::createSubCategoryAction($menu))
                         // Two levels and no more, so only a top-level category holds one.
                         ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY),
-                    self::moveCategoryAction($menu)
-                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY),
-                    self::unfeatureAction($menu)
-                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::FEATURED_ITEM),
-                    self::deleteItemAction($menu)
-                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::ITEM),
-                    self::deleteComboAction($menu)
+                    self::iconButton(self::featureItemsAction('addFeaturedItems', $menu))
+                        ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Featured)),
+                    self::iconButton(self::createComboAction('addCombo', $menu))
+                        ->visible(fn (array $record): bool => $mayManage && self::isBlockRow($record, MenuBlockType::Combos)),
+                    self::iconButton(self::editItemAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && self::isItemRow($record)),
+                    self::iconButton(self::editComboAction($menu))
                         ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::COMBO),
-                    self::deleteCategoryAction($menu)
+                    self::iconButton(self::renameAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
+                    self::iconButton(self::moveCategoryAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::CATEGORY),
+                    self::iconButton(self::unfeatureAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::FEATURED_ITEM),
+                    self::iconButton(self::deleteItemAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::ITEM),
+                    self::iconButton(self::deleteComboAction($menu))
+                        ->visible(fn (array $record): bool => $mayManage && $record['kind'] === self::COMBO),
+                    self::iconButton(self::deleteCategoryAction($menu))
                         ->visible(fn (array $record): bool => $mayManage && self::isCategoryRow($record)),
                 ])
-                    ->label(__('panel.arrangement.actions'))
-                    ->icon(Heroicon::OutlinedEllipsisHorizontal)
-                    ->color('gray')
-                    ->visible(fn (array $record): bool => $mayManage && $record['kind'] !== self::BLOCK),
+                    ->buttonGroup()
+                    ->visible($mayManage),
             ])
             // Clicking a row opens whatever edits it.
             ->recordAction(fn (array $record): ?string => $mayManage ? self::editActionFor($record) : null)
@@ -190,7 +208,7 @@ class MenuArrangementTable
             ->select(['id', 'parent_id', 'name', 'position', 'is_active'])
             ->where('menu_id', $menu->getKey())
             ->with(['menuItems' => fn ($items) => $items
-                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'is_service', 'availability', 'is_featured', 'featured_position', 'position'])
+                ->select(['id', 'menu_category_id', 'name', 'description', 'price_minor_units', 'is_service_request', 'availability', 'is_featured', 'featured_position', 'position'])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -285,12 +303,17 @@ class MenuArrangementTable
         return [
             '__key' => ApplyMenuArrangement::blockKey($block),
             'kind' => self::BLOCK,
+            'list' => self::TOP_LEVEL_LIST,
             'block' => $block->type->value,
             'id' => $block->getKey(),
             'depth' => 0,
             'name' => $block->type->label(),
             'detail' => $block->type->description(),
             'type' => __('panel.arrangement.block'),
+            'type_icon' => match ($block->type) {
+                MenuBlockType::Featured => Heroicon::OutlinedStar,
+                MenuBlockType::Combos => Heroicon::OutlinedSparkles,
+            },
             'type_color' => 'warning',
             'meta' => $meta,
             'state' => null,
@@ -311,6 +334,7 @@ class MenuArrangementTable
         return [
             '__key' => ApplyMenuArrangement::categoryKey($category->getKey()),
             'kind' => $kind,
+            'list' => $kind === self::CATEGORY ? self::TOP_LEVEL_LIST : 'sub-'.$category->parent_id,
             'block' => null,
             'id' => $category->getKey(),
             'depth' => $depth,
@@ -319,6 +343,7 @@ class MenuArrangementTable
             'type' => $kind === self::CATEGORY
                 ? __('panel.categories.section')
                 : __('panel.sub_categories.section'),
+            'type_icon' => $kind === self::CATEGORY ? Heroicon::OutlinedRectangleStack : Heroicon::OutlinedSquares2x2,
             'type_color' => $kind === self::CATEGORY ? 'primary' : 'info',
             'meta' => $subCategoryCount > 0
                 ? $items.' · '.trans_choice('panel.arrangement.sub_categories_count', $subCategoryCount, ['count' => $subCategoryCount])
@@ -342,12 +367,14 @@ class MenuArrangementTable
                 ? ApplyMenuArrangement::featuredItemKey($item->getKey())
                 : ApplyMenuArrangement::itemKey($item->getKey()),
             'kind' => $kind,
+            'list' => $kind === self::FEATURED_ITEM ? self::FEATURED_LIST : 'items-'.$item->menu_category_id,
             'block' => null,
             'id' => $item->getKey(),
             'depth' => $depth,
             'name' => $item->name,
             'detail' => $item->description,
-            'type' => $item->is_service ? __('panel.items.is_service') : __('panel.items.item'),
+            'type' => $item->is_service_request ? __('panel.items.is_service_request') : __('panel.items.item'),
+            'type_icon' => $item->is_service_request ? Heroicon::OutlinedBellAlert : Heroicon::OutlinedListBullet,
             'type_color' => 'gray',
             // Formatted here rather than in the browser: a panel is server
             // rendered, and the currency is resolved once for the page.
@@ -369,12 +396,14 @@ class MenuArrangementTable
         return [
             '__key' => ApplyMenuArrangement::comboKey($combo->getKey()),
             'kind' => self::COMBO,
+            'list' => self::COMBO_LIST,
             'block' => null,
             'id' => $combo->getKey(),
             'depth' => 1,
             'name' => $combo->name,
             'detail' => $combo->description,
             'type' => __('panel.combos.section'),
+            'type_icon' => Heroicon::OutlinedSparkles,
             'type_color' => 'gray',
             'meta' => $combo->formattedPrice($currency).' · '.trans_choice('panel.arrangement.items_count', $contents, ['count' => $contents]),
             'state' => $combo->availability->label(),
@@ -746,6 +775,22 @@ class MenuArrangementTable
 
                 Notification::make()->title(__('panel.arrangement.deleted'))->success()->send();
             });
+    }
+
+    /**
+     * One of a row's actions as an icon button, named by a tooltip rather than in text.
+     *
+     * The label is kept rather than removed: it still heads the action's modal
+     * and is what a screen reader announces.
+     */
+    private static function iconButton(Action $action): Action
+    {
+        $label = $action->getLabel();
+
+        return $action
+            ->hiddenLabel()
+            ->tooltip(is_string($label) ? $label : null)
+            ->color($action->getColor() ?? 'gray');
     }
 
     /**

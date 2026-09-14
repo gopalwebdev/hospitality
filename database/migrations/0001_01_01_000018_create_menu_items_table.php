@@ -24,7 +24,7 @@ return new class extends Migration
             $table->smallInteger('tax_rate_basis_points')->nullable();
             $table->string('hsn_code', 8)->nullable();
             // A service request — an extra pillow, a bedsheet change — rather than something to order.
-            $table->boolean('is_service')->default(false);
+            $table->boolean('is_service_request')->default(false);
             // Null exactly for a service request; see MenuItemObserver.
             $table->string('diet', 32)->nullable();
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
@@ -38,7 +38,7 @@ return new class extends Migration
             ADD CONSTRAINT menu_items_positions_not_negative CHECK ("position" >= 0 AND featured_position >= 0),
             ADD CONSTRAINT menu_items_prices_not_negative CHECK (price_minor_units >= 0 AND (compare_at_price_minor_units IS NULL OR compare_at_price_minor_units >= 0)),
             ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
-            ADD CONSTRAINT menu_items_diet_matches_service CHECK (is_service = (diet IS NULL))');
+            ADD CONSTRAINT menu_items_diet_matches_service_request CHECK (is_service_request = (diet IS NULL))');
     }
 
     public function down(): void

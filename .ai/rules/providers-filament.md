@@ -18,3 +18,6 @@ TenantPanelProvider::brandName() resolves per request: the signed-in tenant's ow
 
 ## PlatformPanelProvider registers before TenantPanelProvider
 Both panels are served under `/dashboard`, and the order in `bootstrap/providers.php` decides which one the root domain's `/dashboard/login` belongs to — see `.ai/rules/filament.md`. Both providers also run `->spa(hasPrefetching: true)`.
+
+## Both sidebars collapse to their icons
+Both providers call `->sidebarCollapsibleOnDesktop()`: the project owner found the navigation took too much of the screen, and the menu page and the items table want the width. It folds to an icon rail rather than disappearing (`sidebarFullyCollapsibleOnDesktop()`), so every page stays one click away. Navigation groups carry no icons of their own on purpose — Filament hides item icons in the expanded sidebar once a group has one.

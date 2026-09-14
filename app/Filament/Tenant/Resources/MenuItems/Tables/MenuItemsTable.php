@@ -9,15 +9,18 @@ use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
+use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\Tenant;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -59,11 +62,14 @@ class MenuItemsTable
                     ->color('gray')
                     ->toggleable(),
 
-                IconColumn::make('is_service')
-                    ->label(__('panel.items.is_service'))
-                    ->boolean()
-                    ->trueIcon(Heroicon::OutlinedSparkles)
-                    ->falseIcon(Heroicon::OutlinedMinusSmall)
+                // In words rather than an icon, so the column answers the
+                // question its heading asks.
+                TextColumn::make('is_service_request')
+                    ->label(__('panel.items.service_request_column'))
+                    ->formatStateUsing(fn (bool $state): string => self::yesOrNo($state))
+                    ->badge()
+                    ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedBellAlert : Heroicon::OutlinedMinusSmall)
+                    ->color(fn (bool $state): string => $state ? 'info' : 'gray')
                     ->sortable(),
 
                 // Empty for a service request, which carries no diet mark.
@@ -119,11 +125,12 @@ class MenuItemsTable
                     ->color(fn (ItemAvailability $state): string => $state->color())
                     ->sortable(),
 
-                IconColumn::make('is_featured')
-                    ->label(__('panel.items.is_featured'))
-                    ->boolean()
-                    ->trueIcon(Heroicon::OutlinedStar)
-                    ->falseIcon(Heroicon::OutlinedMinusSmall)
+                TextColumn::make('is_featured')
+                    ->label(__('panel.items.featured_column'))
+                    ->formatStateUsing(fn (bool $state): string => self::yesOrNo($state))
+                    ->badge()
+                    ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedStar : Heroicon::OutlinedMinusSmall)
+                    ->color(fn (bool $state): string => $state ? 'warning' : 'gray')
                     ->sortable(),
             ])
             ->filters([
@@ -141,14 +148,42 @@ class MenuItemsTable
                         ),
                     )),
 
-                SelectFilter::make('menu_category_id')
-                    ->label(__('panel.items.section'))
-                    // Narrowed to the chosen menu when there is one, so picking
-                    // a menu and then a category reads as one decision rather
-                    // than two lists that repeat each other.
-                    ->options(fn (HasTable $livewire): array => self::sectionOptions($livewire)),
+                // A category brings its sub-categories' items with it: picking
+                // Starters asks for everything under Starters. Narrowed to the
+                // chosen menu, so picking a menu and then a category reads as one
+                // decision rather than two lists repeating each other.
+                SelectFilter::make('category')
+                    ->label(__('panel.categories.section'))
+                    ->options(fn (HasTable $livewire): array => MenuSubCategoryForm::topLevelOptions(
+                        self::tenantKey(),
+                        self::filterValue($livewire, 'menu'),
+                    ))
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $inBranch): Builder => $inBranch->whereIn(
+                            'menu_category_id',
+                            MenuCategory::query()
+                                ->select('id')
+                                ->where(fn (Builder $branch): Builder => $branch
+                                    ->whereKey((int) $data['value'])
+                                    ->orWhere('parent_id', (int) $data['value'])),
+                        ),
+                    )),
 
-                TernaryFilter::make('is_service')->label(__('panel.items.is_service')),
+                // Narrowed to the category picked beside it, else to the menu.
+                SelectFilter::make('sub_category')
+                    ->label(__('panel.sub_categories.section'))
+                    ->options(fn (HasTable $livewire): array => MenuSubCategoryForm::subCategoryOptions(
+                        self::tenantKey(),
+                        self::filterValue($livewire, 'menu'),
+                        self::filterValue($livewire, 'category'),
+                    ))
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $inSubCategory): Builder => $inSubCategory->where('menu_category_id', (int) $data['value']),
+                    )),
 
                 SelectFilter::make('diet')
                     ->label(__('panel.items.diet'))
@@ -158,17 +193,22 @@ class MenuItemsTable
                     ->label(__('panel.items.availability'))
                     ->options(ItemAvailability::options()),
 
+                TernaryFilter::make('is_featured')->label(__('panel.items.is_featured')),
+
                 Filter::make('on_offer')
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('compare_at_price_minor_units')),
-
-                TernaryFilter::make('is_featured')->label(__('panel.items.is_featured')),
-            ])
+            ], layout: FiltersLayout::AboveContent)
+            // On the page rather than behind a button: finding an item by where
+            // it is filed is most of what this page is for. Service requests
+            // and items are the tabs above (ListMenuItems::getTabs()).
+            ->filtersFormColumns(4)
             ->recordActions([
                 EditAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)
+                    ->tooltip(__('panel.arrangement.edit'))
                     ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fillTranslations(
                         MenuItemForm::fillPricing($data),
                         $record,
@@ -178,6 +218,7 @@ class MenuItemsTable
                 DeleteAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedTrash)
+                    ->tooltip(__('panel.arrangement.delete'))
                     ->modalDescription(__('panel.items.delete_warning')),
             ])
             ->toolbarActions([
@@ -202,21 +243,31 @@ class MenuItemsTable
     }
 
     /**
-     * The categories the section filter offers.
-     *
-     * Every category in the tenant, at both levels, unless a menu has been
-     * picked — then only that menu's, because offering the rest would be
-     * offering rows the menu filter has already excluded.
-     *
-     * @return array<int, string>
+     * What a filter is set to, as the key it names, or null while it is not set.
      */
-    private static function sectionOptions(HasTable $livewire): array
+    private static function filterValue(HasTable $livewire, string $filter): ?int
     {
-        $menuKey = $livewire->getTableFilterState('menu')['value'] ?? null;
+        $value = $livewire->getTableFilterState($filter)['value'] ?? null;
 
-        return filled($menuKey)
-            ? MenuSubCategoryForm::categoryOptionsOnMenu((int) $menuKey)
-            : MenuItemForm::sectionOptions();
+        return filled($value) ? (int) $value : null;
+    }
+
+    /**
+     * The tenant the panel is serving.
+     */
+    private static function tenantKey(): ?int
+    {
+        $tenant = Filament::getTenant();
+
+        return $tenant instanceof Tenant ? $tenant->getKey() : null;
+    }
+
+    /**
+     * A true-or-false column in words.
+     */
+    private static function yesOrNo(bool $state): string
+    {
+        return (string) ($state ? __('panel.shared.yes') : __('panel.shared.no'));
     }
 
     /**

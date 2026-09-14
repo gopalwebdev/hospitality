@@ -21,7 +21,7 @@ That is deliberate, and it is the rule below rather than a limitation of the dra
 
 **A row the table did not draw keeps its place.** An empty block is not drawn, so it is missing from the order Filament sends. `renumber()` shuffles only the rows that were sent, among the slots they already held, and does not write a list none of whose rows were sent. Before this, a row missing from the order sorted last, which would have pushed an empty featured block to the bottom of the menu whenever anything else was dragged. A block every menu has but nobody has placed is an unsaved `MenuBlock` reading at 0, and is saved the first time it lands anywhere else.
 
-It loads items with only `id`, `menu_category_id`, `is_featured`, `featured_position` and `position`, which is enough because `MenuItemObserver` reads `is_service` and `diet` only when one of them changes — keep that true, or the renumber throws under strict mode.
+It loads items with only `id`, `menu_category_id`, `is_featured`, `featured_position` and `position`, which is enough because `MenuItemObserver` reads `is_service_request` and `diet` only when one of them changes — keep that true, or the renumber throws under strict mode.
 
 Row keys (`featured`, `combos`, `block-<id>`, `featured-<item id>`, `combo-<id>`, `category-<id>`, `item-<id>`) are formatted by this class as well as parsed by it, so the table that renders them cannot drift from the action that reads them.
 

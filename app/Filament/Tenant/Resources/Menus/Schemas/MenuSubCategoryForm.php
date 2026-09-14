@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 /**
  * Naming a sub-category and saying which category it subdivides.
@@ -122,25 +123,77 @@ class MenuSubCategoryForm
     }
 
     /**
-     * Every category on one menu, at both levels, labelled by its branch.
+     * Top-level categories for the items page's Category filter.
      *
-     * For the items filter once a menu has been picked: "Biryani" and
-     * "Biryani › Chicken" are both places an item can sit, and the menu is
-     * already named by the filter beside it.
+     * Only the chosen menu's once one is picked, named alone because the menu
+     * filter beside it already says which menu; every menu's otherwise, as
+     * "Lunch · Starters", so two menus' "Starters" are told apart.
      *
      * @return array<int, string>
      */
-    public static function categoryOptionsOnMenu(int $menuId): array
+    public static function topLevelOptions(?int $tenantId, ?int $menuId = null): array
     {
-        return once(fn (): array => MenuCategory::query()
-            ->where('menu_id', $menuId)
-            ->with('parent:id,name')
-            ->inMenuOrder()
-            ->get()
+        $menus = $menuId === null ? MenuCategoryForm::menuOptions() : [];
+
+        return self::tenantCategories($tenantId)
+            ->filter(fn (MenuCategory $category): bool => $category->isTopLevel()
+                && ($menuId === null || $category->menu_id === $menuId))
             ->mapWithKeys(fn (MenuCategory $category): array => [
-                $category->getKey() => $category->path(),
+                $category->getKey() => $menuId === null
+                    ? sprintf('%s · %s', $menus[$category->menu_id] ?? '', $category->name)
+                    : $category->name,
             ])
-            ->all());
+            ->all();
+    }
+
+    /**
+     * Sub-categories for the items page's Sub-category filter.
+     *
+     * Narrowed to the category picked beside it, else to the chosen menu, else
+     * every one the tenant has — each labelled with only as much of its branch
+     * as the filters beside it have not already said.
+     *
+     * @return array<int, string>
+     */
+    public static function subCategoryOptions(?int $tenantId, ?int $menuId = null, ?int $parentId = null): array
+    {
+        $categories = self::tenantCategories($tenantId);
+        $names = $categories->mapWithKeys(fn (MenuCategory $category): array => [$category->getKey() => $category->name]);
+        $menus = $menuId === null && $parentId === null ? MenuCategoryForm::menuOptions() : [];
+
+        return $categories
+            ->filter(fn (MenuCategory $category): bool => $category->isSubCategory()
+                && ($parentId === null || $category->parent_id === $parentId)
+                && ($menuId === null || $category->menu_id === $menuId))
+            ->mapWithKeys(function (MenuCategory $category) use ($names, $menus, $menuId, $parentId): array {
+                $branch = sprintf('%s › %s', $names->get($category->parent_id, ''), $category->name);
+
+                return [$category->getKey() => match (true) {
+                    $parentId !== null => $category->name,
+                    $menuId !== null => $branch,
+                    default => sprintf('%s · %s', $menus[$category->menu_id] ?? '', $branch),
+                }];
+            })
+            ->all();
+    }
+
+    /**
+     * Every category the tenant has, at both levels, read once for the request.
+     *
+     * Both filter lists above are built from this one read, with menu names from
+     * the list the Menu filter beside them has already loaded. Each list used to
+     * eager-load the menus for itself, and the second load was the same query
+     * the first had just run.
+     *
+     * @return EloquentCollection<int, MenuCategory>
+     */
+    private static function tenantCategories(?int $tenantId): EloquentCollection
+    {
+        return once(fn (): EloquentCollection => MenuCategory::query()
+            ->select(['id', 'menu_id', 'parent_id', 'name', 'position'])
+            ->where('tenant_id', $tenantId)
+            ->inMenuOrder()
+            ->get());
     }
 
     /**

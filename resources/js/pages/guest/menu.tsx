@@ -24,7 +24,7 @@ export interface MenuItem {
     /** A higher price to show struck through, or null when not on offer. */
     compareAtPriceMinorUnits: number | null;
     /** A service request — an extra pillow — rather than something to order. */
-    isService: boolean;
+    isServiceRequest: boolean;
     /** Null for a service request, which carries no diet mark. */
     diet: Diet | null;
     additions: AddOn[];
@@ -33,7 +33,7 @@ export interface MenuItem {
 interface ComboContent {
     id: number;
     name: string;
-    isService: boolean;
+    isServiceRequest: boolean;
     diet: Diet | null;
     quantity: number;
 }

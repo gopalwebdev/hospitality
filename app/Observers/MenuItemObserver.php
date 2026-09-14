@@ -48,11 +48,11 @@ class MenuItemObserver
      */
     private function pairDietWithService(MenuItem $item): void
     {
-        if ($item->exists && ! $item->isDirty(['is_service', 'diet'])) {
+        if ($item->exists && ! $item->isDirty(['is_service_request', 'diet'])) {
             return;
         }
 
-        if ($item->is_service) {
+        if ($item->is_service_request) {
             $item->diet = null;
 
             return;

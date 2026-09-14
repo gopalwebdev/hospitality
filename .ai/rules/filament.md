@@ -96,3 +96,10 @@ So: no `helperText()` on a form field, and no `->description()` on a form sectio
 Three things are deliberately **not** covered by this and stay: empty-state headings and descriptions, which is where a tenant with nothing set up needs telling what the page is for; the `modalDescription()` on a destructive action, because what a delete takes with it cannot be inferred from a button; and validation messages, which explain a refusal that has already happened.
 
 A conditional table `description()` — one shown only while an action is unavailable — was tried on the items page to explain how to enable dragging, and taken out again. The rule is not "no permanent prose", it is **no prose**: a control that only appears once a filter is set is discoverable by using the filter, and a sentence saying so is a sentence to read every time you visit the page and do not need it.
+
+## Forms stay compact, and icon buttons are named on hover
+A form that fits the screen beats a column of full-width sections. Put related fields in a few `->compact()` sections and lay them side by side in a `Grid` with `->gridContainer()` and container breakpoints (`'@3xl' => 3`), so the same form sits side by side on a page and stacks in a modal — see `MenuForm`. The project owner found the menu's Edit tab, then four stacked sections, took far too much space.
+
+Every icon-only action carries a `tooltip()` naming it; `iconButton()` alone leaves a pencil and a bin to be guessed at. On the menu page a row's actions are one `ActionGroup::buttonGroup()` strip for the same reason (`.ai/rules/menus.md`).
+
+Time pickers are configured once, for every form (`.ai/rules/providers.md`), so a form gives a picker only its label and its rules.

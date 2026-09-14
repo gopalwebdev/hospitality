@@ -561,12 +561,12 @@ it('sends a service request with no diet mark, beside something to order', funct
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $pillow->getKey())
-            ->where('sections.0.items.0.isService', true)
+            ->where('sections.0.items.0.isServiceRequest', true)
             ->where('sections.0.items.0.diet', null)
             // Zero goes out as zero; the app names it complimentary.
             ->where('sections.0.items.0.priceMinorUnits', 0)
             ->where('sections.0.items.1.id', $water->getKey())
-            ->where('sections.0.items.1.isService', false)
+            ->where('sections.0.items.1.isServiceRequest', false)
             ->where('sections.0.items.1.diet', Diet::Vegetarian->value),
         );
 });

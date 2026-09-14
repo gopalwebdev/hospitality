@@ -928,7 +928,7 @@ it('saves a service request without a diet mark', function (): void {
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extra Pillow'],
             'menu_category_id' => $category->getKey(),
-            'is_service' => true,
+            'is_service_request' => true,
             'price' => '0',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -937,7 +937,7 @@ it('saves a service request without a diet mark', function (): void {
     $pillow = byEnglishName(MenuItem::class, 'Extra Pillow');
 
     // A pillow has no diet to declare, and costs a guest nothing.
-    expect($pillow->is_service)->toBeTrue()
+    expect($pillow->is_service_request)->toBeTrue()
         ->and($pillow->diet)->toBeNull()
         ->and($pillow->isComplimentary())->toBeTrue();
 });
@@ -954,7 +954,7 @@ it('asks for a diet mark on anything that is not a service request', function ()
         ->callAction('create', [
             'name' => [Locale::English->value => 'Water Bottle'],
             'menu_category_id' => $category->getKey(),
-            'is_service' => false,
+            'is_service_request' => false,
             'diet' => null,
             'price' => '40',
             'availability' => ItemAvailability::Available->value,
@@ -977,13 +977,13 @@ it('drops the diet mark of an item that becomes a service request', function ():
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'is_service' => true,
+            'is_service_request' => true,
             'price' => '0',
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($menuItem->refresh()->is_service)->toBeTrue()
+    expect($menuItem->refresh()->is_service_request)->toBeTrue()
         ->and($menuItem->diet)->toBeNull();
 });
 

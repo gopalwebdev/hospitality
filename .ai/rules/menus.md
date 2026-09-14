@@ -6,7 +6,7 @@ paths:
 # Menus
 
 ## A menu is two tabs, and the first is the whole menu, edited where it sits
-`MenuResource::getRecordSubNavigation()` puts two pages across the top of one menu record (`SubNavigationPosition::Top`): **Arrangement** (`ArrangeMenu`) and **Edit** (`EditMenu`: name, description, hours, showing).
+`MenuResource::getRecordSubNavigation()` puts two pages across the top of one menu record (`SubNavigationPosition::Top`): **Arrangement** (`ArrangeMenu`) and **Edit** (`EditMenu`: name and description beside showing and hours, two compact sections in a grid container, so they sit side by side on the page and stack in the narrower create modal).
 
 There were four. Featured items and Combos were tabs of their own (`ManageMenuFeaturedItems`, `ManageMenuCombos`), and before those the page carried four relation managers. The project owner asked for one page where the whole menu is seen and every row on it is added, edited and deleted in place, so both tabs were deleted and their jobs moved onto the arrangement. The Items page (`MenuItemResource`) stays as the flat list of every item across every menu, for finding one without knowing where it is filed.
 
@@ -15,11 +15,11 @@ There were four. Featured items and Combos were tabs of their own (`ManageMenuFe
 
 **A block with nothing in it is not drawn.** An empty "Featured items · No items" row used to head every menu. The header carries **New category**, **New combo** and **Feature items**, which is how a block is started; once it holds something it appears where it was placed.
 
-Every row carries what it is mostly for as a button on the row and the rest under ⋯, and a click on the row opens its edit (`recordAction()`):
-- a category or sub-category: **Add item**; ⋯ Edit, Add sub-category (top level only), Move to another menu, Delete
-- the featured block: **Feature items**; each featured item: **Edit**, ⋯ Remove from featured
-- the combos block: **New combo**; each combo: **Edit**, ⋯ Delete
-- an item: **Edit**, ⋯ Delete
+Every action a row has is one strip of icon buttons — `ActionGroup::buttonGroup()`, each action passed through `iconButton()`, which hides its label and shows it as a tooltip — so nothing sits behind a ⋯ menu, and a click on the row opens its edit (`recordAction()`):
+- a category: Add item, Add sub-category, Edit, Move to another menu, Delete; a sub-category the same without Add sub-category and Move
+- the featured block: Feature items; each featured item: Edit, Remove from featured
+- the combos block: New combo; each combo: Edit, Delete
+- an item: Edit, Delete
 
 It is a Filament **custom data** table (`->records()`), because its rows are several models plus blocks that may not be rows anywhere yet. What follows from that:
 
@@ -32,6 +32,13 @@ It is a Filament **custom data** table (`->records()`), because its rows are sev
 - **The page redraws from saved rows after every action** (`ArrangeMenu::afterActionCalled()` flushes the cached records). Filament reads all the rows to find the one a row action is about and keeps that copy for the request, so without it a rename left the old name on screen and a deleted row stayed in the list until a reload.
 
 **Four queries build the rows, however big the menu**: categories at both levels with their items, the menu's placed blocks, and its combos with a count of their contents. Featured rows are picked out of the items already loaded. `MenuCategoryTreeTest` asserts the page's query count does not grow with the menu, so a per-row lookup fails it.
+
+## Rows are tinted by kind, and a drag is refused outside a row's own list
+`recordClasses()` puts `menu-row--<kind>` and `menu-list--<list>` on every row. `resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php` holds what reads them, inline because a panel ships no CSS of ours: a tint and an edge colour per kind, mixed from Filament's own `--primary-500` / `--warning-500` / `--info-500` variables so dark mode follows, and the drag guard.
+
+The guard is a Livewire `@script`. Filament's drag and drop is SortableJS, which exists as `sortable` on the `[x-sortable]` list only in reorder mode, so a MutationObserver waits for it and then sets `onStart` (dim every row outside the dragged row's list and show a note at the foot of the screen saying why), `onMove` (refuse a row in another list, and flash it) and a wrapper around Filament's own `onEnd`, which must still be called — it is what puts the dropped node back where Sortable says it went. The project owner asked for this: a drop into the wrong category used to be accepted on screen and quietly undone by the server.
+
+The `list` values — `top`, `featured`, `combos`, `sub-<parent id>`, `items-<category id>` — mirror the lists `ApplyMenuArrangement` renumbers. Change one and change the other; `MenuCategoryTreeTest` pins them. The server still puts a stray row back among its own siblings, because the guard is only in the browser.
 
 ## Blocks are what sits on a menu's top level beside its categories
 `menu_blocks` holds a menu's top level that is not a category: `type` is `App\Enums\MenuBlockType` (`Featured`, `Combos`), and `position` shares one number space with the top-level `menu_categories.position`, so moving a block is the same drag as moving a category. `Menu::readingOrder($categories, $blocks)` merges the two, and both the panel and `Guest\MenuController` read it — the guest app is *sent* the order (`order`, a list of `'featured' | 'combos' | <section id>`), because what a guest reads first is a decision and decisions stay in PHP.

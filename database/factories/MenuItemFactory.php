@@ -37,7 +37,7 @@ class MenuItemFactory extends Factory
             'compare_at_price_minor_units' => null,
             'tax_rate_basis_points' => null,
             'hsn_code' => null,
-            'is_service' => false,
+            'is_service_request' => false,
             'diet' => fake()->randomElement(Diet::cases()),
             'availability' => ItemAvailability::Available,
             'position' => fake()->numberBetween(0, 20),
@@ -62,7 +62,7 @@ class MenuItemFactory extends Factory
     public function service(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'is_service' => true,
+            'is_service_request' => true,
             'diet' => null,
             'price_minor_units' => 0,
         ]);

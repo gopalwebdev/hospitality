@@ -6,6 +6,7 @@ use App\Filament\Schemas\TranslatedFields;
 use App\Models\Menu;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -23,6 +24,13 @@ class MenuForm
      */
     public const array TRANSLATED = ['name', 'description'];
 
+    /**
+     * Two compact sections, side by side where the form has room and stacked where it has not.
+     *
+     * The breakpoint is the form's own width (a grid container) rather than the
+     * window's, which is what tells the menu's Edit tab from the narrower create
+     * modal on the same laptop. There used to be four full-width sections.
+     */
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -30,56 +38,52 @@ class MenuForm
             ->components([
                 TranslatedFields::localeSwitcher(),
 
-                Section::make(__('panel.menus.name_section'))
-                    ->icon(Heroicon::OutlinedBookOpen)
-                    ->schema(TranslatedFields::text(
-                        'name',
-                        __('panel.shared.name'),
-                        maxLength: 64,
-                        // Scoped to the tenant by Filament's global scope, so
-                        // two tenants may both have a "Dinner" and one
-                        // tenant may not have it twice.
-                        uniqueWithin: fn (): Builder => Menu::query(),
-                        uniqueMessage: __('panel.menus.unique'),
-                    )),
-
-                Section::make(__('panel.menus.description_section'))
-                    ->icon(Heroicon::OutlinedDocumentText)
-                    ->schema(TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 300, rows: 2))
-                    ->collapsed(),
-
-                Section::make(__('panel.menus.storefront_section'))
-                    ->icon(Heroicon::OutlinedEye)
+                Grid::make(['default' => 1, '@3xl' => 3])
+                    ->gridContainer()
                     ->schema([
-                        // Where it sits in the list is arranged by dragging
-                        // the rows there, not typed here — see Reordering.
-                        Toggle::make('is_active')
-                            ->label(__('panel.menus.is_active'))
-                            ->default(true)
-                            ->inline(false),
-                    ])
-                    ->columns(2),
+                        Section::make(__('panel.menus.details_section'))
+                            ->icon(Heroicon::OutlinedBookOpen)
+                            ->compact()
+                            ->columnSpan(['default' => 1, '@3xl' => 2])
+                            ->schema([
+                                ...TranslatedFields::text(
+                                    'name',
+                                    __('panel.shared.name'),
+                                    maxLength: 64,
+                                    // Scoped to the tenant by Filament's global scope, so
+                                    // two tenants may both have a "Dinner" and one
+                                    // tenant may not have it twice.
+                                    uniqueWithin: fn (): Builder => Menu::query(),
+                                    uniqueMessage: __('panel.menus.unique'),
+                                ),
 
-                Section::make(__('panel.menus.service_window'))
-                    ->icon(Heroicon::OutlinedClock)
-                    ->schema([
-                        // Both or neither: a window with one end is not a
-                        // window, so each requires the other rather than the
-                        // missing half being guessed at.
-                        TimePicker::make('available_from')
-                            ->label(__('panel.menus.available_from'))
-                            ->seconds(false)
-                            ->live(onBlur: true)
-                            ->requiredWith('available_until'),
+                                ...TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 300, rows: 3),
+                            ]),
 
-                        TimePicker::make('available_until')
-                            ->label(__('panel.menus.available_until'))
-                            ->seconds(false)
-                            ->live(onBlur: true)
-                            ->requiredWith('available_from'),
-                    ])
-                    ->columns(2)
-                    ->collapsed(fn (?Menu $record): bool => ! ($record?->hasServiceWindow() ?? false)),
+                        Section::make(__('panel.menus.storefront_section'))
+                            ->icon(Heroicon::OutlinedEye)
+                            ->compact()
+                            ->columns(2)
+                            ->schema([
+                                Toggle::make('is_active')
+                                    ->label(__('panel.menus.is_active'))
+                                    ->default(true)
+                                    ->columnSpanFull(),
+
+                                // Both or neither: a window with one end is not a
+                                // window, so each requires the other rather than the
+                                // missing half being guessed at.
+                                TimePicker::make('available_from')
+                                    ->label(__('panel.menus.available_from'))
+                                    ->live(onBlur: true)
+                                    ->requiredWith('available_until'),
+
+                                TimePicker::make('available_until')
+                                    ->label(__('panel.menus.available_until'))
+                                    ->live(onBlur: true)
+                                    ->requiredWith('available_from'),
+                            ]),
+                    ]),
             ]);
     }
 

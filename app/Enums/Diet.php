@@ -9,7 +9,7 @@ namespace App\Enums;
  * the green and brown squares — and guests read it before anything else, so
  * every item that is not a service request has one. A service request (an extra
  * pillow, a bedsheet change) never does; MenuItemObserver and the
- * `menu_items_diet_matches_service` constraint hold the two together.
+ * `menu_items_diet_matches_service_request` constraint hold the two together.
  *
  * @see Role for the note on India being the only market for now
  */

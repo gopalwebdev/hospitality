@@ -110,7 +110,7 @@ class MenuController extends Controller
             ->whereIn('availability', $orderable)
             ->with(['comboItems' => fn ($comboItems) => $comboItems
                 ->select(['id', 'menu_combo_id', 'menu_item_id', 'quantity'])
-                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service', 'diet'])])
+                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service_request', 'diet'])])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -138,7 +138,7 @@ class MenuController extends Controller
                 'contents' => $combo->comboItems->map(fn (MenuComboItem $comboItem): array => [
                     'id' => $comboItem->getKey(),
                     'name' => $comboItem->menuItem->name,
-                    'isService' => $comboItem->menuItem->is_service,
+                    'isServiceRequest' => $comboItem->menuItem->is_service_request,
                     'diet' => $comboItem->menuItem->diet?->value,
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
@@ -243,7 +243,7 @@ class MenuController extends Controller
             'description',
             'price_minor_units',
             'compare_at_price_minor_units',
-            'is_service',
+            'is_service_request',
             'diet',
         ];
     }
@@ -328,7 +328,7 @@ class MenuController extends Controller
             // refuses one at or below the price being charged, so the app never
             // has to decide whether what it was handed is believable.
             'compareAtPriceMinorUnits' => $item->hasComparePrice() ? $item->compare_at_price_minor_units : null,
-            'isService' => $item->is_service,
+            'isServiceRequest' => $item->is_service_request,
             // Null for a service request, which carries no diet mark.
             'diet' => $item->diet?->value,
             'additions' => $item->additions->map(fn (MenuItemAddition $addition): array => [

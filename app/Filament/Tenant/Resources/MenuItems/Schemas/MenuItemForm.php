@@ -63,8 +63,8 @@ class MenuItemForm
 
                         // Live, because it decides whether the diet below is
                         // asked for at all.
-                        Toggle::make('is_service')
-                            ->label(__('panel.items.is_service'))
+                        Toggle::make('is_service_request')
+                            ->label(__('panel.items.is_service_request'))
                             ->default(false)
                             ->inline(false)
                             ->live(),
@@ -91,8 +91,8 @@ class MenuItemForm
                             ->options(Diet::options())
                             ->default(Diet::Vegetarian->value)
                             ->native(false)
-                            ->visible(fn (Get $get): bool => ! (bool) $get('is_service'))
-                            ->required(fn (Get $get): bool => ! (bool) $get('is_service')),
+                            ->visible(fn (Get $get): bool => ! (bool) $get('is_service_request'))
+                            ->required(fn (Get $get): bool => ! (bool) $get('is_service_request')),
 
                         ...self::spanningFull(TranslatedFields::textarea('description', __('panel.shared.description'), maxLength: 500, rows: 3)),
                     ])

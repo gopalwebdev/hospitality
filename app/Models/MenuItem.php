@@ -32,7 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $compare_at_price_minor_units
  * @property int|null $tax_rate_basis_points
  * @property string|null $hsn_code
- * @property bool $is_service
+ * @property bool $is_service_request
  * @property Diet|null $diet
  * @property ItemAvailability $availability
  * @property bool $is_featured
@@ -49,7 +49,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'compare_at_price_minor_units',
     'tax_rate_basis_points',
     'hsn_code',
-    'is_service',
+    'is_service_request',
     'diet',
     'availability',
     'is_featured',
@@ -69,14 +69,14 @@ class MenuItem extends Model
     public array $translatable = ['name', 'description'];
 
     /**
-     * is_service is mirrored here because MenuItemObserver reads it before the row is inserted.
+     * is_service_request is mirrored here because MenuItemObserver reads it before the row is inserted.
      *
      * @var array<string, mixed>
      */
     #[\Override]
     protected $attributes = [
         'position' => 0,
-        'is_service' => false,
+        'is_service_request' => false,
         'availability' => ItemAvailability::Available->value,
         'is_featured' => false,
         'featured_position' => 0,
@@ -197,7 +197,7 @@ class MenuItem extends Model
             'price_minor_units' => 'integer',
             'compare_at_price_minor_units' => 'integer',
             'tax_rate_basis_points' => 'integer',
-            'is_service' => 'boolean',
+            'is_service_request' => 'boolean',
             'diet' => Diet::class,
             'availability' => ItemAvailability::class,
             'is_featured' => 'boolean',

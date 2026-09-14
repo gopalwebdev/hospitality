@@ -48,6 +48,8 @@ class PlatformPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Indigo,
             ])
+            // The sidebar folds down to its icons, handing its width to the page.
+            ->sidebarCollapsibleOnDesktop()
             ->discoverResources(in: app_path('Filament/Platform/Resources'), for: 'App\Filament\Platform\Resources')
             ->discoverPages(in: app_path('Filament/Platform/Pages'), for: 'App\Filament\Platform\Pages')
             ->pages([

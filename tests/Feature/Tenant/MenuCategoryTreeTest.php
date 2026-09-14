@@ -390,11 +390,58 @@ it('filters items by menu, and by a category within it', function (): void {
         ->assertCanSeeTableRecords([$inStarters, $inChicken])
         ->assertCanNotSeeTableRecords([$inDrinks]);
 
-    // A subdivision narrows the list exactly as a section does.
+    // A category brings the items of its sub-categories with it.
     Livewire::test(ListMenuItems::class)
-        ->filterTable('menu_category_id', $chicken->getKey())
+        ->filterTable('category', $starters->getKey())
+        ->assertCanSeeTableRecords([$inStarters, $inChicken])
+        ->assertCanNotSeeTableRecords([$inDrinks]);
+
+    // A sub-category narrows to its own items.
+    Livewire::test(ListMenuItems::class)
+        ->filterTable('sub_category', $chicken->getKey())
         ->assertCanSeeTableRecords([$inChicken])
         ->assertCanNotSeeTableRecords([$inStarters, $inDrinks]);
+});
+
+it('splits the items page into items and service requests, and says which is which', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
+    $water = MenuItem::factory()->inCategory($category)->create();
+    $pillow = MenuItem::factory()->inCategory($category)->service()->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->assertCanSeeTableRecords([$water, $pillow])
+        ->assertTableColumnFormattedStateSet('is_service_request', __('panel.shared.yes'), $pillow)
+        ->assertTableColumnFormattedStateSet('is_service_request', __('panel.shared.no'), $water)
+        ->set('activeTab', 'items')
+        ->assertCanSeeTableRecords([$water])
+        ->assertCanNotSeeTableRecords([$pillow])
+        ->set('activeTab', 'service_requests')
+        ->assertCanSeeTableRecords([$pillow])
+        ->assertCanNotSeeTableRecords([$water]);
+});
+
+it('offers only the chosen category\'s sub-categories once a category is filtered', function (): void {
+    $tenant = Tenant::factory()->create();
+    $lunch = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    $starters = MenuCategory::factory()->inMenu($lunch)->create();
+    $chicken = MenuCategory::factory()->under($starters)->create();
+    $mains = MenuCategory::factory()->inMenu($lunch)->create();
+    MenuCategory::factory()->under($mains)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    $offered = Livewire::test(ListMenuItems::class)
+        ->filterTable('category', $starters->getKey())
+        ->instance()
+        ->getTable()
+        ->getFilter('sub_category')
+        ->getOptions();
+
+    expect(array_keys($offered))->toBe([$chicken->getKey()]);
 });
 
 it('offers only the chosen menu\'s categories once a menu is filtered', function (): void {
@@ -412,14 +459,15 @@ it('offers only the chosen menu\'s categories once a menu is filtered', function
         ->filterTable('menu', $lunch->getKey())
         ->instance()
         ->getTable()
-        ->getFilter('menu_category_id')
+        ->getFilter('category')
         ->getOptions();
 
-    // Both levels of the chosen menu, and nothing from the other one — the
-    // menu filter has already excluded those rows.
-    expect(array_keys($offered))->toContain($starters->getKey())
-        ->toContain($chicken->getKey())
-        ->not->toContain($hot->getKey());
+    // Only the chosen menu's top level, and nothing from the other menu — the
+    // menu filter has already excluded those rows. Its sub-categories are the
+    // Sub-category filter's.
+    expect(array_keys($offered))->toBe([$starters->getKey()])
+        ->and($chicken->parent_id)->toBe($starters->getKey())
+        ->and(array_keys($offered))->not->toContain($hot->getKey());
 });
 
 it('reads the items list menu by menu, section by section', function (): void {
@@ -707,6 +755,40 @@ it('puts a drag handle on every kind of row', function (): void {
         ->toContain('x-sortable-item="'.categoryRow($category).'"')
         ->toContain('x-sortable-item="'.categoryRow($subCategory).'"')
         ->toContain('x-sortable-item="'.itemRow($menuItem).'"');
+});
+
+it('tells the page which list each row may be dragged within', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $starters = MenuCategory::factory()->inMenu($menu)->create();
+    $chicken = MenuCategory::factory()->under($starters)->create();
+    $inStarters = MenuItem::factory()->inCategory($starters)->create(['is_featured' => true]);
+    $inChicken = MenuItem::factory()->inCategory($chicken)->create();
+    $combo = MenuCombo::factory()->onMenu($menu)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // The page's drag guard refuses a drop outside a row's own list while the
+    // row is still being dragged, and it knows the lists only from these —
+    // the same lists ApplyMenuArrangement renumbers.
+    $lists = collect(arrangementOf($menu)->instance()->getTable()->getRecords()->all())
+        ->map(fn (array $row): string => $row['list'])
+        ->all();
+
+    expect($lists)->toBe([
+        'featured' => 'top',
+        ApplyMenuArrangement::featuredItemKey($inStarters->getKey()) => 'featured',
+        'combos' => 'top',
+        ApplyMenuArrangement::comboKey($combo->getKey()) => 'combos',
+        categoryRow($starters) => 'top',
+        itemRow($inStarters) => 'items-'.$starters->getKey(),
+        categoryRow($chicken) => 'sub-'.$starters->getKey(),
+        itemRow($inChicken) => 'items-'.$chicken->getKey(),
+    ]);
+
+    expect(arrangementOf($menu)->html())
+        ->toContain('menu-list--items-'.$chicken->getKey())
+        ->toContain('menu-row--sub_category');
 });
 
 it('drags the featured and combo rows in among the categories', function (): void {

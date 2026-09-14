@@ -87,7 +87,7 @@ class ApplyMenuArrangement
 
         // Each select carries what its model's own saving hooks read as well as
         // what this writes: MenuCategoryObserver looks at menu_id and
-        // parent_id, MenuItemObserver at is_featured — and at is_service and
+        // parent_id, MenuItemObserver at is_featured — and at is_service_request and
         // diet only when one of them changes, which a renumber never does.
         // Model::shouldBeStrict() throws on an attribute that was never fetched.
         $categories = MenuCategory::query()

@@ -63,7 +63,7 @@ Keeping the guest app the only Inertia surface on a subdomain is what keeps its 
 ## The menu is four levels, one of which nests once, and a guest lands on tiles
 `menus` → `menu_categories` → `menu_items` → `menu_item_additions`, where `menu_categories` holds **both** levels of section: a row with no `parent_id` is a section of the menu, and one with a parent is a subdivision of that section. A tenant that serves one card all day simply keeps one menu; one that serves a different card at lunch has two.
 
-The menu is generic, on the project owner's instruction: one card carries things to order and **service requests** side by side — a bottle of water beside an extra pillow — and the wording rule in `.ai/rules/general.md` keeps the code, the copy and the rules that way. An item is either (`menu_items.is_service`), and only a thing to order carries a diet mark; see `.ai/rules/models.md`.
+The menu is generic, on the project owner's instruction: one card carries things to order and **service requests** side by side — a bottle of water beside an extra pillow — and the wording rule in `.ai/rules/general.md` keeps the code, the copy and the rules that way. An item is either (`menu_items.is_service_request`), and only a thing to order carries a diet mark; see `.ai/rules/models.md`.
 
 Subdividing is optional, and the depth is capped at two. An item names exactly one category whichever level it sits on, so there is no (category, sub-category) pair to keep consistent — that is the whole reason the two levels share a table. A separate `menu_sub_categories` table was built first and replaced; see `.ai/rules/models.md` for what the merge bought.
 

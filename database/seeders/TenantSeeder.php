@@ -196,7 +196,7 @@ class TenantSeeder extends Seeder
             'items' => [
                 [
                     'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 0,
                     'is_featured' => true,
                     'featured_position' => 1,
@@ -207,23 +207,23 @@ class TenantSeeder extends Seeder
                 ],
                 [
                     'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 0,
                 ],
                 [
                     'name' => ['en' => 'Bedsheet Change', 'ta' => 'படுக்கை விரிப்பு மாற்றம்'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 0,
                 ],
                 [
                     'name' => ['en' => 'Towel Set', 'ta' => 'துண்டு தொகுப்பு'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 0,
                 ],
                 [
                     // A service request that is charged for, at the rate services pay.
                     'name' => ['en' => 'Laundry Pickup', 'ta' => 'சலவை சேகரிப்பு'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 15000,
                     'tax_rate_basis_points' => 1800,
                 ],
@@ -234,7 +234,7 @@ class TenantSeeder extends Seeder
             'items' => [
                 [
                     'name' => ['en' => 'Toiletry Kit', 'ta' => 'கழிப்பறை பொருட்கள் தொகுப்பு'],
-                    'is_service' => true,
+                    'is_service_request' => true,
                     'price_minor_units' => 0,
                 ],
                 [
@@ -983,7 +983,7 @@ class TenantSeeder extends Seeder
                 // Null on almost every item: not on offer. A zero would be a
                 // price of nothing.
                 'compare_at_price_minor_units' => $item['compare_at_price_minor_units'] ?? null,
-                'is_service' => $item['is_service'] ?? false,
+                'is_service_request' => $item['is_service_request'] ?? false,
                 'diet' => $item['diet'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 'is_featured' => $item['is_featured'] ?? false,

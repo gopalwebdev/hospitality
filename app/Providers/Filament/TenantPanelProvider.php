@@ -51,6 +51,9 @@ class TenantPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            // The sidebar folds down to its icons, handing its width to the
+            // page — the menu page and the items table use all of it.
+            ->sidebarCollapsibleOnDesktop()
             // Signed in, a tenant sees only its own name in the topbar,
             // not a name plus a switcher into other tenants: an owner
             // panel is scoped to one tenant, and there is nowhere else to
