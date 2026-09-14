@@ -19,7 +19,9 @@ class MenuComboFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->randomElement([
+        // The number keeps the name unique; see MenuCategoryFactory for why the
+        // word is not drawn with unique() too.
+        $name = fake()->randomElement([
             'Family Feast', 'Lunch Box', 'Burger Meal', 'Biryani Combo',
             'Snack Pack', 'Dinner for Two', 'Party Platter',
         ]).' '.fake()->unique()->numberBetween(1, 9999);

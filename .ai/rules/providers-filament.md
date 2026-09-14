@@ -21,3 +21,8 @@ Both panels are served under `/dashboard`, and the order in `bootstrap/providers
 
 ## Both sidebars collapse to their icons
 Both providers call `->sidebarCollapsibleOnDesktop()`: the project owner found the navigation took too much of the screen, and the menu page and the items table want the width. It folds to an icon rail rather than disappearing (`sidebarFullyCollapsibleOnDesktop()`), so every page stays one click away. Navigation groups carry no icons of their own on purpose — Filament hides item icons in the expanded sidebar once a group has one.
+
+Both also run `->maxContentWidth(Width::Full)`. Filament otherwise caps a page at `7xl` (80rem) and centres it, so on a laptop with the sidebar folded the page sat between two wide empty bands — the very space folding the sidebar was meant to hand over. The project owner asked for it back.
+
+## The tenant panel registers violet
+Beside its amber primary, `TenantPanelProvider` registers `violet` in `->colors()`, for the category rows of the menu page (`.ai/rules/menus.md`). A colour only exists in a panel once it is registered there: that is what defines its CSS variables (`--violet-500`) and lets a badge or action name it.

@@ -17,7 +17,9 @@ class MenuFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->randomElement([
+        // The number keeps the name unique; see MenuCategoryFactory for why the
+        // word is not drawn with unique() too.
+        $name = fake()->randomElement([
             'Lunch', 'Dinner', 'Breakfast', 'Drinks', 'Desserts', 'Weekend Special',
         ]).' '.fake()->unique()->numberBetween(1, 9999);
 

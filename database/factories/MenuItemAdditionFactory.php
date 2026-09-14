@@ -21,7 +21,9 @@ class MenuItemAdditionFactory extends Factory
         // MenuItemFactory takes its tenant from the category.
         $item = MenuItem::factory();
 
-        $name = fake()->unique()->randomElement([
+        // The number keeps the name unique; see MenuCategoryFactory for why the
+        // word is not drawn with unique() too.
+        $name = fake()->randomElement([
             'Extra cheese', 'Extra gravy', 'Large portion', 'Less spicy',
             'No onions', 'Extra raita', 'Add egg', 'Butter topping',
         ]).' '.fake()->unique()->numberBetween(1, 9999);

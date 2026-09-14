@@ -46,7 +46,9 @@ The outline is a Filament **custom data** table (`->records()`), because its row
 The items table creates through `MenuItem::query()->create()` rather than through the relationship, because the item form keeps its category select: created through the relationship, a different choice there would be silently overruled.
 
 ## Rows are tinted by kind, and a drag is refused outside a row's own list
-`recordClasses()` puts `menu-row--<kind>` (`featured`, `combos`, `category`, `sub_category`) and `menu-list--<list>` on every row. `resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php` holds what reads them, inline because a panel ships no CSS of ours: a tint per kind on the row and a coloured edge on its first cell, mixed from Filament's own `--primary-500` / `--warning-500` / `--success-500` / `--info-500` variables so dark mode follows.
+`recordClasses()` puts `menu-row--<kind>` (`featured`, `combos`, `category`, `sub_category`) and `menu-list--<list>` on every row. `resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php` holds what reads them, inline because a panel ships no CSS of ours: a tint per kind on the row and a coloured edge on its first cell, mixed from Filament's colour variables so dark mode follows, with the row's Kind badge in the same colour.
+
+**Every kind has a colour of its own**, as the project owner asked: amber (`warning`) for Featured items, green (`success`) for Combos, violet for a category and blue (`info`) for a sub-category. Categories were first `primary`, and the tenant panel's primary is amber, so they read as featured items. Violet is not a Filament default: `TenantPanelProvider` registers it in `->colors()`, which is what defines `--violet-500` and lets a badge be `->color('violet')`.
 
 Filament draws a table's rows as **`tr.fi-ta-row`**. The styles once targeted `.fi-ta-record`, which is the grid layout's class, and tinted nothing. The edge sits on the first cell because not every browser draws a box-shadow on a table row, and hover is a gradient laid over the tint because the tint replaces Filament's own hover colour.
 
@@ -79,6 +81,8 @@ Featuring belongs to one menu, so an item carried to a category on **another** m
 `menu_combos` sits beside the featured items rather than under a category: a combo is something a menu leads with, not something in a category, and "which category does a burger meal belong to" is a question with no answer worth having.
 
 Its price is typed, never derived from `menu_combo_items`. The whole point of a combo is that it costs less than the sum of its parts, so a derived price would either be that sum or a discount rule nobody asked for — `MenuCombo::contentsPriceMinorUnits()` exists only to show the saving beside the price, never to set it. Repricing an item therefore never silently reprices a combo.
+
+What goes in a combo is an **item**, never a service request — a laundry pickup is asked for, not sold in a bundle. `MenuComboForm::itemOptions()` offers this menu's items grouped under the category each is filed in, in menu order, so each option is the item's name alone; the project owner found "Tiffin › Dosa · Masala Dosa" on every line hard to read. A single select's own `in` validation looks inside groups, so an id the picker did not offer is refused (`MenuComboTest`).
 
 ## The menus list is not ordered by hand
 `menus` has no `position`, on the project owner's instruction: menus are not rearranged, the things inside a menu are. A guest reaches a menu through a home screen tile, so nothing reads the order of the menus list but an admin scanning it. `MenusTable` sorts by name through `TranslatedFields::sort()`, `Menu::scopeByName()` orders the option lists that name menus, and `MenuPolicy` has no `reorder()`.

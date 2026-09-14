@@ -15,6 +15,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Contracts\View\View;
@@ -50,10 +51,15 @@ class TenantPanelProvider extends PanelProvider
             ->brandLogoHeight('2rem')
             ->colors([
                 'primary' => Color::Amber,
+                // The menu page's category rows; amber is the featured items'.
+                'violet' => Color::Violet,
             ])
             // The sidebar folds down to its icons, handing its width to the
             // page — the menu page and the items table use all of it.
             ->sidebarCollapsibleOnDesktop()
+            // And the page takes that width. Filament centres it at 80rem
+            // otherwise, between two empty bands. See .ai/rules/providers-filament.md.
+            ->maxContentWidth(Width::Full)
             // Signed in, a tenant sees only its own name in the topbar,
             // not a name plus a switcher into other tenants: an owner
             // panel is scoped to one tenant, and there is nowhere else to

@@ -13,6 +13,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Contracts\View\View;
@@ -50,6 +51,9 @@ class PlatformPanelProvider extends PanelProvider
             ])
             // The sidebar folds down to its icons, handing its width to the page.
             ->sidebarCollapsibleOnDesktop()
+            // The page takes all of that width. Filament centres it at 80rem
+            // otherwise, between two empty bands. See .ai/rules/providers-filament.md.
+            ->maxContentWidth(Width::Full)
             ->discoverResources(in: app_path('Filament/Platform/Resources'), for: 'App\Filament\Platform\Resources')
             ->discoverPages(in: app_path('Filament/Platform/Pages'), for: 'App\Filament\Platform\Pages')
             ->pages([

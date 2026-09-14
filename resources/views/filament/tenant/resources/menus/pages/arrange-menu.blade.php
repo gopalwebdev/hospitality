@@ -33,12 +33,13 @@
             box-shadow: inset 4px 0 0 var(--success-500);
         }
 
+        /* Violet, registered on the tenant panel: its primary is amber, the featured items' colour. */
         .menu-arrangement .fi-ta-row.menu-row--category {
-            background-color: color-mix(in oklab, var(--primary-500) 7%, transparent);
+            background-color: color-mix(in oklab, var(--violet-500) 8%, transparent);
         }
 
         .menu-arrangement .fi-ta-row.menu-row--category > td:first-child {
-            box-shadow: inset 4px 0 0 var(--primary-500);
+            box-shadow: inset 4px 0 0 var(--violet-500);
         }
 
         .menu-arrangement .fi-ta-row.menu-row--sub_category {

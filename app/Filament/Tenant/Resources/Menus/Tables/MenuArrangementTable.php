@@ -268,7 +268,9 @@ class MenuArrangementTable
                 ? __('panel.categories.section')
                 : __('panel.sub_categories.section'),
             'type_icon' => $isTopLevel ? Heroicon::OutlinedRectangleStack : Heroicon::OutlinedSquare2Stack,
-            'type_color' => $isTopLevel ? 'primary' : 'info',
+            // Violet rather than primary: the tenant panel's primary is amber,
+            // which is the featured items' colour.
+            'type_color' => $isTopLevel ? 'violet' : 'info',
             'meta' => $subCategoryCount > 0
                 ? $items.' · '.trans_choice('panel.arrangement.sub_categories_count', $subCategoryCount, ['count' => $subCategoryCount])
                 : $items,

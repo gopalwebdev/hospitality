@@ -17,10 +17,10 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -38,6 +38,8 @@ class MenuItemsTable
         $complimentary = (string) __('panel.items.complimentary');
 
         return $table
+            // No column says whether an item is a service request: the tabs
+            // above the table do (ListMenuItems::getTabs()).
             ->columns([
                 TextColumn::make('name')
                     // A translated column holds a JSON document, so searching
@@ -61,16 +63,6 @@ class MenuItemsTable
                     ->badge()
                     ->color('gray')
                     ->toggleable(),
-
-                // In words rather than an icon, so the column answers the
-                // question its heading asks.
-                TextColumn::make('is_service_request')
-                    ->label(__('panel.items.service_request_column'))
-                    ->formatStateUsing(fn (bool $state): string => self::yesOrNo($state))
-                    ->badge()
-                    ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedBellAlert : Heroicon::OutlinedMinusSmall)
-                    ->color(fn (bool $state): string => $state ? 'info' : 'gray')
-                    ->sortable(),
 
                 // Empty for a service request, which carries no diet mark.
                 TextColumn::make('diet')
@@ -125,6 +117,8 @@ class MenuItemsTable
                     ->color(fn (ItemAvailability $state): string => $state->color())
                     ->sortable(),
 
+                // In words rather than an icon, so the column answers the
+                // question its heading asks.
                 TextColumn::make('is_featured')
                     ->label(__('panel.items.featured_column'))
                     ->formatStateUsing(fn (bool $state): string => self::yesOrNo($state))
@@ -199,11 +193,13 @@ class MenuItemsTable
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('compare_at_price_minor_units')),
-            ], layout: FiltersLayout::AboveContent)
-            // On the page rather than behind a button: finding an item by where
-            // it is filed is most of what this page is for. Service requests
-            // and items are the tabs above (ListMenuItems::getTabs()).
-            ->filtersFormColumns(4)
+            ])
+            // Behind the table's filter button rather than laid out above it,
+            // where they took half the screen before the first row. The cuts
+            // made most often — service requests, what has run out, each diet
+            // mark — are the tabs instead (ListMenuItems::getTabs()).
+            ->filtersFormColumns(2)
+            ->filtersFormWidth(Width::ThreeExtraLarge)
             ->recordActions([
                 EditAction::make()
                     ->iconButton()

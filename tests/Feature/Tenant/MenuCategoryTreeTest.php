@@ -418,24 +418,56 @@ it('filters items by menu, and by a category within it', function (): void {
         ->assertCanNotSeeTableRecords([$inStarters, $inDrinks]);
 });
 
-it('splits the items page into items and service requests, and says which is which', function (): void {
+it('splits the items page into tabs by kind, by stock and by diet mark', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
-    $water = MenuItem::factory()->inCategory($category)->create();
+    $water = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian]);
+    $omelette = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Egg, 'availability' => ItemAvailability::OutOfStock]);
+    $chicken = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::NonVegetarian]);
     $pillow = MenuItem::factory()->inCategory($category)->service()->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    Livewire::test(ListMenuItems::class)
-        ->assertCanSeeTableRecords([$water, $pillow])
-        ->assertTableColumnFormattedStateSet('is_service_request', __('panel.shared.yes'), $pillow)
-        ->assertTableColumnFormattedStateSet('is_service_request', __('panel.shared.no'), $water)
-        ->set('activeTab', 'items')
-        ->assertCanSeeTableRecords([$water])
-        ->assertCanNotSeeTableRecords([$pillow])
-        ->set('activeTab', 'service_requests')
+    // Whether an item is a service request is what its tab says, so the table
+    // no longer spends a column on it.
+    $page = Livewire::test(ListMenuItems::class)
+        ->assertCanSeeTableRecords([$water, $omelette, $chicken, $pillow])
+        ->assertTableColumnDoesNotExist('is_service_request');
+
+    $page->set('activeTab', 'items')
+        ->assertCanSeeTableRecords([$water, $omelette, $chicken])
+        ->assertCanNotSeeTableRecords([$pillow]);
+
+    $page->set('activeTab', 'service_requests')
         ->assertCanSeeTableRecords([$pillow])
-        ->assertCanNotSeeTableRecords([$water]);
+        ->assertCanNotSeeTableRecords([$water, $omelette, $chicken]);
+
+    $page->set('activeTab', 'out_of_stock')
+        ->assertCanSeeTableRecords([$omelette])
+        ->assertCanNotSeeTableRecords([$water, $chicken, $pillow]);
+
+    $page->set('activeTab', 'veg')
+        ->assertCanSeeTableRecords([$water])
+        ->assertCanNotSeeTableRecords([$omelette, $chicken, $pillow]);
+
+    $page->set('activeTab', 'egg')
+        ->assertCanSeeTableRecords([$omelette])
+        ->assertCanNotSeeTableRecords([$water, $chicken, $pillow]);
+
+    $page->set('activeTab', 'non_veg')
+        ->assertCanSeeTableRecords([$chicken])
+        ->assertCanNotSeeTableRecords([$water, $omelette, $pillow]);
+
+    // Every badge, from one query. Filament hands a badge back as a string.
+    expect(collect($page->instance()->getTabs())->map->getBadge()->all())->toEqual([
+        'all' => 4,
+        'items' => 3,
+        'service_requests' => 1,
+        'out_of_stock' => 1,
+        'veg' => 1,
+        'egg' => 1,
+        'non_veg' => 1,
+    ]);
 });
 
 it('offers only the chosen category\'s sub-categories once a category is filtered', function (): void {

@@ -125,12 +125,16 @@ class MenuComboForm
     }
 
     /**
-     * The items this combo may contain.
+     * The items this combo may contain, grouped under the category each is filed in.
      *
-     * Every item on the same menu, labelled with the section it sits in so two
-     * items of the same name in different sections are told apart.
+     * Every item on the same menu that is something to order: a service request
+     * — a laundry pickup, an extra pillow — is asked for, not sold in a bundle.
+     * Each option is the item's name alone, with its category as the heading
+     * above it, so the list reads the way the menu does and two items of one
+     * name in different categories are still told apart. The groups come in
+     * menu order: a category, then its own sub-categories.
      *
-     * @return array<int, string>
+     * @return array<string, array<int, string>>
      */
     public static function itemOptions(?int $menuId): array
     {
@@ -141,13 +145,27 @@ class MenuComboForm
         // once(): a repeater asks every row's select for its options.
         return once(fn (): array => MenuItem::query()
             ->onMenu($menuId)
-            ->with(['menuCategory:id,parent_id,name', 'menuCategory.parent:id,name'])
+            ->where('is_service_request', false)
+            ->with(['menuCategory:id,parent_id,name,position', 'menuCategory.parent:id,name,position'])
             ->inMenuOrder()
             ->get()
-            ->mapWithKeys(fn (MenuItem $item): array => [
-                $item->getKey() => sprintf('%s · %s', $item->menuCategory->path(), $item->name),
-            ])
-            ->all());
+            ->sortBy(function (MenuItem $item): array {
+                $category = $item->menuCategory;
+                $topLevel = $category->parent ?? $category;
+
+                return [
+                    $topLevel->position,
+                    $topLevel->getKey(),
+                    $category->parent === null ? -1 : $category->position,
+                    $category->getKey(),
+                    $item->position,
+                ];
+            })
+            ->reduce(function (array $groups, MenuItem $item): array {
+                $groups[$item->menuCategory->path()][$item->getKey()] = $item->name;
+
+                return $groups;
+            }, []));
     }
 
     /**

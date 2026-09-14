@@ -18,7 +18,11 @@ class MenuCategoryFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->unique()->randomElement([
+        // The number is what keeps the name unique. unique() on the word as well
+        // capped a test at ten categories, fewer when a menu had drawn one of
+        // the same words: Faker keeps one pool per method, shared by every
+        // factory, so a menu called "Desserts" took that word from here too.
+        $name = fake()->randomElement([
             'Starters', 'Soups', 'Biryani', 'Breads', 'Curries',
             'Rice', 'Desserts', 'Beverages', 'Tandoori', 'Chinese',
         ]).' '.fake()->unique()->numberBetween(1, 9999);

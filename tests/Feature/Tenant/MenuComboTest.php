@@ -155,6 +155,7 @@ it('offers only this menu\'s items as combo contents', function (): void {
     $otherMenu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $mine = itemOn($menu);
+    $pillow = MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->service()->create();
     $elsewhere = itemOn($otherMenu);
 
     $theirs = Tenant::factory()->create();
@@ -163,12 +164,40 @@ it('offers only this menu\'s items as combo contents', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     // The same call the select inside the repeater makes. A combo may only
-    // contain items from the menu it is offered on.
-    $offered = array_keys(MenuComboForm::itemOptions($menu->getKey()));
+    // contain items from the menu it is offered on — and items, never a
+    // service request, which is asked for rather than sold in a bundle.
+    $groups = MenuComboForm::itemOptions($menu->getKey());
+    $offered = collect($groups)->map(fn (array $options): array => array_keys($options))->flatten()->all();
 
     expect($offered)->toContain($mine->getKey())
+        ->and($offered)->not->toContain($pillow->getKey())
         ->and($offered)->not->toContain($elsewhere->getKey())
-        ->and($offered)->not->toContain($theirItem->getKey());
+        ->and($offered)->not->toContain($theirItem->getKey())
+        // Each option is the item's name alone, under its category's heading.
+        ->and($groups[$mine->load('menuCategory.parent')->menuCategory->path()][$mine->getKey()])->toBe($mine->name);
+});
+
+it('refuses a service request as combo contents', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $pillow = MenuItem::factory()->inCategory(MenuCategory::factory()->inMenu($menu)->create())->service()->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // The picker does not offer it, and the select's own validation refuses
+    // the id when it is sent anyway.
+    combosOf($menu)
+        ->callAction(TestAction::make('create')->table(), [
+            'name' => [Locale::English->value => 'Pillow Deal'],
+            'price' => '99',
+            'availability' => ItemAvailability::Available->value,
+            'comboItems' => [
+                ['menu_item_id' => $pillow->getKey(), 'quantity' => 1],
+            ],
+        ])
+        ->assertHasActionErrors();
+
+    expect(MenuCombo::query()->withoutGlobalScopes()->where('name->'.Locale::English->value, 'Pillow Deal')->exists())->toBeFalse();
 });
 
 it('refuses a combo containing another tenant\'s item, even around the form', function (): void {
