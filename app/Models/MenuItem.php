@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property Diet|null $diet
  * @property ItemAvailability $availability
  * @property int|null $max_quantity
+ * @property int|null $stock_quantity
  * @property bool $is_featured
  * @property int $featured_position
  * @property int $position
@@ -54,6 +55,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'diet',
     'availability',
     'max_quantity',
+    'stock_quantity',
     'is_featured',
     'featured_position',
     'position',
@@ -71,7 +73,7 @@ class MenuItem extends Model
     public array $translatable = ['name', 'description'];
 
     /**
-     * is_service_request is mirrored here because MenuItemObserver reads it before the row is inserted.
+     * is_service_request and stock_quantity are mirrored here because MenuItemObserver reads them before and after the row is inserted.
      *
      * @var array<string, mixed>
      */
@@ -80,6 +82,7 @@ class MenuItem extends Model
         'position' => 0,
         'is_service_request' => false,
         'availability' => ItemAvailability::Available->value,
+        'stock_quantity' => null,
         'is_featured' => false,
         'featured_position' => 0,
     ];
@@ -128,9 +131,27 @@ class MenuItem extends Model
             ->withTimestamps();
     }
 
+    /**
+     * Every change to its count, and why.
+     *
+     * @return HasMany<StockMovement, $this>
+     */
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
     public function isOrderable(): bool
     {
         return $this->availability->isOrderable();
+    }
+
+    /**
+     * Whether anyone counts how many are left; one nobody counts never runs out.
+     */
+    public function tracksStock(): bool
+    {
+        return $this->stock_quantity !== null;
     }
 
     /**
@@ -203,6 +224,7 @@ class MenuItem extends Model
             'diet' => Diet::class,
             'availability' => ItemAvailability::class,
             'max_quantity' => 'integer',
+            'stock_quantity' => 'integer',
             'is_featured' => 'boolean',
             'featured_position' => 'integer',
             'position' => 'integer',

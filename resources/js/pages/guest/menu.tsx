@@ -18,8 +18,16 @@ import {
 } from '@/hooks/use-basket';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
-import type { AddOnGroup } from '@/lib/add-on-rules';
+import { type AddOnGroup, withItemMaxSelections } from '@/lib/add-on-rules';
 import { type OrderLimits, quantityHeld, roomFor } from '@/lib/order-limits';
+
+/** One add-on group this item offers, and this item's own cap on its picks. */
+export interface AddOnGroupLink {
+    /** One of the page's `addOnGroups`. */
+    id: number;
+    /** This item's own cap, tighter or looser than the group's own; null follows the group. */
+    maxSelections: number | null;
+}
 
 export interface MenuItem extends OrderLimits {
     id: number;
@@ -33,11 +41,8 @@ export interface MenuItem extends OrderLimits {
     isServiceRequest: boolean;
     /** Null for a service request, which carries a bell mark instead. */
     diet: Diet | null;
-    /**
-     * The add-on groups it is customised with, in the order a guest reads them.
-     * Each is one of the page's `addOnGroups`.
-     */
-    addOnGroupIds: number[];
+    /** The add-on groups it is customised with, in the order a guest reads them. */
+    addOnGroupLinks: AddOnGroupLink[];
 }
 
 interface ComboContent {
@@ -200,10 +205,12 @@ export default function Menu({
     const groupsById = new Map(addOnGroups.map((group) => [group.id, group]));
 
     const groupsOf = (item: MenuItem): AddOnGroup[] =>
-        item.addOnGroupIds.flatMap((id) => {
+        item.addOnGroupLinks.flatMap(({ id, maxSelections }) => {
             const group = groupsById.get(id);
 
-            return group === undefined ? [] : [group];
+            return group === undefined
+                ? []
+                : [withItemMaxSelections(group, maxSelections)];
         });
 
     const heldOf = (type: BasketLineType, id: number): number =>
@@ -213,7 +220,7 @@ export default function Menu({
         acceptingOrders && menu.isBeingServed
             ? {
                   addItem: (item) => {
-                      if (item.addOnGroupIds.length > 0) {
+                      if (item.addOnGroupLinks.length > 0) {
                           setCustomising(item);
 
                           return;
@@ -783,7 +790,7 @@ function Item({
                 <AddControl
                     name={item.name}
                     isFull={ordering.isFull('item', item)}
-                    isCustomisable={item.addOnGroupIds.length > 0}
+                    isCustomisable={item.addOnGroupLinks.length > 0}
                     onAdd={() => {
                         ordering.addItem(item);
                     }}

@@ -13,6 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/** | .ai/rules/filament.md |
 | ** | .ai/rules/general.md |
 | app/Filament/Tenant/Resources/HomeRows/** | .ai/rules/home-rows.md |
+| app/Actions/Inventory/**, app/Actions/Orders/**, app/Filament/Tenant/Resources/Orders/**, app/Filament/Schemas/StockFields.php, app/Filament/Tables/StockActions.php, app/Models/Order.php, app/Models/OrderLine.php, app/Models/OrderLineChoice.php, app/Models/OrderCharge.php, app/Models/StockMovement.php | .ai/rules/inventory.md |
 | resources/js/** | .ai/rules/js.md |
 | lang/** | .ai/rules/lang.md |
 | app/Filament/Tenant/Resources/Menus/** | .ai/rules/menus.md |

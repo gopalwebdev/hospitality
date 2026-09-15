@@ -146,7 +146,7 @@ class TenantSeeder extends Seeder
      * two of. `items` is the order a group is linked in, and a group earlier in
      * this list comes first on an item that has several.
      *
-     * @var list<array{name: array<string, string>, is_required: bool, max_selections: int|null, allows_quantities?: bool, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_default?: bool}>, items: list<string>}>
+     * @var list<array{name: array<string, string>, is_required: bool, max_selections: int|null, options: list<array{name: array<string, string>, price_minor_units: int, max_quantity?: int, is_default?: bool, stock_quantity?: int}>, items: list<string>}>
      */
     public const array ADD_ON_GROUPS = [
         [
@@ -185,10 +185,9 @@ class TenantSeeder extends Seeder
             'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
             'is_required' => false,
             'max_selections' => 3,
-            'allows_quantities' => true,
             'options' => [
                 ['name' => ['en' => 'Extra cheese', 'ta' => 'கூடுதல் சீஸ்'], 'price_minor_units' => 4000, 'max_quantity' => 2],
-                ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price_minor_units' => 6000],
+                ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price_minor_units' => 6000, 'stock_quantity' => 15],
                 ['name' => ['en' => 'Raita', 'ta' => 'ராய்தா'], 'price_minor_units' => 3000],
             ],
             'items' => ['Paneer Tikka', 'Paneer Butter Masala', 'Hyderabadi Chicken Biryani', 'Vegetable Dum Biryani'],
@@ -197,7 +196,6 @@ class TenantSeeder extends Seeder
             'name' => ['en' => 'Dosa sides', 'ta' => 'தோசை துணைகள்'],
             'is_required' => false,
             'max_selections' => 4,
-            'allows_quantities' => true,
             'options' => [
                 ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price_minor_units' => 1500, 'max_quantity' => 2],
                 ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price_minor_units' => 1500, 'max_quantity' => 2],
@@ -325,6 +323,8 @@ class TenantSeeder extends Seeder
                     'price_minor_units' => 0,
                     // Two to an order, however they are split between kinds.
                     'max_quantity' => 2,
+                    // Counted: the linen room has only so many.
+                    'stock_quantity' => 30,
                     'is_featured' => true,
                     'featured_position' => 1,
                 ],
@@ -711,6 +711,9 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Mutton Dum Biryani', 'ta' => 'மட்டன் தம் பிரியாணி'],
                             'price_minor_units' => 46000,
                             'diet' => Diet::NonVegetarian,
+                            // Made in one pot a day, so it is counted — and the
+                            // biryani combo draws on the same count.
+                            'stock_quantity' => 20,
                         ],
                         [
                             'name' => ['en' => 'Mutton Keema Biryani', 'ta' => 'மட்டன் கீமா பிரியாணி'],
@@ -1072,6 +1075,8 @@ class TenantSeeder extends Seeder
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 // Null is no limit.
                 'max_quantity' => $item['max_quantity'] ?? null,
+                // Null is nobody counting.
+                'stock_quantity' => $item['stock_quantity'] ?? null,
                 'is_featured' => $item['is_featured'] ?? false,
                 'featured_position' => $item['featured_position'] ?? 0,
                 'tax_rate_basis_points' => $item['tax_rate_basis_points'] ?? null,
@@ -1112,7 +1117,6 @@ class TenantSeeder extends Seeder
                 fn (): MenuAddOnGroup => new MenuAddOnGroup([
                     'is_required' => $definition['is_required'],
                     'max_selections' => $definition['max_selections'],
-                    'allows_quantities' => $definition['allows_quantities'] ?? false,
                 ]),
                 ['tenant_id' => $tenant->getKey()],
             );
@@ -1126,6 +1130,8 @@ class TenantSeeder extends Seeder
                         'max_quantity' => $option['max_quantity'] ?? 1,
                         'is_default' => $option['is_default'] ?? false,
                         'is_available' => true,
+                        // Null is nobody counting.
+                        'stock_quantity' => $option['stock_quantity'] ?? null,
                         'position' => $optionPosition,
                     ]),
                     ['tenant_id' => $tenant->getKey(), 'menu_add_on_group_id' => $group->getKey()],

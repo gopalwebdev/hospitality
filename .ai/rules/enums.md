@@ -22,6 +22,8 @@ What a role *grants* is not owned by the code. `App\Enums\Role::permissions()` i
 ## Availability is a reason, not a boolean
 `App\Enums\ItemAvailability` replaced a boolean on `menu_items` and `menu_combos` because "off the menu" has a reason worth carrying, and because nothing here is ever hard-deleted to hide it. `isOrderable()` and `orderableValues()` are the only places the distinction between "showing" and "orderable" is made, so a fourth case cannot leave a query behind.
 
+`OutOfStock` is also written for an admin: a counted item reaching none left is marked out of stock, and a restock marks it available again — never `TemporarilyUnavailable` (`.ai/rules/inventory.md`).
+
 ## Diet is a mark, and a service request has none
 `App\Enums\Diet` (Vegetarian, Egg, NonVegetarian) is the veg / egg / non-veg mark on `menu_items.diet`. It replaced an enum whose name tied the menu to one kind of business, and whether an item is a service request is **not** a case here or an enum of its own: an `ItemKind` enum was built and replaced by the `menu_items.is_service_request` boolean on the project owner's instruction. The pairing — diet null exactly for a service request — is in `.ai/rules/models.md`.
 
@@ -42,3 +44,11 @@ When a feature first differs by type, put the difference on the enum as a method
 
 ## A menu block's type says what it is, and whether every menu has one
 `App\Enums\MenuBlockType` (`Featured`, `Combos`) is the `type` of a `menu_blocks` row. It replaced a `MenuBlock` enum of the same two cases whose job was naming a `position` column on `menus` for each. `isOnEveryMenu()` is the one question that changes how a type is read: true means exactly one per menu with no row until it is placed (`Menu::readingOrder()` fills it in at 0), false — for a kind a menu may hold several of, such as a banner — means only its rows exist. `label()` is what the panel calls it. Adding a case is covered in `.ai/rules/menus.md`; `menu_blocks_type_is_known` is rebuilt from the cases by `migrate:fresh`.
+
+## Orders and stock carry four small enums
+- **`OrderStatus`:** `Placed`, `Cancelled`. The steps staff move an order through arrive with the screens that move it; `orders_status_is_known` is built from the cases.
+- **`OrderLineType`:** `Item`, `Combo` — the same words as `QuoteBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
+- **`StockMovementReason`:** `Restock`, `Count`, `OrderPlaced`, `OrderCancelled`, with `label()` and `color()` for the history table.
+- **`OrderRefusal`:** why an order was refused, sent to the guest app as `reason` with `message()` from `lang/en/guest.php`. `InsufficientStock` is a case here too, so a refusal always answers with the same field.
+
+See `.ai/rules/inventory.md`.

@@ -4,8 +4,10 @@ namespace App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas;
 
 use App\Enums\Currency;
 use App\Filament\Schemas\PricingFields;
+use App\Filament\Schemas\StockFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuAddOnGroup;
+use App\Models\MenuAddOnOption;
 use App\Models\Tenant;
 use Closure;
 use Filament\Facades\Filament;
@@ -13,23 +15,32 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Once;
 use LogicException;
 
 /**
- * An add-on group: what a guest reads above it, whether they must pick from it, how many they may pick, and the options.
+ * An add-on group: what a guest reads above it, whether they must pick from it, and how many they may pick.
  *
- * Three answers and no more: Required, a Maximum (blank for any number), and
- * whether one option may be taken twice. A minimum and a pair of "how many"
- * buttons were asked once and taken out on the project owner's instruction —
- * a required group means at least one pick (.ai/rules/add-on-groups.md).
+ * Two answers on the group and no more: Required, and a Maximum picks (blank
+ * for any number). A minimum and a pair of "how many" buttons were asked once
+ * and taken out on the project owner's instruction — a required group means at
+ * least one pick (.ai/rules/add-on-groups.md). An item linking the group may
+ * cap its own Maximum picks tighter or looser (MenuItemForm), which is the one
+ * thing a group does not settle for every item alike.
+ *
+ * Each option carries its own Max each — how many of that one option a guest
+ * may take — always, not behind a switch: a group of one pick still shows it,
+ * capped at one, because a hidden column that reappeared once the maximum
+ * changed was harder to find than a column disabled at one.
  *
  * An option has a price and no tax rate: an add-on is part of the item it is
  * added to, taxed at that item's rate.
@@ -68,7 +79,7 @@ class MenuAddOnGroupForm
         return Section::make(__('panel.add_on_groups.section'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
             ->compact()
-            ->columns(3)
+            ->columns(2)
             ->schema([
                 ...array_map(
                     static fn (TextInput $field): TextInput => $field->columnSpanFull(),
@@ -90,7 +101,9 @@ class MenuAddOnGroupForm
                     ->default(false),
 
                 // One is a single pick, which a guest reads as radios when the
-                // group is required as well. Blank is any number.
+                // group is required as well. Blank is any number. An item
+                // offering this group may cap its own picks differently
+                // (MenuItemForm); this is only the group's own default.
                 TextInput::make('max_selections')
                     ->label(__('panel.add_on_groups.max_selections'))
                     ->integer()
@@ -100,17 +113,6 @@ class MenuAddOnGroupForm
                     ->placeholder(__('panel.add_on_groups.no_limit'))
                     ->live(onBlur: true)
                     ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state),
-
-                // Taking one option twice needs room for two picks, so it is not
-                // offered while a guest may pick only one, and is saved off then.
-                Toggle::make('allows_quantities')
-                    ->label(__('panel.add_on_groups.allows_quantities'))
-                    ->inline(false)
-                    ->default(false)
-                    ->live()
-                    ->visible(fn (Get $get): bool => ! self::isOnePick($get))
-                    ->dehydratedWhenHidden()
-                    ->dehydrateStateUsing(fn (Get $get): bool => self::allowsQuantities($get)),
             ]);
     }
 
@@ -118,10 +120,11 @@ class MenuAddOnGroupForm
      * What a guest picks from, in the order they read it.
      *
      * A repeater bound to the relationship, so the options are written in the
-     * same save as the group. Max qty is a column only while the same option may
-     * be taken twice, and the row's fields follow the same answer, so there is
-     * always exactly one cell per column — a translated name included, through
-     * `TranslatedFields::textCell()` (.ai/rules/filament.md).
+     * same save as the group. Max each is always a column — there is always
+     * exactly one cell per column, a translated name included, through
+     * `TranslatedFields::textCell()` (.ai/rules/filament.md) — disabled and
+     * forced to one while the group is a single pick, since taking one option
+     * twice needs room for two.
      */
     private static function optionsSection(Currency $currency): Section
     {
@@ -132,16 +135,15 @@ class MenuAddOnGroupForm
                 Repeater::make('options')
                     ->relationship()
                     ->hiddenLabel()
-                    ->table(fn (Get $get): array => self::withoutNulls([
+                    ->table([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
                         TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
-                        self::allowsQuantities($get)
-                            ? TableColumn::make(__('panel.add_on_groups.max_quantity'))->width('7rem')
-                            : null,
+                        TableColumn::make(__('panel.add_on_groups.max_quantity'))->width('7rem'),
+                        TableColumn::make(__('panel.stock.in_stock'))->width('8rem'),
                         TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
                         TableColumn::make(__('panel.add_on_groups.is_available'))->width('7rem')->alignment(Alignment::Center),
-                    ]))
-                    ->schema(fn (Get $get): array => self::withoutNulls([
+                    ])
+                    ->schema([
                         TranslatedFields::textCell('name', __('panel.add_on_groups.option'), maxLength: 64),
 
                         // Blank is free: a spice level costs nothing extra.
@@ -154,16 +156,22 @@ class MenuAddOnGroupForm
                             ->prefix('+ '.$currency->symbol())
                             ->placeholder(__('panel.add_on_groups.free')),
 
-                        self::allowsQuantities($get)
-                            ? TextInput::make('max_quantity')
-                                ->label(__('panel.add_on_groups.max_quantity'))
-                                ->required()
-                                ->integer()
-                                ->minValue(1)
-                                ->maxValue(99)
-                                ->default(1)
-                                ->rule(fn (Get $get): Closure => self::maxQuantityRule($get))
-                            : null,
+                        TextInput::make('max_quantity')
+                            ->label(__('panel.add_on_groups.max_quantity'))
+                            ->required()
+                            ->integer()
+                            ->minValue(1)
+                            ->maxValue(99)
+                            ->default(1)
+                            ->disabled(fn (Get $get): bool => self::isOnePick($get, '../../'))
+                            ->rule(fn (Get $get): Closure => self::maxQuantityRule($get)),
+
+                        // The count and the count the modal opened with, grouped
+                        // so the hidden half does not draw a cell of its own.
+                        Group::make([
+                            StockFields::quantity(),
+                            StockFields::loaded(),
+                        ]),
 
                         Toggle::make('is_default')
                             ->label(__('panel.add_on_groups.is_default'))
@@ -172,7 +180,7 @@ class MenuAddOnGroupForm
                         Toggle::make('is_available')
                             ->label(__('panel.add_on_groups.is_available'))
                             ->default(true),
-                    ]))
+                    ])
                     ->orderColumn('position')
                     // A group with nothing in it offers a guest nothing to pick.
                     ->minItems(1)
@@ -180,9 +188,9 @@ class MenuAddOnGroupForm
                     ->addActionLabel(__('panel.add_on_groups.add_option'))
                     ->reorderable()
                     ->rule(fn (Get $get): Closure => self::defaultsRule($get))
-                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data, Get $get): array => self::storeOption($data, $currency, self::allowsQuantities($get)))
-                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data, Get $get): array => self::storeOption($data, $currency, self::allowsQuantities($get)))
-                    ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => self::fillOption($data, $currency))
+                    ->mutateRelationshipDataBeforeCreateUsing(fn (array $data, Get $get): array => StockFields::storeNew(self::storeOption($data, $currency, self::isOnePick($get))))
+                    ->mutateRelationshipDataBeforeSaveUsing(fn (array $data, Get $get, MenuAddOnOption $record): array => self::storeExistingOption($data, $record, $currency, self::isOnePick($get)))
+                    ->mutateRelationshipDataBeforeFillUsing(fn (array $data): array => StockFields::fill(self::fillOption($data, $currency)))
                     ->columnSpanFull(),
             ]);
     }
@@ -203,14 +211,6 @@ class MenuAddOnGroupForm
     private static function isOnePick(Get $get, string $path = ''): bool
     {
         return self::maximum($get, $path) === 1;
-    }
-
-    /**
-     * Whether one option may be taken more than once — never while a guest picks only one.
-     */
-    private static function allowsQuantities(Get $get, string $path = ''): bool
-    {
-        return ! self::isOnePick($get, $path) && (bool) $get($path.'allows_quantities');
     }
 
     /**
@@ -243,11 +243,16 @@ class MenuAddOnGroupForm
      *
      * A guest who may pick two things in all cannot take three extra cheese. Read
      * from inside a row of the options table, so the group's answers are two
-     * levels up.
+     * levels up. Skipped for a single pick: the field is disabled there and
+     * storeOption() forces it to one whatever was typed before it was disabled.
      */
     private static function maxQuantityRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+            if (self::isOnePick($get, '../../')) {
+                return;
+            }
+
             $maximum = self::maximum($get, '../../');
 
             if ($maximum !== null && (int) $value > $maximum) {
@@ -283,21 +288,46 @@ class MenuAddOnGroupForm
     }
 
     /**
+     * This tenant's groups, each with how many of its own options are ticked as the default.
+     *
+     * The defaults count is what an item's own Maximum on this item is checked
+     * against: an item cannot cap the group below how many options it defaults
+     * to ticking.
+     *
+     * @return Collection<int, MenuAddOnGroup>
+     */
+    public static function groupsForItemForm(): Collection
+    {
+        // once(): the item form's repeater asks every row's select, and its
+        // maximum's placeholder and validation rule, while it renders.
+        return once(fn (): Collection => MenuAddOnGroup::query()
+            ->where('tenant_id', self::tenantKey())
+            ->byName()
+            ->withCount(['options as defaults_count' => fn (Builder $query): Builder => $query->where('is_default', true)])
+            ->get(['id', 'name', 'is_required', 'max_selections'])
+            ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey()));
+    }
+
+    /**
+     * One of this tenant's groups, from the same cached lookup groupOptions() and the item form's Maximum column read.
+     */
+    public static function groupForItemForm(int $groupId): ?MenuAddOnGroup
+    {
+        return self::groupsForItemForm()->get($groupId);
+    }
+
+    /**
      * This tenant's groups by name, each labelled with what it asks of a guest.
      *
      * @return array<int, string>
      */
     public static function groupOptions(): array
     {
-        // once(): the item form's repeater asks every row's select.
-        return once(fn (): array => MenuAddOnGroup::query()
-            ->where('tenant_id', self::tenantKey())
-            ->byName()
-            ->get(['id', 'name', 'is_required', 'max_selections'])
+        return self::groupsForItemForm()
             ->mapWithKeys(fn (MenuAddOnGroup $group): array => [
                 $group->getKey() => sprintf('%s — %s', $group->name, self::ruleSummary($group->is_required, $group->max_selections)),
             ])
-            ->all());
+            ->all();
     }
 
     /**
@@ -332,20 +362,38 @@ class MenuAddOnGroupForm
     }
 
     /**
-     * One option's typed price as what gets stored, and one of each while quantities are not allowed.
+     * One option's typed price as what gets stored, and one of each while the group is a single pick.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private static function storeOption(array $data, Currency $currency, bool $allowsQuantities): array
+    private static function storeOption(array $data, Currency $currency, bool $isOnePick): array
     {
         $data['price_minor_units'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
-        if (! $allowsQuantities) {
+        if ($isOnePick) {
             $data['max_quantity'] = 1;
         }
 
         unset($data['price']);
+
+        return $data;
+    }
+
+    /**
+     * A saved option's row as it is stored, with its count set under the lock only if this modal changed it.
+     *
+     * The row itself is saved after this returns, without the count, so it cannot
+     * put back a count an order has taken from while the modal was open.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private static function storeExistingOption(array $data, MenuAddOnOption $record, Currency $currency, bool $isOnePick): array
+    {
+        [$data, $typed, $loaded] = StockFields::pull(self::storeOption($data, $currency, $isOnePick));
+
+        StockFields::applyIfChanged($record, $typed, $loaded);
 
         return $data;
     }
@@ -363,19 +411,6 @@ class MenuAddOnGroupForm
         $data['price'] = $minorUnits === 0 ? null : $currency->toMajorUnits($minorUnits);
 
         return $data;
-    }
-
-    /**
-     * A list of components with the ones an answer leaves out removed.
-     *
-     * @template TComponent of object
-     *
-     * @param  list<TComponent|null>  $components
-     * @return list<TComponent>
-     */
-    private static function withoutNulls(array $components): array
-    {
-        return array_values(array_filter($components, static fn (?object $component): bool => $component !== null));
     }
 
     /**

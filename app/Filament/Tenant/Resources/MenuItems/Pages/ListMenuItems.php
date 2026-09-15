@@ -34,7 +34,7 @@ class ListMenuItems extends ListRecords
                 // beats an empty select.
                 ->disabled(fn (): bool => ! $this->hasAnyCategory())
                 ->tooltip(fn (): ?string => $this->hasAnyCategory() ? null : $this->needsASectionTooltip())
-                ->mutateDataUsing(fn (array $data): array => MenuItemForm::storePricing($data)),
+                ->mutateDataUsing(fn (array $data): array => MenuItemForm::storeNew($data)),
         ];
     }
 

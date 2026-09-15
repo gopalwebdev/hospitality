@@ -2,7 +2,10 @@
 
 namespace App\Actions\Menus;
 
+use App\Actions\Inventory\FindStockShortages;
+use App\Actions\Inventory\StockDemand;
 use App\Enums\ItemAvailability;
+use App\Exceptions\InsufficientStock;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
@@ -25,11 +28,19 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  *
  * The arithmetic is here rather than in the browser because it is a decision:
  * which rate each part is taxed at, whether prices already include GST, which
- * charges a bill from this menu carries. The app formats what this returns. When
- * orders arrive, they are checked by these same rules.
+ * charges a bill from this menu carries. The app formats what this returns.
+ * Placing an order (App\Actions\Orders\PlaceOrder) prices the basket here first,
+ * and refuses it when a line is not `ok`.
+ *
+ * `shortages` is what the lines that stand would take from a counted item or
+ * option with fewer left — a reading taken without a lock, so the guest can be
+ * told before they order. A line keeps its status either way: an item with none
+ * left is already out of stock, and so already `unavailable`.
  *
  * @phpstan-type BasketLine array{key: string, type: string, id: int, quantity: int, choices?: list<array{optionId: int, quantity: int}>}
  * @phpstan-type PricedPart array{amount: int, rate: int}
+ *
+ * @phpstan-import-type Shortage from InsufficientStock
  */
 class QuoteBasket
 {
@@ -45,9 +56,14 @@ class QuoteBasket
     /** Still on the menu, but its choices break the rules of its groups, or the basket holds more of it than one order may. */
     public const string INVALID = 'invalid';
 
+    public function __construct(
+        private readonly StockDemand $stockDemand,
+        private readonly FindStockShortages $findStockShortages,
+    ) {}
+
     /**
      * @param  list<BasketLine>  $lines
-     * @return array{lines: list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>, subtotalMinorUnits: int, taxMinorUnits: int, pricesIncludeTax: bool, charges: list<array{id: int, name: string, amountMinorUnits: int}>, totalMinorUnits: int}
+     * @return array{lines: list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>, subtotalMinorUnits: int, taxMinorUnits: int, pricesIncludeTax: bool, charges: list<array{id: int, name: string, amountMinorUnits: int}>, totalMinorUnits: int, shortages: list<Shortage>}
      */
     public function __invoke(Tenant $tenant, Menu $menu, array $lines): array
     {
@@ -99,7 +115,28 @@ class QuoteBasket
             'totalMinorUnits' => $subtotal
                 + ($pricesIncludeTax ? 0 : $tax)
                 + array_sum(array_column($charges, 'amountMinorUnits')),
+            'shortages' => $this->shortagesIn($lines, $priced),
         ];
+    }
+
+    /**
+     * What the lines that stand would take from a counted row with fewer left.
+     *
+     * @param  list<BasketLine>  $lines
+     * @param  list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>  $priced  in the same order as the lines
+     * @return list<Shortage>
+     */
+    private function shortagesIn(array $lines, array $priced): array
+    {
+        $standing = [];
+
+        foreach ($lines as $index => $line) {
+            if ($priced[$index]['status'] === self::OK) {
+                $standing[] = $line;
+            }
+        }
+
+        return $standing === [] ? [] : ($this->findStockShortages)(($this->stockDemand)($standing));
     }
 
     /**
@@ -120,9 +157,18 @@ class QuoteBasket
             ->filter()
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());
 
+        // This item's own cap on each group's picks, tighter or looser than
+        // the group's own maximum; a group with no link of its own (there
+        // should always be one) falls back to the group's maximum.
+        $maxSelections = $offered->map(function (MenuAddOnGroup $group) use ($item): ?int {
+            $link = $item->addOnGroupLinks->firstWhere('menu_add_on_group_id', $group->getKey());
+
+            return $link instanceof MenuItemAddOnGroup ? $link->effectiveMaxSelections($group) : $group->max_selections;
+        });
+
         // The decision the menu screen makes: a required group that its
         // available options can no longer meet takes the item off the menu.
-        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered()))) {
+        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered($maxSelections->get($group->getKey()))))) {
             return self::UNAVAILABLE;
         }
 
@@ -159,8 +205,9 @@ class QuoteBasket
 
             $group = $offered->get($option->menu_add_on_group_id);
 
-            // Or more of it than its group lets a guest take.
-            if (! $group instanceof MenuAddOnGroup || $quantity > $group->quantityAllowedFor($option)) {
+            // Or more of it than its group — or this item's own cap on it —
+            // lets a guest take.
+            if (! $group instanceof MenuAddOnGroup || $quantity > $group->quantityAllowedFor($option, $maxSelections->get($group->getKey()))) {
                 return self::INVALID;
             }
 
@@ -170,8 +217,9 @@ class QuoteBasket
 
         foreach ($offered as $group) {
             $count = $picks[$group->getKey()] ?? 0;
+            $max = $maxSelections->get($group->getKey());
 
-            if (($group->is_required && $count === 0) || ($group->max_selections !== null && $count > $group->max_selections)) {
+            if (($group->is_required && $count === 0) || ($max !== null && $count > $max)) {
                 return self::INVALID;
             }
         }
@@ -250,7 +298,7 @@ class QuoteBasket
             ->onMenu($menu->getKey())
             ->orderable()
             ->whereKey($ids)
-            ->with(['addOnGroupLinks' => fn ($links) => $links->select(['id', 'menu_item_id', 'menu_add_on_group_id'])])
+            ->with(['addOnGroupLinks' => fn ($links) => $links->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'max_selections'])])
             ->get()
             ->keyBy(fn (MenuItem $item): int => $item->getKey());
     }
@@ -274,7 +322,7 @@ class QuoteBasket
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'tenant_id', 'is_required', 'max_selections', 'allows_quantities'])
+            ->select(['id', 'tenant_id', 'is_required', 'max_selections'])
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options

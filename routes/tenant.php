@@ -4,6 +4,7 @@ use App\Enums\FilamentPanel;
 use App\Http\Controllers\Guest\BasketQuoteController;
 use App\Http\Controllers\Guest\HomeController;
 use App\Http\Controllers\Guest\MenuController;
+use App\Http\Controllers\Guest\PlaceOrderController;
 use App\Http\Controllers\Guest\ProgressiveWebAppController;
 use App\Http\Controllers\Guest\TileController;
 use App\Http\Controllers\PanelProgressiveWebAppController;
@@ -47,6 +48,12 @@ Route::domain('{tenant}.'.config('app.domain'))->group(function (): void {
         Route::post('menus/{menu}/basket-quotes', BasketQuoteController::class)
             ->middleware('throttle:60,1')
             ->name('menus.basket-quotes.store');
+
+        // Placing that basket as an order, which takes from stock. Throttled
+        // harder than a quote: a phone asks for a price often and orders rarely.
+        Route::post('menus/{menu}/orders', PlaceOrderController::class)
+            ->middleware('throttle:10,1')
+            ->name('menus.orders.store');
 
         // A tile's own page exists only for the ones that open a PDF: the file
         // is embedded there so the app keeps its header and its back arrow.

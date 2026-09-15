@@ -14,5 +14,7 @@ The one that bites: a hand-arranged table asks for `reorder()`, which is not one
 
 When you add a resource or a table capability, write the policy method in the same change and cover the page with a test that actually renders it — a policy check that is never exercised proves nothing.
 
+`OrderPolicy` has a `cancel()` that no generator writes, asked by the cancel action's `->authorize('cancel')`, and answers `create`, `update`, `delete` and `deleteAny` with false outright: orders are placed by guests and never edited in the panel.
+
 ## ChargePolicy is settings.manage for everything
 `ChargePolicy` answers every method — looking included — with `settings.manage`, which a tenant owner holds and floor staff do not. Charges moved off the Settings page onto their own, and the same people change them; do not split them onto `menu.view` / `menu.manage`, which staff and guests partly hold.

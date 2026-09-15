@@ -63,12 +63,22 @@ class MenuAddOnOptionFactory extends Factory
     }
 
     /**
-     * An option a guest may take more than one of — while its group allows quantities.
+     * An option a guest may take more than one of, up to $quantity.
      */
     public function upTo(int $quantity): static
     {
         return $this->state(fn (array $attributes): array => [
             'max_quantity' => $quantity,
+        ]);
+    }
+
+    /**
+     * An option someone counts, with $count left across every item offering it.
+     */
+    public function stocked(int $count): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'stock_quantity' => $count,
         ]);
     }
 

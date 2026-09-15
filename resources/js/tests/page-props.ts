@@ -40,6 +40,7 @@ const DEFAULT_TRANSLATIONS: Translations = {
         choose_at_least: 'Choose at least :count',
         choose_any: 'Choose any',
         choose_more: 'Choose :count more from :group',
+        option_up_to: 'Up to :count',
         add: 'Add · :price',
         quantity: 'Quantity',
         increase: 'One more :name',

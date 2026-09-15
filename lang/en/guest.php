@@ -49,6 +49,7 @@ return [
         'choose_at_least' => 'Choose at least :count',
         'choose_any' => 'Choose any',
         'choose_more' => 'Choose :count more from :group',
+        'option_up_to' => 'Up to :count',
         'add' => 'Add · :price',
         'quantity' => 'Quantity',
         'increase' => 'One more :name',
@@ -71,6 +72,13 @@ return [
         'pricing' => 'Working out the total…',
         'hint' => 'Show this to a member of staff to place your order.',
         'clear' => 'Empty basket',
+    ],
+
+    'orders' => [
+        'insufficient_stock' => 'Some things ran out while you were ordering.',
+        'not_accepting_orders' => 'Orders are not being taken right now.',
+        'not_being_served' => 'This menu is not being served right now.',
+        'lines_changed' => 'Some things in your basket have changed.',
     ],
 
     'limits' => [

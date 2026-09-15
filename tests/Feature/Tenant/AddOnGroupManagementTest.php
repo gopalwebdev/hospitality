@@ -14,7 +14,6 @@ use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\DB;
-use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -47,7 +46,8 @@ function addOnGroupNamed(string $name): MenuAddOnGroup
 /**
  * One row of a group's options table, as an admin types it.
  *
- * A blank price is free. `upTo` is only read while the group allows quantities.
+ * A blank price is free. `upTo` is disabled, and saved as one, while the group
+ * is a single pick.
  *
  * @return array<string, mixed>
  */
@@ -72,40 +72,6 @@ function addOnItemFor(Tenant $tenant): MenuItem
         ->create();
 }
 
-/**
- * How many header cells and first-row cells the options table in the open modal draws.
- *
- * Read from the rendered HTML, because the columns and a row's fields are two
- * lists that have to agree, and only the table as drawn shows whether they did.
- *
- * @return array{headers: int, cells: int}
- */
-function addOnOptionsTableShape(Testable $page): array
-{
-    // The modal comes back as a partial of its own — keyed "action-modals" when
-    // it is mounted and "action-modals.0" after an update — and the component's
-    // html() holds no modal at all.
-    $html = collect($page->effects['partials'] ?? [])
-        ->first(fn (mixed $partial, string $key): bool => str_starts_with($key, 'action-modals'));
-
-    expect($html)->toBeString();
-
-    $previous = libxml_use_internal_errors(true);
-    $document = new DOMDocument;
-    $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
-    libxml_use_internal_errors($previous);
-
-    $xpath = new DOMXPath($document);
-    $table = $xpath->query('//*[contains(@class, "fi-fo-table-repeater")]//table')->item(0);
-
-    expect($table)->not->toBeNull();
-
-    return [
-        'headers' => $xpath->query('./thead/tr/th', $table)->length,
-        'cells' => $xpath->query('./tbody/tr[1]/td', $table)->length,
-    ];
-}
-
 it('makes a required group of one pick, one of each option', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -128,7 +94,6 @@ it('makes a required group of one pick, one of each option', function (): void {
     expect($group->tenant_id)->toBe($tenant->getKey())
         ->and($group->is_required)->toBeTrue()
         ->and($group->max_selections)->toBe(1)
-        ->and($group->allows_quantities)->toBeFalse()
         ->and($group->getTranslation('name', Locale::Tamil->value))->toBe('ரொட்டியைத் தேர்ந்தெடுக்கவும்')
         ->and($options->map(fn (MenuAddOnOption $option): string => $option->name)->all())->toBe(['Butter naan', 'Garlic naan'])
         // Left blank, a butter naan is free.
@@ -146,7 +111,6 @@ it('makes an optional group with no limit, the same option allowed twice', funct
             'name' => [Locale::English->value => 'Extras'],
             'is_required' => false,
             'max_selections' => '',
-            'allows_quantities' => true,
             'options' => [addOnOptionRow('Extra cheese', '40', upTo: 2), addOnOptionRow('Raita', '30')],
         ])
         ->assertHasNoActionErrors();
@@ -156,19 +120,16 @@ it('makes an optional group with no limit, the same option allowed twice', funct
     // Blank is any number of picks, not a limit of none.
     expect($extras->is_required)->toBeFalse()
         ->and($extras->max_selections)->toBeNull()
-        ->and($extras->allows_quantities)->toBeTrue()
         ->and($extras->options()->inMenuOrder()->pluck('max_quantity')->all())->toBe([2, 1]);
 });
 
-it('never lets one option be taken twice while a guest may pick only one', function (): void {
+it('forces every option to one while a guest may pick only one, whatever Max each was typed', function (): void {
     enterTenantPanel(Tenant::factory()->create(), RoleEnum::Owner);
 
-    // Switched on while the maximum was higher, then the maximum set to one.
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Strength'],
             'max_selections' => 1,
-            'allows_quantities' => true,
             'options' => [addOnOptionRow('Extra strong', '10', upTo: 3)],
         ])
         ->assertHasNoActionErrors();
@@ -176,7 +137,6 @@ it('never lets one option be taken twice while a guest may pick only one', funct
     $strength = addOnGroupNamed('Strength');
 
     expect($strength->max_selections)->toBe(1)
-        ->and($strength->allows_quantities)->toBeFalse()
         ->and($strength->options()->sole()->max_quantity)->toBe(1);
 });
 
@@ -215,7 +175,6 @@ it('refuses more of one option than the group\'s own maximum', function (): void
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extras'],
             'max_selections' => 2,
-            'allows_quantities' => true,
             'options' => [addOnOptionRow('Extra cheese', '40', upTo: 3)],
         ])
         ->assertHasActionErrors(['options.*.max_quantity']);
@@ -223,36 +182,9 @@ it('refuses more of one option than the group\'s own maximum', function (): void
     expect(MenuAddOnGroup::query()->withoutGlobalScopes()->exists())->toBeFalse();
 });
 
-it('draws one cell per column, adding Max qty as a column and a field together', function (): void {
-    $tenant = Tenant::factory()->create();
-    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
-    MenuAddOnOption::factory()->inGroup($group)->create();
-
-    enterTenantPanel($tenant, RoleEnum::Owner);
-
-    $page = Livewire::test(ManageMenuAddOnGroups::class)
-        ->mountAction(TestAction::make('edit')->table($group));
-
-    // A translated name is two inputs, and a row that put both straight into
-    // the table drew a cell for the hidden one, pushing every field after it
-    // one column to the right.
-    $before = addOnOptionsTableShape($page);
-
-    expect($before['cells'])->toBe($before['headers']);
-
-    // Switched on in the open modal, Max qty must arrive as a header and as a
-    // cell in the same render, or the row lags a column behind its headers.
-    $page->setActionData(['allows_quantities' => true]);
-
-    $after = addOnOptionsTableShape($page);
-
-    expect($after['cells'])->toBe($after['headers'])
-        ->and($after['headers'])->toBe($before['headers'] + 1);
-});
-
 it('opens a group with its answers, and each option as stored, a free one blank', function (): void {
     $tenant = Tenant::factory()->create();
-    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->allowingQuantities()->create();
+    $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
     $cheese = MenuAddOnOption::factory()->inGroup($group)->asDefault()->create(['price_minor_units' => 2050, 'max_quantity' => 2]);
     $raita = MenuAddOnOption::factory()->inGroup($group)->free()->create();
 
@@ -270,7 +202,6 @@ it('opens a group with its answers, and each option as stored, a free one blank'
 
     expect($state['is_required'])->toBeFalse()
         ->and($state['max_selections'])->toBe(3)
-        ->and($state['allows_quantities'])->toBeTrue()
         ->and($cheeseRow['price'])->toBe(20.5)
         ->and($cheeseRow['max_quantity'])->toBe(2)
         ->and($cheeseRow['is_default'])->toBeTrue()

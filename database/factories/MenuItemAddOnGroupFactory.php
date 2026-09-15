@@ -46,4 +46,14 @@ class MenuItemAddOnGroupFactory extends Factory
             'tenant_id' => $item->tenant_id,
         ]);
     }
+
+    /**
+     * Cap this item's own picks from the group, tighter or looser than the group's own maximum.
+     */
+    public function capping(int $maxSelections): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'max_selections' => $maxSelections,
+        ]);
+    }
 }

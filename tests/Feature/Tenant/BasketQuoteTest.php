@@ -43,7 +43,7 @@ function seedCurryWithChoices(): array
     $curry = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 28900]);
 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
-    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->allowingQuantities()->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
 
     MenuItemAddOnGroup::factory()->linking($curry, $bread)->create(['position' => 0]);
     MenuItemAddOnGroup::factory()->linking($curry, $extras)->create(['position' => 1]);
@@ -114,7 +114,32 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
                 ['id' => $packing->getKey(), 'name' => $packing->name, 'amountMinorUnits' => 2000],
             ],
             'totalMinorUnits' => 137700 + 6885 + 13770 + 2000,
+            // Nothing here is counted, so nothing can run short.
+            'shortages' => [],
         ]);
+});
+
+it('says what a basket would run short of, without refusing its lines or holding the stock', function (): void {
+    [
+        'tenant' => $tenant, 'menu' => $menu, 'curry' => $curry,
+        'butterNaan' => $butterNaan, 'cheese' => $cheese,
+    ] = seedCurryWithChoices();
+
+    $curry->update(['stock_quantity' => 3]);
+    $cheese->update(['stock_quantity' => 1]);
+
+    // Two lines of curry are one count of three wanted, and two cheese on each
+    // of the first line's two curries are four wanted of the one left.
+    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+        basketLine('two-with-cheese', $curry, quantity: 2, choices: [[$butterNaan, 1], [$cheese, 2]]),
+        basketLine('one-plain', $curry, choices: [[$butterNaan, 1]]),
+    ]])->assertOk();
+
+    expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([QuoteBasket::OK])
+        ->and($response->json('shortages'))->toBe([
+            ['type' => 'option', 'id' => $cheese->getKey(), 'requested' => 4, 'available' => 1, 'lineKeys' => ['two-with-cheese']],
+        ])
+        ->and($curry->refresh()->stock_quantity)->toBe(3);
 });
 
 it('flags a line whose choices break the rules of its groups, and prices the rest', function (): void {
@@ -127,11 +152,11 @@ it('flags a line whose choices break the rules of its groups, and prices the res
     $runOut = MenuAddOnOption::factory()->inGroup($extras)->unavailable()->create();
     $notOffered = MenuAddOnOption::factory()->inGroup(MenuAddOnGroup::factory()->ofTenant($tenant)->create())->create();
 
-    // Offered on the curry, and capped at three, but its group does not allow
-    // the same option twice: one of each at most.
+    // Offered on the curry and capped at three overall, but this option's own
+    // cap is one: it may not be taken twice even though the group has room.
     $sides = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
     MenuItemAddOnGroup::factory()->linking($curry, $sides)->create(['position' => 2]);
-    $chutney = MenuAddOnOption::factory()->inGroup($sides)->upTo(3)->create();
+    $papadum = MenuAddOnOption::factory()->inGroup($sides)->create();
 
     $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
         basketLine('meets-every-rule', $curry, choices: [[$butterNaan, 1], [$cheese, 2], [$paneer, 1]]),
@@ -141,7 +166,7 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         basketLine('three-cheese', $curry, choices: [[$butterNaan, 1], [$cheese, 3]]),
         basketLine('run-out', $curry, choices: [[$butterNaan, 1], [$runOut, 1]]),
         basketLine('not-offered-on-it', $curry, choices: [[$butterNaan, 1], [$notOffered, 1]]),
-        basketLine('two-of-one-without-quantities', $curry, choices: [[$butterNaan, 1], [$chutney, 2]]),
+        basketLine('two-papadum', $curry, choices: [[$butterNaan, 1], [$papadum, 2]]),
     ]])->assertOk();
 
     expect(collect($response->json('lines'))->pluck('status', 'key')->all())->toBe([
@@ -152,10 +177,32 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         'three-cheese' => QuoteBasket::INVALID,
         'run-out' => QuoteBasket::INVALID,
         'not-offered-on-it' => QuoteBasket::INVALID,
-        'two-of-one-without-quantities' => QuoteBasket::INVALID,
+        'two-papadum' => QuoteBasket::INVALID,
     ])
         // A flagged line adds nothing until it is changed.
         ->and($response->json('subtotalMinorUnits'))->toBe(28900 + 8000 + 6000);
+});
+
+it("enforces an item's own cap on a group's picks, tighter than the group's own", function (): void {
+    ['tenant' => $tenant, 'menu' => $menu, 'category' => $category] = seedCurryWithChoices();
+
+    $dal = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 19900]);
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
+    $cheese = MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price_minor_units' => 4000]);
+    $paneer = MenuAddOnOption::factory()->inGroup($extras)->create(['price_minor_units' => 6000]);
+
+    // The group's own library allows up to three; this item allows only one.
+    MenuItemAddOnGroup::factory()->linking($dal, $extras)->capping(1)->create();
+
+    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+        basketLine('one-extra', $dal, choices: [[$cheese, 1]]),
+        basketLine('two-extras', $dal, choices: [[$cheese, 1], [$paneer, 1]]),
+    ]])->assertOk();
+
+    expect(collect($response->json('lines'))->pluck('status', 'key')->all())->toBe([
+        'one-extra' => QuoteBasket::OK,
+        'two-extras' => QuoteBasket::INVALID,
+    ]);
 });
 
 it('flags every line of an item or combo the basket holds more of than one order may, counting across its lines', function (): void {
@@ -257,6 +304,7 @@ it('adds no charge to an empty basket', function (): void {
             'pricesIncludeTax' => false,
             'charges' => [],
             'totalMinorUnits' => 0,
+            'shortages' => [],
         ]);
 });
 

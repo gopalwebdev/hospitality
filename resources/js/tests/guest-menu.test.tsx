@@ -37,7 +37,7 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         compareAtPriceMinorUnits: null,
         isServiceRequest: false,
         diet: 'vegetarian',
-        addOnGroupIds: [],
+        addOnGroupLinks: [],
         maxQuantity: null,
         ...overrides,
     };
@@ -281,7 +281,10 @@ describe('guest menu', () => {
                             priceMinorUnits: 28900,
                             // The item's own order, not the order the menu
                             // sent the groups in.
-                            addOnGroupIds: [2, 1],
+                            addOnGroupLinks: [
+                                { id: 2, maxSelections: null },
+                                { id: 1, maxSelections: null },
+                            ],
                         }),
                     ],
                     subSections: [],
@@ -355,6 +358,50 @@ describe('guest menu', () => {
         ]);
     });
 
+    it("caps a group's picks to this item's own maximum, tighter than the group's own", () => {
+        renderMenu({
+            sections: [
+                {
+                    id: 1,
+                    name: 'Curries',
+                    items: [
+                        item({
+                            id: 31,
+                            name: 'Chicken 65',
+                            // Extras is "up to 3" in the group's own library;
+                            // this item caps it at one.
+                            addOnGroupLinks: [{ id: 1, maxSelections: 1 }],
+                        }),
+                    ],
+                    subSections: [],
+                },
+            ],
+            addOnGroups: [extras],
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add Chicken 65' }));
+
+        const sheet = screen.getByRole('dialog');
+
+        expect(within(sheet).getByText('Choose up to 1')).toBeInTheDocument();
+
+        fireEvent.click(
+            within(sheet).getByRole('checkbox', { name: 'Extra cheese' }),
+        );
+        fireEvent.click(
+            within(sheet).getByRole('checkbox', { name: 'Extra paneer' }),
+        );
+
+        // One pick moves the tick rather than refusing the second, exactly as
+        // an optional pick-one already does.
+        expect(
+            within(sheet).getByRole('checkbox', { name: 'Extra cheese' }),
+        ).not.toBeChecked();
+        expect(
+            within(sheet).getByRole('checkbox', { name: 'Extra paneer' }),
+        ).toBeChecked();
+    });
+
     it('stops offering an item once the basket holds as many as one order may', () => {
         renderMenu({
             sections: [
@@ -415,7 +462,7 @@ describe('guest menu', () => {
                         item({
                             id: 30,
                             name: 'Paneer Butter Masala',
-                            addOnGroupIds: [2],
+                            addOnGroupLinks: [{ id: 2, maxSelections: null }],
                             maxQuantity: 3,
                         }),
                     ],

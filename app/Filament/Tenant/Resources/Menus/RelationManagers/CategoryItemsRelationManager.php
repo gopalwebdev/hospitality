@@ -6,6 +6,7 @@ use App\Enums\Currency;
 use App\Enums\ItemAvailability;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Tables\Reordering;
+use App\Filament\Tables\StockActions;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
@@ -78,13 +79,15 @@ class CategoryItemsRelationManager extends RelationManager
                     // was changed. Created through the relationship instead, a
                     // different choice in that select would be quietly overruled.
                     ->using(fn (array $data): MenuItem => MenuItem::query()->create([
-                        ...MenuItemForm::storePricing($data),
+                        ...MenuItemForm::storeNew($data),
                         // At the bottom of its category, where whoever added it looks for it.
                         'position' => ((int) MenuItem::query()->where('menu_category_id', $data['menu_category_id'])->max('position')) + 1,
                     ]))
                     ->successNotificationTitle(__('panel.arrangement.item_created')),
             ])
             ->recordActions([
+                StockActions::adjust(),
+                StockActions::history(),
                 self::editAction(),
 
                 DeleteAction::make()
@@ -140,6 +143,14 @@ class CategoryItemsRelationManager extends RelationManager
                 ->badge()
                 ->formatStateUsing(fn (ItemAvailability $state): string => $state->label())
                 ->color(fn (ItemAvailability $state): string => $state->color()),
+
+            // A dash when nobody counts it, red at none left.
+            TextColumn::make('stock_quantity')
+                ->label(__('panel.stock.in_stock'))
+                ->numeric()
+                ->placeholder('—')
+                ->color(fn (?int $state): ?string => $state === 0 ? 'danger' : null)
+                ->alignEnd(),
         ];
     }
 
@@ -154,11 +165,8 @@ class CategoryItemsRelationManager extends RelationManager
             ->tooltip(__('panel.arrangement.edit'))
             ->slideOver()
             ->modalWidth(Width::Full)
-            ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fillTranslations(
-                MenuItemForm::fillPricing($data),
-                $record,
-            ))
-            ->mutateDataUsing(fn (array $data): array => MenuItemForm::storePricing($data));
+            ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fill($data, $record))
+            ->using(fn (array $data, MenuItem $record): MenuItem => MenuItemForm::update($record, $data));
     }
 
     private function category(): MenuCategory

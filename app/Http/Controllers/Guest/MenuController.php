@@ -34,8 +34,9 @@ use Inertia\Response;
  * keys nobody renders.
  *
  * An add-on group is sent once for the whole menu and each item names the groups
- * it offers, in its own order: a spice level on twenty items is one group on the
- * wire, not twenty copies of it.
+ * it offers, in its own order, with its own cap on each: a spice level on
+ * twenty items is one group on the wire, not twenty copies of it, even where
+ * one item caps its picks differently from the group's own default.
  *
  * Only what is actually orderable is sent: a hidden category, a hidden
  * sub-category, a sold-out item and an option that has run out are all absent
@@ -102,10 +103,10 @@ class MenuController extends Controller
             ->inFeaturedOrder()
             ->get();
 
-        $groupIdsByItem = $this->addOnGroupIdsByItem($sections, $featured);
-        $groups = $this->addOnGroups($groupIdsByItem);
+        $groupLinksByItem = $this->addOnGroupLinksByItem($sections, $featured);
+        $groups = $this->addOnGroups($groupLinksByItem);
 
-        $canBeOrdered = fn (MenuItem $item): bool => $this->requiredGroupsCanBeMet($item, $groupIdsByItem, $groups);
+        $canBeOrdered = fn (MenuItem $item): bool => $this->requiredGroupsCanBeMet($item, $groupLinksByItem, $groups);
 
         foreach ($sections as $category) {
             $category->setRelation('menuItems', $category->menuItems->filter($canBeOrdered)->values());
@@ -123,17 +124,20 @@ class MenuController extends Controller
 
         // The groups an item offers, in its own order: those with at least one
         // option a guest can have.
-        $offeredGroupIds = fn (MenuItem $item): array => array_values(array_filter(
-            $groupIdsByItem[$item->getKey()] ?? [],
-            fn (int $groupId): bool => $groups->get($groupId)?->options->isNotEmpty() ?? false,
+        $offeredGroupLinks = fn (MenuItem $item): array => array_values(array_filter(
+            $groupLinksByItem[$item->getKey()] ?? [],
+            fn (array $link): bool => $groups->get($link['id'])?->options->isNotEmpty() ?? false,
         ));
 
-        $present = fn (MenuItem $item): array => $this->presentItem($item, $offeredGroupIds($item));
+        $present = fn (MenuItem $item): array => $this->presentItem($item, $offeredGroupLinks($item));
 
         $combos = MenuCombo::query()
             ->select(['id', 'name', 'description', 'price_minor_units', 'compare_at_price_minor_units', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', $orderable)
+            // A combo has no count of its own and draws on its items', so one
+            // holding a counted item with none left cannot be had either.
+            ->whereDoesntHave('comboItems.menuItem', fn ($item) => $item->where('stock_quantity', 0))
             ->with(['comboItems' => fn ($comboItems) => $comboItems
                 ->select(['id', 'menu_combo_id', 'menu_item_id', 'quantity'])
                 ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service_request', 'diet'])])
@@ -191,7 +195,7 @@ class MenuController extends Controller
                         'items' => $child->menuItems->map($present)->values()->all(),
                     ])->values()->all(),
             ])->values()->all(),
-            'addOnGroups' => $this->presentAddOnGroups($groups, $this->shownItems($sections, $featured)->flatMap($offeredGroupIds)),
+            'addOnGroups' => $this->presentAddOnGroups($groups, $this->shownItems($sections, $featured)->flatMap($offeredGroupLinks)->pluck('id')),
             'tax' => $this->tax($tenant),
             'charges' => $this->charges($tenant, $menu),
             'acceptingOrders' => $tenant->isAcceptingOrders(),
@@ -201,15 +205,15 @@ class MenuController extends Controller
     }
 
     /**
-     * The add-on groups each item on the page offers, in that item's own order.
+     * The add-on groups each item on the page offers, in that item's own order, with this item's own cap on each.
      *
      * One query for every item, featured ones included.
      *
      * @param  EloquentCollection<int, MenuCategory>  $sections
      * @param  EloquentCollection<int, MenuItem>  $featured
-     * @return array<int, non-empty-list<int>> group ids, keyed by item id
+     * @return array<int, non-empty-list<array{id: int, maxSelections: int|null}>> keyed by item id
      */
-    private function addOnGroupIdsByItem(EloquentCollection $sections, EloquentCollection $featured): array
+    private function addOnGroupLinksByItem(EloquentCollection $sections, EloquentCollection $featured): array
     {
         $itemIds = $this->shownItems($sections, $featured)
             ->map(fn (MenuItem $item): int => $item->getKey())
@@ -222,36 +226,36 @@ class MenuController extends Controller
         }
 
         $links = MenuItemAddOnGroup::query()
-            ->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'position'])
+            ->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'position', 'max_selections'])
             ->whereIn('menu_item_id', $itemIds)
             ->inMenuOrder()
             ->get();
 
-        $groupIds = [];
+        $groupLinks = [];
 
         foreach ($links as $link) {
-            $groupIds[$link->menu_item_id][] = $link->menu_add_on_group_id;
+            $groupLinks[$link->menu_item_id][] = ['id' => $link->menu_add_on_group_id, 'maxSelections' => $link->max_selections];
         }
 
-        return $groupIds;
+        return $groupLinks;
     }
 
     /**
      * Every group those items offer, with only the options a guest can have right now.
      *
-     * @param  array<int, non-empty-list<int>>  $groupIdsByItem
+     * @param  array<int, non-empty-list<array{id: int, maxSelections: int|null}>>  $groupLinksByItem
      * @return EloquentCollection<int, MenuAddOnGroup> keyed by id
      */
-    private function addOnGroups(array $groupIdsByItem): EloquentCollection
+    private function addOnGroups(array $groupLinksByItem): EloquentCollection
     {
-        $groupIds = array_values(array_unique(array_merge(...array_values($groupIdsByItem))));
+        $groupIds = collect($groupLinksByItem)->flatten(1)->pluck('id')->unique()->values()->all();
 
         if ($groupIds === []) {
             return new EloquentCollection;
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'name', 'is_required', 'max_selections', 'allows_quantities'])
+            ->select(['id', 'name', 'is_required', 'max_selections'])
             ->whereKey($groupIds)
             ->with(['options' => fn ($options) => $options
                 ->select(['id', 'menu_add_on_group_id', 'name', 'price_minor_units', 'max_quantity', 'is_default'])
@@ -264,15 +268,15 @@ class MenuController extends Controller
     /**
      * Whether a guest could still complete every group an item makes them choose from.
      *
-     * @param  array<int, non-empty-list<int>>  $groupIdsByItem
+     * @param  array<int, non-empty-list<array{id: int, maxSelections: int|null}>>  $groupLinksByItem
      * @param  EloquentCollection<int, MenuAddOnGroup>  $groups
      */
-    private function requiredGroupsCanBeMet(MenuItem $item, array $groupIdsByItem, EloquentCollection $groups): bool
+    private function requiredGroupsCanBeMet(MenuItem $item, array $groupLinksByItem, EloquentCollection $groups): bool
     {
-        foreach ($groupIdsByItem[$item->getKey()] ?? [] as $groupId) {
-            $group = $groups->get($groupId);
+        foreach ($groupLinksByItem[$item->getKey()] ?? [] as $link) {
+            $group = $groups->get($link['id']);
 
-            if ($group instanceof MenuAddOnGroup && ! $group->canBeMetBy($group->picksOffered())) {
+            if ($group instanceof MenuAddOnGroup && ! $group->canBeMetBy($group->picksOffered($link['maxSelections']))) {
                 return false;
             }
         }
@@ -440,10 +444,10 @@ class MenuController extends Controller
     /**
      * One item, and the add-on groups a guest customises it with.
      *
-     * @param  list<int>  $addOnGroupIds
+     * @param  list<array{id: int, maxSelections: int|null}>  $addOnGroupLinks
      * @return array<string, mixed>
      */
-    private function presentItem(MenuItem $item, array $addOnGroupIds): array
+    private function presentItem(MenuItem $item, array $addOnGroupLinks): array
     {
         return [
             'id' => $item->getKey(),
@@ -460,9 +464,10 @@ class MenuController extends Controller
             // The most one order may hold, counted across every basket line it
             // is on. Null is no limit.
             'maxQuantity' => $item->max_quantity,
-            // In the order the guest reads them; each id is one of the menu's
-            // `addOnGroups`.
-            'addOnGroupIds' => $addOnGroupIds,
+            // In the order the guest reads them; each id names one of the
+            // menu's `addOnGroups`, and maxSelections is this item's own cap on
+            // it — null follows the group's own, whatever it is.
+            'addOnGroupLinks' => $addOnGroupLinks,
         ];
     }
 }

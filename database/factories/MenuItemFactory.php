@@ -102,6 +102,16 @@ class MenuItemFactory extends Factory
     }
 
     /**
+     * An item someone counts, with $count left.
+     */
+    public function stocked(int $count): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'stock_quantity' => $count,
+        ]);
+    }
+
+    /**
      * An item with every language filled in.
      */
     public function translated(): static

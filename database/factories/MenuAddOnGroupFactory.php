@@ -29,20 +29,7 @@ class MenuAddOnGroupFactory extends Factory
             'name' => [Locale::English->value => $name],
             'is_required' => false,
             'max_selections' => null,
-            'allows_quantities' => false,
         ];
-    }
-
-    /**
-     * A group whose options a guest may take more than once: two of "Extra cheese".
-     *
-     * Its maximum must be blank or at least two, or the database refuses it.
-     */
-    public function allowingQuantities(): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'allows_quantities' => true,
-        ]);
     }
 
     /**

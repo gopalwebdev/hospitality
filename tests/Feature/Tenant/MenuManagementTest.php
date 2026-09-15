@@ -491,6 +491,65 @@ it('offers an item the add-on groups picked for it, in the order they were put i
         ->and($item->addOnGroupLinks()->pluck('tenant_id')->unique()->all())->toBe([$tenant->getKey()]);
 });
 
+it("saves an item's own cap on a group's picks, and leaves it blank to follow the group's own", function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+    $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Chicken 65'],
+            'menu_category_id' => $category->getKey(),
+            'diet' => Diet::Vegetarian->value,
+            'price' => '210',
+            'availability' => ItemAvailability::Available->value,
+            'addOnGroupLinks' => [
+                // Capped tighter than the group's own three.
+                ['menu_add_on_group_id' => $extras->getKey(), 'max_selections' => 1],
+                // Left blank: follows the bread group's own maximum.
+                ['menu_add_on_group_id' => $bread->getKey(), 'max_selections' => ''],
+            ],
+        ])
+        ->assertHasNoActionErrors();
+
+    $links = byEnglishName(MenuItem::class, 'Chicken 65')->addOnGroupLinks()->inMenuOrder()->get();
+
+    expect($links->pluck('max_selections', 'menu_add_on_group_id')->all())
+        ->toBe([$extras->getKey() => 1, $bread->getKey() => null]);
+});
+
+it("refuses an item's own cap out of range, or lower than how many options the group defaults to ticking", function (array $link, string $refusedField): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+    $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 3)->create();
+    MenuAddOnOption::factory()->inGroup($bread)->asDefault()->count(2)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Chicken 65'],
+            'menu_category_id' => $category->getKey(),
+            'diet' => Diet::Vegetarian->value,
+            'price' => '210',
+            'availability' => ItemAvailability::Available->value,
+            'addOnGroupLinks' => [['menu_add_on_group_id' => $bread->getKey(), ...$link]],
+        ])
+        ->assertHasActionErrors([$refusedField]);
+
+    expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
+})->with([
+    'out of range' => [['max_selections' => 100], 'addOnGroupLinks.*.max_selections'],
+    'below how many options default to ticked' => [['max_selections' => 1], 'addOnGroupLinks.*.max_selections'],
+]);
+
 it('refuses the same group twice on one item, and a group this tenant does not have', function (array $pick): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()

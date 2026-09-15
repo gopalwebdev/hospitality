@@ -6,7 +6,7 @@ export interface AddOnOption {
     name: string;
     /** What one of it adds, in the currency's minor unit; 0 is free. */
     priceMinorUnits: number;
-    /** How many of this one option a guest may take on one item: 1 unless its group allows quantities. */
+    /** How many of this one option a guest may take on one item, already capped at the group's own maximum. */
     maxQuantity: number;
     /** Ticked for the guest when the sheet opens: "Medium" on a spice level. */
     isDefault: boolean;
@@ -15,7 +15,9 @@ export interface AddOnOption {
 /**
  * A set of choices an item is customised with: a spice level, a bread, extras.
  *
- * Sent once per menu and named by id on each item that offers it.
+ * Sent once per menu and named by id on each item that offers it, so this is
+ * the group's own default rule — see withItemMaxSelections() for an item that
+ * caps it differently.
  */
 export interface AddOnGroup {
     id: number;
@@ -55,6 +57,32 @@ export interface Phrase {
 
 export function isRequired(group: AddOnGroup): boolean {
     return group.isRequired;
+}
+
+/**
+ * A group as one item caps its picks, tighter or looser than the group's own maximum.
+ *
+ * `maxSelections` is the item's own answer — null follows the group's own, so
+ * there is nothing to do then. Each option's own cap is capped again here,
+ * because an option allowed more than the item's new maximum could otherwise
+ * be ticked past what the item as a whole permits.
+ */
+export function withItemMaxSelections(
+    group: AddOnGroup,
+    maxSelections: number | null,
+): AddOnGroup {
+    if (maxSelections === null) {
+        return group;
+    }
+
+    return {
+        ...group,
+        maxSelections,
+        options: group.options.map((option) => ({
+            ...option,
+            maxQuantity: Math.min(option.maxQuantity, maxSelections),
+        })),
+    };
 }
 
 /**

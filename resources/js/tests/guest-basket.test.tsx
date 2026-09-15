@@ -65,7 +65,10 @@ const masala: MenuItem = {
     compareAtPriceMinorUnits: null,
     isServiceRequest: false,
     diet: 'vegetarian',
-    addOnGroupIds: [2, 1],
+    addOnGroupLinks: [
+        { id: 2, maxSelections: null },
+        { id: 1, maxSelections: null },
+    ],
     maxQuantity: null,
 };
 

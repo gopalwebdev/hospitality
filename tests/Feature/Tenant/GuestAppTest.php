@@ -719,8 +719,13 @@ it('sends each add-on group once, and each item the groups it offers in its own 
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('sections.0.items.0.addOnGroupIds', [$extras->getKey(), $bread->getKey()])
-            ->where('sections.0.items.1.addOnGroupIds', [$bread->getKey()])
+            ->where('sections.0.items.0.addOnGroupLinks', [
+                ['id' => $extras->getKey(), 'maxSelections' => null],
+                ['id' => $bread->getKey(), 'maxSelections' => null],
+            ])
+            ->where('sections.0.items.1.addOnGroupLinks', [
+                ['id' => $bread->getKey(), 'maxSelections' => null],
+            ])
             // Offered on two items, sent once.
             ->has('addOnGroups', 2)
             ->where('addOnGroups', fn (Collection $groups): bool => $groups->firstWhere('id', $bread->getKey()) === [
@@ -734,9 +739,8 @@ it('sends each add-on group once, and each item the groups it offers in its own 
                     ['id' => $garlic->getKey(), 'name' => $garlic->name, 'priceMinorUnits' => 2000, 'maxQuantity' => 1, 'isDefault' => true],
                 ],
             ])
-            // Its option is capped at two, but the group does not allow the same
-            // option twice, so a guest is sent a cap of one.
-            ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxQuantity'] ?? null) === 1)
+            // Its own cap of two stands: nothing in the group forces it down to one.
+            ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxQuantity'] ?? null) === 2)
             ->where('quoteUrl', guestMenuUrl($tenant, $menu).'/basket-quotes'),
         );
 });
@@ -764,7 +768,7 @@ it('leaves out an item whose required group has nothing left to pick, and a grou
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->has('sections.0.items', 1)
             ->where('sections.0.items.0.id', $dal->getKey())
-            ->where('sections.0.items.0.addOnGroupIds', [])
+            ->where('sections.0.items.0.addOnGroupLinks', [])
             ->where('addOnGroups', []),
         );
 });

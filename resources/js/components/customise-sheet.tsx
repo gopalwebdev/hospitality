@@ -307,6 +307,7 @@ function CheckboxOption({
     picks,
     onChange,
 }: GroupChoicesProps & { option: AddOnOption }) {
+    const { t } = useTranslations();
     const nameId = useId();
     const quantity = picks[option.id] ?? 0;
     const isPicked = quantity > 0;
@@ -326,11 +327,24 @@ function CheckboxOption({
                         onChange(toggle(group, option, picks));
                     }}
                 />
-                <span
-                    id={nameId}
-                    className={isFull ? 'text-muted-foreground' : undefined}
-                >
-                    {option.name}
+                <span className="min-w-0 flex-1">
+                    <span
+                        id={nameId}
+                        className={isFull ? 'text-muted-foreground' : undefined}
+                    >
+                        {option.name}
+                    </span>
+                    {/* Outside the labelled span, so it reads as part of the row
+                        rather than the checkbox's own accessible name — and a
+                        guest sees it before they tick, not only once the
+                        stepper appears. */}
+                    {option.maxQuantity > 1 && (
+                        <span className="text-muted-foreground ml-1.5 text-xs">
+                            {t('customise.option_up_to', {
+                                count: option.maxQuantity,
+                            })}
+                        </span>
+                    )}
                 </span>
             </label>
 

@@ -71,7 +71,7 @@ The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charg
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
-The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, with `maxQuantity` already 1 for an option whose group does not allow quantities — and each item names its groups, in its own order, as `addOnGroupIds`. A group offered on twenty items is one entry on the wire.
+The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, each option's `maxQuantity` already capped at the *group's own* maximum. Each item names its groups, in its own order, as `addOnGroupLinks: {id, maxSelections}[]` — `maxSelections` is that item's own cap on the group's picks, null following the group's own default. `withItemMaxSelections()` (`lib/add-on-rules.ts`) is what merges an item's own cap onto a shared group for the sheet, clamping every option's `maxQuantity` down with it; a group offered on twenty items is still one entry on the wire; only the small `{id, maxSelections}` link is per item.
 
 Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
 - a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
@@ -95,7 +95,7 @@ Every number in `components/basket-sheet.tsx` is the server's. `hooks/use-basket
 - `useHttp` hands back new helpers on every render, so the hook reads them through a ref; listing them as effect dependencies re-posts on every render.
 - It calls `transform()` before `post()`, because `post()` sends from a ref that a `setData()` in the same tick has not updated yet.
 
-Nothing is ordered from here: the sheet tells the guest to show it to a member of staff. `guest-basket.test.tsx` mocks `use-basket-quote`, so the basket is tested against a fixed answer.
+Nothing is ordered from here yet: the sheet tells the guest to show it to a member of staff. The server side of ordering exists — `POST menus/{menu}/orders` (`guest.menus.orders.store`) places the same lines and takes them from stock, answering 422 with `shortages` when something ran out — and the quote already carries `shortages`, which the sheet does not read. Wiring either in is the app's next step (`.ai/rules/inventory.md`). `guest-basket.test.tsx` mocks `use-basket-quote`, so the basket is tested against a fixed answer.
 
 `components/ui/sheet.tsx`, `radio-group.tsx` and `checkbox.tsx` were written from the shadcn registry with two changes: `cn` comes from `@/lib/utils`, and the icons come from `components/icons.tsx`. The registry imports `lucide-react`, which this app deliberately does not depend on, so do not let the CLI add it.
 

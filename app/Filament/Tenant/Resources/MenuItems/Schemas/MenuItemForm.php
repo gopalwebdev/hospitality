@@ -5,12 +5,14 @@ namespace App\Filament\Tenant\Resources\MenuItems\Schemas;
 use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Filament\Schemas\PricingFields;
+use App\Filament\Schemas\StockFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas\MenuAddOnGroupForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuItem;
 use App\Models\Tenant;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
@@ -63,6 +65,7 @@ class MenuItemForm
                             ->schema([
                                 self::priceSection($currency),
                                 self::taxSection(),
+                                self::stockSection(),
                             ]),
 
                         self::addOnGroupsSection()
@@ -181,13 +184,33 @@ class MenuItemForm
     }
 
     /**
+     * How many are left, beside the price rather than behind an action: blank is nobody counting.
+     *
+     * Day-to-day restocking is the Adjust stock action on the items tables; this is
+     * where counting starts or stops. See StockFields for why a count the form did
+     * not change is never written back.
+     */
+    private static function stockSection(): Section
+    {
+        return Section::make(__('panel.stock.section'))
+            ->icon(Heroicon::OutlinedArchiveBox)
+            ->compact()
+            ->columns(2)
+            ->schema([
+                StockFields::quantity(),
+                StockFields::loaded(),
+            ]);
+    }
+
+    /**
      * The add-on groups a guest customises this item with, in the order they read them.
      *
      * Each row names a group from the tenant's library — the Add-on groups page —
-     * so a group offered on twenty items is edited once. A row is only the link
-     * and its place on this item, which is why the repeater is bound to the links
-     * rather than to the groups. A group that does not exist yet can be made from
-     * the select without leaving the item.
+     * so a group offered on twenty items is edited once. A row is only the link,
+     * its place on this item and this item's own cap on the group's picks, which
+     * is why the repeater is bound to the links rather than to the groups. A
+     * group that does not exist yet can be made from the select without leaving
+     * the item.
      *
      * A repeater bound to the relationship, so the links are written in the same
      * save as the item. The rule in .ai/rules/filament.md against
@@ -205,6 +228,7 @@ class MenuItemForm
                     ->hiddenLabel()
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.section'))->markAsRequired(),
+                        TableColumn::make(__('panel.add_on_groups.item_max_selections'))->width('12rem'),
                     ])
                     ->schema([
                         Select::make('menu_add_on_group_id')
@@ -215,9 +239,21 @@ class MenuItemForm
                             // A group is offered on an item once; nothing but this
                             // refuses a second row.
                             ->distinct()
+                            ->live()
                             ->validationMessages(['distinct' => __('panel.add_on_groups.duplicate')])
                             ->createOptionForm(fn (Schema $schema): Schema => MenuAddOnGroupForm::configure($schema->model(MenuAddOnGroup::class)))
                             ->createOptionUsing(fn (array $data, Schema $schema): int => MenuAddOnGroupForm::createFromItemForm($data, $schema)),
+
+                        // Blank follows the group's own Maximum, shown as the
+                        // placeholder so an admin sees what "blank" means here.
+                        TextInput::make('max_selections')
+                            ->label(__('panel.add_on_groups.item_max_selections'))
+                            ->integer()
+                            ->minValue(1)
+                            ->maxValue(99)
+                            ->placeholder(fn (Get $get): string => self::itemMaxSelectionsPlaceholder($get))
+                            ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state)
+                            ->rule(fn (Get $get): Closure => self::itemMaxSelectionsRule($get)),
                     ])
                     ->orderColumn('position')
                     // Most items have none, and a blank row waiting to be filled
@@ -227,6 +263,36 @@ class MenuItemForm
                     ->reorderable()
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * What "blank" means for this row's Maximum on this item: the group's own Maximum, or no limit.
+     */
+    private static function itemMaxSelectionsPlaceholder(Get $get): string
+    {
+        $groupId = $get('menu_add_on_group_id');
+        $default = filled($groupId) ? MenuAddOnGroupForm::groupForItemForm((int) $groupId)?->max_selections : null;
+
+        return $default === null ? __('panel.add_on_groups.no_limit') : (string) $default;
+    }
+
+    /**
+     * Refuse an item's own maximum lower than how many of the group's options it defaults to ticking.
+     */
+    private static function itemMaxSelectionsRule(Get $get): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+            if (blank($value)) {
+                return;
+            }
+
+            $groupId = $get('menu_add_on_group_id');
+            $group = filled($groupId) ? MenuAddOnGroupForm::groupForItemForm((int) $groupId) : null;
+
+            if ($group instanceof MenuAddOnGroup && (int) $value < $group->defaults_count) {
+                $fail(__('panel.add_on_groups.item_max_selections_below_defaults'));
+            }
+        };
     }
 
     /**
@@ -266,6 +332,47 @@ class MenuItemForm
     public static function storePricing(array $data): array
     {
         return PricingFields::store($data, self::currency());
+    }
+
+    /**
+     * Everything an edit form opens with: every language, the prices as typed, and the count it started from.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function fill(array $data, MenuItem $record): array
+    {
+        return self::fillTranslations(StockFields::fill(self::fillPricing($data)), $record);
+    }
+
+    /**
+     * A new item's data as it is stored, its count with it.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function storeNew(array $data): array
+    {
+        return StockFields::storeNew(self::storePricing($data));
+    }
+
+    /**
+     * Save an edited item, then its count — under the lock, and only if the form changed it.
+     *
+     * The item first, so the count's own save has the last word on whether an item
+     * with none left is out of stock.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function update(MenuItem $record, array $data): MenuItem
+    {
+        [$data, $typed, $loaded] = StockFields::pull(self::storePricing($data));
+
+        $record->update($data);
+
+        StockFields::applyIfChanged($record, $typed, $loaded);
+
+        return $record;
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tables\StockActions;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
@@ -102,6 +103,15 @@ class MenuItemsTable
                     ->formatStateUsing(fn (ItemAvailability $state): string => $state->label())
                     ->color(fn (ItemAvailability $state): string => $state->color())
                     ->sortable(),
+
+                // A dash when nobody counts it, red at none left.
+                TextColumn::make('stock_quantity')
+                    ->label(__('panel.stock.in_stock'))
+                    ->numeric()
+                    ->placeholder('—')
+                    ->color(fn (?int $state): ?string => $state === 0 ? 'danger' : null)
+                    ->sortable()
+                    ->alignEnd(),
             ])
             ->filters([
                 // An item reaches its menu through its category, so this filters
@@ -163,6 +173,11 @@ class MenuItemsTable
                     ->label(__('panel.items.availability'))
                     ->options(ItemAvailability::options()),
 
+                Filter::make('tracks_stock')
+                    ->label(__('panel.stock.tracked'))
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('stock_quantity')),
+
                 Filter::make('on_offer')
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
@@ -176,17 +191,17 @@ class MenuItemsTable
             ->filtersFormColumns(2)
             ->filtersFormWidth(Width::ThreeExtraLarge)
             ->recordActions([
+                StockActions::adjust(),
+                StockActions::history(),
+
                 EditAction::make()
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)
                     ->tooltip(__('panel.arrangement.edit'))
                     // The item form is laid out in columns for the whole width.
                     ->modalWidth(Width::Full)
-                    ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fillTranslations(
-                        MenuItemForm::fillPricing($data),
-                        $record,
-                    ))
-                    ->mutateDataUsing(fn (array $data): array => MenuItemForm::storePricing($data)),
+                    ->mutateRecordDataUsing(fn (array $data, MenuItem $record): array => MenuItemForm::fill($data, $record))
+                    ->using(fn (array $data, MenuItem $record): MenuItem => MenuItemForm::update($record, $data)),
 
                 DeleteAction::make()
                     ->iconButton()

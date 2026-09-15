@@ -30,6 +30,9 @@ return new class extends Migration
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
             // The most one order may hold, across every basket line it is on; null is no limit.
             $table->smallInteger('max_quantity')->nullable();
+            // How many are left; null is not counted. Changed on an existing item only
+            // through App\Actions\Inventory\ApplyStockChanges, which locks the row.
+            $table->integer('stock_quantity')->nullable();
             $table->boolean('is_featured')->default(false);
             $table->integer('featured_position')->default(0);
             $table->integer('position')->default(0);
@@ -42,6 +45,13 @@ return new class extends Migration
             ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_items_diet_matches_service_request CHECK (is_service_request = (diet IS NULL)),
             ADD CONSTRAINT menu_items_max_quantity_in_range CHECK (max_quantity IS NULL OR max_quantity BETWEEN 1 AND 99)');
+
+        $available = ItemAvailability::Available->value;
+
+        // None left is never "available": MenuItemObserver marks it out of stock.
+        DB::statement("ALTER TABLE menu_items
+            ADD CONSTRAINT menu_items_stock_not_negative CHECK (stock_quantity IS NULL OR stock_quantity >= 0),
+            ADD CONSTRAINT menu_items_none_left_is_not_available CHECK (stock_quantity IS NULL OR stock_quantity > 0 OR availability <> '{$available}')");
     }
 
     public function down(): void

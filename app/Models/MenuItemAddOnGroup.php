@@ -22,10 +22,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read MenuItem $menuItem
  * @property-read MenuAddOnGroup $addOnGroup
  * @property int $position
+ * @property int|null $max_selections
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['menu_add_on_group_id', 'position'])]
+#[Fillable(['menu_add_on_group_id', 'position', 'max_selections'])]
 #[ObservedBy([MenuItemAddOnGroupObserver::class])]
 class MenuItemAddOnGroup extends Model
 {
@@ -71,6 +72,14 @@ class MenuItemAddOnGroup extends Model
     }
 
     /**
+     * The picks a guest may make from the group on this item: this link's own cap, or the group's own when it has none.
+     */
+    public function effectiveMaxSelections(MenuAddOnGroup $group): ?int
+    {
+        return $this->max_selections ?? $group->max_selections;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -79,6 +88,7 @@ class MenuItemAddOnGroup extends Model
             'menu_item_id' => 'integer',
             'menu_add_on_group_id' => 'integer',
             'position' => 'integer',
+            'max_selections' => 'integer',
         ];
     }
 }

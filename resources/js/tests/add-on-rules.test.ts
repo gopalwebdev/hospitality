@@ -12,6 +12,7 @@ import {
     step,
     toggle,
     unitPrice,
+    withItemMaxSelections,
 } from '@/lib/add-on-rules';
 
 function option(overrides: Partial<AddOnOption> & { id: number }): AddOnOption {
@@ -120,6 +121,20 @@ describe('add-on rules', () => {
             missing: 1,
         });
         expect(firstShortfall([extras, bread], { 21: 1 })).toBeNull();
+    });
+
+    it("caps a group's own maximum and each option's to an item's own, tighter maximum", () => {
+        const capped = withItemMaxSelections(extras, 1);
+
+        expect(capped.maxSelections).toBe(1);
+        // Extra cheese was allowed twice; this item allows only one pick in all.
+        expect(capped.options.map((option) => option.maxQuantity)).toEqual([
+            1, 1, 1,
+        ]);
+    });
+
+    it('leaves a group untouched when an item names no maximum of its own', () => {
+        expect(withItemMaxSelections(extras, null)).toBe(extras);
     });
 
     it('prices one of the item with its picks, and keeps the picks in the order they are read', () => {

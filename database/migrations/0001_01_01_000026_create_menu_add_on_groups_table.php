@@ -16,17 +16,15 @@ return new class extends Migration
             $table->jsonb('name');
             // Whether a guest has to pick at least one option before the item goes in.
             $table->boolean('is_required')->default(false);
-            // The most picks a guest may make; null is no limit.
+            // The most picks a guest may make here; null is no limit. An item
+            // linking this group may set its own, tighter or looser
+            // (menu_item_add_on_groups.max_selections).
             $table->smallInteger('max_selections')->nullable();
-            // Whether a guest may take one option more than once ("Extra cheese × 2").
-            // Square calls it allow_quantities; a group of one pick cannot.
-            $table->boolean('allows_quantities')->default(false);
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE menu_add_on_groups
-            ADD CONSTRAINT menu_add_on_groups_max_in_range CHECK (max_selections IS NULL OR max_selections BETWEEN 1 AND 99),
-            ADD CONSTRAINT menu_add_on_groups_quantities_need_more_than_one CHECK (NOT allows_quantities OR max_selections IS NULL OR max_selections >= 2)');
+            ADD CONSTRAINT menu_add_on_groups_max_in_range CHECK (max_selections IS NULL OR max_selections BETWEEN 1 AND 99)');
     }
 
     public function down(): void
