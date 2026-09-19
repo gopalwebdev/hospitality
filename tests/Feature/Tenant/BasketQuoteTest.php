@@ -36,7 +36,7 @@ function basketQuoteUrl(Tenant $tenant, Menu $menu): string
 function seedCurryWithChoices(): array
 {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => false]);
+    taxTenantAt($tenant, 500);
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -272,7 +272,7 @@ it('flags a line the menu can no longer offer, whatever was chosen', function ()
 
 it('reports the GST already inside prices that include it, rather than adding it', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => true]);
+    taxTenantAt($tenant, 500, pricesIncludeTax: true);
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $item = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
@@ -286,6 +286,27 @@ it('reports the GST already inside prices that include it, rather than adding it
             'taxMinorUnits' => 500,
             'pricesIncludeTax' => true,
             'totalMinorUnits' => 10500,
+        ]);
+});
+
+it('taxes every line at the tenant rate once settings override the items own', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 500);
+    $tenant->settings->update(['tax_overrides_item_rates' => true]);
+
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $item = MenuItem::factory()
+        ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
+        ->taxedAt(2800)
+        ->create(['price_minor_units' => 10000]);
+
+    // The item says 28%, the tenant says everything it sells is 5%, and the
+    // tenant wins — ₹100.00 plus ₹5.00 rather than plus ₹28.00.
+    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
+        ->assertOk()
+        ->assertJson([
+            'subtotalMinorUnits' => 10000,
+            'taxMinorUnits' => 500,
         ]);
 });
 

@@ -5,6 +5,7 @@ use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\MenuBlockType;
+use App\Enums\Weekday;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
@@ -16,6 +17,8 @@ use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
 use App\Models\Tenant;
+use App\Models\TenantOpeningHour;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -520,10 +523,7 @@ it('sends how many of an item or a combo one order may hold', function (): void 
 
 it('tells a guest what the prices do not include before they order', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update([
-        'tax_rate_basis_points' => 500,
-        'prices_include_tax' => false,
-    ]);
+    taxTenantAt($tenant, 500);
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
@@ -534,6 +534,45 @@ it('tells a guest what the prices do not include before they order', function ()
             ->where('tax.pricesIncludeTax', false)
             // A tenant that levies nothing sends nothing to say.
             ->where('charges', []),
+        );
+});
+
+it('tells a guest whether the doors are open, and the hours kept today', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    TenantOpeningHour::factory()
+        ->ofTenant($tenant)
+        ->on(Weekday::on(CarbonImmutable::now()))
+        ->between('09:00', '23:00')
+        ->create();
+
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('store.opensAt', '09:00')
+            ->where('store.closesAt', '23:00')
+            ->has('store.isOpen'),
+        );
+});
+
+it('tells a guest the doors are shut on a day the tenant does not open', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    TenantOpeningHour::factory()
+        ->ofTenant($tenant)
+        ->on(Weekday::on(CarbonImmutable::now()))
+        ->closed()
+        ->create();
+
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('store.isOpen', false)
+            // A day it never opens has no hours to show.
+            ->where('store.opensAt', null)
+            ->where('store.closesAt', null),
         );
 });
 

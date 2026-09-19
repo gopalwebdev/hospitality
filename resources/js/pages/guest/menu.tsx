@@ -125,7 +125,17 @@ interface MenuProps {
     tax: Tax;
     /** Only the charges this menu carries, switched on, in the tenant's order. */
     charges: Charge[];
-    acceptingOrders: boolean;
+    /**
+     * Whether the tenant's doors are open, and the hours it keeps today.
+     *
+     * Decided on the server against the tenant's week, so a guest reading a
+     * menu after closing is told so rather than shown Add buttons that refuse.
+     */
+    store: {
+        isOpen: boolean;
+        opensAt: string | null;
+        closesAt: string | null;
+    };
     /** Where the basket is priced. */
     quoteUrl: string;
     homeUrl: string;
@@ -186,7 +196,7 @@ export default function Menu({
     addOnGroups,
     tax,
     charges,
-    acceptingOrders,
+    store,
     quoteUrl,
     homeUrl,
 }: MenuProps) {
@@ -217,7 +227,7 @@ export default function Menu({
         quantityHeld(basket.lines, type, id);
 
     const ordering: Ordering | null =
-        acceptingOrders && menu.isBeingServed
+        store.isOpen && menu.isBeingServed
             ? {
                   addItem: (item) => {
                       if (item.addOnGroupLinks.length > 0) {
@@ -253,8 +263,8 @@ export default function Menu({
             <Head title={menu.name} />
 
             <AppBar title={menu.name} eyebrow={tenant?.name} backHref={homeUrl}>
-                <Badge variant={acceptingOrders ? 'default' : 'secondary'}>
-                    {acceptingOrders ? t('status.open') : t('status.closed')}
+                <Badge variant={store.isOpen ? 'default' : 'secondary'}>
+                    {store.isOpen ? t('status.open') : t('status.closed')}
                 </Badge>
             </AppBar>
 
@@ -264,6 +274,29 @@ export default function Menu({
                         {menu.description}
                     </p>
                 )}
+
+                {/* The tenant's own hours, above the menu's: a guest who cannot
+                    order at all should read why here rather than work it out
+                    from a missing button. A day it never opens says just that. */}
+                <p
+                    className={`px-5 pt-4 text-sm ${
+                        store.isOpen
+                            ? 'text-muted-foreground'
+                            : 'text-foreground font-medium'
+                    }`}
+                >
+                    {store.opensAt === null || store.closesAt === null
+                        ? t('menu.store_closed_today')
+                        : [
+                              store.isOpen ? null : t('menu.store_closed'),
+                              t('menu.store_hours', {
+                                  from: store.opensAt,
+                                  until: store.closesAt,
+                              }),
+                          ]
+                              .filter((part) => part !== null)
+                              .join(' · ')}
+                </p>
 
                 {/* A menu served only at certain hours says so, and says it
                     louder once those hours have passed — a guest reading the

@@ -106,7 +106,15 @@ Tests: `tests/Feature/PanelProgressiveWebAppTest.php`.
 ## No theming in the panel
 A tenant chooses no colours and no light/dark default. `App\Enums\Appearance` has two cases and lives on the phone. Do not add a theme section back without asking.
 
-The Settings page has three sections — Contact, Trading and Tax — and no others. Tax holds the GSTIN, the default GST rate every price falls back to, and whether menu prices already include it. `Settings::readableRates()` / `::storableRates()` are the only place the rate is converted, so the rounding is done once.
+The Settings page has three sections — **Contact**, **Tax** and **Opening hours** — and no others. Contact and Tax sit side by side; the week needs the full width and goes underneath.
+
+- **Contact:** the email and three numbers a tenant is reached on — phone, alternate phone and landline.
+- **Tax:** the GSTIN, then **CGST** and **SGST** as separate percentages, because that is how GST is levied on an intra-state supply and how an invoice has to show it. The two are `live(onBlur: true)` and a `Text` prime under them adds them up as they are typed, so nobody types the total as well. A **Tax every item at this rate** toggle (`tax_overrides_item_rates`) makes the tenant's rate beat an item's own; `prices_include_tax` says whether the menu's prices already carry it. `Settings::readableRates()` / `::storableRates()` are the only place a rate is converted, so the rounding is done once.
+- **Opening hours:** seven rows, one per `App\Enums\Weekday`, each a day name, a **Closed** toggle and two `ClockTimePicker`s. The toggle is `live()` and the two times are hidden — and stop being required — on a day the tenant is closed. Only the first row carries labels; the rest `hiddenLabel()` them, so it reads as a table rather than as 28 labelled fields.
+
+The hours are not `tenant_settings` columns: they are a `tenant_opening_hours` row per day, filled into the form's `hours` state by `readableHours()` and written back by `storeHours()`, which `updateOrCreate`s each day and blanks the times of a closed one. A tenant that has never opened this page has **no rows at all**, which reads as always open — never as permanently shut.
+
+There was a **Trading** section, with one pair of opening times and an "Accepting orders" toggle. Both are gone: one pair of times could not say that a tenant shuts on Mondays, and a switch that had to be flipped by hand twice a day is what opening hours are for.
 
 Charges are **not** a section of it any more: they are the Charges page (`App\Filament\Tenant\Resources\Charges\ChargeResource`), beside Settings in the navigation and behind the same `settings.manage` permission, because a tenant may levy any number and each is limited to some menus. Every rate and amount there is typed the way a person says it — "10" percent, "20" rupees — and stored the way the rest of the application stores its kind: rates in basis points, money in minor units. `ChargeForm::storeValue()` / `::fillValue()` are the only place that conversion happens, through `PricingFields`. A charge a tenant does not want is switched off rather than set to zero. (For a service charge that distinction is the point: the CCPA's 2022 guidelines make it voluntary.)
 

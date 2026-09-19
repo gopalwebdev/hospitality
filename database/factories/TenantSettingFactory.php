@@ -23,15 +23,17 @@ class TenantSettingFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'contact_email' => fake()->unique()->companyEmail(),
             'contact_phone' => fake()->numerify('+91 ##### #####'),
+            // Most tenants give one number; the other two are there for the ones that give more.
+            'alternate_phone' => null,
+            'landline_phone' => null,
             'currency' => Currency::IndianRupee,
             'gstin' => null,
-            // The tenant rate and prices quoted before tax, which is how a
-            // tenant starts out.
-            'tax_rate_basis_points' => TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS,
+            // Half the default rate each, prices quoted before tax, and an
+            // item's own rate left to stand — how a tenant starts out.
+            'cgst_rate_basis_points' => intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2),
+            'sgst_rate_basis_points' => intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2),
+            'tax_overrides_item_rates' => false,
             'prices_include_tax' => false,
-            'accepts_orders' => true,
-            'opens_at' => '09:00:00',
-            'closes_at' => '23:00:00',
         ];
     }
 
@@ -46,12 +48,23 @@ class TenantSettingFactory extends Factory
     }
 
     /**
-     * Indicate that the tenant is not taking orders.
+     * A tenant taxing everything at one rate, whatever an item's own says.
      */
-    public function closedForOrders(): static
+    public function overridingItemTaxRates(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'accepts_orders' => false,
+            'tax_overrides_item_rates' => true,
+        ]);
+    }
+
+    /**
+     * Taxed at $basisPoints in all, split into the centre's half and the state's.
+     */
+    public function taxedAt(int $basisPoints): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'cgst_rate_basis_points' => intdiv($basisPoints, 2),
+            'sgst_rate_basis_points' => $basisPoints - intdiv($basisPoints, 2),
         ]);
     }
 }

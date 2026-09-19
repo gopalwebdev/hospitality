@@ -6,10 +6,12 @@ use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
 use App\Enums\Role as RoleEnum;
 use App\Enums\TenantType;
+use App\Enums\Weekday;
 use Carbon\CarbonImmutable;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -97,6 +99,14 @@ class Tenant extends Model
     }
 
     /**
+     * @return HasMany<TenantOpeningHour, $this>
+     */
+    public function openingHours(): HasMany
+    {
+        return $this->hasMany(TenantOpeningHour::class);
+    }
+
+    /**
      * @param  Builder<$this>  $query
      */
     public function scopeActive(Builder $query): void
@@ -154,9 +164,66 @@ class Tenant extends Model
         return $this->resolvedSettings()?->taxRateBasisPoints() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 
-    public function isAcceptingOrders(): bool
+    /**
+     * Whether the tenant's own rate is charged on everything, ignoring an item's own.
+     */
+    public function overridesItemTaxRates(): bool
     {
-        return $this->resolvedSettings()->accepts_orders ?? false;
+        return $this->resolvedSettings()?->overridesItemTaxRates() ?? false;
+    }
+
+    /**
+     * The week's hours, read once and kept as the `openingHours` relation, keyed by day.
+     *
+     * Keyed rather than a list because every reader wants one named day, and a
+     * lazy load per day is what `Model::shouldBeStrict()` throws on.
+     *
+     * @return Collection<string, TenantOpeningHour>
+     */
+    public function resolvedOpeningHours(): Collection
+    {
+        if (! $this->relationLoaded('openingHours')) {
+            $this->setRelation('openingHours', TenantOpeningHour::query()->where('tenant_id', $this->getKey())->get());
+        }
+
+        /** @var Collection<int, TenantOpeningHour> $hours */
+        $hours = $this->getRelation('openingHours');
+
+        return $hours->keyBy(fn (TenantOpeningHour $day): string => $day->weekday->value);
+    }
+
+    /**
+     * The hours kept on the day a moment falls on, or null where the tenant has set none.
+     */
+    public function hoursToday(?CarbonImmutable $moment = null): ?TenantOpeningHour
+    {
+        return $this->resolvedOpeningHours()->get(Weekday::on($moment ?? CarbonImmutable::now())->value);
+    }
+
+    /**
+     * Whether the doors are open, which is what decides if an order may be placed.
+     *
+     * A tenant that has never set its hours keeps none, so it is always open:
+     * no tenant is shut out of taking orders by a table nobody has filled in.
+     * A window that runs past midnight belongs to the day it started on, so a
+     * moment at one in the morning asks yesterday's row as well as today's.
+     */
+    public function isOpenAt(?CarbonImmutable $moment = null): bool
+    {
+        $moment ??= CarbonImmutable::now();
+        $week = $this->resolvedOpeningHours();
+
+        if ($week->isEmpty()) {
+            return true;
+        }
+
+        $today = Weekday::on($moment);
+
+        if ($week->get($today->value)?->isOpenAt($moment) === true) {
+            return true;
+        }
+
+        return $week->get($today->previous()->value)?->runsPastMidnightInto($moment) === true;
     }
 
     /**

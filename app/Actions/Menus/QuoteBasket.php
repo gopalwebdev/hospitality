@@ -68,6 +68,7 @@ class QuoteBasket
     public function __invoke(Tenant $tenant, Menu $menu, array $lines): array
     {
         $tenantRate = $tenant->taxRateBasisPoints();
+        $tenantOverrides = $tenant->overridesItemTaxRates();
         $settings = $tenant->resolvedSettings();
         $pricesIncludeTax = $settings instanceof TenantSetting && $settings->prices_include_tax;
 
@@ -82,8 +83,8 @@ class QuoteBasket
 
         foreach ($lines as $line) {
             $parts = $line['type'] === self::COMBO
-                ? $this->comboParts($combos->get($line['id']), $held[self::COMBO][$line['id']], $tenantRate)
-                : $this->itemParts($items->get($line['id']), $groups, $line['choices'] ?? [], $held[self::ITEM][$line['id']], $tenantRate);
+                ? $this->comboParts($combos->get($line['id']), $held[self::COMBO][$line['id']], $tenantRate, $tenantOverrides)
+                : $this->itemParts($items->get($line['id']), $groups, $line['choices'] ?? [], $held[self::ITEM][$line['id']], $tenantRate, $tenantOverrides);
 
             if (is_string($parts)) {
                 $priced[] = ['key' => $line['key'], 'status' => $parts, 'unitPriceMinorUnits' => 0, 'totalMinorUnits' => 0];
@@ -146,7 +147,7 @@ class QuoteBasket
      * @param  list<array{optionId: int, quantity: int}>  $choices
      * @return list<PricedPart>|string
      */
-    private function itemParts(?MenuItem $item, EloquentCollection $groups, array $choices, int $held, int $tenantRate): array|string
+    private function itemParts(?MenuItem $item, EloquentCollection $groups, array $choices, int $held, int $tenantRate, bool $tenantOverrides): array|string
     {
         if (! $item instanceof MenuItem) {
             return self::UNAVAILABLE;
@@ -191,7 +192,7 @@ class QuoteBasket
         // Every part of the line is taxed at the item's rate. An add-on is part of
         // the item it is added to — a composite supply, taxed at the rate of its
         // principal supply (CGST Act, s. 8(a)) — so an option has no rate of its own.
-        $rate = $item->taxRateBasisPoints($tenantRate);
+        $rate = $item->taxRateBasisPoints($tenantRate, $tenantOverrides);
         $parts = [['amount' => $item->price_minor_units, 'rate' => $rate]];
         $picks = [];
 
@@ -232,7 +233,7 @@ class QuoteBasket
      *
      * @return list<PricedPart>|string
      */
-    private function comboParts(?MenuCombo $combo, int $held, int $tenantRate): array|string
+    private function comboParts(?MenuCombo $combo, int $held, int $tenantRate, bool $tenantOverrides): array|string
     {
         if (! $combo instanceof MenuCombo) {
             return self::UNAVAILABLE;
@@ -242,7 +243,7 @@ class QuoteBasket
             return self::INVALID;
         }
 
-        return [['amount' => $combo->price_minor_units, 'rate' => $combo->taxRateBasisPoints($tenantRate)]];
+        return [['amount' => $combo->price_minor_units, 'rate' => $combo->taxRateBasisPoints($tenantRate, $tenantOverrides)]];
     }
 
     /**

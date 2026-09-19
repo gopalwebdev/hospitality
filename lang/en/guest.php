@@ -32,6 +32,9 @@ return [
         'complimentary' => 'Complimentary',
         'served_between' => 'Served :from to :until',
         'not_being_served' => 'Not being served right now',
+        'store_hours' => 'Open :from to :until',
+        'store_closed' => 'Closed right now',
+        'store_closed_today' => 'Closed today',
         'tax_included' => 'Prices include GST at :rate.',
         'tax_excluded' => 'Prices exclude GST, charged at :rate.',
         'charge_rate' => ':name of :rate is added to the bill.',
@@ -76,7 +79,7 @@ return [
 
     'orders' => [
         'insufficient_stock' => 'Some things ran out while you were ordering.',
-        'not_accepting_orders' => 'Orders are not being taken right now.',
+        'store_closed' => 'We are closed right now.',
         'not_being_served' => 'This menu is not being served right now.',
         'lines_changed' => 'Some things in your basket have changed.',
     ],

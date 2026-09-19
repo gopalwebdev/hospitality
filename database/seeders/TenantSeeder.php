@@ -12,6 +12,7 @@ use App\Enums\ItemAvailability;
 use App\Enums\Locale;
 use App\Enums\Role;
 use App\Enums\TenantType;
+use App\Enums\Weekday;
 use App\Models\Charge;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
@@ -863,11 +864,12 @@ class TenantSeeder extends Seeder
             $tenant->settings()->firstOrCreate([], [
                 'contact_email' => "hello@{$definition['slug']}.example.com",
                 'contact_phone' => '+91 98765 43210',
+                'alternate_phone' => '+91 98765 43211',
+                'landline_phone' => '+91 44 2345 6789',
                 'currency' => Currency::IndianRupee,
-                'accepts_orders' => true,
-                'opens_at' => '09:00:00',
-                'closes_at' => '23:00:00',
             ]);
+
+            $this->seedOpeningHours($tenant);
 
             // The owner belongs to this tenant, not the product team: a
             // null tenant_id would file them under "Product team" in the
@@ -896,6 +898,29 @@ class TenantSeeder extends Seeder
             $this->seedAddOnGroups($tenant);
 
             $this->seedCharges($tenant, self::CHARGES[$definition['slug']], $menus);
+        }
+    }
+
+    /**
+     * The week a tenant keeps its doors open, with one day off.
+     *
+     * Monday is the holiday, so the guest app's closed state and the refusal
+     * that goes with it are visible on a fresh install without anyone editing
+     * the settings first.
+     */
+    private function seedOpeningHours(Tenant $tenant): void
+    {
+        foreach (Weekday::week() as $weekday) {
+            $isHoliday = $weekday === Weekday::Monday;
+
+            $tenant->openingHours()->firstOrCreate(
+                ['weekday' => $weekday],
+                [
+                    'is_closed' => $isHoliday,
+                    'opens_at' => $isHoliday ? null : '09:00:00',
+                    'closes_at' => $isHoliday ? null : '23:00:00',
+                ],
+            );
         }
     }
 

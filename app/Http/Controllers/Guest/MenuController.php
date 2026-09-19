@@ -198,7 +198,13 @@ class MenuController extends Controller
             'addOnGroups' => $this->presentAddOnGroups($groups, $this->shownItems($sections, $featured)->flatMap($offeredGroupLinks)->pluck('id')),
             'tax' => $this->tax($tenant),
             'charges' => $this->charges($tenant, $menu),
-            'acceptingOrders' => $tenant->isAcceptingOrders(),
+            // Whether the doors are open, and this weekday's hours, so a guest
+            // reading a menu at midnight is told why nothing can be added.
+            'store' => [
+                'isOpen' => $tenant->isOpenAt(),
+                'opensAt' => $tenant->hoursToday()?->opensAt(),
+                'closesAt' => $tenant->hoursToday()?->closesAt(),
+            ],
             'quoteUrl' => route('guest.menus.basket-quotes.store', ['tenant' => $tenant->slug, 'menu' => $menu->getKey()]),
             'homeUrl' => route('guest.home', ['tenant' => $tenant->slug]),
         ]);

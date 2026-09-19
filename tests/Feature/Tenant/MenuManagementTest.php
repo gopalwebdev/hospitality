@@ -961,7 +961,7 @@ it('says why an item is off the menu rather than only that it is', function (): 
 
 it('falls back to the tenant GST rate on an item, and overrides it when told', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500]);
+    taxTenantAt($tenant, 500);
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
@@ -1002,7 +1002,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
 
 it('taxes an option at the rate of the item it is added to', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => false]);
+    taxTenantAt($tenant, 500);
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $menuItem = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())

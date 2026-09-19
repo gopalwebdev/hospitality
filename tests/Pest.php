@@ -92,6 +92,24 @@ function enterTenantPanel(Tenant $tenant, Role $role): User
 }
 
 /**
+ * Charge a tenant's GST at a total rate, split into the halves it is levied in.
+ *
+ * Settings keep CGST and SGST rather than one rate, because that is how the
+ * tax is levied and how an invoice has to show it. Almost every test cares
+ * only about what the two come to, so the split is done once here.
+ */
+function taxTenantAt(Tenant $tenant, int $totalBasisPoints, bool $pricesIncludeTax = false): void
+{
+    $half = intdiv($totalBasisPoints, 2);
+
+    $tenant->settings->update([
+        'cgst_rate_basis_points' => $half,
+        'sgst_rate_basis_points' => $totalBasisPoints - $half,
+        'prices_include_tax' => $pricesIncludeTax,
+    ]);
+}
+
+/**
  * Sign in as a member of the product team, with their panel current.
  */
 function enterProductTeamPanel(): User

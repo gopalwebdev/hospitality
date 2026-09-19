@@ -58,7 +58,7 @@ final readonly class PlaceOrder
      */
     public function __invoke(Tenant $tenant, Menu $menu, array $lines, ?string $locationLabel = null, ?string $note = null): Order
     {
-        throw_unless($tenant->isAcceptingOrders(), OrderRefused::class, OrderRefusal::NotAcceptingOrders);
+        throw_unless($tenant->isOpenAt(), OrderRefused::class, OrderRefusal::StoreClosed);
 
         throw_unless($menu->isBeingServedAt(), OrderRefused::class, OrderRefusal::NotBeingServed);
 
@@ -101,6 +101,7 @@ final readonly class PlaceOrder
     private function copyLines(Tenant $tenant, Order $order, array $lines, array $priced): void
     {
         $tenantRate = $tenant->taxRateBasisPoints();
+        $tenantOverrides = $tenant->overridesItemTaxRates();
 
         $items = $this->named(MenuItem::query(), $this->idsOf($lines, QuoteBasket::ITEM), ['id', 'name', 'tax_rate_basis_points']);
         $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, QuoteBasket::COMBO), ['id', 'name', 'tax_rate_basis_points']);
@@ -120,7 +121,7 @@ final readonly class PlaceOrder
                 'quantity' => (int) $line['quantity'],
                 'unit_price_minor_units' => $priced[$index]['unitPriceMinorUnits'],
                 'total_minor_units' => $priced[$index]['totalMinorUnits'],
-                'tax_rate_basis_points' => $ordered->taxRateBasisPoints($tenantRate),
+                'tax_rate_basis_points' => $ordered->taxRateBasisPoints($tenantRate, $tenantOverrides),
                 'position' => $index,
             ]);
 

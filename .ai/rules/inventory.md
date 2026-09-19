@@ -51,7 +51,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 `POST /menus/{menu}/orders` — `guest.menus.orders.store`, `throttle:10,1`, no account — is `Guest\PlaceOrderController` calling `App\Actions\Orders\PlaceOrder`. **The guest app does not call it yet.**
 
 1. **Refused before stock is touched** with `OrderRefused` (422, `reason` from `App\Enums\OrderRefusal`) when:
-   - the tenant is not accepting orders
+   - the tenant is closed (`OrderRefusal::StoreClosed`, from its weekly opening hours — `.ai/rules/app.md`)
    - the menu is outside its service window
    - any line is not `ok` in `QuoteBasket` — every priced line comes back as `lines`
 2. **One transaction:** the order row, then `ApplyStockChanges` with the lines' `StockDemand`, then the lines, their choices and the charges copied in.

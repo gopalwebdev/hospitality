@@ -16,19 +16,28 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('contact_email')->nullable();
             $table->string('contact_phone', 32)->nullable();
+            // A second mobile and the desk line, both of which a guest may be given.
+            $table->string('alternate_phone', 32)->nullable();
+            $table->string('landline_phone', 32)->nullable();
             $table->string('currency', 3)->default(Currency::IndianRupee->value);
             $table->string('gstin', 15)->nullable();
-            // Basis points: 5% is 500. What is added on top of a bill lives in charges.
-            $table->smallInteger('tax_rate_basis_points')->default(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS);
+            // GST is levied in halves on an intra-state supply: CGST to the centre
+            // and SGST to the state. Both in basis points — 2.5% is 250 — and the
+            // rate anything is taxed at is the two added up.
+            $table->smallInteger('cgst_rate_basis_points')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
+            $table->smallInteger('sgst_rate_basis_points')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
+            // On: this rate is what every item is taxed at, whatever its own says.
+            $table->boolean('tax_overrides_item_rates')->default(false);
             $table->boolean('prices_include_tax')->default(false);
-            $table->boolean('accepts_orders')->default(true);
-            $table->time('opens_at')->nullable();
-            $table->time('closes_at')->nullable();
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE tenant_settings
-            ADD CONSTRAINT tenant_settings_tax_rate_in_range CHECK (tax_rate_basis_points BETWEEN 0 AND 10000)');
+            ADD CONSTRAINT tenant_settings_tax_rates_in_range CHECK (
+                cgst_rate_basis_points BETWEEN 0 AND 10000
+                AND sgst_rate_basis_points BETWEEN 0 AND 10000
+                AND cgst_rate_basis_points + sgst_rate_basis_points <= 10000
+            )');
     }
 
     public function down(): void

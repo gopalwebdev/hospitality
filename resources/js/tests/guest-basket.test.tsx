@@ -95,7 +95,7 @@ function renderMenu(items: MenuItem[] = [masala]) {
             addOnGroups={[extras, bread]}
             tax={{ rateBasisPoints: 500, pricesIncludeTax: false }}
             charges={[]}
-            acceptingOrders
+            store={{ isOpen: true, opensAt: '09:00', closesAt: '23:00' }}
             quoteUrl={quoteUrl}
             homeUrl="http://spice.hospitality.test"
         />,

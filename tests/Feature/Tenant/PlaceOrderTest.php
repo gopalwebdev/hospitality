@@ -7,6 +7,7 @@ use App\Enums\OrderLineType;
 use App\Enums\OrderRefusal;
 use App\Enums\OrderStatus;
 use App\Enums\StockMovementReason;
+use App\Enums\Weekday;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuAddOnOption;
@@ -18,6 +19,7 @@ use App\Models\MenuItemAddOnGroup;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Models\Tenant;
+use App\Models\TenantOpeningHour;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -45,7 +47,7 @@ function placeOrderUrl(Tenant $tenant, Menu $menu): string
 function seedCountedCurry(): array
 {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => false]);
+    taxTenantAt($tenant, 500);
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
@@ -221,13 +223,19 @@ it('counts a combo against the items in it', function (): void {
         ->and(Order::query()->sole()->lines()->sole()->type)->toBe(OrderLineType::Combo);
 });
 
-it('refuses an order while the tenant is not taking orders, and takes nothing', function (): void {
+it('refuses an order while the tenant is closed, and takes nothing', function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'curry' => $curry, 'butterNaan' => $butterNaan] = seedCountedCurry();
-    $tenant->settings->update(['accepts_orders' => false]);
+
+    // Whatever day the suite runs on is this tenant's weekly holiday.
+    TenantOpeningHour::factory()
+        ->ofTenant($tenant)
+        ->on(Weekday::on(CarbonImmutable::now()))
+        ->closed()
+        ->create();
 
     $this->postJson(placeOrderUrl($tenant, $menu), ['lines' => [orderLine('curry', $curry, choices: [[$butterNaan, 1]])]])
         ->assertUnprocessable()
-        ->assertJsonPath('reason', OrderRefusal::NotAcceptingOrders->value);
+        ->assertJsonPath('reason', OrderRefusal::StoreClosed->value);
 
     expect($curry->refresh()->stock_quantity)->toBe(5)
         ->and(Order::query()->exists())->toBeFalse();

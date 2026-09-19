@@ -68,12 +68,14 @@ An item's row reads name, price and description down the left and keeps the righ
 
 The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charges`: only the switched-on charges this menu carries, in the tenant's order, each with exactly one of `rateBasisPoints` or `amountMinorUnits` set. Which charges apply is decided in PHP; the page only words them, one line each.
 
+The tenant's own hours arrive as `store` — `{isOpen, opensAt, closesAt}`, the times already read as `HH:MM` and both null on a day it does not open. `isOpen` is worked out on the server against the tenant's week (`.ai/rules/app.md`), never in the browser from the two times, because the phone's clock is not the tenant's. The page drives the Open/Closed badge and a line above the menu with it, so a guest reading a card after closing is told why the Add buttons are gone.
+
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
 The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, each option's `maxQuantity` already capped at the *group's own* maximum. Each item names its groups, in its own order, as `addOnGroupLinks: {id, maxSelections}[]` — `maxSelections` is that item's own cap on the group's picks, null following the group's own default. `withItemMaxSelections()` (`lib/add-on-rules.ts`) is what merges an item's own cap onto a shared group for the sheet, clamping every option's `maxQuantity` down with it; a group offered on twenty items is still one entry on the wire; only the small `{id, maxSelections}` link is per item.
 
-Add buttons appear only while `acceptingOrders` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
+Add buttons appear only while `store.isOpen` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
 - a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
 - an optional pick-one moves its tick rather than locking
 - a full group stops offering the options not picked

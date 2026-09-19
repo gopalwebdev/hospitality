@@ -3,8 +3,10 @@
 use App\Enums\Currency;
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
+use App\Enums\Weekday;
 use App\Filament\Tenant\Pages\Settings;
 use App\Models\Tenant;
+use App\Models\TenantOpeningHour;
 use App\Models\TenantSetting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -72,7 +74,8 @@ it('saves changes against the tenant in the panel', function (): void {
         ->fillForm([
             'contact_email' => 'new@example.com',
             'contact_phone' => '+44 20 7946 0000',
-            'accepts_orders' => false,
+            'alternate_phone' => '+91 98765 43210',
+            'landline_phone' => '+91 44 2345 6789',
         ])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -80,7 +83,10 @@ it('saves changes against the tenant in the panel', function (): void {
     $settings = $tenant->refresh()->settings;
 
     expect($settings->contact_email)->toBe('new@example.com')
-        ->and($settings->accepts_orders)->toBeFalse();
+        ->and($settings->contact_phone)->toBe('+44 20 7946 0000')
+        // Three numbers, because a tenant is reached on more than one.
+        ->and($settings->alternate_phone)->toBe('+91 98765 43210')
+        ->and($settings->landline_phone)->toBe('+91 44 2345 6789');
 });
 
 it('leaves other tenants settings alone when saving', function (): void {
@@ -181,16 +187,17 @@ it('keeps no charges among the settings', function (): void {
         ->and(Schema::hasColumn('tenant_settings', 'parcel_charge_minor_units'))->toBeFalse();
 });
 
-it('saves the GST rate and whether prices already include it', function (): void {
+it('saves GST as the two halves it is levied in, and whether prices already include it', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
         ->fillForm([
             'gstin' => '29ABCDE1234F1Z5',
-            // Typed as the percentage an accountant quotes, stored as basis
-            // points — 18% is 1800.
-            'tax_rate_percentage' => '18',
+            // Typed as the percentages an accountant quotes, stored as basis
+            // points — 9% each is 900, and 18% in all.
+            'cgst_rate_percentage' => '9',
+            'sgst_rate_percentage' => '9',
             'prices_include_tax' => true,
         ])
         ->call('save')
@@ -199,8 +206,25 @@ it('saves the GST rate and whether prices already include it', function (): void
     $settings = $tenant->refresh()->settings;
 
     expect($settings->gstin)->toBe('29ABCDE1234F1Z5')
+        ->and($settings->cgst_rate_basis_points)->toBe(900)
+        ->and($settings->sgst_rate_basis_points)->toBe(900)
+        // What anything is actually taxed at is the two added up.
         ->and($settings->taxRateBasisPoints())->toBe(1800)
         ->and($settings->prices_include_tax)->toBeTrue();
+});
+
+it('charges its own rate on every item when told to override them', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterTenantPanel($tenant, Role::Owner);
+
+    expect($tenant->overridesItemTaxRates())->toBeFalse();
+
+    Livewire::test(Settings::class)
+        ->fillForm(['tax_overrides_item_rates' => true])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($tenant->refresh()->overridesItemTaxRates())->toBeTrue();
 });
 
 it('accepts a GST rate no fixed list of slabs would have held', function (): void {
@@ -211,39 +235,91 @@ it('accepts a GST rate no fixed list of slabs would have held', function (): voi
     // is typed rather than picked so the next notification is a number, not a
     // deployment.
     Livewire::test(Settings::class)
-        ->fillForm(['tax_rate_percentage' => '12.5'])
+        ->fillForm(['cgst_rate_percentage' => '6.25', 'sgst_rate_percentage' => '6.25'])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
+    expect($tenant->refresh()->settings->taxRateBasisPoints())->toBe(1250);
 });
 
-it('keeps opening hours as the clock picker sets them, and opens the form with them', function (): void {
+it('round-trips the GST halves through the form without drift', function (): void {
+    $tenant = Tenant::factory()->create();
+    $tenant->settings->update(['cgst_rate_basis_points' => 625, 'sgst_rate_basis_points' => 625]);
+
+    enterTenantPanel($tenant, Role::Owner);
+
+    Livewire::test(Settings::class)
+        ->assertFormSet(['cgst_rate_percentage' => 6.25, 'sgst_rate_percentage' => 6.25])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($tenant->refresh()->settings->taxRateBasisPoints())->toBe(1250);
+});
+
+/*
+|--------------------------------------------------------------------------
+| The week the doors keep
+|--------------------------------------------------------------------------
+|
+| Hours repeat weekly: a row per day, open between two times or closed for
+| the day. What those hours mean — whether the doors are open right now — is
+| Tenant::isOpenAt(), tested in tests/Feature/Tenant/StoreHoursTest.php.
+|
+*/
+
+it('opens the week with every day offered open until a tenant says otherwise', function (): void {
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
-        ->fillForm(['opens_at' => '09:30', 'closes_at' => '23:00'])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    // A time column hands the seconds back; the picker is filled with hours and
-    // minutes, which is what it shows.
-    Livewire::test(Settings::class)
-        ->assertFormSet(['opens_at' => '09:30', 'closes_at' => '23:00'])
+        ->assertFormSet([
+            'hours' => collect(Weekday::week())
+                ->mapWithKeys(fn (Weekday $weekday): array => [
+                    $weekday->value => ['is_closed' => false, 'opens_at' => '09:00', 'closes_at' => '23:00'],
+                ])
+                ->all(),
+        ])
         ->assertSeeHtml('clock-picker');
 });
 
-it('round-trips the GST rate through the form without drift', function (): void {
+it('keeps a row per day of the week, and forgets the hours of a day it is closed', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 1250]);
+    enterTenantPanel($tenant, Role::Owner);
+
+    $hours = collect(Weekday::week())
+        ->mapWithKeys(fn (Weekday $weekday): array => [
+            $weekday->value => ['is_closed' => false, 'opens_at' => '09:30', 'closes_at' => '23:00'],
+        ])
+        ->put(Weekday::Monday->value, ['is_closed' => true, 'opens_at' => '09:30', 'closes_at' => '23:00'])
+        ->all();
+
+    Livewire::test(Settings::class)
+        ->fillForm(['hours' => $hours])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $week = $tenant->refresh()->resolvedOpeningHours();
+
+    expect($week)->toHaveCount(7)
+        ->and($week->get(Weekday::Tuesday->value)->opensAt())->toBe('09:30')
+        ->and($week->get(Weekday::Tuesday->value)->closesAt())->toBe('23:00')
+        // A holiday keeps no hours: there are none to keep.
+        ->and($week->get(Weekday::Monday->value)->is_closed)->toBeTrue()
+        ->and($week->get(Weekday::Monday->value)->opens_at)->toBeNull()
+        ->and($week->get(Weekday::Monday->value)->closes_at)->toBeNull();
+});
+
+it('edits the week it already keeps rather than adding a second one', function (): void {
+    $tenant = Tenant::factory()->create();
+    TenantOpeningHour::factory()->ofTenant($tenant)->on(Weekday::Friday)->between('08:00', '20:00')->create();
 
     enterTenantPanel($tenant, Role::Owner);
 
     Livewire::test(Settings::class)
-        ->assertFormSet(['tax_rate_percentage' => 12.5])
+        ->assertFormSet(['hours.friday.opens_at' => '08:00', 'hours.friday.closes_at' => '20:00'])
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($tenant->refresh()->settings->tax_rate_basis_points)->toBe(1250);
+    expect($tenant->refresh()->openingHours()->count())->toBe(7)
+        ->and($tenant->openingHours()->where('weekday', Weekday::Friday)->count())->toBe(1);
 });

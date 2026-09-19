@@ -30,7 +30,7 @@ A duplicate is the same SQL with the same bindings twice inside one HTTP request
 
 The fixes, in order of preference: read the answer once and hand it down; eager load what a loop asks for and name the columns (an eager load of `menu:id,name` never collides with a table's own `select *`); and where Filament evaluates the same closure several times while building one page — select options, a `disabled()` beside a `helperText()`, a rule on every language's input — memoize it with `once()`. `configureRequestMemoization()` flushes `Once` on every `RouteMatched`, so `once()` means once per request rather than once per process; without it a test that makes several requests reads a stale option list.
 
-`Tenant::resolvedSettings()` is the pattern for a per-request lookup on a model: loaded once and kept as the `settings` relation, never a lazy load. `currency()`, `taxRateBasisPoints()` and `isAcceptingOrders()` all read it, as do the guest menu's tax line and the Settings page.
+`Tenant::resolvedSettings()` is the pattern for a per-request lookup on a model: loaded once and kept as the `settings` relation, never a lazy load. `currency()`, `taxRateBasisPoints()` and `overridesItemTaxRates()` all read it, as do the guest menu's tax line and the Settings page. `Tenant::resolvedOpeningHours()` does the same for the week, keyed by weekday, so `isOpenAt()` and `hoursToday()` cost one read however many days they ask about.
 
 ## India is the only market for now
 Defaults are Indian: CountryCallingCode has one case (+91) and mobile numbers validate as ten digits, and addresses take a pincode. This is a "for now", not a permanent assumption, so keep this shape multi-country: values that vary by country belong in an enum with a case per country rather than hardcoded in a form or a rule. Add the country to the enum rather than branching on it at the call site.
@@ -92,7 +92,20 @@ An item and a combo each say the most one order may hold (`max_quantity`, null f
 
 An option's `max_quantity` is a different limit: how many of it one item takes.
 
-`menu_items` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to `tenant_settings.tax_rate_basis_points`, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as a served drink, a laundry pickup taxed as a service — override it. The Settings page holds only the global rate and `prices_include_tax`. An add-on option carries no rate: it is taxed at the rate of the item it is added to (`.ai/rules/add-on-groups.md`).
+`menu_items` and `menu_combos` each carry a nullable `tax_rate_basis_points` that falls back to the tenant's own rate, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as a served drink, a laundry pickup taxed as a service — override it. An add-on option carries no rate: it is taxed at the rate of the item it is added to (`.ai/rules/add-on-groups.md`).
+
+The tenant's rate is stored as **two halves**, `tenant_settings.cgst_rate_basis_points` and `sgst_rate_basis_points`, because GST on an intra-state supply is levied as CGST plus SGST and an invoice has to show both. `TenantSetting::taxRateBasisPoints()` is the two added up and is the only thing any pricing code reads.
+
+`tenant_settings.tax_overrides_item_rates` reverses the fallback: with it on, the tenant's rate is charged on **everything** and an item's own is ignored. `IsPricedOnAMenu::taxRateBasisPoints($tenantRate, $tenantOverrides)` is where that is decided, and `QuoteBasket` and `PlaceOrder` are what pass the flag in — a tenant whose accountant moves the whole menu to one slab changes one toggle rather than every item.
+
+## A tenant keeps weekly opening hours, and being closed refuses orders
+`tenant_opening_hours` is a row per `App\Enums\Weekday` per tenant: closed for the day, or open between two wall-clock times. Hours **repeat weekly and name no date** — a tenant says "closed on Mondays", not "closed on the 14th". A dated calendar of one-off holidays is a different feature and deliberately not this one.
+
+- **`Tenant::isOpenAt()`** is the one answer, and it replaced `isAcceptingOrders()` (a `tenant_settings.accepts_orders` switch somebody had to flip twice a day). `PlaceOrder` refuses a closed tenant with `OrderRefusal::StoreClosed` before touching stock, and the guest menu is sent `store: {isOpen, opensAt, closesAt}`.
+- **No rows means always open.** A tenant that has never opened the Settings page is not shut out of trading by an empty table. One that has set *some* of its week is a tenant whose week is set, so a day with no row is a day it does not open.
+- **A window may run past midnight** — open at six, closed at one — and the half after midnight belongs to the day it started on, which is why `isOpenAt()` asks yesterday's row as well as today's (`TenantOpeningHour::runsPastMidnightInto()`).
+
+Times are compared as `HH:MM:SS` strings against `config('app.timezone')`, the one timezone there is (there is no per-tenant timezone — see above). Tests: `tests/Feature/Tenant/StoreHoursTest.php`.
 
 ## Charges are their own module, on every menu or only some
 What is added to a bill beyond the price — a service charge, a packing charge, a room-service fee — is `charges`, managed on its own Charges page in the tenant panel rather than as settings: a tenant may levy any number, each is a share of the bill or a fixed amount, and each applies to the menus picked for it (a room-service fee on in-room dining and not on housekeeping requests). Two fixed switches on `tenant_settings` existed and were replaced, because they could say a service charge and a packing charge and nothing else, and could not say which menus either belonged on.

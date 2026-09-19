@@ -282,7 +282,7 @@ it('prices a combo on its own rather than from its contents', function (): void 
 
 it('falls back to the tenant\'s GST rate, and overrides it when told', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 1800]);
+    taxTenantAt($tenant, 1800);
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
     $following = MenuCombo::factory()->onMenu($menu)->create();

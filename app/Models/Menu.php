@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\MenuBlockType;
 use App\Models\Concerns\HasTranslatedNames;
+use App\Models\Concerns\ReadsClockTimes;
 use Carbon\CarbonImmutable;
 use Database\Factories\MenuFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -35,6 +36,7 @@ class Menu extends Model
     use HasFactory;
 
     use HasTranslatedNames;
+    use ReadsClockTimes;
 
     /** @var list<string> */
     public array $translatable = ['name', 'description'];
@@ -243,18 +245,5 @@ class Menu extends Model
         return [
             'is_active' => 'boolean',
         ];
-    }
-
-    private function clockReading(string $time): string
-    {
-        return substr($this->normalisedTime($time), 0, 5);
-    }
-
-    /**
-     * HH:MM:SS, padded to a fixed width so two times compare as strings.
-     */
-    private function normalisedTime(string $time): string
-    {
-        return substr($time.':00:00', 0, 8);
     }
 }

@@ -58,8 +58,15 @@ trait IsPricedOnAMenu
      *
      * Pass $tenantRate when rendering a list; every row shares it.
      */
-    public function taxRateBasisPoints(?int $tenantRate = null): int
+    public function taxRateBasisPoints(?int $tenantRate = null, bool $tenantOverrides = false): int
     {
+        // Settings can say the tenant's rate is the rate. An item's own is then
+        // passed over rather than cleared, so switching the override back off
+        // returns every line to the rate it was already carrying.
+        if ($tenantOverrides && $tenantRate !== null) {
+            return $tenantRate;
+        }
+
         if ($this->tax_rate_basis_points !== null) {
             return $this->tax_rate_basis_points;
         }
@@ -74,13 +81,12 @@ trait IsPricedOnAMenu
             return $tenant->taxRateBasisPoints();
         }
 
+        // Both halves, because what anything is taxed at is the two added up.
         $stored = TenantSetting::query()
             ->where('tenant_id', $this->tenant_id)
-            ->value('tax_rate_basis_points');
+            ->first(['cgst_rate_basis_points', 'sgst_rate_basis_points']);
 
-        return $stored === null
-            ? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS
-            : (int) $stored;
+        return $stored?->taxRateBasisPoints() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 
     /**

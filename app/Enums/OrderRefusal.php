@@ -11,8 +11,8 @@ namespace App\Enums;
  */
 enum OrderRefusal: string
 {
-    /** The tenant has switched ordering off in its settings. */
-    case NotAcceptingOrders = 'not-accepting-orders';
+    /** The tenant's doors are shut: outside its hours, or on its weekly holiday. */
+    case StoreClosed = 'store-closed';
 
     /** The menu has a service window, and this is outside it. */
     case NotBeingServed = 'not-being-served';
@@ -26,7 +26,7 @@ enum OrderRefusal: string
     public function message(): string
     {
         $message = match ($this) {
-            self::NotAcceptingOrders => __('guest.orders.not_accepting_orders'),
+            self::StoreClosed => __('guest.orders.store_closed'),
             self::NotBeingServed => __('guest.orders.not_being_served'),
             self::LinesChanged => __('guest.orders.lines_changed'),
             self::InsufficientStock => __('guest.orders.insufficient_stock'),

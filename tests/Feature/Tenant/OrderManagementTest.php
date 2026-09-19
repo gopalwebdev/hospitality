@@ -78,7 +78,7 @@ it('lists this tenant\'s orders for staff, newest first', function (): void {
 
 it('opens an order with what was ordered and what it came to, under the name it was ordered by', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['tax_rate_basis_points' => 500, 'prices_include_tax' => false]);
+    taxTenantAt($tenant, 500);
 
     $item = orderableItemFor($tenant, stock: 10, attributes: [
         'name' => [Locale::English->value => 'Paneer Tikka'],

@@ -57,8 +57,15 @@ class MenuItemForm
                 Grid::make(['default' => 1, '@4xl' => 3])
                     ->gridContainer()
                     ->schema([
-                        self::itemSection($categoryId)
-                            ->columnSpan(['default' => 1, '@4xl' => 2]),
+                        // What the item is, and straight under it what a guest
+                        // customises it with: the groups read as part of the
+                        // item rather than as a footnote below the whole form.
+                        Grid::make(1)
+                            ->columnSpan(['default' => 1, '@4xl' => 2])
+                            ->schema([
+                                self::itemSection($categoryId),
+                                self::addOnGroupsSection(),
+                            ]),
 
                         Grid::make(1)
                             ->columnSpan(1)
@@ -67,9 +74,6 @@ class MenuItemForm
                                 self::taxSection(),
                                 self::stockSection(),
                             ]),
-
-                        self::addOnGroupsSection()
-                            ->columnSpanFull(),
                     ]),
             ]);
     }

@@ -123,7 +123,7 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
             addOnGroups={[]}
             tax={tax}
             charges={[]}
-            acceptingOrders
+            store={{ isOpen: true, opensAt: '09:00', closesAt: '23:00' }}
             quoteUrl={`${homeUrl}/menus/1/basket-quotes`}
             homeUrl={homeUrl}
             {...overrides}
@@ -222,7 +222,10 @@ describe('guest menu', () => {
         ).toBeInTheDocument();
         open.unmount();
 
-        const closed = renderMenu({ sections, acceptingOrders: false });
+        const closed = renderMenu({
+            sections,
+            store: { isOpen: false, opensAt: '09:00', closesAt: '23:00' },
+        });
         expect(
             screen.queryByRole('button', { name: 'Add Paneer Tikka' }),
         ).not.toBeInTheDocument();
@@ -702,7 +705,9 @@ describe('guest menu', () => {
     });
 
     it('says so plainly when there is no menu yet', () => {
-        renderMenu({ acceptingOrders: false });
+        renderMenu({
+            store: { isOpen: false, opensAt: '09:00', closesAt: '23:00' },
+        });
 
         expect(screen.getByText(/not ready yet/i)).toBeInTheDocument();
         expect(screen.getByText('Closed')).toBeInTheDocument();
