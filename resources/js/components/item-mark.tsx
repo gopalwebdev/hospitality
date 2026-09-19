@@ -1,23 +1,26 @@
-import { BellIcon } from '@/components/icons';
+import { BellIcon, LeafIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
-/** The veg / egg / non-veg mark an item carries. */
-export type Diet = 'vegetarian' | 'egg' | 'non-vegetarian';
+/** The veg / vegan / egg / non-veg mark an item carries. */
+export type Diet = 'vegetarian' | 'vegan' | 'egg' | 'non-vegetarian';
 
 const RING: Record<Diet, string> = {
     vegetarian: 'border-green-600',
+    vegan: 'border-teal-600',
     egg: 'border-amber-500',
     'non-vegetarian': 'border-red-600',
 };
 
 const DOT: Record<Diet, string> = {
     vegetarian: 'bg-green-600',
+    vegan: 'bg-teal-600',
     egg: 'bg-amber-500',
     'non-vegetarian': 'bg-red-600',
 };
 
 const LABEL: Record<Diet, string> = {
     vegetarian: 'Vegetarian',
+    vegan: 'Vegan',
     egg: 'Contains egg',
     'non-vegetarian': 'Non-vegetarian',
 };
@@ -28,6 +31,11 @@ const LABEL: Record<Diet, string> = {
  * Something to order carries the square-and-dot diet mark Indian menus use. It
  * is deliberately not themed: guests read it at a glance, and its colours mean
  * a fixed thing.
+ *
+ * Vegan carries a leaf in that square rather than a dot, and a teal square
+ * rather than a green one. Two cues rather than one, because a green square
+ * with a dot and a green square with a leaf are the same thing at 16px, and a
+ * guest who keeps vegan is the one person this mark has to be exact for.
  *
  * A service request has no diet, and carries a bell in the same square instead,
  * in a colour none of the diets use so it is never read as one. A basket line
@@ -79,7 +87,11 @@ export function ItemMark({
                 className,
             )}
         >
-            <span className={cn('size-2 rounded-full', DOT[diet])} />
+            {diet === 'vegan' ? (
+                <LeafIcon className="size-2.5 text-teal-600" strokeWidth={3} />
+            ) : (
+                <span className={cn('size-2 rounded-full', DOT[diet])} />
+            )}
         </span>
     );
 }

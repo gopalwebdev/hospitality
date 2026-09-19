@@ -24,6 +24,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use LogicException;
 
 beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -364,7 +365,7 @@ it('stores a typed price as an exact integer count of minor units', function ():
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '249.50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -392,7 +393,7 @@ it('round-trips a price through the edit form without drift', function (): void 
         ->callAction(TestAction::make('edit')->table($item), [
             'name' => $item->getTranslations('name'),
             'menu_category_id' => $category->getKey(),
-            'diet' => $item->diet->value,
+            'diets' => dietValues($item),
             'price' => '249.50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -474,7 +475,7 @@ it('offers an item the add-on groups picked for it, in the order they were put i
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Butter Masala'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '289',
             'availability' => ItemAvailability::Available->value,
             'addOnGroupLinks' => [
@@ -505,7 +506,7 @@ it("saves an item's own cap on a group's picks, and leaves it blank to follow th
         ->callAction('create', [
             'name' => [Locale::English->value => 'Chicken 65'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '210',
             'availability' => ItemAvailability::Available->value,
             'addOnGroupLinks' => [
@@ -537,7 +538,7 @@ it("refuses an item's own cap out of range, or lower than how many options the g
         ->callAction('create', [
             'name' => [Locale::English->value => 'Chicken 65'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '210',
             'availability' => ItemAvailability::Available->value,
             'addOnGroupLinks' => [['menu_add_on_group_id' => $bread->getKey(), ...$link]],
@@ -564,7 +565,7 @@ it('refuses the same group twice on one item, and a group this tenant does not h
         ->callAction('create', [
             'name' => [Locale::English->value => 'Gobi Manchurian'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '210',
             'availability' => ItemAvailability::Available->value,
             'addOnGroupLinks' => array_map(
@@ -594,7 +595,7 @@ it('lets an item be saved with no add-on groups at all', function (): void {
         ->callAction('create', [
             'name' => [Locale::English->value => 'Tandoori Roti'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '50',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -674,7 +675,7 @@ it('refuses to file an item under another tenant\'s section', function (): void 
         ->callAction('create', [
             'name' => [Locale::English->value => 'Smuggled'],
             'menu_category_id' => $theirCategory->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -766,7 +767,7 @@ it('features an item from its own form', function (): void {
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'diet' => $menuItem->diet->value,
+            'diets' => dietValues($menuItem),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
@@ -791,7 +792,7 @@ it('takes an item out of the featured row without taking it off the menu', funct
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'diet' => $menuItem->diet->value,
+            'diets' => dietValues($menuItem),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => false,
@@ -874,7 +875,7 @@ it('stores a struck-through price beside the one being charged', function (): vo
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '299',
             'compare_at_price' => '360',
             'availability' => ItemAvailability::Available->value,
@@ -902,7 +903,7 @@ it('refuses a struck-through price that is not above what is charged', function 
         ->callAction('create', [
             'name' => [Locale::English->value => 'Paneer Tikka'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '299',
             'compare_at_price' => '250',
             'availability' => ItemAvailability::Available->value,
@@ -922,7 +923,7 @@ it('keeps the most of an item one order may hold, blank for no limit', function 
         ->callAction('create', [
             'name' => [Locale::English->value => 'Idli'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '60',
             'availability' => ItemAvailability::Available->value,
             'max_quantity' => $maximum,
@@ -989,7 +990,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ->callAction('create', [
             'name' => [Locale::English->value => 'Cola'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::Vegetarian->value,
+            'diets' => [Diet::Vegetarian->value],
             'price' => '60',
             'availability' => ItemAvailability::Available->value,
             'tax_rate_percentage' => '40',
@@ -1058,7 +1059,7 @@ it('saves a service request without a diet mark', function (): void {
 
     // A pillow has no diet to declare, and costs a guest nothing.
     expect($pillow->is_service_request)->toBeTrue()
-        ->and($pillow->diet)->toBeNull()
+        ->and($pillow->diets)->toBeNull()
         ->and($pillow->isComplimentary())->toBeTrue();
 });
 
@@ -1075,13 +1076,76 @@ it('asks for a diet mark on anything that is not a service request', function ()
             'name' => [Locale::English->value => 'Water Bottle'],
             'menu_category_id' => $category->getKey(),
             'is_service_request' => false,
-            'diet' => null,
+            'diets' => null,
             'price' => '40',
             'availability' => ItemAvailability::Available->value,
         ])
-        ->assertHasActionErrors(['diet' => 'required']);
+        ->assertHasActionErrors(['diets' => 'required']);
 
     expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
+});
+
+it('keeps every diet mark an item carries, and reads the strictest of them', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // Most vegetarian items are vegan as well, which is the whole reason the
+    // marks are a list rather than one choice.
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Idli Plate'],
+            'menu_category_id' => $category->getKey(),
+            'diets' => [Diet::Vegetarian->value, Diet::Vegan->value],
+            'price' => '80',
+            'availability' => ItemAvailability::Available->value,
+        ])
+        ->assertHasNoActionErrors();
+
+    $idli = byEnglishName(MenuItem::class, 'Idli Plate');
+
+    expect($idli->diets->all())->toBe([Diet::Vegetarian, Diet::Vegan])
+        // One mark reaches the guest menu: the strictest, which already says
+        // the item is vegetarian too.
+        ->and($idli->dietMark())->toBe(Diet::Vegan);
+});
+
+it('refuses two diet marks that contradict each other', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // Vegan sharpens vegetarian; nothing else combines at all.
+    Livewire::test(ListMenuItems::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Confused Curry'],
+            'menu_category_id' => $category->getKey(),
+            'diets' => [Diet::Vegetarian->value, Diet::NonVegetarian->value],
+            'price' => '80',
+            'availability' => ItemAvailability::Available->value,
+        ])
+        ->assertHasActionErrors(['diets']);
+
+    expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
+});
+
+it('refuses contradictory marks written around the form, and an item carrying none', function (): void {
+    $tenant = Tenant::factory()->create();
+    $category = MenuCategory::factory()
+        ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
+        ->create();
+
+    // The form is not the only way in, so MenuItemObserver says it too.
+    expect(fn () => MenuItem::factory()->inCategory($category)->marked(Diet::Vegan, Diet::Egg)->create())
+        ->toThrow(LogicException::class)
+        ->and(fn () => MenuItem::factory()->inCategory($category)->marked()->create())
+        ->toThrow(LogicException::class);
 });
 
 it('drops the diet mark of an item that becomes a service request', function (): void {
@@ -1089,7 +1153,7 @@ it('drops the diet mark of an item that becomes a service request', function ():
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
-    $menuItem = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian]);
+    $menuItem = MenuItem::factory()->inCategory($category)->create(['diets' => [Diet::Vegetarian]]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -1104,7 +1168,7 @@ it('drops the diet mark of an item that becomes a service request', function ():
         ->assertHasNoActionErrors();
 
     expect($menuItem->refresh()->is_service_request)->toBeTrue()
-        ->and($menuItem->diet)->toBeNull();
+        ->and($menuItem->diets)->toBeNull();
 });
 
 it('refuses an item with no diet mark that is not a service request, even around the form', function (): void {
@@ -1112,7 +1176,7 @@ it('refuses an item with no diet mark that is not a service request, even around
 
     // MenuItemObserver is the backstop the CHECK constraint mirrors: code that
     // writes around the form still cannot store an item that is neither.
-    expect(fn () => MenuItem::factory()->inCategory($category)->create(['diet' => null]))
+    expect(fn () => MenuItem::factory()->inCategory($category)->create(['diets' => null]))
         ->toThrow(LogicException::class);
 });
 
@@ -1132,7 +1196,7 @@ it('refiles an item into a sub-category from the items page', function (): void 
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $chicken->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'diet' => $menuItem->diet->value,
+            'diets' => dietValues($menuItem),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -1156,7 +1220,7 @@ it('lifts an item back out of a sub-category to the category itself', function (
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'diet' => $menuItem->diet->value,
+            'diets' => dietValues($menuItem),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -1183,7 +1247,7 @@ it('unfeatures an item carried to another menu, and keeps one that stays', funct
         ->callAction(TestAction::make('edit')->table($leaving), [
             'menu_category_id' => $elsewhere->getKey(),
             'name' => $leaving->getTranslations('name'),
-            'diet' => $leaving->diet->value,
+            'diets' => dietValues($leaving),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
@@ -1192,7 +1256,7 @@ it('unfeatures an item carried to another menu, and keeps one that stays', funct
         ->callAction(TestAction::make('edit')->table($staying), [
             'menu_category_id' => $sibling->getKey(),
             'name' => $staying->getTranslations('name'),
-            'diet' => $staying->diet->value,
+            'diets' => dietValues($staying),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
             'is_featured' => true,
@@ -1226,7 +1290,7 @@ it('refuses to refile an item under a name the target category already has', fun
         ->callAction(TestAction::make('edit')->table($moving), [
             'menu_category_id' => $to->getKey(),
             'name' => $moving->getTranslations('name'),
-            'diet' => $moving->diet->value,
+            'diets' => dietValues($moving),
             'price' => '100',
             'availability' => ItemAvailability::Available->value,
         ])

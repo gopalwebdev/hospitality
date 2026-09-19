@@ -422,9 +422,11 @@ it('filters items by menu, and by a category within it', function (): void {
 it('splits the items page into tabs by kind, by stock, by featuring and by diet mark', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
-    $water = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Vegetarian, 'is_featured' => true]);
-    $omelette = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::Egg, 'availability' => ItemAvailability::OutOfStock]);
-    $chicken = MenuItem::factory()->inCategory($category)->create(['diet' => Diet::NonVegetarian]);
+    $water = MenuItem::factory()->inCategory($category)->create(['diets' => [Diet::Vegetarian], 'is_featured' => true]);
+    // Both marks, which is what most vegetarian items carry.
+    $idli = MenuItem::factory()->inCategory($category)->marked(Diet::Vegetarian, Diet::Vegan)->create();
+    $omelette = MenuItem::factory()->inCategory($category)->create(['diets' => [Diet::Egg], 'availability' => ItemAvailability::OutOfStock]);
+    $chicken = MenuItem::factory()->inCategory($category)->create(['diets' => [Diet::NonVegetarian]]);
     $pillow = MenuItem::factory()->inCategory($category)->service()->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -433,47 +435,56 @@ it('splits the items page into tabs by kind, by stock, by featuring and by diet 
     // so the table spends no column on either; nor on the GST rate, which the
     // project owner had taken off the list.
     $page = Livewire::test(ListMenuItems::class)
-        ->assertCanSeeTableRecords([$water, $omelette, $chicken, $pillow])
+        ->assertCanSeeTableRecords([$water, $idli, $omelette, $chicken, $pillow])
         ->assertTableColumnDoesNotExist('is_service_request')
         ->assertTableColumnDoesNotExist('is_featured')
         ->assertTableColumnDoesNotExist('tax_rate_basis_points');
 
     $page->set('activeTab', 'items')
-        ->assertCanSeeTableRecords([$water, $omelette, $chicken])
+        ->assertCanSeeTableRecords([$water, $idli, $omelette, $chicken])
         ->assertCanNotSeeTableRecords([$pillow]);
 
     $page->set('activeTab', 'service_requests')
         ->assertCanSeeTableRecords([$pillow])
-        ->assertCanNotSeeTableRecords([$water, $omelette, $chicken]);
+        ->assertCanNotSeeTableRecords([$water, $idli, $omelette, $chicken]);
 
     $page->set('activeTab', 'out_of_stock')
         ->assertCanSeeTableRecords([$omelette])
-        ->assertCanNotSeeTableRecords([$water, $chicken, $pillow]);
+        ->assertCanNotSeeTableRecords([$water, $idli, $chicken, $pillow]);
 
     $page->set('activeTab', 'featured')
         ->assertCanSeeTableRecords([$water])
+        ->assertCanNotSeeTableRecords([$idli, $omelette, $chicken, $pillow]);
+
+    // A tab asks whether an item carries its mark, not whether that is the only
+    // one it carries, so the vegan idli is on the veg tab as well.
+    $page->set('activeTab', 'veg')
+        ->assertCanSeeTableRecords([$water, $idli])
         ->assertCanNotSeeTableRecords([$omelette, $chicken, $pillow]);
 
-    $page->set('activeTab', 'veg')
-        ->assertCanSeeTableRecords([$water])
-        ->assertCanNotSeeTableRecords([$omelette, $chicken, $pillow]);
+    // Vegan is still a tab of its own, and the merely vegetarian item is not on it.
+    $page->set('activeTab', 'vegan')
+        ->assertCanSeeTableRecords([$idli])
+        ->assertCanNotSeeTableRecords([$water, $omelette, $chicken, $pillow]);
 
     $page->set('activeTab', 'egg')
         ->assertCanSeeTableRecords([$omelette])
-        ->assertCanNotSeeTableRecords([$water, $chicken, $pillow]);
+        ->assertCanNotSeeTableRecords([$water, $idli, $chicken, $pillow]);
 
     $page->set('activeTab', 'non_veg')
         ->assertCanSeeTableRecords([$chicken])
-        ->assertCanNotSeeTableRecords([$water, $omelette, $pillow]);
+        ->assertCanNotSeeTableRecords([$water, $idli, $omelette, $pillow]);
 
     // Every badge, from one query. Filament hands a badge back as a string.
+    // The diet counts overlap: the idli is counted as veg and as vegan.
     expect(collect($page->instance()->getTabs())->map->getBadge()->all())->toEqual([
-        'all' => 4,
-        'items' => 3,
+        'all' => 5,
+        'items' => 4,
         'service_requests' => 1,
         'out_of_stock' => 1,
         'featured' => 1,
-        'veg' => 1,
+        'veg' => 2,
+        'vegan' => 1,
         'egg' => 1,
         'non_veg' => 1,
     ]);
@@ -1098,7 +1109,7 @@ it('adds an item to the category or sub-category it was opened from', function (
         ->and($menuItem->tenant_id)->toBe($tenant->getKey())
         ->and($menuItem->price_minor_units)->toBe(22000)
         ->and($menuItem->availability)->toBe(ItemAvailability::Available)
-        ->and($menuItem->diet)->toBe(Diet::Vegetarian)
+        ->and($menuItem->dietMark())->toBe(Diet::Vegetarian)
         ->and($menuItem->position)->toBeGreaterThan($existing->position);
 });
 

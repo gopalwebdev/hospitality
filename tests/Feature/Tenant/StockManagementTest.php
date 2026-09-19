@@ -77,7 +77,7 @@ it('starts counting an item from its form, and begins its history with that coun
         ->callAction('create', [
             'name' => [Locale::English->value => 'Mutton Dum Biryani'],
             'menu_category_id' => $category->getKey(),
-            'diet' => Diet::NonVegetarian->value,
+            'diets' => [Diet::NonVegetarian->value],
             'price' => '460',
             'availability' => ItemAvailability::Available->value,
             'stock_quantity' => '12',

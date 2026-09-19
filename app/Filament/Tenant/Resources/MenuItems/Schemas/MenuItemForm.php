@@ -101,17 +101,23 @@ class MenuItemForm
                     uniqueMessage: __('panel.items.unique'),
                 ), 4),
 
-                // Everything but a service request carries the veg /
-                // egg / non-veg mark. A hidden field is not saved, and
-                // MenuItemObserver clears the diet of an item that has
-                // just become a service request.
-                Select::make('diet')
+                // Everything but a service request carries at least one of the
+                // veg / vegan / egg / non-veg marks, and most vegetarian items
+                // carry two, because they are vegan as well. A hidden field is
+                // not saved, and MenuItemObserver clears the marks of an item
+                // that has just become a service request.
+                Select::make('diets')
                     ->label(__('panel.items.diet'))
+                    ->multiple()
                     ->options(Diet::options())
-                    ->default(Diet::Vegetarian->value)
+                    ->default([Diet::Vegetarian->value])
                     ->native(false)
                     ->visible(fn (Get $get): bool => ! (bool) $get('is_service_request'))
                     ->required(fn (Get $get): bool => ! (bool) $get('is_service_request'))
+                    // Wrapped, because Filament evaluates a closure handed to
+                    // rule() to *produce* the rule rather than treating it as
+                    // one, and injects its parameters while doing so.
+                    ->rule(static fn (): Closure => self::dietsDoNotContradict())
                     ->columnSpan(2),
 
                 // One select, because an item is filed under exactly one
@@ -313,6 +319,37 @@ class MenuItemForm
             static fn (TextInput|Textarea $field): TextInput|Textarea => $field->columnSpan($columns),
             $fields,
         );
+    }
+
+    /**
+     * Refuse two diet marks that contradict each other, naming the pair.
+     *
+     * The same rule `MenuItemObserver` enforces and the
+     * `menu_items_diets_are_consistent` constraint states, said here so an
+     * admin reads a message about the two they picked rather than watching a
+     * save fail. Which pairs contradict is `Diet::goesWith()`, in one place.
+     */
+    private static function dietsDoNotContradict(): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail): void {
+            $marks = array_filter(array_map(
+                static fn (mixed $one): ?Diet => is_string($one) ? Diet::tryFrom($one) : null,
+                is_array($value) ? $value : [],
+            ));
+
+            foreach ($marks as $mark) {
+                foreach ($marks as $other) {
+                    if (! $mark->goesWith($other)) {
+                        $fail(__('panel.items.diets_contradict', [
+                            'first' => $mark->label(),
+                            'second' => $other->label(),
+                        ]));
+
+                        return;
+                    }
+                }
+            }
+        };
     }
 
     /**

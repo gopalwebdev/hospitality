@@ -38,7 +38,7 @@ class MenuItemFactory extends Factory
             'tax_rate_basis_points' => null,
             'hsn_code' => null,
             'is_service_request' => false,
-            'diet' => fake()->randomElement(Diet::cases()),
+            'diets' => [fake()->randomElement(Diet::cases())],
             'availability' => ItemAvailability::Available,
             'max_quantity' => null,
             'position' => fake()->numberBetween(0, 20),
@@ -64,8 +64,18 @@ class MenuItemFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'is_service_request' => true,
-            'diet' => null,
+            'diets' => null,
             'price_minor_units' => 0,
+        ]);
+    }
+
+    /**
+     * The marks this item carries — `marked(Diet::Vegetarian, Diet::Vegan)`.
+     */
+    public function marked(Diet ...$diets): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'diets' => $diets,
         ]);
     }
 

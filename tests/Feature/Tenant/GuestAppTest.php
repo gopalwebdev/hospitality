@@ -620,7 +620,7 @@ it('sends a service request with no diet mark, beside something to order', funct
     $pillow = MenuItem::factory()->inCategory($category)->service()->create(['position' => 0]);
     $water = MenuItem::factory()->inCategory($category)->create([
         'position' => 1,
-        'diet' => Diet::Vegetarian,
+        'diets' => [Diet::Vegetarian],
     ]);
 
     $this->get(guestMenuUrl($tenant, $menu))
@@ -634,6 +634,22 @@ it('sends a service request with no diet mark, beside something to order', funct
             ->where('sections.0.items.1.id', $water->getKey())
             ->where('sections.0.items.1.isServiceRequest', false)
             ->where('sections.0.items.1.diet', Diet::Vegetarian->value),
+        );
+});
+
+it('sends one diet mark for an item carrying several, the strictest of them', function (): void {
+    $tenant = Tenant::factory()->create();
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $category = MenuCategory::factory()->inMenu($menu)->create();
+
+    MenuItem::factory()->inCategory($category)->marked(Diet::Vegetarian, Diet::Vegan)->create();
+
+    // The panel records both; the menu shows one square per item, and vegan
+    // already says the item is vegetarian.
+    $this->get(guestMenuUrl($tenant, $menu))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+            ->where('sections.0.items.0.diet', Diet::Vegan->value),
         );
 });
 

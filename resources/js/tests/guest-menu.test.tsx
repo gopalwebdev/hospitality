@@ -178,6 +178,27 @@ describe('guest menu', () => {
         expect(screen.getByLabelText('Vegetarian')).toBeInTheDocument();
     });
 
+    it('marks a vegan item apart from a vegetarian one', () => {
+        renderMenu({
+            sections: [
+                {
+                    id: 1,
+                    name: 'Tiffin',
+                    items: [
+                        item({ id: 11, name: 'Idli Plate', diet: 'vegan' }),
+                        item({ id: 12, name: 'Ghee Roast' }),
+                    ],
+                    subSections: [],
+                },
+            ],
+        });
+
+        // Vegan is its own mark, not the vegetarian one: a guest who keeps it
+        // cannot tell ghee from no ghee off a green square.
+        expect(screen.getByLabelText('Vegan')).toBeInTheDocument();
+        expect(screen.getByLabelText('Vegetarian')).toBeInTheDocument();
+    });
+
     it('marks a service request with a bell rather than a diet, and names a zero price rather than pricing it', () => {
         renderMenu({
             sections: [

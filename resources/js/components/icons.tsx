@@ -126,6 +126,16 @@ export function StarIcon(props: IconProps) {
     );
 }
 
+/** Inside the vegan diet mark, so it is never read off its colour alone. */
+export function LeafIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M20 4C9 5 4 11 4 19v1" />
+            <path d="M20 4c1 9-4 14-12 14H4" />
+        </svg>
+    );
+}
+
 /** Beside a service request: the bell on a front desk. */
 export function BellIcon(props: IconProps) {
     return (

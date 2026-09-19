@@ -160,10 +160,10 @@ it('seeds a hotel whose room requests share a menu with things to order', functi
     // and something to order with both.
     expect($menusHoldingThem)->toHaveCount(1)
         ->and($pillow->is_service_request)->toBeTrue()
-        ->and($pillow->diet)->toBeNull()
+        ->and($pillow->diets)->toBeNull()
         ->and($pillow->isComplimentary())->toBeTrue()
         ->and($water->is_service_request)->toBeFalse()
-        ->and($water->diet)->toBe(Diet::Vegetarian)
+        ->and($water->dietMark())->toBe(Diet::Vegetarian)
         ->and($water->isComplimentary())->toBeFalse();
 });
 

@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\Diet;
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
+use App\Models\MenuItem;
 use App\Models\Tenant;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -107,6 +109,19 @@ function taxTenantAt(Tenant $tenant, int $totalBasisPoints, bool $pricesIncludeT
         'sgst_rate_basis_points' => $totalBasisPoints - $half,
         'prices_include_tax' => $pricesIncludeTax,
     ]);
+}
+
+/**
+ * The diet marks an item carries, as the multi-select posts them.
+ *
+ * An item may carry more than one — vegetarian and vegan together — so a form
+ * filled with an existing item has to send them all back or the save drops one.
+ *
+ * @return list<string>
+ */
+function dietValues(MenuItem $item): array
+{
+    return ($item->diets ?? collect())->map(fn (Diet $diet): string => $diet->value)->values()->all();
 }
 
 /**

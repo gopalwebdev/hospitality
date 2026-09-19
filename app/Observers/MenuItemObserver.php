@@ -60,30 +60,43 @@ class MenuItemObserver
     }
 
     /**
-     * Keep the diet mark in step with the service flag, as the CHECK constraint does.
+     * Keep the diet marks in step with the service flag, as the CHECK constraints do.
      *
-     * A service request has its diet cleared, which is what lets an item become
-     * one at all; anything else refuses to save without a diet. A saved item
-     * whose flag and diet are both untouched is left alone, so renumbering a list
-     * reads no column it was not given.
+     * A service request has its marks cleared, which is what lets an item become
+     * one at all; anything else refuses to save without at least one mark, and
+     * refuses two that contradict each other. A saved item whose flag and marks
+     * are both untouched is left alone, so renumbering a list reads no column it
+     * was not given.
      */
     private function pairDietWithService(MenuItem $item): void
     {
-        if ($item->exists && ! $item->isDirty(['is_service_request', 'diet'])) {
+        if ($item->exists && ! $item->isDirty(['is_service_request', 'diets'])) {
             return;
         }
 
         if ($item->is_service_request) {
-            $item->diet = null;
+            $item->diets = null;
 
             return;
         }
 
+        $diets = $item->diets;
+
         throw_if(
-            $item->diet === null,
+            $diets === null || $diets->isEmpty(),
             LogicException::class,
             'An item that is not a service request needs a diet mark.',
         );
+
+        foreach ($diets as $diet) {
+            foreach ($diets as $other) {
+                throw_unless(
+                    $diet->goesWith($other),
+                    LogicException::class,
+                    "An item cannot be both {$diet->label()} and {$other->label()}.",
+                );
+            }
+        }
     }
 
     /**

@@ -139,6 +139,7 @@ A time of day is `App\Filament\Forms\Components\ClockTimePicker`: hour, minute a
 
 ## Several choices are a multi-select dropdown
 The project owner's standing instruction: a field that takes several values is `Select::make()->multiple()`, never a `CheckboxList`. Today that is:
+- **An item's diet marks** (`menu_items.diets`), because most vegetarian items are vegan as well. A closure rule refuses a contradictory pair, naming the two — and it is wrapped as `->rule(fn (): Closure => ...)`, because Filament evaluates a closure handed to `rule()` to *produce* a rule and injects its parameters, so a bare `($attribute, $value, $fail)` rule fails with "`$attribute` was unresolvable".
 - **A charge's menus.**
 - **An account's roles,** in both panels.
 - **A role's permissions:** one select per category, with a **Select all** hint action standing in for the checkbox list's bulk toggle.

@@ -53,6 +53,9 @@ class TenantPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
                 // The menu page's category rows; amber is the featured items'.
                 'violet' => Color::Violet,
+                // The vegan diet mark: plant-based without being the
+                // vegetarian green it sits next to (App\Enums\Diet::color()).
+                'teal' => Color::Teal,
             ])
             // The sidebar folds down to its icons, handing its width to the
             // page — the menu page and the items table use all of it.

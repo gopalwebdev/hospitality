@@ -25,7 +25,16 @@ What a role *grants* is not owned by the code. `App\Enums\Role::permissions()` i
 `OutOfStock` is also written for an admin: a counted item reaching none left is marked out of stock, and a restock marks it available again — never `TemporarilyUnavailable` (`.ai/rules/inventory.md`).
 
 ## Diet is a mark, and a service request has none
-`App\Enums\Diet` (Vegetarian, Egg, NonVegetarian) is the veg / egg / non-veg mark on `menu_items.diet`. It replaced an enum whose name tied the menu to one kind of business, and whether an item is a service request is **not** a case here or an enum of its own: an `ItemKind` enum was built and replaced by the `menu_items.is_service_request` boolean on the project owner's instruction. The pairing — diet null exactly for a service request — is in `.ai/rules/models.md`.
+`App\Enums\Diet` (Vegetarian, Vegan, Egg, NonVegetarian) is the veg / vegan / egg / non-veg mark. **An item carries a list of them**, not one: `menu_items.diets` is a `jsonb` array cast with `AsEnumCollection`, because most vegetarian items are vegan as well and one choice made a tenant pick which of the two to say.
+
+**Vegan is its own case, not a kind of vegetarian**: it is a stricter claim — no dairy, no honey — and in a country where most vegetarian cooking uses ghee, curd and milk, it cannot be read off the green square. FSSAI's Vegan Foods Regulations of 2022 give it a separate mark for the same reason. It is teal with a leaf rather than a second green (`Diet::color()` returns `teal`, registered in `TenantPanelProvider`), because two cues beat one at the size these marks are read at.
+
+Two methods carry the rules, and both are the only place they are stated:
+
+- **`Diet::goesWith()`** — which marks may sit together. Every mark but vegan replaces the others; vegan sharpens vegetarian rather than contradicting it, so `Vegetarian + Vegan` is the only pair there is. `MenuItemForm`, `MenuItemObserver` and the `menu_items_diets_are_consistent` constraint all read it, and that constraint is **built from the enum** in the migration, so a case added later cannot leave the database accepting what the form refuses.
+- **`Diet::strictest()`** — the one mark a guest reads, by `strictness()` (vegan, vegetarian, egg, non-veg). `MenuItem::dietMark()` wraps it, and the guest payload sends that alone: the panel records everything true, the menu shows one square per item (`.ai/rules/js.md`). `strictness()` is a `match`, so a new case has to say where it sits rather than inherit a position from the order of the cases.
+
+It replaced an enum whose name tied the menu to one kind of business, and whether an item is a service request is **not** a case here or an enum of its own: an `ItemKind` enum was built and replaced by the `menu_items.is_service_request` boolean on the project owner's instruction. The pairing — no marks at all exactly for a service request — is in `.ai/rules/models.md`.
 
 ## A charge is a share of the bill or a fixed sum
 `App\Enums\ChargeCalculation` is `Percentage` or `FixedAmount`, and `valueColumn()` is the single place that says which column holds the number (`rate_basis_points` or `amount_minor_units`) — the same shape as `HomeTileAction::targetColumn()`. `ChargeObserver` and `ChargeForm` both read it. A third calculation means a case, a column, a line in `valueColumn()`, and an edit to `charges_value_matches_calculation`.

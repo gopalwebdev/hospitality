@@ -140,7 +140,7 @@ class MenuController extends Controller
             ->whereDoesntHave('comboItems.menuItem', fn ($item) => $item->where('stock_quantity', 0))
             ->with(['comboItems' => fn ($comboItems) => $comboItems
                 ->select(['id', 'menu_combo_id', 'menu_item_id', 'quantity'])
-                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service_request', 'diet'])])
+                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service_request', 'diets'])])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -168,7 +168,7 @@ class MenuController extends Controller
                     'id' => $comboItem->getKey(),
                     'name' => $comboItem->menuItem->name,
                     'isServiceRequest' => $comboItem->menuItem->is_service_request,
-                    'diet' => $comboItem->menuItem->diet?->value,
+                    'diet' => $comboItem->menuItem->dietMark()?->value,
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
             ])->values()->all(),
@@ -378,7 +378,7 @@ class MenuController extends Controller
             'price_minor_units',
             'compare_at_price_minor_units',
             'is_service_request',
-            'diet',
+            'diets',
             'max_quantity',
         ];
     }
@@ -465,8 +465,10 @@ class MenuController extends Controller
             // has to decide whether what it was handed is believable.
             'compareAtPriceMinorUnits' => $item->hasComparePrice() ? $item->compare_at_price_minor_units : null,
             'isServiceRequest' => $item->is_service_request,
+            // One mark, not the list the item carries: the strictest says
+            // everything the others do, and the menu keeps one square per row.
             // Null for a service request, which the app marks with a bell instead.
-            'diet' => $item->diet?->value,
+            'diet' => $item->dietMark()?->value,
             // The most one order may hold, counted across every basket line it
             // is on. Null is no limit.
             'maxQuantity' => $item->max_quantity,

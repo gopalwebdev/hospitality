@@ -12,15 +12,17 @@ use Database\Factories\MenuItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * One item on a menu — something to order, or a service request — filed under exactly one category at either level.
- * Prices are integer minor units; a service request carries no diet mark, and everything else carries one.
+ * Prices are integer minor units; a service request carries no diet mark, and everything else carries at least one.
  *
  * @property int $id
  * @property int $tenant_id
@@ -33,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $tax_rate_basis_points
  * @property string|null $hsn_code
  * @property bool $is_service_request
- * @property Diet|null $diet
+ * @property Collection<int, Diet>|null $diets
  * @property ItemAvailability $availability
  * @property int|null $max_quantity
  * @property int|null $stock_quantity
@@ -52,7 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'tax_rate_basis_points',
     'hsn_code',
     'is_service_request',
-    'diet',
+    'diets',
     'availability',
     'max_quantity',
     'stock_quantity',
@@ -163,6 +165,17 @@ class MenuItem extends Model
     }
 
     /**
+     * The one diet mark a guest reads beside this item, or null for a service request.
+     *
+     * An item may carry several — vegetarian and vegan together — but the menu
+     * shows the strictest of them, which already says everything the others do.
+     */
+    public function dietMark(): ?Diet
+    {
+        return Diet::strictest($this->diets ?? []);
+    }
+
+    /**
      * What a guest may order right now: available, under showing categories, on a showing menu.
      *
      * @param  Builder<$this>  $query
@@ -221,7 +234,7 @@ class MenuItem extends Model
             'compare_at_price_minor_units' => 'integer',
             'tax_rate_basis_points' => 'integer',
             'is_service_request' => 'boolean',
-            'diet' => Diet::class,
+            'diets' => AsEnumCollection::of(Diet::class),
             'availability' => ItemAvailability::class,
             'max_quantity' => 'integer',
             'stock_quantity' => 'integer',

@@ -368,7 +368,7 @@ class TenantSeeder extends Seeder
                     // bottle of water carries its diet mark and a price.
                     'name' => ['en' => 'Water Bottle (1 L)', 'ta' => 'தண்ணீர் பாட்டில் (1 லி)'],
                     'price_minor_units' => 4000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                     'tax_rate_basis_points' => 1800,
                 ],
             ],
@@ -397,14 +397,14 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Masala Dosa', 'ta' => 'மசாலா தோசை'],
                             'price_minor_units' => 11000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                             'is_featured' => true,
                             'featured_position' => 1,
                         ],
                         [
                             'name' => ['en' => 'Ghee Roast', 'ta' => 'நெய் ரோஸ்ட்'],
                             'price_minor_units' => 13000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -412,14 +412,17 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Idli and Vada', 'ta' => 'இட்லி மற்றும் வடை'],
                     'items' => [
                         [
+                            // Rice and lentils and nothing else, so both marks:
+                            // vegetarian like the rest of the card, and vegan
+                            // too. The Ghee Roast above it is only the first.
                             'name' => ['en' => 'Idli Plate', 'ta' => 'இட்லி பிளேட்'],
                             'price_minor_units' => 8000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian, Diet::Vegan],
                         ],
                         [
                             'name' => ['en' => 'Medu Vada', 'ta' => 'மெது வடை'],
                             'price_minor_units' => 7000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian, Diet::Vegan],
                         ],
                     ],
                 ],
@@ -431,12 +434,12 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Egg Bhurji', 'ta' => 'முட்டை பூர்ஜி'],
                     'price_minor_units' => 12000,
-                    'diet' => Diet::Egg,
+                    'diets' => [Diet::Egg],
                 ],
                 [
                     'name' => ['en' => 'Omelette', 'ta' => 'ஆம்லெட்'],
                     'price_minor_units' => 9000,
-                    'diet' => Diet::Egg,
+                    'diets' => [Diet::Egg],
                 ],
             ],
         ],
@@ -523,19 +526,19 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Filter Coffee', 'ta' => 'ஃபில்டர் காபி'],
                     'price_minor_units' => 5000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                     'is_featured' => true,
                     'featured_position' => 1,
                 ],
                 [
                     'name' => ['en' => 'Masala Chai', 'ta' => 'மசாலா டீ'],
                     'price_minor_units' => 4000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Badam Milk', 'ta' => 'பாதாம் பால்'],
                     'price_minor_units' => 7000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
             ],
         ],
@@ -548,12 +551,12 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Fresh Lime Soda', 'ta' => 'ஃபிரெஷ் லைம் சோடா'],
                             'price_minor_units' => 8000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                         [
                             'name' => ['en' => 'Watermelon Juice', 'ta' => 'தர்பூசணி ஜூஸ்'],
                             'price_minor_units' => 9000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -564,14 +567,14 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Mango Lassi', 'ta' => 'மாம்பழ லஸ்ஸி'],
                             'price_minor_units' => 11000,
                             'compare_at_price_minor_units' => 13000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                             'is_featured' => true,
                             'featured_position' => 2,
                         ],
                         [
                             'name' => ['en' => 'Cold Coffee', 'ta' => 'கோல்ட் காபி'],
                             'price_minor_units' => 12000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -583,13 +586,13 @@ class TenantSeeder extends Seeder
                             // aerated one at that — 40% under GST 2.0.
                             'name' => ['en' => 'Cola', 'ta' => 'கோலா'],
                             'price_minor_units' => 6000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                             'tax_rate_basis_points' => 4000,
                         ],
                         [
                             'name' => ['en' => 'Mineral Water', 'ta' => 'மினரல் வாட்டர்'],
                             'price_minor_units' => 2000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                             'tax_rate_basis_points' => 1800,
                         ],
                     ],
@@ -608,19 +611,19 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Paneer Tikka', 'ta' => 'பன்னீர் டிக்கா'],
                             'price_minor_units' => 24950,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                             'is_featured' => true,
                             'featured_position' => 1,
                         ],
                         [
                             'name' => ['en' => 'Gobi Manchurian', 'ta' => 'கோபி மஞ்சூரியன்'],
                             'price_minor_units' => 21000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                         [
                             'name' => ['en' => 'Mushroom 65', 'ta' => 'காளான் 65'],
                             'price_minor_units' => 23000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -631,25 +634,25 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Chicken 65', 'ta' => 'சிக்கன் 65'],
                             'price_minor_units' => 29900,
                             'compare_at_price_minor_units' => 34900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             'is_featured' => true,
                             'featured_position' => 2,
                         ],
                         [
                             'name' => ['en' => 'Apollo Fish', 'ta' => 'அப்பல்லோ மீன்'],
                             'price_minor_units' => 34900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                         ],
                         [
                             'name' => ['en' => 'Prawn Koliwada', 'ta' => 'இறால் கோலிவாடா'],
                             'price_minor_units' => 39900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             'availability' => ItemAvailability::OutOfStock,
                         ],
                         [
                             'name' => ['en' => 'Egg Pepper Fry', 'ta' => 'முட்டை மிளகு வறுவல்'],
                             'price_minor_units' => 19900,
-                            'diet' => Diet::Egg,
+                            'diets' => [Diet::Egg],
                         ],
                     ],
                 ],
@@ -661,17 +664,17 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Sweet Corn Soup', 'ta' => 'ஸ்வீட் கார்ன் சூப்'],
                     'price_minor_units' => 14900,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Hot and Sour Soup', 'ta' => 'ஹாட் அண்ட் சார் சூப்'],
                     'price_minor_units' => 15900,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Mutton Paya Soup', 'ta' => 'மட்டன் பாயா சூப்'],
                     'price_minor_units' => 21900,
-                    'diet' => Diet::NonVegetarian,
+                    'diets' => [Diet::NonVegetarian],
                 ],
             ],
         ],
@@ -683,7 +686,7 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Egg Biryani', 'ta' => 'முட்டை பிரியாணி'],
                     'price_minor_units' => 27500,
-                    'diet' => Diet::Egg,
+                    'diets' => [Diet::Egg],
                 ],
             ],
             'sub_categories' => [
@@ -694,14 +697,14 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Hyderabadi Chicken Biryani', 'ta' => 'ஹைதராபாதி சிக்கன் பிரியாணி'],
                             'price_minor_units' => 38000,
                             'compare_at_price_minor_units' => 45000,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             'is_featured' => true,
                             'featured_position' => 3,
                         ],
                         [
                             'name' => ['en' => 'Chicken 65 Biryani', 'ta' => 'சிக்கன் 65 பிரியாணி'],
                             'price_minor_units' => 41000,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                         ],
                     ],
                 ],
@@ -711,7 +714,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mutton Dum Biryani', 'ta' => 'மட்டன் தம் பிரியாணி'],
                             'price_minor_units' => 46000,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             // Made in one pot a day, so it is counted — and the
                             // biryani combo draws on the same count.
                             'stock_quantity' => 20,
@@ -719,7 +722,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mutton Keema Biryani', 'ta' => 'மட்டன் கீமா பிரியாணி'],
                             'price_minor_units' => 44000,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             'availability' => ItemAvailability::TemporarilyUnavailable,
                         ],
                     ],
@@ -730,12 +733,12 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Vegetable Dum Biryani', 'ta' => 'வெஜிடபிள் தம் பிரியாணி'],
                             'price_minor_units' => 30000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                         [
                             'name' => ['en' => 'Paneer Biryani', 'ta' => 'பன்னீர் பிரியாணி'],
                             'price_minor_units' => 33000,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -750,12 +753,12 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Paneer Butter Masala', 'ta' => 'பன்னீர் பட்டர் மசாலா'],
                             'price_minor_units' => 28900,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                         [
                             'name' => ['en' => 'Dal Tadka', 'ta' => 'தால் தட்கா'],
                             'price_minor_units' => 21900,
-                            'diet' => Diet::Vegetarian,
+                            'diets' => [Diet::Vegetarian],
                         ],
                     ],
                 ],
@@ -765,19 +768,19 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Butter Chicken', 'ta' => 'பட்டர் சிக்கன்'],
                             'price_minor_units' => 36900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                             'is_featured' => true,
                             'featured_position' => 4,
                         ],
                         [
                             'name' => ['en' => 'Chettinad Chicken', 'ta' => 'செட்டிநாடு சிக்கன்'],
                             'price_minor_units' => 35900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                         ],
                         [
                             'name' => ['en' => 'Mutton Rogan Josh', 'ta' => 'மட்டன் ரோகன் ஜோஷ்'],
                             'price_minor_units' => 44900,
-                            'diet' => Diet::NonVegetarian,
+                            'diets' => [Diet::NonVegetarian],
                         ],
                     ],
                 ],
@@ -789,22 +792,22 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Butter Naan', 'ta' => 'பட்டர் நான்'],
                     'price_minor_units' => 8000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Tandoori Roti', 'ta' => 'தந்தூரி ரொட்டி'],
                     'price_minor_units' => 5000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Laccha Paratha', 'ta' => 'லச்சா பராத்தா'],
                     'price_minor_units' => 7000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Kerala Parotta', 'ta' => 'கேரள பரோட்டா'],
                     'price_minor_units' => 4500,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
             ],
         ],
@@ -814,19 +817,19 @@ class TenantSeeder extends Seeder
                 [
                     'name' => ['en' => 'Gulab Jamun', 'ta' => 'குலாப் ஜாமூன்'],
                     'price_minor_units' => 12000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     'name' => ['en' => 'Rasmalai', 'ta' => 'ரஸ்மலாய்'],
                     'price_minor_units' => 14000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                     'is_featured' => true,
                     'featured_position' => 5,
                 ],
                 [
                     'name' => ['en' => 'Double Ka Meetha', 'ta' => 'டபுள் கா மீதா'],
                     'price_minor_units' => 13000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                 ],
                 [
                     // Sold as a sealed tub rather than served, so it carries a
@@ -834,7 +837,7 @@ class TenantSeeder extends Seeder
                     // follows.
                     'name' => ['en' => 'Ice Cream Tub', 'ta' => 'ஐஸ்கிரீம் டப்'],
                     'price_minor_units' => 18000,
-                    'diet' => Diet::Vegetarian,
+                    'diets' => [Diet::Vegetarian],
                     'tax_rate_basis_points' => 1800,
                 ],
             ],
@@ -1077,7 +1080,8 @@ class TenantSeeder extends Seeder
      *
      * The category may be a section or one of its subdivisions; an item is filed
      * under exactly one either way. An item is something to order unless its card
-     * marks it a service request, and only a service request goes without a diet.
+     * marks it a service request, and only a service request goes without a diet
+     * mark; everything else carries at least one, and a vegan item carries two.
      *
      * @param  array<string, mixed>  $item
      */
@@ -1096,7 +1100,7 @@ class TenantSeeder extends Seeder
                 // price of nothing.
                 'compare_at_price_minor_units' => $item['compare_at_price_minor_units'] ?? null,
                 'is_service_request' => $item['is_service_request'] ?? false,
-                'diet' => $item['diet'] ?? null,
+                'diets' => $item['diets'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 // Null is no limit.
                 'max_quantity' => $item['max_quantity'] ?? null,

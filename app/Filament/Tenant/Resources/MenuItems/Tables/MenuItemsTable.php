@@ -63,12 +63,15 @@ class MenuItemsTable
                     ->color('gray')
                     ->toggleable(),
 
-                // Empty for a service request, which carries no diet mark.
-                TextColumn::make('diet')
+                // One badge per mark, so an item that is vegetarian and vegan
+                // says both here — unlike the guest menu, which shows the
+                // strictest alone. Empty for a service request, which carries
+                // no mark at all.
+                TextColumn::make('diets')
                     ->label(__('panel.items.diet'))
                     ->badge()
-                    ->formatStateUsing(fn (?Diet $state): string => $state?->label() ?? '')
-                    ->color(fn (?Diet $state): string => $state?->color() ?? 'gray')
+                    ->formatStateUsing(fn (Diet $state): string => $state->label())
+                    ->color(fn (Diet $state): string => $state->color())
                     ->placeholder('—'),
 
                 // Stored in minor units, shown as money in the tenant's own
@@ -165,9 +168,15 @@ class MenuItemsTable
                         fn (Builder $inSubCategory): Builder => $inSubCategory->where('menu_category_id', (int) $data['value']),
                     )),
 
-                SelectFilter::make('diet')
+                // The marks are a list, so the filter asks whether the item
+                // carries the one picked rather than whether it equals it.
+                SelectFilter::make('diets')
                     ->label(__('panel.items.diet'))
-                    ->options(Diet::options()),
+                    ->options(Diet::options())
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $carrying): Builder => $carrying->whereJsonContains('diets', $data['value']),
+                    )),
 
                 SelectFilter::make('availability')
                     ->label(__('panel.items.availability'))
