@@ -8,7 +8,6 @@ use App\Models\MenuAddOnOption;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 
@@ -52,8 +51,8 @@ final readonly class ApplyStockChanges
 
         DB::transaction(function () use ($changes, $reason, $order, $user, $note): void {
             $rows = [
-                MenuItem::class => $this->lock(MenuItem::query(), $changes, MenuItem::class, ['id', 'tenant_id', 'stock_quantity', 'availability']),
-                MenuAddOnOption::class => $this->lock(MenuAddOnOption::query(), $changes, MenuAddOnOption::class, ['id', 'tenant_id', 'stock_quantity']),
+                MenuItem::class => $this->lockItems($changes),
+                MenuAddOnOption::class => $this->lockOptions($changes),
             ];
 
             /** @var array<class-string<MenuItem|MenuAddOnOption>, array<int, int|null>> $counts */
@@ -107,38 +106,70 @@ final readonly class ApplyStockChanges
     }
 
     /**
-     * The rows of one kind the changes name, locked until the transaction ends.
+     * The items the changes name, locked until the transaction ends.
      *
      * Every tenant's rows are read: the keys come from a basket already priced
      * against this tenant's menu, or from a record the panel has already scoped.
      *
-     * @template TRow of MenuItem|MenuAddOnOption
-     *
-     * @param  Builder<TRow>  $query
      * @param  list<StockChange>  $changes
-     * @param  class-string<TRow>  $type
-     * @param  list<string>  $columns
-     * @return EloquentCollection<int, TRow>
+     * @return EloquentCollection<int, MenuItem>
      */
-    private function lock(Builder $query, array $changes, string $type, array $columns): EloquentCollection
+    private function lockItems(array $changes): EloquentCollection
+    {
+        $ids = $this->idsOf($changes, MenuItem::class);
+
+        if ($ids === []) {
+            return new EloquentCollection;
+        }
+
+        return MenuItem::query()
+            ->withoutGlobalScopes()
+            ->whereKey($ids)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id', 'tenant_id', 'stock_quantity', 'availability'])
+            ->keyBy(fn (MenuItem $item): int => $item->getKey());
+    }
+
+    /**
+     * The options the changes name, locked after the items — so every caller takes the two in one order.
+     *
+     * @param  list<StockChange>  $changes
+     * @return EloquentCollection<int, MenuAddOnOption>
+     */
+    private function lockOptions(array $changes): EloquentCollection
+    {
+        $ids = $this->idsOf($changes, MenuAddOnOption::class);
+
+        if ($ids === []) {
+            return new EloquentCollection;
+        }
+
+        return MenuAddOnOption::query()
+            ->withoutGlobalScopes()
+            ->whereKey($ids)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id', 'tenant_id', 'stock_quantity'])
+            ->keyBy(fn (MenuAddOnOption $option): int => $option->getKey());
+    }
+
+    /**
+     * The keys of one kind the changes name, in key order.
+     *
+     * @param  list<StockChange>  $changes
+     * @param  class-string<MenuItem|MenuAddOnOption>  $type
+     * @return list<int>
+     */
+    private function idsOf(array $changes, string $type): array
     {
         $ids = array_values(array_unique(array_map(
             static fn (StockChange $change): int => $change->id,
             array_filter($changes, static fn (StockChange $change): bool => $change->type === $type),
         )));
 
-        if ($ids === []) {
-            return new EloquentCollection;
-        }
-
         sort($ids);
 
-        return $query
-            ->withoutGlobalScopes()
-            ->whereKey($ids)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get($columns)
-            ->keyBy(fn (MenuItem|MenuAddOnOption $row): int => $row->getKey());
+        return $ids;
     }
 }

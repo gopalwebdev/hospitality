@@ -287,9 +287,8 @@ class MenuItemForm
             }
 
             $groupId = $get('menu_add_on_group_id');
-            $group = filled($groupId) ? MenuAddOnGroupForm::groupForItemForm((int) $groupId) : null;
 
-            if ($group instanceof MenuAddOnGroup && (int) $value < $group->defaults_count) {
+            if (filled($groupId) && (int) $value < MenuAddOnGroupForm::defaultsCountOf((int) $groupId)) {
                 $fail(__('panel.add_on_groups.item_max_selections_below_defaults'));
             }
         };

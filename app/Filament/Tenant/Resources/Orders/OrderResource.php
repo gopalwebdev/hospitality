@@ -68,7 +68,11 @@ class OrderResource extends Resource
      */
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
-        return parent::getRecordRouteBindingEloquentQuery()->with([
+        // Filament's own is a query of the resource's model, which is this one.
+        /** @var Builder<Order> $query */
+        $query = parent::getRecordRouteBindingEloquentQuery();
+
+        return $query->with([
             'menu' => fn ($menu) => $menu->select(['id', 'name']),
             'lines' => fn ($lines) => $lines->orderBy('position')->orderBy('id'),
             'lines.choices',

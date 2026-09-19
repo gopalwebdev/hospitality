@@ -65,7 +65,7 @@ How a guest sees it:
   - `max_quantity BETWEEN 1 AND 99` on options
 - **Form validation:**
   - `MenuAddOnGroupForm`: the maximum is 1–99, or blank; no more options are set as the default than the maximum (this rule sits on the options repeater, so its message reads under the table); an option's Max each is not more than the group's own maximum; a group has at least one option.
-  - `MenuItemForm`: an item's own cap on a group is 1–99 or blank, and not less than how many of that group's options are ticked as the default (`MenuAddOnGroupForm::groupForItemForm()` reads the same cached lookup the select uses, so this costs no extra query per row).
+  - `MenuItemForm`: an item's own cap on a group is 1–99 or blank, and not less than how many of that group's options are ticked as the default — `MenuAddOnGroupForm::defaultsCountOf()`, which reads the same cached lookup the select uses, so this costs no extra query per row. It reads `defaults_count` as an attribute rather than a property, because a `withCount()` aggregate is not a column and the model does not carry one.
 - **Pricing:** `QuoteBasket` refuses a line as `invalid` when a required group has nothing picked or a group's picks go over the maximum in play for that item.
 
 `MenuAddOnGroupForm::ruleSummary()` words a rule for the panel's item form ("Required · Choose 1", "Optional · Up to 3", "Required · At least 1") from the *group's own* answers — the select's label does not know an item's own override. `resources/js/lib/add-on-rules.ts` `ruleOf()` words the same cases for a guest, from whatever `maxSelections` the item was actually sent. Change one, change the other.

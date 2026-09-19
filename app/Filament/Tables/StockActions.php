@@ -143,7 +143,8 @@ final class StockActions
         $itemId = $record->getKey();
 
         // once(): Filament reads the entry's state more than once while it draws the modal.
-        return once(fn (): array => StockMovement::query()
+        // array_values(): a collection's all() is keyed, and this reads as a list.
+        return once(fn (): array => array_values(StockMovement::query()
             ->where('menu_item_id', $itemId)
             // A member of the product team who changed a count is on no roster,
             // so the panel's tenancy scope on users would lose their name.
@@ -161,7 +162,6 @@ final class StockActions
                     : $movement->user?->name,
                 'note' => $movement->note,
             ])
-            ->values()
-            ->all());
+            ->all()));
     }
 }

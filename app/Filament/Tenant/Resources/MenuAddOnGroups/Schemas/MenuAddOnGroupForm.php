@@ -317,6 +317,18 @@ class MenuAddOnGroupForm
     }
 
     /**
+     * How many of a group's options are ticked as the default, from that same lookup.
+     *
+     * `defaults_count` is a `withCount()` aggregate rather than a column, so it is
+     * read as an attribute: nothing carries it but the query above. A group this
+     * tenant does not have counts as none, and the select refuses it anyway.
+     */
+    public static function defaultsCountOf(int $groupId): int
+    {
+        return (int) self::groupForItemForm($groupId)?->getAttribute('defaults_count');
+    }
+
+    /**
      * This tenant's groups by name, each labelled with what it asks of a guest.
      *
      * @return array<int, string>
