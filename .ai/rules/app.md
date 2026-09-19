@@ -56,7 +56,7 @@ Settled architecture, one surface per audience:
 
 Both panels live under `/dashboard` and are told apart by host, and `/login` on either host is the way in — `.ai/rules/filament.md` explains why that depends on provider order. They were once named for roles, at paths and in folders to match; they are named for whose they are now, because a tenant's panel serves its staff as much as its owners.
 
-A staff app (React, phone-first) existed and was removed on the project owner's instruction. When staff get a surface again it is React rather than a third panel, for the reason it was before: they are on phones, and `.ai/rules/filament.md` reserves panels for laptop-and-larger. The guest app does not work offline — there is no offline requirement, and Inertia needs the server for every page.
+A staff app (React, phone-first) existed and was removed on the project owner's instruction. The reason given for bringing it back as React rather than as a third panel — that staff are on phones and panels were laptop-only — no longer holds: panels are becoming responsive so staff can install one on a phone or tablet (`.ai/rules/filament.md`). If a separate staff surface is ever wanted again, it needs a fresh reason. The guest app does not work offline — there is no offline requirement, and Inertia needs the server for every page.
 
 Keeping the guest app the only Inertia surface on a subdomain is what keeps its bundle free of Filament assets. Do not import Filament into it, and do not add a Filament panel for a phone audience.
 

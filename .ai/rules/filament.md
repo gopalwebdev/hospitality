@@ -33,12 +33,20 @@ Those guards live in RoleResource/PermissionResource::canDelete() (and `disabled
 
 Both panels run `strictAuthorization()`, so a resource whose policy lacks the method being asked about is refused rather than waved through. tests/Feature/PanelAuthorizationTest.php walks every registered resource and page in both panels and asserts an account holding nothing is refused, so a page added later cannot ship open.
 
-## Panels are for laptops and larger screens, not phones
-Both panels are back-office tools — the product team's, and a tenant owner's — used sitting down at a laptop or a bigger display. "Staff" in this codebase means floor staff on phones; they have no surface right now, and would not be given a panel. Design for that width and do not spend effort making a panel page work on a phone: no phone-first layouts, and no hiding columns below a breakpoint with visibleFrom()/hiddenFrom(), which only costs information when a laptop window is dragged narrow. A table may show every column it needs, and a form may assume the room to use columns().
+## Panels are becoming responsive — decided, not built yet
+**This reverses the earlier rule that panels are for laptops and larger.** The project owner's decision: both panels are installable PWAs, and staff will install them on a phone, a tablet or a PC, so every panel page has to work at every width. The guest app is unaffected and stays phone-only for ever (`.ai/rules/js.md`) — that half was never in question.
 
-This is enforced, not just intended: both panels render `resources/views/filament/desktop-only.blade.php` through the `BODY_START` render hook, which covers the panel with a "open this on a laptop" message below 1024px. It is CSS-only and inline, so it is correct on first paint and needs none of the utilities a panel does not ship. It is a door, not a second layout — building a phone layout for a panel is exactly what this rule rules out.
+**What is still true of the code today.** The reversal is a direction, not a finished change, and nothing has been laid out for a narrow screen yet. Both panels still render `resources/views/filament/desktop-only.blade.php` through the `BODY_START` render hook, which covers the panel below 1024px with "open this on a laptop". It is CSS-only and inline, so it is correct on first paint and needs none of the utilities a panel does not ship.
 
-The guest app is the opposite — see .ai/rules/js.md, which is phone-only. A staff surface, when one comes back, is not a panel either: staff are on phones, and this rule is the reason.
+**That door is the first thing to come out, and only once there is something behind it.** Removing it before the pages are responsive does not make the panel work on a phone; it replaces a clear message with a broken table. Until then an installed panel on a phone shows the door, which is why the install is worth finishing.
+
+What the work involves, when it is picked up:
+- **Tables** are the hard part, not forms. A table with eight columns has no narrow layout; Filament's answer is `->columnToggle()`, split/stacked columns, or a panel-specific card layout below a breakpoint.
+- `visibleFrom()` / `hiddenFrom()` were previously banned outright. They are now the tool for this, but the old objection still stands where it applies: hiding a column costs information when a laptop window is merely dragged narrow, so hide on real breakpoints and prefer stacking over dropping.
+- Forms mostly follow already, because `->columns()` and the `Grid` container breakpoints in "Forms stay compact" collapse on their own.
+- The panel PWA manifest already suits a phone (`display: standalone`, no orientation lock), so nothing there changes.
+
+Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes. That constraint gets sharper here: a responsive tweak cannot be a Tailwind utility on a panel page.
 
 Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes.
 
