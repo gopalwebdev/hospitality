@@ -33,20 +33,23 @@ Those guards live in RoleResource/PermissionResource::canDelete() (and `disabled
 
 Both panels run `strictAuthorization()`, so a resource whose policy lacks the method being asked about is refused rather than waved through. tests/Feature/PanelAuthorizationTest.php walks every registered resource and page in both panels and asserts an account holding nothing is refused, so a page added later cannot ship open.
 
-## Panels are becoming responsive — decided, not built yet
-**This reverses the earlier rule that panels are for laptops and larger.** The project owner's decision: both panels are installable PWAs, and staff will install them on a phone, a tablet or a PC, so every panel page has to work at every width. The guest app is unaffected and stays phone-only for ever (`.ai/rules/js.md`) — that half was never in question.
+## Panels work at every width; only the guest app is phone-only
+**This reverses the earlier rule that panels are for laptops and larger.** The project owner's decision: both panels are installable PWAs and staff install them on a phone, a tablet or a PC, so every panel page has to work at every width. The guest app is the only phone-only surface (`.ai/rules/js.md`).
 
-**What is still true of the code today.** The reversal is a direction, not a finished change, and nothing has been laid out for a narrow screen yet. Both panels still render `resources/views/filament/desktop-only.blade.php` through the `BODY_START` render hook, which covers the panel below 1024px with "open this on a laptop". It is CSS-only and inline, so it is correct on first paint and needs none of the utilities a panel does not ship.
+There was a `resources/views/filament/desktop-only.blade.php` hung on `BODY_START` in both providers, covering the panel below 1024px with "open this on a laptop". **It is deleted, and must not come back.** It made an installed panel on a phone open to a dead end, which is the exact case staff are in. `PanelResponsivenessTest` asserts neither panel serves a gate like it.
 
-**That door is the first thing to come out, and only once there is something behind it.** Removing it before the pages are responsive does not make the panel work on a phone; it replaces a clear message with a broken table. Until then an installed panel on a phone shows the door, which is why the install is worth finishing.
+Most of what makes this work is Filament's own doing, not ours, and it is why removing the gate was not the cliff it looked like:
+- the sidebar becomes a slide-over below `lg` on its own — `sidebarCollapsibleOnDesktop()` only governs wider screens;
+- `->columns(n)` on a section and the `Grid` container breakpoints in "Forms stay compact" already collapse to one column;
+- a table that does not fit scrolls inside its own container rather than pushing the page wide;
+- `modalWidth(Width::Full)` and friends cap at the viewport.
 
-What the work involves, when it is picked up:
-- **Tables** are the hard part, not forms. A table with eight columns has no narrow layout; Filament's answer is `->columnToggle()`, split/stacked columns, or a panel-specific card layout below a breakpoint.
-- `visibleFrom()` / `hiddenFrom()` were previously banned outright. They are now the tool for this, but the old objection still stands where it applies: hiding a column costs information when a laptop window is merely dragged narrow, so hide on real breakpoints and prefer stacking over dropping.
-- Forms mostly follow already, because `->columns()` and the `Grid` container breakpoints in "Forms stay compact" collapse on their own.
-- The panel PWA manifest already suits a phone (`display: standalone`, no orientation lock), so nothing there changes.
+What still deserves attention, in order:
+- **Wide tables** are the weak point. They scroll, which is usable but not good. The answer when a table earns it is `->columnToggle()`, stacked/split columns, or a card layout below a breakpoint — not a second page.
+- `visibleFrom()` / `hiddenFrom()` were previously banned outright. They are the tool for this now, but the old objection still holds where it applies: hiding a column costs information when a laptop window is merely dragged narrow, so hide on real breakpoints and prefer stacking to dropping.
+- `ClockTimePicker`'s three columns are the narrowest custom component; check it first at ~360px when changing it.
 
-Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes. That constraint gets sharper here: a responsive tweak cannot be a Tailwind utility on a panel page.
+Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes. That constraint is sharper here: a responsive tweak cannot be a Tailwind utility on a panel page.
 
 Panels are served Filament's own compiled CSS, which carries its fi- classes and no general Tailwind utilities, so any styling of your own needs inline styles or a panel theme rather than utility classes.
 

@@ -63,12 +63,6 @@ class PlatformPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
             ])
-            // Panels are for laptops and larger; a phone is shown a door
-            // rather than a layout nobody designed. See .ai/rules/filament.md.
-            ->renderHook(
-                PanelsRenderHook::BODY_START,
-                fn (): View => view('filament.desktop-only'),
-            )
             // Installable, so the panel opens in a window of its own. See
             // PanelProgressiveWebAppController.
             ->renderHook(
