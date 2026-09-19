@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
@@ -24,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // the language toggle each need to know what is currently set before
         // the server can tell them — so neither may be encrypted.
         $middleware->encryptCookies(except: ['appearance', 'locale']);
+
+        // Global, not on the `web` group: a Filament panel does not run that
+        // group, and these have to hold on every surface. See the middleware
+        // for why there is no CSP among them.
+        $middleware->append(AddSecurityHeaders::class);
 
         // SetLocale comes first: everything after it, the Inertia middleware
         // included, renders in the language it chooses.
