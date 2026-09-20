@@ -4,6 +4,7 @@ namespace App\Filament\Tenant\Resources\MenuItems\Schemas;
 
 use App\Enums\Currency;
 use App\Enums\Diet;
+use App\Enums\MenuItemKind;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\StockFields;
 use App\Filament\Schemas\TranslatedFields;
@@ -101,19 +102,19 @@ class MenuItemForm
                     uniqueMessage: __('panel.items.unique'),
                 ), 4),
 
-                // Everything but a service request carries at least one of the
-                // veg / vegan / egg / non-veg marks, and most vegetarian items
-                // carry two, because they are vegan as well. A hidden field is
-                // not saved, and MenuItemObserver clears the marks of an item
-                // that has just become a service request.
+                // Only Consumable carries a diet mark — MenuItemKind::requiresDietMark()
+                // is the single source of truth for that, and most vegetarian
+                // items carry two, because they are vegan as well. A hidden
+                // field is not saved, and MenuItemObserver clears the marks of
+                // an item whose kind has just stopped requiring one.
                 Select::make('diets')
                     ->label(__('panel.items.diet'))
                     ->multiple()
                     ->options(Diet::options())
                     ->default([Diet::Vegetarian->value])
                     ->native(false)
-                    ->visible(fn (Get $get): bool => ! (bool) $get('is_service_request'))
-                    ->required(fn (Get $get): bool => ! (bool) $get('is_service_request'))
+                    ->visible(fn (Get $get): bool => self::kindRequiresDietMark($get))
+                    ->required(fn (Get $get): bool => self::kindRequiresDietMark($get))
                     // Wrapped, because Filament evaluates a closure handed to
                     // rule() to *produce* the rule rather than treating it as
                     // one, and injects its parameters while doing so.
@@ -135,11 +136,14 @@ class MenuItemForm
                     ->prefixIcon(Heroicon::OutlinedRectangleStack)
                     ->columnSpan(4),
 
-                // Live, because it decides whether the diet is asked for at all.
-                Toggle::make('is_service_request')
-                    ->label(__('panel.items.is_service_request'))
-                    ->default(false)
-                    ->inline(false)
+                // Live, because it decides whether the diet is asked for at
+                // all, and what the code field beneath is called.
+                Select::make('kind')
+                    ->label(__('panel.items.kind'))
+                    ->options(MenuItemKind::options())
+                    ->default(MenuItemKind::Consumable->value)
+                    ->native(false)
+                    ->required()
                     ->live()
                     ->columnSpan(2),
 
@@ -180,6 +184,10 @@ class MenuItemForm
 
     /**
      * The GST rate and code, open beside the price rather than folded away.
+     *
+     * The code field labels itself HSN or SAC from the kind chosen above it —
+     * MenuItemKind::taxCodeLabel() says which — rather than asking for
+     * "HSN / SAC code" whatever is being priced.
      */
     private static function taxSection(): Section
     {
@@ -189,8 +197,31 @@ class MenuItemForm
             ->columns(2)
             ->schema([
                 PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
-                PricingFields::hsnSacCode(),
+                PricingFields::hsnSacCode()
+                    ->label(fn (Get $get): string => self::taxCodeLabel($get)),
             ]);
+    }
+
+    /**
+     * Whether the kind currently chosen requires a diet mark.
+     *
+     * MenuItemKind::requiresDietMark() is the single source of truth; a kind
+     * not yet chosen (a form still mounting) defaults to true, which is
+     * Consumable's own answer and the field's own default.
+     */
+    private static function kindRequiresDietMark(Get $get): bool
+    {
+        return (MenuItemKind::tryFrom((string) $get('kind')) ?? MenuItemKind::Consumable)->requiresDietMark();
+    }
+
+    /**
+     * What the code field is called for the kind currently chosen: "HSN code" or "SAC code".
+     */
+    private static function taxCodeLabel(Get $get): string
+    {
+        $kind = MenuItemKind::tryFrom((string) $get('kind')) ?? MenuItemKind::Consumable;
+
+        return (string) __('panel.items.tax_code_label', ['code' => $kind->taxCodeLabel()]);
     }
 
     /**

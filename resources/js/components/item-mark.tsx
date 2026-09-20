@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils';
 /** The veg / vegan / egg / non-veg mark an item carries. */
 export type Diet = 'vegetarian' | 'vegan' | 'egg' | 'non-vegetarian';
 
+/** What a menu item is — App\Enums\MenuItemKind. Only Consumable carries a diet. */
+export type MenuItemKind = 'consumable' | 'goods' | 'service';
+
 const RING: Record<Diet, string> = {
     vegetarian: 'border-green-600',
     vegan: 'border-teal-600',
@@ -28,35 +31,36 @@ const LABEL: Record<Diet, string> = {
 /**
  * The mark beside an item's name: what it is, at a glance.
  *
- * Something to order carries the square-and-dot diet mark Indian menus use. It
- * is deliberately not themed: guests read it at a glance, and its colours mean
- * a fixed thing.
+ * A consumable carries the square-and-dot diet mark Indian menus use. It is
+ * deliberately not themed: guests read it at a glance, and its colours mean a
+ * fixed thing.
  *
  * Vegan carries a leaf in that square rather than a dot, and a teal square
  * rather than a green one. Two cues rather than one, because a green square
  * with a dot and a green square with a leaf are the same thing at 16px, and a
  * guest who keeps vegan is the one person this mark has to be exact for.
  *
- * A service request has no diet, and carries a bell in the same square instead,
- * in a colour none of the diets use so it is never read as one. A basket line
- * the menu no longer lists carries neither and keeps the space, hidden from
- * screen readers, so its name still starts at the same edge.
+ * A Service has no diet, and carries a bell in the same square instead, in a
+ * colour none of the diets use so it is never read as one. Goods — a towel, a
+ * bottle nobody has marked — needs no mark at all, and keeps the space
+ * instead, hidden from screen readers so its name still starts at the same
+ * edge. A basket line the menu no longer lists reads the same way.
  */
 export function ItemMark({
+    kind,
     diet,
-    isServiceRequest,
     className,
 }: {
+    kind: MenuItemKind;
     diet: Diet | null;
-    isServiceRequest: boolean;
     className?: string;
 }) {
-    if (isServiceRequest) {
+    if (kind === 'service') {
         return (
             <span
                 role="img"
-                aria-label="Service request"
-                title="Service request"
+                aria-label="Service"
+                title="Service"
                 className={cn(
                     'inline-flex size-4 shrink-0 items-center justify-center rounded-[3px] border-2 border-sky-600 text-sky-600',
                     className,
@@ -67,7 +71,7 @@ export function ItemMark({
         );
     }
 
-    if (diet === null) {
+    if (kind === 'goods' || diet === null) {
         return (
             <span
                 aria-hidden="true"

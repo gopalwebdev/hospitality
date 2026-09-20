@@ -4,6 +4,7 @@ namespace App\Filament\Tenant\Resources\Menus\RelationManagers;
 
 use App\Enums\Currency;
 use App\Enums\ItemAvailability;
+use App\Enums\MenuItemKind;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Tables\Reordering;
 use App\Filament\Tables\StockActions;
@@ -121,12 +122,12 @@ class CategoryItemsRelationManager extends RelationManager
                 ->label(__('panel.shared.name'))
                 ->description(fn (MenuItem $record): ?string => $record->description),
 
-            TextColumn::make('is_service_request')
+            TextColumn::make('kind')
                 ->label(__('panel.items.type'))
                 ->badge()
-                ->formatStateUsing(fn (bool $state): string => (string) ($state ? __('panel.items.is_service_request') : __('panel.items.item')))
-                ->icon(fn (bool $state): Heroicon => $state ? Heroicon::OutlinedBellAlert : Heroicon::OutlinedListBullet)
-                ->color(fn (bool $state): string => $state ? 'info' : 'gray'),
+                ->formatStateUsing(fn (MenuItemKind $state): string => $state->label())
+                ->icon(fn (MenuItemKind $state): Heroicon => $state->icon())
+                ->color(fn (MenuItemKind $state): string => $state->color()),
 
             // Formatted here rather than in the browser: a panel is server
             // rendered, and the currency is resolved once for the table.

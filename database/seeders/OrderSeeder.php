@@ -16,11 +16,12 @@ use App\Models\MenuAddOnOption;
 use App\Models\MenuCombo;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 
 /**
  * A realistic spread of orders and stock history against the tenants TenantSeeder makes.
@@ -84,9 +85,9 @@ class OrderSeeder extends Seeder
         try {
             $this->seedSpiceOrders($now, $placeOrder, $cancelOrder, $applyStockChanges, $recordStockMovement);
             $this->seedSeaviewOrders($now, $placeOrder, $cancelOrder, $applyStockChanges, $recordStockMovement);
-            $this->seedSunriseOrders($now, $placeOrder, $cancelOrder, $applyStockChanges, $recordStockMovement);
+            $this->seedSunriseOrders($now, $placeOrder, $applyStockChanges, $recordStockMovement);
         } finally {
-            Carbon::setTestNow(null);
+            Date::setTestNow();
         }
     }
 
@@ -112,14 +113,14 @@ class OrderSeeder extends Seeder
 
         [$owner, $staff] = $this->peopleOf($tenant);
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '07:30'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '07:30'));
         $this->seedInitialStockHistory($tenant, $recordStockMovement, $owner);
 
         $main = $this->menuNamed($tenant, 'Main Menu');
         $drinks = $this->menuNamed($tenant, 'Drinks');
         $breakfast = $this->menuNamed($tenant, 'Breakfast');
 
-        Carbon::setTestNow($this->openMoment($now, '13:00'));
+        Date::setTestNow($this->openMoment($now, '13:00'));
         $placeOrder($tenant, $main, [
             $this->line('tikka', $this->itemNamed($tenant, 'Paneer Tikka'), 2, [
                 [$this->optionNamed($tenant, 'Spice level', 'Medium'), 1],
@@ -127,7 +128,7 @@ class OrderSeeder extends Seeder
             $this->line('feast', $this->comboNamed($tenant, 'Biryani Feast')),
         ], locationLabel: 'Table 4', note: 'Extra spicy please');
 
-        Carbon::setTestNow($this->openMoment($now->subDay(), '19:30'));
+        Date::setTestNow($this->openMoment($now->subDay(), '19:30'));
         $placeOrder($tenant, $main, [
             $this->line('biryani', $this->itemNamed($tenant, 'Hyderabadi Chicken Biryani'), 1, [
                 [$this->optionNamed($tenant, 'Portion', 'Full'), 1],
@@ -139,7 +140,7 @@ class OrderSeeder extends Seeder
         // `StockMovementReason::OrderCancelled` example — the other cancelled
         // order (Seaview's) holds nothing counted, and a cancellation with
         // nothing to give back writes no movement at all.
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '12:00'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '12:00'));
         $cancelled = $placeOrder($tenant, $main, [
             $this->line('chicken65', $this->itemNamed($tenant, 'Chicken 65'), 1, [
                 [$this->optionNamed($tenant, 'Spice level', 'Hot'), 1],
@@ -149,10 +150,10 @@ class OrderSeeder extends Seeder
             ]),
         ], locationLabel: 'Table 2', note: 'Customer changed mind');
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '14:00'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '14:00'));
         $cancelOrder($cancelled, $staff);
 
-        Carbon::setTestNow($this->openMoment($now, '10:00'));
+        Date::setTestNow($this->openMoment($now, '10:00'));
         $placeOrder($tenant, $drinks, [
             $this->line('coffee', $this->itemNamed($tenant, 'Filter Coffee'), 2, [
                 [$this->optionNamed($tenant, 'Sugar', 'Less sugar'), 1],
@@ -166,7 +167,7 @@ class OrderSeeder extends Seeder
         // Within both windows: the breakfast card's own 07:00-11:00 and the
         // tenant's daily 09:00-23:00 — a menu can be served before its
         // tenant opens its doors, and PlaceOrder checks both.
-        Carbon::setTestNow($this->openMoment($now, '09:15'));
+        Date::setTestNow($this->openMoment($now, '09:15'));
         $placeOrder($tenant, $breakfast, [
             $this->line('dosa', $this->itemNamed($tenant, 'Masala Dosa')),
             $this->line('idli', $this->itemNamed($tenant, 'Idli Plate'), 1, [
@@ -174,7 +175,7 @@ class OrderSeeder extends Seeder
             ]),
         ], locationLabel: 'Table 1', note: 'Pack it');
 
-        Carbon::setTestNow($this->openMoment($now, '17:00'));
+        Date::setTestNow($this->openMoment($now, '17:00'));
         $this->restock($tenant, $applyStockChanges, $staff, 'Hyderabadi Chicken Biryani', 10, 'Fresh batch prepared for dinner service');
     }
 
@@ -200,14 +201,14 @@ class OrderSeeder extends Seeder
 
         [$owner, $staff] = $this->peopleOf($tenant);
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '07:30'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '07:30'));
         $this->seedInitialStockHistory($tenant, $recordStockMovement, $owner);
 
         $inRoomDining = $this->menuNamed($tenant, 'In-room Dining');
         $breakfast = $this->menuNamed($tenant, 'Breakfast');
         $roomRequests = $this->menuNamed($tenant, 'Room Requests');
 
-        Carbon::setTestNow($this->openMoment($now, '20:00'));
+        Date::setTestNow($this->openMoment($now, '20:00'));
         $placeOrder($tenant, $inRoomDining, [
             $this->line('paneer', $this->itemNamed($tenant, 'Paneer Butter Masala'), 1, [
                 [$this->optionNamed($tenant, 'Choose your bread', 'Garlic naan'), 1],
@@ -215,7 +216,7 @@ class OrderSeeder extends Seeder
             $this->line('thali', $this->comboNamed($tenant, 'Veg Thali')),
         ], locationLabel: 'Room 204', note: 'Deliver by 8pm');
 
-        Carbon::setTestNow($this->openMoment($now->subDay(), '11:00'));
+        Date::setTestNow($this->openMoment($now->subDay(), '11:00'));
         $placeOrder($tenant, $roomRequests, [
             $this->line('pillow', $this->itemNamed($tenant, 'Extra Pillow'), 2, [
                 [$this->optionNamed($tenant, 'Pillow type', 'Memory foam'), 1],
@@ -224,7 +225,7 @@ class OrderSeeder extends Seeder
             $this->line('water', $this->itemNamed($tenant, 'Water Bottle (1 L)')),
         ], locationLabel: 'Room 310');
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '13:00'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '13:00'));
         $cancelled = $placeOrder($tenant, $inRoomDining, [
             $this->line('butterchicken', $this->itemNamed($tenant, 'Butter Chicken'), 1, [
                 [$this->optionNamed($tenant, 'Choose your bread', 'Tandoori roti'), 1],
@@ -232,10 +233,10 @@ class OrderSeeder extends Seeder
             $this->line('naan', $this->itemNamed($tenant, 'Butter Naan'), 2),
         ], locationLabel: 'Room 118', note: 'Wrong room, cancel');
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '15:00'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '15:00'));
         $cancelOrder($cancelled, $staff);
 
-        Carbon::setTestNow($this->openMoment($now, '09:00'));
+        Date::setTestNow($this->openMoment($now, '09:00'));
         $placeOrder($tenant, $breakfast, [
             $this->line('bhurji', $this->itemNamed($tenant, 'Egg Bhurji'), 1, [
                 [$this->optionNamed($tenant, 'Spice level', 'Mild'), 1],
@@ -243,7 +244,7 @@ class OrderSeeder extends Seeder
             $this->line('omelette', $this->itemNamed($tenant, 'Omelette')),
         ], locationLabel: 'Room 220');
 
-        Carbon::setTestNow($this->openMoment($now, '17:00'));
+        Date::setTestNow($this->openMoment($now, '17:00'));
         $this->restock($tenant, $applyStockChanges, $staff, 'Extra Pillow', 10, 'Linen delivery arrived');
     }
 
@@ -254,7 +255,6 @@ class OrderSeeder extends Seeder
     private function seedSunriseOrders(
         CarbonImmutable $now,
         PlaceOrder $placeOrder,
-        CancelOrder $cancelOrder,
         ApplyStockChanges $applyStockChanges,
         RecordStockMovement $recordStockMovement,
     ): void {
@@ -266,12 +266,12 @@ class OrderSeeder extends Seeder
 
         [$owner, $staff] = $this->peopleOf($tenant);
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '07:30'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '07:30'));
         $this->seedInitialStockHistory($tenant, $recordStockMovement, $owner);
 
         $patientCare = $this->menuNamed($tenant, 'Patient Care');
 
-        Carbon::setTestNow($this->openMoment($now, '13:00'));
+        Date::setTestNow($this->openMoment($now, '13:00'));
         $placeOrder($tenant, $patientCare, [
             $this->line('thali', $this->itemNamed($tenant, 'Regular Thali')),
             $this->line('coffee', $this->itemNamed($tenant, 'Filter Coffee'), 1, [
@@ -279,7 +279,7 @@ class OrderSeeder extends Seeder
             ]),
         ], locationLabel: 'Ward 3B');
 
-        Carbon::setTestNow($this->openMoment($now->subDay(), '12:30'));
+        Date::setTestNow($this->openMoment($now->subDay(), '12:30'));
         $placeOrder($tenant, $patientCare, [
             $this->line('tray', $this->itemNamed($tenant, 'Attender Meal Tray')),
             $this->line('pillow', $this->itemNamed($tenant, 'Extra Pillow'), 2, [
@@ -287,13 +287,13 @@ class OrderSeeder extends Seeder
             ]),
         ], locationLabel: 'Ward 5A');
 
-        Carbon::setTestNow($this->openMoment($now->subWeek(), '09:00'));
+        Date::setTestNow($this->openMoment($now->subWeek(), '09:00'));
         $placeOrder($tenant, $patientCare, [
             $this->line('diabetic', $this->itemNamed($tenant, 'Diabetic Thali')),
             $this->line('wheelchair', $this->itemNamed($tenant, 'Wheelchair Assistance')),
         ], locationLabel: 'Ward 1C', note: 'Diabetic patient, low sugar');
 
-        Carbon::setTestNow($this->openMoment($now, '17:00'));
+        Date::setTestNow($this->openMoment($now, '17:00'));
         $this->restock($tenant, $applyStockChanges, $staff, 'Extra Pillow', 5, 'Housekeeping restocked the ward store');
     }
 
@@ -317,13 +317,13 @@ class OrderSeeder extends Seeder
             // analysis can read back onto the column's own `int|null` type,
             // hence the cast — the same one ApplyStockChanges itself makes
             // of a value it has already established is not null.
-            ->each(fn (MenuItem $item) => $recordStockMovement($item, (int) $item->stock_quantity, StockMovementReason::Count, user: $owner));
+            ->each(fn (MenuItem $item): StockMovement => $recordStockMovement($item, (int) $item->stock_quantity, StockMovementReason::Count, user: $owner));
 
         MenuAddOnOption::query()
             ->where('tenant_id', $tenant->getKey())
             ->where('stock_quantity', '>', 0)
             ->get(['id', 'tenant_id', 'stock_quantity'])
-            ->each(fn (MenuAddOnOption $option) => $recordStockMovement($option, (int) $option->stock_quantity, StockMovementReason::Count, user: $owner));
+            ->each(fn (MenuAddOnOption $option): StockMovement => $recordStockMovement($option, (int) $option->stock_quantity, StockMovementReason::Count, user: $owner));
     }
 
     /**

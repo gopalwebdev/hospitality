@@ -4,6 +4,7 @@ use App\Enums\Appearance;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuItemKind;
 use App\Enums\MenuRailType;
 use App\Enums\Weekday;
 use App\Models\Charge;
@@ -612,14 +613,15 @@ it('sends only the charges a menu carries, switched on, in the order arranged', 
         );
 });
 
-it('sends a service request with no diet mark, beside something to order', function (): void {
+it('sends a service with no diet mark, beside a consumable and goods', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
 
     $pillow = MenuItem::factory()->inCategory($category)->service()->create(['position' => 0]);
+    $towel = MenuItem::factory()->inCategory($category)->goods()->create(['position' => 1]);
     $water = MenuItem::factory()->inCategory($category)->create([
-        'position' => 1,
+        'position' => 2,
         'diets' => [Diet::Vegetarian],
     ]);
 
@@ -627,13 +629,16 @@ it('sends a service request with no diet mark, beside something to order', funct
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $pillow->getKey())
-            ->where('sections.0.items.0.isServiceRequest', true)
+            ->where('sections.0.items.0.kind', MenuItemKind::Service->value)
             ->where('sections.0.items.0.diet', null)
             // Zero goes out as zero; the app names it complimentary.
             ->where('sections.0.items.0.price', 0)
-            ->where('sections.0.items.1.id', $water->getKey())
-            ->where('sections.0.items.1.isServiceRequest', false)
-            ->where('sections.0.items.1.diet', Diet::Vegetarian->value),
+            ->where('sections.0.items.1.id', $towel->getKey())
+            ->where('sections.0.items.1.kind', MenuItemKind::Goods->value)
+            ->where('sections.0.items.1.diet', null)
+            ->where('sections.0.items.2.id', $water->getKey())
+            ->where('sections.0.items.2.kind', MenuItemKind::Consumable->value)
+            ->where('sections.0.items.2.diet', Diet::Vegetarian->value),
         );
 });
 

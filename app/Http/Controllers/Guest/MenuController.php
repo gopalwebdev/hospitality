@@ -140,7 +140,7 @@ class MenuController extends Controller
             ->whereDoesntHave('comboItems.menuItem', fn ($item) => $item->where('stock_quantity', 0))
             ->with(['comboItems' => fn ($comboItems) => $comboItems
                 ->select(['id', 'menu_combo_id', 'menu_item_id', 'quantity'])
-                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'is_service_request', 'diets'])])
+                ->with(['menuItem' => fn ($item) => $item->select(['id', 'name', 'kind', 'diets'])])
                 ->inMenuOrder()])
             ->inMenuOrder()
             ->get();
@@ -167,7 +167,7 @@ class MenuController extends Controller
                 'contents' => $combo->comboItems->map(fn (MenuComboItem $comboItem): array => [
                     'id' => $comboItem->getKey(),
                     'name' => $comboItem->menuItem->name,
-                    'isServiceRequest' => $comboItem->menuItem->is_service_request,
+                    'kind' => $comboItem->menuItem->kind->value,
                     'diet' => $comboItem->menuItem->dietMark()?->value,
                     'quantity' => $comboItem->quantity,
                 ])->values()->all(),
@@ -377,7 +377,7 @@ class MenuController extends Controller
             'description',
             'price',
             'original_price',
-            'is_service_request',
+            'kind',
             'diets',
             'max_per_order',
         ];
@@ -464,10 +464,11 @@ class MenuController extends Controller
             // refuses one at or below the price being charged, so the app never
             // has to decide whether what it was handed is believable.
             'originalPrice' => $item->hasComparePrice() ? $item->original_price : null,
-            'isServiceRequest' => $item->is_service_request,
+            'kind' => $item->kind->value,
             // One mark, not the list the item carries: the strictest says
             // everything the others do, and the menu keeps one square per row.
-            // Null for a service request, which the app marks with a bell instead.
+            // Null for a kind that carries none, which the app marks
+            // accordingly — a bell for Service, a blank space for Goods.
             'diet' => $item->dietMark()?->value,
             // The most one order may hold, counted across every basket line it
             // is on. Null is no limit.

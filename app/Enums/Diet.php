@@ -14,8 +14,8 @@ namespace App\Enums;
  * Vegan is a mark of its own rather than a kind of vegetarian. It is a stricter
  * claim — no dairy, no honey — and in a country where most vegetarian cooking
  * uses ghee, curd and milk, a guest who keeps it cannot read it off the green
- * square. FSSAI agrees: its Vegan Foods Regulations of 2022 gave vegan a
- * separate mark rather than folding it into the green one.
+ * square. FSSAI agrees: its 2022 regulations for vegan-labelled products gave
+ * vegan a separate mark rather than folding it into the green one.
  *
  * The cases run the two plant marks, then egg, then non-veg, which is the order
  * they are offered in and tabbed by.

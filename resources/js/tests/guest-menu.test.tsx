@@ -35,7 +35,7 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         description: null,
         price: 24950,
         originalPrice: null,
-        isServiceRequest: false,
+        kind: 'consumable',
         diet: 'vegetarian',
         addOnGroupLinks: [],
         maxPerOrder: null,
@@ -199,7 +199,7 @@ describe('guest menu', () => {
         expect(screen.getByLabelText('Vegetarian')).toBeInTheDocument();
     });
 
-    it('marks a service request with a bell rather than a diet, and names a zero price rather than pricing it', () => {
+    it('marks a service with a bell rather than a diet, and names a zero price rather than pricing it', () => {
         renderMenu({
             sections: [
                 {
@@ -208,8 +208,8 @@ describe('guest menu', () => {
                     items: [
                         item({
                             id: 20,
-                            name: 'Extra Pillow',
-                            isServiceRequest: true,
+                            name: 'Wheelchair Assistance',
+                            kind: 'service',
                             diet: null,
                             price: 0,
                         }),
@@ -219,10 +219,10 @@ describe('guest menu', () => {
             ],
         });
 
-        expect(screen.getByText('Extra Pillow')).toBeInTheDocument();
-        // A pillow has no diet to declare, and is marked as what it is instead.
+        expect(screen.getByText('Wheelchair Assistance')).toBeInTheDocument();
+        // A service has no diet to declare, and is marked as what it is instead.
         expect(
-            screen.getByRole('img', { name: 'Service request' }),
+            screen.getByRole('img', { name: 'Service' }),
         ).toBeInTheDocument();
         expect(
             screen.queryByLabelText(/vegetarian|egg/i),
@@ -436,7 +436,7 @@ describe('guest menu', () => {
                         item({
                             id: 20,
                             name: 'Extra Blanket',
-                            isServiceRequest: true,
+                            kind: 'goods',
                             diet: null,
                             price: 0,
                             maxPerOrder: 2,
@@ -628,14 +628,14 @@ describe('guest menu', () => {
                         {
                             id: 30,
                             name: 'Chicken Biryani',
-                            isServiceRequest: false,
+                            kind: 'consumable',
                             diet: 'non-vegetarian',
                             quantity: 2,
                         },
                         {
                             id: 31,
                             name: 'Raita',
-                            isServiceRequest: false,
+                            kind: 'consumable',
                             diet: 'vegetarian',
                             quantity: 1,
                         },

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuItemKind;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -37,7 +38,7 @@ class MenuItemFactory extends Factory
             'original_price' => null,
             'tax_rate' => null,
             'hsn_sac_code' => null,
-            'is_service_request' => false,
+            'kind' => MenuItemKind::Consumable,
             'diets' => [fake()->randomElement(Diet::cases())],
             'availability' => ItemAvailability::Available,
             'max_per_order' => null,
@@ -58,12 +59,24 @@ class MenuItemFactory extends Factory
     }
 
     /**
-     * A service request: no diet mark, and complimentary.
+     * Goods: no diet mark, taxed as goods rather than as something served.
+     */
+    public function goods(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'kind' => MenuItemKind::Goods,
+            'diets' => null,
+        ]);
+    }
+
+    /**
+     * A service: no diet mark, and complimentary — a laundry pickup or a
+     * wheelchair called for, not sold.
      */
     public function service(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'is_service_request' => true,
+            'kind' => MenuItemKind::Service,
             'diets' => null,
             'price' => 0,
         ]);

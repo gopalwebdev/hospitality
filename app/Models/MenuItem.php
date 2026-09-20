@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
+use App\Enums\MenuItemKind;
 use App\Models\Concerns\HasPricing;
 use App\Models\Concerns\HasTranslatedNames;
 use App\Observers\MenuItemObserver;
@@ -21,8 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 /**
- * One item on a menu — something to order, or a service request — filed under exactly one category at either level.
- * Prices are integer minor units; a service request carries no diet mark, and everything else carries at least one.
+ * One item on a menu — Consumable, Goods or Service (App\Enums\MenuItemKind) — filed under exactly one category at either level.
+ * Prices are integer minor units; only Consumable carries a diet mark, and Consumable and Goods take an HSN code where Service takes a SAC.
  *
  * @property int $id
  * @property int $tenant_id
@@ -34,7 +35,7 @@ use Illuminate\Support\Collection;
  * @property int|null $original_price
  * @property int|null $tax_rate
  * @property string|null $hsn_sac_code
- * @property bool $is_service_request
+ * @property MenuItemKind $kind
  * @property Collection<int, Diet>|null $diets
  * @property ItemAvailability $availability
  * @property int|null $max_per_order
@@ -53,7 +54,7 @@ use Illuminate\Support\Collection;
     'original_price',
     'tax_rate',
     'hsn_sac_code',
-    'is_service_request',
+    'kind',
     'diets',
     'availability',
     'max_per_order',
@@ -75,14 +76,14 @@ class MenuItem extends Model
     public array $translatable = ['name', 'description'];
 
     /**
-     * is_service_request and stock_quantity are mirrored here because MenuItemObserver reads them before and after the row is inserted.
+     * kind and stock_quantity are mirrored here because MenuItemObserver reads them before and after the row is inserted.
      *
      * @var array<string, mixed>
      */
     #[\Override]
     protected $attributes = [
         'position' => 0,
-        'is_service_request' => false,
+        'kind' => MenuItemKind::Consumable->value,
         'availability' => ItemAvailability::Available->value,
         'stock_quantity' => null,
         'is_featured' => false,
@@ -165,7 +166,7 @@ class MenuItem extends Model
     }
 
     /**
-     * The one diet mark a guest reads beside this item, or null for a service request.
+     * The one diet mark a guest reads beside this item, or null for a kind that carries none.
      *
      * An item may carry several — vegetarian and vegan together — but the menu
      * shows the strictest of them, which already says everything the others do.
@@ -233,7 +234,7 @@ class MenuItem extends Model
             'price' => 'integer',
             'original_price' => 'integer',
             'tax_rate' => 'integer',
-            'is_service_request' => 'boolean',
+            'kind' => MenuItemKind::class,
             'diets' => AsEnumCollection::of(Diet::class),
             'availability' => ItemAvailability::class,
             'max_per_order' => 'integer',

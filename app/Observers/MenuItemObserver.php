@@ -16,7 +16,7 @@ class MenuItemObserver
 {
     public function saving(MenuItem $item): void
     {
-        $this->pairDietWithService($item);
+        $this->pairDietWithKind($item);
         $this->pairStockWithAvailability($item);
 
         app(InheritParentTenant::class)($item, MenuCategory::class, 'menu_category_id');
@@ -60,21 +60,23 @@ class MenuItemObserver
     }
 
     /**
-     * Keep the diet marks in step with the service flag, as the CHECK constraints do.
+     * Keep the diet marks in step with the kind, as the CHECK constraints do.
      *
-     * A service request has its marks cleared, which is what lets an item become
-     * one at all; anything else refuses to save without at least one mark, and
-     * refuses two that contradict each other. A saved item whose flag and marks
-     * are both untouched is left alone, so renumbering a list reads no column it
-     * was not given.
+     * MenuItemKind::requiresDietMark() is the single source of truth for the
+     * pairing: a kind that does not require one has its marks cleared, which is
+     * what lets an item change kind at all; a kind that does require one
+     * refuses to save without at least one mark, and refuses two that
+     * contradict each other. A saved item whose kind and marks are both
+     * untouched is left alone, so renumbering a list reads no column it was
+     * not given.
      */
-    private function pairDietWithService(MenuItem $item): void
+    private function pairDietWithKind(MenuItem $item): void
     {
-        if ($item->exists && ! $item->isDirty(['is_service_request', 'diets'])) {
+        if ($item->exists && ! $item->isDirty(['kind', 'diets'])) {
             return;
         }
 
-        if ($item->is_service_request) {
+        if (! $item->kind->requiresDietMark()) {
             $item->diets = null;
 
             return;
@@ -85,7 +87,7 @@ class MenuItemObserver
         throw_if(
             $diets === null || $diets->isEmpty(),
             LogicException::class,
-            'An item that is not a service request needs a diet mark.',
+            "An item of kind {$item->kind->label()} needs a diet mark.",
         );
 
         foreach ($diets as $diet) {

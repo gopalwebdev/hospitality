@@ -2,6 +2,7 @@
 
 use App\Enums\Diet;
 use App\Enums\HomeTileAction;
+use App\Enums\MenuItemKind;
 use App\Enums\Role;
 use App\Models\Charge;
 use App\Models\HomeTile;
@@ -197,13 +198,13 @@ it('seeds a hotel whose room requests share a menu with things to order', functi
         ->pluck('menu_id')
         ->unique();
 
-    // One card holds both: a service request with no diet mark and no price,
-    // and something to order with both.
+    // One card holds both: Goods with no diet mark and no price, and a
+    // Consumable with both.
     expect($menusHoldingThem)->toHaveCount(1)
-        ->and($pillow->is_service_request)->toBeTrue()
+        ->and($pillow->kind)->toBe(MenuItemKind::Goods)
         ->and($pillow->diets)->toBeNull()
         ->and($pillow->isComplimentary())->toBeTrue()
-        ->and($water->is_service_request)->toBeFalse()
+        ->and($water->kind)->toBe(MenuItemKind::Consumable)
         ->and($water->dietMark())->toBe(Diet::Vegetarian)
         ->and($water->isComplimentary())->toBeFalse();
 });

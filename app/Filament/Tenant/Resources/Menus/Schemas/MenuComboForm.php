@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Menus\Schemas;
 
+use App\Enums\MenuItemKind;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuCombo;
@@ -128,12 +129,13 @@ class MenuComboForm
     /**
      * The items this combo may contain, grouped under the category each is filed in.
      *
-     * Every item on the same menu that is something to order: a service request
-     * — a laundry pickup, an extra pillow — is asked for, not sold in a bundle.
-     * Each option is the item's name alone, with its category as the heading
-     * above it, so the list reads the way the menu does and two items of one
-     * name in different categories are still told apart. The groups come in
-     * menu order: a category, then its own sub-categories.
+     * Only items of kind Consumable: neither Goods (a towel, a branded takeaway tin)
+     * nor a Service (a laundry pickup) is sold in a bundle, both being asked
+     * for on their own rather than combined. Each option is the item's name
+     * alone, with its category as the heading above it, so the list reads the
+     * way the menu does and two items of one name in different categories are
+     * still told apart. The groups come in menu order: a category, then its
+     * own sub-categories.
      *
      * @return array<string, array<int, string>>
      */
@@ -146,7 +148,7 @@ class MenuComboForm
         // once(): a repeater asks every row's select for its options.
         return once(fn (): array => MenuItem::query()
             ->onMenu($menuId)
-            ->where('is_service_request', false)
+            ->where('kind', MenuItemKind::Consumable)
             ->with(['menuCategory:id,parent_id,name,position', 'menuCategory.parent:id,name,position'])
             ->inMenuOrder()
             ->get()

@@ -11,6 +11,7 @@ use App\Enums\HomeRowLayout;
 use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuItemKind;
 use App\Enums\MenuRailType;
 use App\Enums\Role;
 use App\Enums\TenantType;
@@ -50,7 +51,7 @@ class TenantSeeder extends Seeder
      *
      * `menus` names the cards in CARDS each one gets, in the order its guests
      * read them: a restaurant and a hotel serve different things, and the
-     * hotel is what shows items and service requests sharing one menu.
+     * hotel is what shows Consumable, Goods and Service items sharing one menu.
      *
      * The GST fields make the three demonstrate every `GstTreatment` and both
      * `prices_include_tax` states, because a fresh install otherwise shows
@@ -361,7 +362,7 @@ class TenantSeeder extends Seeder
             'items' => ['Fresh Lime Soda'],
         ],
         [
-            // A service request customised like anything else: which pillow.
+            // Goods customised like anything else: which pillow.
             'name' => ['en' => 'Pillow type', 'ta' => 'தலையணை வகை'],
             'is_required' => true,
             'max_picks' => 1,
@@ -434,9 +435,11 @@ class TenantSeeder extends Seeder
      * What a hotel guest asks for from the room: housekeeping, and a few things
      * to drink beside it.
      *
-     * Most of it is a service request and most of that is complimentary, which
-     * is what the card is for — it shows a pillow and a bottle of water on one
-     * menu, one with no diet mark and no price, the other with both.
+     * Most of it is Goods and most of that is complimentary, which is what the
+     * card is for — it shows a pillow and a bottle of water on one menu, one
+     * with no diet mark and no price, the other with both. Laundry Pickup is
+     * the one genuine Service on the card, charged for and carrying a SAC
+     * rather than an HSN.
      *
      * @var list<array<string, mixed>>
      */
@@ -446,7 +449,7 @@ class TenantSeeder extends Seeder
             'items' => [
                 [
                     'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
                     // Two to an order, however they are split between kinds.
                     'max_per_order' => 2,
@@ -454,28 +457,36 @@ class TenantSeeder extends Seeder
                     'stock_quantity' => 30,
                     'is_featured' => true,
                     'featured_position' => 1,
+                    // Mattress supports, bedding and pillows.
+                    'hsn_sac_code' => '9404',
                 ],
                 [
                     'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
                     'max_per_order' => 2,
+                    // Blankets and travelling rugs.
+                    'hsn_sac_code' => '6301',
                 ],
                 [
                     'name' => ['en' => 'Bedsheet Change', 'ta' => 'படுக்கை விரிப்பு மாற்றம்'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
                     'max_per_order' => 1,
+                    // Bed linen, table linen, toilet linen and kitchen linen.
+                    'hsn_sac_code' => '6302',
                 ],
                 [
                     'name' => ['en' => 'Towel Set', 'ta' => 'துண்டு தொகுப்பு'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
+                    // Toilet linen, the same heading a bedsheet carries.
+                    'hsn_sac_code' => '6302',
                 ],
                 [
-                    // A service request that is charged for, at the rate services pay.
+                    // A Service that is charged for, at the rate services pay.
                     'name' => ['en' => 'Laundry Pickup', 'ta' => 'சலவை சேகரிப்பு'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Service,
                     'price' => 15000,
                     'tax_rate' => 1800,
                     // A SAC, not an HSN: this is a service, not a good.
@@ -488,8 +499,10 @@ class TenantSeeder extends Seeder
             'items' => [
                 [
                     'name' => ['en' => 'Toiletry Kit', 'ta' => 'கழிப்பறை பொருட்கள் தொகுப்பு'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
+                    // Travel sets for personal toilet.
+                    'hsn_sac_code' => '9605',
                 ],
                 [
                     // Something to order on the same card as the pillows: a
@@ -514,9 +527,9 @@ class TenantSeeder extends Seeder
 
     /**
      * What the hospital's card carries: meals a ward orders, and a handful of
-     * requests beside them — the same "things to order and service requests
-     * side by side" shape the hotel's room requests card shows, in a
-     * hospital's own words rather than a hotel's.
+     * requests beside them — the same "Consumable, Goods and Service items side
+     * by side" shape the hotel's room requests card shows, in a hospital's own words
+     * rather than a hotel's.
      *
      * Reuses a few of the restaurant and hotel's own English names on
      * purpose — Filter Coffee, Extra Pillow — so `seedAddOnGroups()` links
@@ -558,17 +571,19 @@ class TenantSeeder extends Seeder
                     // and still worth a SAC, because a support service is
                     // billed to the stay even at a price of nothing.
                     'name' => ['en' => 'Wheelchair Assistance', 'ta' => 'சக்கர நாற்காலி உதவி'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Service,
                     'price' => 0,
                     'max_per_order' => 1,
                     'hsn_sac_code' => '999312',
                 ],
                 [
                     'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
-                    'is_service_request' => true,
+                    'kind' => MenuItemKind::Goods,
                     'price' => 0,
                     'max_per_order' => 2,
                     'stock_quantity' => 15,
+                    // Mattress supports, bedding and pillows.
+                    'hsn_sac_code' => '9404',
                 ],
                 [
                     // Something to order beside the requests, the way the
@@ -805,8 +820,10 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Bottled', 'ta' => 'பாட்டில்'],
                     'items' => [
                         [
-                            // Sealed goods rather than a served drink, and an
-                            // aerated one at that — 40% under GST 2.0.
+                            // Sealed and taxed the way packaged goods are, and
+                            // an aerated one at that — 40% under GST 2.0 — but
+                            // still a Consumable: a guest drinks it, so it keeps
+                            // its diet mark, unlike the masala powder below.
                             'name' => ['en' => 'Cola', 'ta' => 'கோலா'],
                             'price' => 6000,
                             'diets' => [Diet::Vegetarian],
@@ -819,6 +836,15 @@ class TenantSeeder extends Seeder
                             'diets' => [Diet::Vegetarian],
                             'tax_rate' => 1800,
                             'hsn_sac_code' => '2201',
+                        ],
+                        [
+                            // Genuinely Goods, unlike the drinks above it: a
+                            // branded tin to take home rather than something
+                            // drunk here, so it carries no diet mark.
+                            'name' => ['en' => 'House Masala Powder (200 g)', 'ta' => 'ஹவுஸ் மசாலா பொடி (200 கி)'],
+                            'kind' => MenuItemKind::Goods,
+                            'price' => 15000,
+                            'hsn_sac_code' => '0910',
                         ],
                     ],
                 ],
@@ -1337,9 +1363,9 @@ class TenantSeeder extends Seeder
      * One item, and its offer if it has one.
      *
      * The category may be a section or one of its subdivisions; an item is filed
-     * under exactly one either way. An item is something to order unless its card
-     * marks it a service request, and only a service request goes without a diet
-     * mark; everything else carries at least one, and a vegan item carries two.
+     * under exactly one either way. An item defaults to Consumable, the only
+     * kind that carries a diet mark; a card marks one Goods or Service instead,
+     * and both of those go without one.
      *
      * @param  array<string, mixed>  $item
      */
@@ -1357,7 +1383,7 @@ class TenantSeeder extends Seeder
                 // Null on almost every item: not on offer. A zero would be a
                 // price of nothing.
                 'original_price' => $item['original_price'] ?? null,
-                'is_service_request' => $item['is_service_request'] ?? false,
+                'kind' => $item['kind'] ?? MenuItemKind::Consumable,
                 'diets' => $item['diets'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 // Null is no limit.

@@ -6,7 +6,7 @@ import { BasketBar } from '@/components/basket-bar';
 import { BasketSheet, type LineDescription } from '@/components/basket-sheet';
 import { CustomiseSheet } from '@/components/customise-sheet';
 import { PlusIcon, StarIcon } from '@/components/icons';
-import { ItemMark, type Diet } from '@/components/item-mark';
+import { ItemMark, type Diet, type MenuItemKind } from '@/components/item-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -40,9 +40,9 @@ export interface MenuItem extends OrderLimits {
     price: number;
     /** A higher price to show struck through, or null when not on offer. */
     originalPrice: number | null;
-    /** A service request — an extra pillow — rather than something to order. */
-    isServiceRequest: boolean;
-    /** Null for a service request, which carries a bell mark instead. */
+    /** Consumable, Goods or Service — App\Enums\MenuItemKind. */
+    kind: MenuItemKind;
+    /** Null unless the kind is Consumable, which is the only one a bell or a blank space stands in for. */
     diet: Diet | null;
     /** The add-on groups it is customised with, in the order a guest reads them. */
     addOnGroupLinks: AddOnGroupLink[];
@@ -51,7 +51,7 @@ export interface MenuItem extends OrderLimits {
 interface ComboContent {
     id: number;
     name: string;
-    isServiceRequest: boolean;
+    kind: MenuItemKind;
     diet: Diet | null;
     quantity: number;
 }
@@ -439,7 +439,10 @@ function describeLine({
         return {
             name: item?.name ?? combo?.name ?? line.name,
             diet: item?.diet ?? null,
-            isServiceRequest: item?.isServiceRequest ?? false,
+            // Goods needs no mark, so it is what a line the menu no longer
+            // lists falls back to: it keeps the mark's space blank whatever
+            // its diet reads.
+            kind: item?.kind ?? 'goods',
             limits: item ?? combo ?? { maxPerOrder: null },
             choices: line.choices.flatMap((choice) => {
                 const option = optionsById.get(choice.optionId);
@@ -639,8 +642,8 @@ function ComboCard({ combo }: { combo: Combo }) {
                                 className="text-muted-foreground flex items-center gap-2 text-sm"
                             >
                                 <ItemMark
+                                    kind={content.kind}
                                     diet={content.diet}
-                                    isServiceRequest={content.isServiceRequest}
                                 />
                                 <span>
                                     {content.quantity > 1 &&
@@ -791,11 +794,7 @@ function Item({
 
     return (
         <article className="flex items-start gap-3 px-5 py-4">
-            <ItemMark
-                diet={item.diet}
-                isServiceRequest={item.isServiceRequest}
-                className="mt-1"
-            />
+            <ItemMark kind={item.kind} diet={item.diet} className="mt-1" />
 
             {/* Name, price and description read down the left, the way a
                 guest already reads a delivery app, which leaves the right to

@@ -5,6 +5,7 @@ use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuItemKind;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Schemas\PricingFields;
@@ -22,6 +23,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Database\QueryException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use LogicException;
@@ -1029,15 +1031,15 @@ it('taxes an option at the rate of the item it is added to', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Service requests
+| Kind and diet marks
 |--------------------------------------------------------------------------
 |
-| An extra pillow sits on the same menu as a bottle of water. Everything that
-| is not a service request carries a diet mark; a service request never does.
+| An extra pillow sits on the same menu as a bottle of water. Only Consumable
+| (App\Enums\MenuItemKind) carries a diet mark; Goods and Service never do.
 |
 */
 
-it('saves a service request without a diet mark', function (): void {
+it('saves goods without a diet mark', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -1049,7 +1051,7 @@ it('saves a service request without a diet mark', function (): void {
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extra Pillow'],
             'menu_category_id' => $category->getKey(),
-            'is_service_request' => true,
+            'kind' => MenuItemKind::Goods->value,
             'price' => '0',
             'availability' => ItemAvailability::Available->value,
         ])
@@ -1058,12 +1060,12 @@ it('saves a service request without a diet mark', function (): void {
     $pillow = byEnglishName(MenuItem::class, 'Extra Pillow');
 
     // A pillow has no diet to declare, and costs a guest nothing.
-    expect($pillow->is_service_request)->toBeTrue()
+    expect($pillow->kind)->toBe(MenuItemKind::Goods)
         ->and($pillow->diets)->toBeNull()
         ->and($pillow->isComplimentary())->toBeTrue();
 });
 
-it('asks for a diet mark on anything that is not a service request', function (): void {
+it('asks for a diet mark on a consumable', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -1075,7 +1077,7 @@ it('asks for a diet mark on anything that is not a service request', function ()
         ->callAction('create', [
             'name' => [Locale::English->value => 'Water Bottle'],
             'menu_category_id' => $category->getKey(),
-            'is_service_request' => false,
+            'kind' => MenuItemKind::Consumable->value,
             'diets' => null,
             'price' => '40',
             'availability' => ItemAvailability::Available->value,
@@ -1148,7 +1150,7 @@ it('refuses contradictory marks written around the form, and an item carrying no
         ->toThrow(LogicException::class);
 });
 
-it('drops the diet mark of an item that becomes a service request', function (): void {
+it('drops the diet mark of an item whose kind stops requiring one', function (): void {
     $tenant = Tenant::factory()->create();
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
@@ -1161,24 +1163,45 @@ it('drops the diet mark of an item that becomes a service request', function ():
         ->callAction(TestAction::make('edit')->table($menuItem), [
             'menu_category_id' => $category->getKey(),
             'name' => $menuItem->getTranslations('name'),
-            'is_service_request' => true,
+            'kind' => MenuItemKind::Service->value,
             'price' => '0',
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($menuItem->refresh()->is_service_request)->toBeTrue()
+    expect($menuItem->refresh()->kind)->toBe(MenuItemKind::Service)
         ->and($menuItem->diets)->toBeNull();
 });
 
-it('refuses an item with no diet mark that is not a service request, even around the form', function (): void {
+it('refuses a consumable item with no diet mark, even around the form', function (): void {
     $category = MenuCategory::factory()->create();
 
     // MenuItemObserver is the backstop the CHECK constraint mirrors: code that
-    // writes around the form still cannot store an item that is neither.
+    // writes around the form still cannot store a Consumable item without one.
     expect(fn () => MenuItem::factory()->inCategory($category)->create(['diets' => null]))
         ->toThrow(LogicException::class);
 });
+
+it('refuses a consumable row with no diet mark at the database, whatever writes it', function (): void {
+    $category = MenuCategory::factory()->create();
+
+    // MenuItemObserver refuses this before it reaches Postgres, so events are
+    // switched off to prove menu_items_diets_match_kind is what actually
+    // guards a write that goes around the model entirely.
+    expect(fn () => MenuItem::withoutEvents(fn (): MenuItem => MenuItem::factory()
+        ->inCategory($category)
+        ->create(['kind' => MenuItemKind::Consumable, 'diets' => null])))
+        ->toThrow(QueryException::class);
+});
+
+it('refuses goods or a service carrying a diet mark at the database, whatever writes it', function (MenuItemKind $kind): void {
+    $category = MenuCategory::factory()->create();
+
+    expect(fn () => MenuItem::withoutEvents(fn (): MenuItem => MenuItem::factory()
+        ->inCategory($category)
+        ->create(['kind' => $kind, 'diets' => [Diet::Vegetarian]])))
+        ->toThrow(QueryException::class);
+})->with([MenuItemKind::Goods, MenuItemKind::Service]);
 
 it('refiles an item into a sub-category from the items page', function (): void {
     $tenant = Tenant::factory()->create();

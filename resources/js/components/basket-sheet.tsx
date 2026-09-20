@@ -1,5 +1,5 @@
 import { XIcon } from '@/components/icons';
-import { ItemMark, type Diet } from '@/components/item-mark';
+import { ItemMark, type Diet, type MenuItemKind } from '@/components/item-mark';
 import { Money } from '@/components/money';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ import { formatRate, wholeRate } from '@/lib/rate';
 export interface LineDescription {
     name: string;
     diet: Diet | null;
-    isServiceRequest: boolean;
+    kind: MenuItemKind;
     /** The most of the item or combo one order may hold. */
     limits: OrderLimits;
     /** Each picked option, "2 × Extra cheese" where more than one was taken. */
@@ -180,8 +180,8 @@ function LineRow({
     return (
         <li className="flex items-start gap-3 px-5 py-4">
             <ItemMark
+                kind={description.kind}
                 diet={description.diet}
-                isServiceRequest={description.isServiceRequest}
                 className="mt-1"
             />
 

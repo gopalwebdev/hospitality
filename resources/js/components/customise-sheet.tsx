@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 
-import { ItemMark, type Diet } from '@/components/item-mark';
+import { ItemMark, type Diet, type MenuItemKind } from '@/components/item-mark';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ export interface CustomisableItem extends OrderLimits {
     name: string;
     description: string | null;
     price: number;
-    isServiceRequest: boolean;
+    kind: MenuItemKind;
     diet: Diet | null;
 }
 
@@ -127,8 +127,8 @@ function Customiser({
             <SheetHeader className="border-b px-5 pt-5 pb-4 text-left">
                 <div className="flex items-start gap-3 pr-8">
                     <ItemMark
+                        kind={item.kind}
                         diet={item.diet}
-                        isServiceRequest={item.isServiceRequest}
                         className="mt-1.5"
                     />
 

@@ -4,6 +4,7 @@ namespace App\Filament\Tenant\Resources\MenuItems\Pages;
 
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
+use App\Enums\MenuItemKind;
 use App\Filament\Tenant\Resources\MenuItems\MenuItemResource;
 use App\Filament\Tenant\Resources\MenuItems\Schemas\MenuItemForm;
 use App\Models\MenuCategory;
@@ -39,7 +40,7 @@ class ListMenuItems extends ListRecords
     }
 
     /**
-     * Things to order and service requests, then the cuts the list is most often made by: what has run out, what is featured, and each diet mark.
+     * Consumables, Goods and Services, then the cuts the list is most often made by: what has run out, what is featured, and each diet mark.
      *
      * The project owner asked for Out of stock, Featured and the diet marks
      * beside the kind rather than behind the filter button; Featured replaced
@@ -57,17 +58,23 @@ class ListMenuItems extends ListRecords
                 ->badge(fn (): int => $this->counts()['all'])
                 ->deferBadge(),
 
-            'items' => Tab::make(__('panel.items.items_tab'))
-                ->icon(Heroicon::OutlinedListBullet)
-                ->badge(fn (): int => $this->counts()['items'])
+            'consumables' => Tab::make(__('panel.items.consumables_tab'))
+                ->icon(MenuItemKind::Consumable->icon())
+                ->badge(fn (): int => $this->counts()['consumables'])
                 ->deferBadge()
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('is_service_request', false)),
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('kind', MenuItemKind::Consumable)),
 
-            'service_requests' => Tab::make(__('panel.items.service_requests_tab'))
-                ->icon(Heroicon::OutlinedBellAlert)
-                ->badge(fn (): int => $this->counts()['service_requests'])
+            'goods' => Tab::make(__('panel.items.goods_tab'))
+                ->icon(MenuItemKind::Goods->icon())
+                ->badge(fn (): int => $this->counts()['goods'])
                 ->deferBadge()
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('is_service_request', true)),
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('kind', MenuItemKind::Goods)),
+
+            'services' => Tab::make(__('panel.items.services_tab'))
+                ->icon(MenuItemKind::Service->icon())
+                ->badge(fn (): int => $this->counts()['services'])
+                ->deferBadge()
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('kind', MenuItemKind::Service)),
 
             'out_of_stock' => Tab::make(__('panel.items.out_of_stock_tab'))
                 ->icon(Heroicon::OutlinedNoSymbol)
@@ -109,7 +116,7 @@ class ListMenuItems extends ListRecords
     /**
      * One mark, shaped as the jsonb array `diets @> ?` is asked with.
      */
-    private static function carrying(Diet $diet): string
+    private function carrying(Diet $diet): string
     {
         return (string) json_encode([$diet->value]);
     }
@@ -121,7 +128,7 @@ class ListMenuItems extends ListRecords
      * scope keeps it to this tenant's items. The diet counts overlap on
      * purpose: an item marked vegetarian and vegan is counted under both.
      *
-     * @return array{all: int, items: int, service_requests: int, out_of_stock: int, featured: int, veg: int, vegan: int, egg: int, non_veg: int}
+     * @return array{all: int, consumables: int, goods: int, services: int, out_of_stock: int, featured: int, veg: int, vegan: int, egg: int, non_veg: int}
      */
     private function counts(): array
     {
@@ -130,8 +137,9 @@ class ListMenuItems extends ListRecords
                 ->toBase()
                 ->selectRaw(
                     'count(*) as all_items'
-                    .', sum(case when is_service_request then 0 else 1 end) as items'
-                    .', sum(case when is_service_request then 1 else 0 end) as service_requests'
+                    .', sum(case when kind = ? then 1 else 0 end) as consumables'
+                    .', sum(case when kind = ? then 1 else 0 end) as goods'
+                    .', sum(case when kind = ? then 1 else 0 end) as services'
                     .', sum(case when availability = ? then 1 else 0 end) as out_of_stock'
                     .', sum(case when is_featured then 1 else 0 end) as featured'
                     .', sum(case when diets @> ?::jsonb then 1 else 0 end) as veg'
@@ -139,19 +147,23 @@ class ListMenuItems extends ListRecords
                     .', sum(case when diets @> ?::jsonb then 1 else 0 end) as egg'
                     .', sum(case when diets @> ?::jsonb then 1 else 0 end) as non_veg',
                     [
+                        MenuItemKind::Consumable->value,
+                        MenuItemKind::Goods->value,
+                        MenuItemKind::Service->value,
                         ItemAvailability::OutOfStock->value,
-                        self::carrying(Diet::Vegetarian),
-                        self::carrying(Diet::Vegan),
-                        self::carrying(Diet::Egg),
-                        self::carrying(Diet::NonVegetarian),
+                        $this->carrying(Diet::Vegetarian),
+                        $this->carrying(Diet::Vegan),
+                        $this->carrying(Diet::Egg),
+                        $this->carrying(Diet::NonVegetarian),
                     ],
                 )
                 ->first();
 
             return [
                 'all' => (int) ($row->all_items ?? 0),
-                'items' => (int) ($row->items ?? 0),
-                'service_requests' => (int) ($row->service_requests ?? 0),
+                'consumables' => (int) ($row->consumables ?? 0),
+                'goods' => (int) ($row->goods ?? 0),
+                'services' => (int) ($row->services ?? 0),
                 'out_of_stock' => (int) ($row->out_of_stock ?? 0),
                 'featured' => (int) ($row->featured ?? 0),
                 'veg' => (int) ($row->veg ?? 0),

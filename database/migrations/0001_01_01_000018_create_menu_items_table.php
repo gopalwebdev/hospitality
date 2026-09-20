@@ -2,6 +2,7 @@
 
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
+use App\Enums\MenuItemKind;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -23,14 +24,15 @@ return new class extends Migration
             $table->integer('original_price')->nullable();
             // Null falls back to tenant_settings.tax_rate.
             $table->smallInteger('tax_rate')->nullable();
-            // HSN for goods, SAC for a service — a bedsheet change carries a
-            // SAC. One column, because an invoice and GSTR-1 have one field.
+            // HSN for a Consumable and Goods, SAC for a Service — App\Enums\MenuItemKind::taxCodeLabel()
+            // says which. One column, because an invoice and GSTR-1 have one field.
             $table->string('hsn_sac_code', 8)->nullable();
-            // A service request — an extra pillow, a bedsheet change — rather than something to order.
-            $table->boolean('is_service_request')->default(false);
+            // Consumable, Goods or Service — App\Enums\MenuItemKind. The split is what
+            // decides whether a diet mark applies and HSN against SAC on the invoice.
+            $table->string('kind', 32)->default(MenuItemKind::Consumable->value);
             // Every mark the item carries: vegetarian and vegan together, or
-            // one of the others on its own. Null exactly for a service
-            // request; see MenuItemObserver.
+            // one of the others on its own. Null exactly for a kind that does
+            // not require one; see MenuItemObserver.
             $table->jsonb('diets')->nullable();
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
             // The most one order may hold, across every basket line it is on; null is no limit.
@@ -44,12 +46,25 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE menu_items
-            ADD CONSTRAINT menu_items_positions_not_negative CHECK ("position" >= 0 AND featured_position >= 0),
+        // Which kinds carry a diet mark comes from the enum, so a case added
+        // later cannot leave the database accepting a kind the form refuses a
+        // diet on, or requiring one the form never asks for.
+        $kinds = collect(MenuItemKind::cases())
+            ->map(fn (MenuItemKind $kind): string => "'{$kind->value}'")
+            ->implode(', ');
+
+        $dietRequiringKinds = collect(MenuItemKind::cases())
+            ->filter(fn (MenuItemKind $kind): bool => $kind->requiresDietMark())
+            ->map(fn (MenuItemKind $kind): string => "'{$kind->value}'")
+            ->implode(', ');
+
+        DB::statement("ALTER TABLE menu_items
+            ADD CONSTRAINT menu_items_positions_not_negative CHECK (\"position\" >= 0 AND featured_position >= 0),
             ADD CONSTRAINT menu_items_prices_not_negative CHECK (price >= 0 AND (original_price IS NULL OR original_price >= 0)),
             ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT menu_items_diets_match_service_request CHECK (is_service_request = (diets IS NULL)),
-            ADD CONSTRAINT menu_items_max_per_order_in_range CHECK (max_per_order IS NULL OR max_per_order BETWEEN 1 AND 99)');
+            ADD CONSTRAINT menu_items_kind_is_known CHECK (kind IN ({$kinds})),
+            ADD CONSTRAINT menu_items_diets_match_kind CHECK ((kind IN ({$dietRequiringKinds})) = (diets IS NOT NULL)),
+            ADD CONSTRAINT menu_items_max_per_order_in_range CHECK (max_per_order IS NULL OR max_per_order BETWEEN 1 AND 99)");
 
         // Which marks contradict each other comes from the enum, so a case
         // added later cannot leave the database accepting a combination the
@@ -64,7 +79,7 @@ return new class extends Migration
             }
         }
 
-        // An item that is not a service request carries at least one mark, and
+        // An item whose kind requires a diet mark carries at least one, and
         // never two that contradict each other.
         DB::statement('ALTER TABLE menu_items
             ADD CONSTRAINT menu_items_diets_are_consistent CHECK (

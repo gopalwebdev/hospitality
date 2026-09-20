@@ -85,7 +85,7 @@ const masala: MenuItem = {
     description: null,
     price: 28900,
     originalPrice: null,
-    isServiceRequest: false,
+    kind: 'consumable',
     diet: 'vegetarian',
     addOnGroupLinks: [
         { id: 2, maxPicks: null },
