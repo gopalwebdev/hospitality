@@ -205,7 +205,7 @@ class MenuController extends Controller
                 'opensAt' => $tenant->hoursToday()?->opensAt(),
                 'closesAt' => $tenant->hoursToday()?->closesAt(),
             ],
-            'quoteUrl' => route('guest.menus.basket-quotes.store', ['tenant' => $tenant->slug, 'menu' => $menu->getKey()]),
+            'priceUrl' => route('guest.menus.basket-prices.store', ['tenant' => $tenant->slug, 'menu' => $menu->getKey()]),
             'homeUrl' => route('guest.home', ['tenant' => $tenant->slug]),
         ]);
     }

@@ -45,7 +45,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  *
  * @phpstan-import-type Shortage from InsufficientStock
  */
-class QuoteBasket
+class PriceBasket
 {
     public const string ITEM = 'item';
 

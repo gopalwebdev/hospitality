@@ -65,7 +65,7 @@ When a feature first differs by type, put the difference on the enum as a method
 
 ## Orders and stock carry four small enums
 - **`OrderStatus`:** `Placed`, `Cancelled`. The steps staff move an order through arrive with the screens that move it; `orders_status_is_known` is built from the cases.
-- **`OrderLineType`:** `Item`, `Combo` — the same words as `QuoteBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
+- **`OrderLineType`:** `Item`, `Combo` — the same words as `PriceBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
 - **`StockMovementReason`:** `Restock`, `Count`, `OrderPlaced`, `OrderCancelled`, with `label()` and `color()` for the history table.
 - **`OrderRefusal`:** why an order was refused, sent to the guest app as `reason` with `message()` from `lang/en/guest.php`. `InsufficientStock` is a case here too, so a refusal always answers with the same field. `StoreClosed` replaced `NotAcceptingOrders` when the switch it named became weekly opening hours.
 

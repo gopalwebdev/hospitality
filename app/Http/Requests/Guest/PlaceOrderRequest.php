@@ -11,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
  * it. Only the shape: whether it can still be had, and whether enough is left,
  * is PlaceOrder's to decide against what is saved.
  */
-class PlaceOrderRequest extends QuoteBasketRequest
+class PlaceOrderRequest extends PriceBasketRequest
 {
     /**
      * @return array<string, ValidationRule|array<mixed>|string>

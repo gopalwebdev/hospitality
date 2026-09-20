@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * Which takes would come up short right now, without locking anything.
  *
- * What a quote shows before a guest places the order. It is a reading, not a
+ * What a priced basket shows before a guest places the order. It is a reading, not a
  * promise: two guests can both see enough left, and the one who orders second
  * is refused by ApplyStockChanges under its lock.
  *

@@ -87,7 +87,7 @@ Prices carry an optional `compare_at_price` — the higher "was" price shown str
 
 An item and a combo each say the most one order may hold (`max_quantity`, null for no limit), counted across every basket line it is on:
 - **Counting:** a feather pillow and a memory foam one are two towards a maximum of two.
-- **Where it is set and checked:** the item and combo forms ask for it, and `QuoteBasket` refuses a basket over it.
+- **Where it is set and checked:** the item and combo forms ask for it, and `PriceBasket` refuses a basket over it.
 - **No minimum:** one was built beside it and taken out on the project owner's instruction.
 
 An option's `max_quantity` is a different limit: how many of it one item takes.
@@ -98,7 +98,7 @@ The tenant's rate is stored as **two halves**, `tenant_settings.cgst_rate` and `
 
 **No tax information is hardcoded.** Standing instruction from the project owner: a tenant states what it charges on its Settings page and the application assumes nothing. `TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS` is therefore **0** — a starting value of 5% meant every tenant created silently charged a rate nobody had typed. `tenant_settings.gst_treatment` (`App\Enums\GstTreatment`: CGST+SGST, CGST+UTGST, or IGST) is a tenant's own statement too; there is deliberately **no** table of which union territories levy UTGST, and an earlier `GstStateCode` enum holding one was deleted for exactly that reason. Do not put tax policy back into the code.
 
-`tenant_settings.tax_overrides_item_rates` reverses the fallback: with it on, the tenant's rate is charged on **everything** and an item's own is ignored. `IsPricedOnAMenu::taxRate($tenantRate, $tenantOverrides)` is where that is decided, and `QuoteBasket` and `PlaceOrder` are what pass the flag in — a tenant whose accountant moves the whole menu to one slab changes one toggle rather than every item.
+`tenant_settings.tax_overrides_item_rates` reverses the fallback: with it on, the tenant's rate is charged on **everything** and an item's own is ignored. `IsPricedOnAMenu::taxRate($tenantRate, $tenantOverrides)` is where that is decided, and `PriceBasket` and `PlaceOrder` are what pass the flag in — a tenant whose accountant moves the whole menu to one slab changes one toggle rather than every item.
 
 ## A tenant keeps weekly opening hours, and being closed refuses orders
 `tenant_opening_hours` is a row per `App\Enums\Weekday` per tenant: closed for the day, or open between two wall-clock times. Hours **repeat weekly and name no date** — a tenant says "closed on Mondays", not "closed on the 14th". A dated calendar of one-off holidays is a different feature and deliberately not this one.
@@ -112,7 +112,7 @@ Times are compared as `HH:MM:SS` strings against `config('app.timezone')`, the o
 ## Charges are their own module, on every menu or only some
 What is added to a bill beyond the price — a service charge, a packing charge, a room-service fee — is `charges`, managed on its own Charges page in the tenant panel rather than as settings: a tenant may levy any number, each is a share of the bill or a fixed amount, and each applies to the menus picked for it (a room-service fee on in-room dining and not on housekeeping requests). Two fixed switches on `tenant_settings` existed and were replaced, because they could say a service charge and a packing charge and nothing else, and could not say which menus either belonged on.
 
-The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Menus\QuoteBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
+The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Menus\PriceBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
 
 ## Two languages a tenant writes in; the application itself is English
 `App\Enums\Locale` has one case per language a tenant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.

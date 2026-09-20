@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Actions\Orders\CancelOrder;
 use App\Enums\ItemAvailability;
 use App\Enums\OrderLineType;
@@ -79,7 +79,7 @@ function orderLine(string $key, MenuItem|MenuCombo $thing, int $quantity = 1, ar
 {
     return [
         'key' => $key,
-        'type' => $thing instanceof MenuCombo ? QuoteBasket::COMBO : QuoteBasket::ITEM,
+        'type' => $thing instanceof MenuCombo ? PriceBasket::COMBO : PriceBasket::ITEM,
         'id' => $thing->getKey(),
         'quantity' => $quantity,
         'choices' => array_map(
@@ -160,7 +160,7 @@ it('marks an item out of stock when an order takes the last of it, and refuses t
     $this->postJson(placeOrderUrl($tenant, $menu), ['lines' => [orderLine('curry', $curry, choices: [[$butterNaan, 1]])]])
         ->assertUnprocessable()
         ->assertJsonPath('reason', OrderRefusal::LinesChanged->value)
-        ->assertJsonPath('lines.0.status', QuoteBasket::UNAVAILABLE);
+        ->assertJsonPath('lines.0.status', PriceBasket::UNAVAILABLE);
 
     expect(Order::query()->count())->toBe(1);
 });

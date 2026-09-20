@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Enums\GstTreatment;
 use App\Models\Charge;
 use App\Models\Menu;
@@ -24,9 +24,9 @@ use Illuminate\Support\Facades\DB;
 |
 */
 
-function basketQuoteUrl(Tenant $tenant, Menu $menu): string
+function basketPriceUrl(Tenant $tenant, Menu $menu): string
 {
-    return 'http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey().'/basket-quotes';
+    return 'http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey().'/basket-prices';
 }
 
 /**
@@ -64,7 +64,7 @@ function seedCurryWithChoices(): array
 }
 
 /**
- * A quote's GST as it comes back on the wire: levied in halves, so CGST and
+ * A priced basket's GST as it comes back on the wire: levied in halves, so CGST and
  * SGST each carry half the rate and whatever each was worked out to be.
  *
  * @return array<string, mixed>
@@ -92,7 +92,7 @@ function basketLine(string $key, MenuItem|MenuCombo $thing, int $quantity = 1, a
 {
     return [
         'key' => $key,
-        'type' => $thing instanceof MenuCombo ? QuoteBasket::COMBO : QuoteBasket::ITEM,
+        'type' => $thing instanceof MenuCombo ? PriceBasket::COMBO : PriceBasket::ITEM,
         'id' => $thing->getKey(),
         'quantity' => $quantity,
         'choices' => array_map(
@@ -113,7 +113,7 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
     Charge::factory()->ofTenant($tenant)->fixedAmount(5000)->onMenus(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))->create();
     Charge::factory()->fixedAmount(7000)->onMenus($menu)->inactive()->create();
 
-    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         basketLine('curry', $curry, quantity: 2, choices: [[$garlicNaan, 1], [$cheese, 2]]),
         basketLine('combo', $combo),
     ]])
@@ -122,7 +122,7 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
             'lines' => [
                 // ₹289.00 with a ₹20.00 garlic naan and two ₹40.00 cheese, twice.
                 [
-                    'key' => 'curry', 'status' => QuoteBasket::OK,
+                    'key' => 'curry', 'status' => PriceBasket::OK,
                     'unitPrice' => 38900, 'total' => 77800,
                     'taxableValue' => 77800,
                     'tax' => 2890 + 200 + 800,
@@ -131,7 +131,7 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
                     'taxParts' => splitOf(cgst: 1945, sgst: 1945),
                 ],
                 [
-                    'key' => 'combo', 'status' => QuoteBasket::OK,
+                    'key' => 'combo', 'status' => PriceBasket::OK,
                     'unitPrice' => 59900, 'total' => 59900,
                     'taxableValue' => 59900,
                     'tax' => 2995,
@@ -176,12 +176,12 @@ it('says what a basket would run short of, without refusing its lines or holding
 
     // Two lines of curry are one count of three wanted, and two cheese on each
     // of the first line's two curries are four wanted of the one left.
-    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $response = $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         basketLine('two-with-cheese', $curry, quantity: 2, choices: [[$butterNaan, 1], [$cheese, 2]]),
         basketLine('one-plain', $curry, choices: [[$butterNaan, 1]]),
     ]])->assertOk();
 
-    expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([QuoteBasket::OK])
+    expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([PriceBasket::OK])
         ->and($response->json('shortages'))->toBe([
             ['type' => 'option', 'id' => $cheese->getKey(), 'requested' => 4, 'available' => 1, 'lineKeys' => ['two-with-cheese']],
         ])
@@ -204,7 +204,7 @@ it('flags a line whose choices break the rules of its groups, and prices the res
     MenuItemAddOnGroup::factory()->linking($curry, $sides)->create(['position' => 2]);
     $papadum = MenuAddOnOption::factory()->inGroup($sides)->create();
 
-    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $response = $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         basketLine('meets-every-rule', $curry, choices: [[$butterNaan, 1], [$cheese, 2], [$paneer, 1]]),
         basketLine('no-bread', $curry),
         basketLine('two-breads', $curry, choices: [[$butterNaan, 1], [$garlicNaan, 1]]),
@@ -216,14 +216,14 @@ it('flags a line whose choices break the rules of its groups, and prices the res
     ]])->assertOk();
 
     expect(collect($response->json('lines'))->pluck('status', 'key')->all())->toBe([
-        'meets-every-rule' => QuoteBasket::OK,
-        'no-bread' => QuoteBasket::INVALID,
-        'two-breads' => QuoteBasket::INVALID,
-        'four-extras' => QuoteBasket::INVALID,
-        'three-cheese' => QuoteBasket::INVALID,
-        'run-out' => QuoteBasket::INVALID,
-        'not-offered-on-it' => QuoteBasket::INVALID,
-        'two-papadum' => QuoteBasket::INVALID,
+        'meets-every-rule' => PriceBasket::OK,
+        'no-bread' => PriceBasket::INVALID,
+        'two-breads' => PriceBasket::INVALID,
+        'four-extras' => PriceBasket::INVALID,
+        'three-cheese' => PriceBasket::INVALID,
+        'run-out' => PriceBasket::INVALID,
+        'not-offered-on-it' => PriceBasket::INVALID,
+        'two-papadum' => PriceBasket::INVALID,
     ])
         // A flagged line adds nothing until it is changed.
         ->and($response->json('subtotal'))->toBe(28900 + 8000 + 6000);
@@ -240,14 +240,14 @@ it("enforces an item's own cap on a group's picks, tighter than the group's own"
     // The group's own library allows up to three; this item allows only one.
     MenuItemAddOnGroup::factory()->linking($dal, $extras)->capping(1)->create();
 
-    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $response = $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         basketLine('one-extra', $dal, choices: [[$cheese, 1]]),
         basketLine('two-extras', $dal, choices: [[$cheese, 1], [$paneer, 1]]),
     ]])->assertOk();
 
     expect(collect($response->json('lines'))->pluck('status', 'key')->all())->toBe([
-        'one-extra' => QuoteBasket::OK,
-        'two-extras' => QuoteBasket::INVALID,
+        'one-extra' => PriceBasket::OK,
+        'two-extras' => PriceBasket::INVALID,
     ]);
 });
 
@@ -260,7 +260,7 @@ it('flags every line of an item or combo the basket holds more of than one order
     $curry->update(['max_quantity' => 2]);
     $platter = MenuCombo::factory()->onMenu($menu)->limitedPerOrder(1)->create();
 
-    $statuses = fn (array $lines): array => collect($this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => $lines])->assertOk()->json('lines'))
+    $statuses = fn (array $lines): array => collect($this->postJson(basketPriceUrl($tenant, $menu), ['lines' => $lines])->assertOk()->json('lines'))
         ->pluck('status', 'key')
         ->all();
 
@@ -271,9 +271,9 @@ it('flags every line of an item or combo the basket holds more of than one order
         basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
         basketLine('one-platter', $platter),
     ]))->toBe([
-        'butter' => QuoteBasket::OK,
-        'garlic' => QuoteBasket::OK,
-        'one-platter' => QuoteBasket::OK,
+        'butter' => PriceBasket::OK,
+        'garlic' => PriceBasket::OK,
+        'one-platter' => PriceBasket::OK,
     ])
         // A third curry on either line is one too many for both lines.
         ->and($statuses([
@@ -281,9 +281,9 @@ it('flags every line of an item or combo the basket holds more of than one order
             basketLine('garlic', $curry, choices: [[$garlicNaan, 1]]),
             basketLine('two-platters', $platter, quantity: 2),
         ]))->toBe([
-            'butter' => QuoteBasket::INVALID,
-            'garlic' => QuoteBasket::INVALID,
-            'two-platters' => QuoteBasket::INVALID,
+            'butter' => PriceBasket::INVALID,
+            'garlic' => PriceBasket::INVALID,
+            'two-platters' => PriceBasket::INVALID,
         ]);
 });
 
@@ -303,7 +303,7 @@ it('flags a line the menu can no longer offer, whatever was chosen', function ()
     $noRiceLeft = MenuAddOnOption::factory()->inGroup($rice)->unavailable()->create();
     MenuItemAddOnGroup::factory()->linking($dal, $rice)->create();
 
-    $response = $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $response = $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         basketLine('sold-out', $soldOut),
         basketLine('on-another-menu', $onAnotherMenu),
         basketLine('another-tenants', $anotherTenants),
@@ -311,7 +311,7 @@ it('flags a line the menu can no longer offer, whatever was chosen', function ()
         basketLine('nothing-left-to-choose', $dal, choices: [[$noRiceLeft, 1]]),
     ]])->assertOk();
 
-    expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([QuoteBasket::UNAVAILABLE])
+    expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([PriceBasket::UNAVAILABLE])
         ->and($response->json('subtotal'))->toBe(0)
         ->and($response->json('charges'))->toBe([]);
 });
@@ -325,7 +325,7 @@ it('reports the GST already inside prices that include it, rather than adding it
         ->create(['price' => 10500]);
 
     // ₹105.00 including 5% is ₹100.00 and ₹5.00 of GST.
-    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
+    $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
         ->assertOk()
         ->assertJson([
             'subtotal' => 10500,
@@ -348,7 +348,7 @@ it('taxes every line at the tenant rate once settings override the items own', f
 
     // The item says 28%, the tenant says everything it sells is 5%, and the
     // tenant wins — ₹100.00 plus ₹5.00 rather than plus ₹28.00.
-    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
+    $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
         ->assertOk()
         ->assertJson([
             'subtotal' => 10000,
@@ -362,7 +362,7 @@ it('adds no charge to an empty basket', function (): void {
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     Charge::factory()->ofTenant($tenant)->fixedAmount(2000)->create();
 
-    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => []])
+    $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => []])
         ->assertOk()
         ->assertExactJson([
             'lines' => [],
@@ -381,15 +381,15 @@ it('prices nothing on a menu that is switched off, or on another tenant\'s', fun
     $hidden = Menu::factory()->hidden()->create(['tenant_id' => $tenant->getKey()]);
     $theirs = Menu::factory()->create();
 
-    $this->postJson(basketQuoteUrl($tenant, $hidden), ['lines' => []])->assertNotFound();
-    $this->postJson(basketQuoteUrl($tenant, $theirs), ['lines' => []])->assertNotFound();
+    $this->postJson(basketPriceUrl($tenant, $hidden), ['lines' => []])->assertNotFound();
+    $this->postJson(basketPriceUrl($tenant, $theirs), ['lines' => []])->assertNotFound();
 });
 
 it('refuses a basket that is not the shape of one', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
 
-    $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [
+    $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => [
         ['key' => 'voucher', 'type' => 'voucher', 'id' => 1, 'quantity' => 0, 'choices' => [['optionId' => 'extra', 'quantity' => 1]]],
     ]])
         ->assertUnprocessable()
@@ -408,7 +408,7 @@ it('prices a basket in the same number of queries however many lines it has', fu
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => $lines])->assertOk();
+        $this->postJson(basketPriceUrl($tenant, $menu), ['lines' => $lines])->assertOk();
 
         DB::disableQueryLog();
 

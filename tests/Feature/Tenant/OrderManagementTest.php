@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Actions\Orders\PlaceOrder;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
@@ -56,7 +56,7 @@ function placedOrderOf(MenuItem $item, int $quantity): Order
     return app(PlaceOrder::class)(
         Tenant::query()->findOrFail($item->tenant_id),
         Menu::query()->withoutGlobalScopes()->findOrFail($category->menu_id),
-        [['key' => 'item-'.$item->getKey(), 'type' => QuoteBasket::ITEM, 'id' => $item->getKey(), 'quantity' => $quantity, 'choices' => []]],
+        [['key' => 'item-'.$item->getKey(), 'type' => PriceBasket::ITEM, 'id' => $item->getKey(), 'quantity' => $quantity, 'choices' => []]],
         'Room 204',
     );
 }

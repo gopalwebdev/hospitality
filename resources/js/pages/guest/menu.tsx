@@ -21,6 +21,7 @@ import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 import { type AddOnGroup, withItemMaxSelections } from '@/lib/add-on-rules';
 import { type OrderLimits, quantityHeld, roomFor } from '@/lib/order-limits';
+import { formatRate } from '@/lib/rate';
 
 /** One add-on group this item offers, and this item's own cap on its picks. */
 export interface AddOnGroupLink {
@@ -138,7 +139,7 @@ interface MenuProps {
         closesAt: string | null;
     };
     /** Where the basket is priced. */
-    quoteUrl: string;
+    priceUrl: string;
     homeUrl: string;
 }
 
@@ -156,18 +157,6 @@ interface Ordering {
 }
 
 const OrderingContext = createContext<Ordering | null>(null);
-
-/**
- * Turn basis points into the percentage a guest reads: 500 becomes "5%".
- *
- * The server sends basis points because that is how a rate is stored — an
- * integer, so the arithmetic behind a bill stays exact. Only the reader wants a
- * percentage, so the conversion belongs here, beside the money formatting and
- * for the same reason.
- */
-function percentage(basisPoints: number): string {
-    return `${String(Number((basisPoints / 100).toFixed(2)))}%`;
-}
 
 /**
  * One of a tenant's menus, read at the table or in the room.
@@ -198,7 +187,7 @@ export default function Menu({
     tax,
     charges,
     store,
-    quoteUrl,
+    priceUrl,
     homeUrl,
 }: MenuProps) {
     const { t } = useTranslations();
@@ -388,7 +377,7 @@ export default function Menu({
                 open={isBasketOpen}
                 onOpenChange={setBasketOpen}
                 basket={basket}
-                quoteUrl={quoteUrl}
+                priceUrl={priceUrl}
                 describe={describeLine({
                     items: [
                         ...featured,
@@ -582,7 +571,7 @@ function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
     const { t } = useTranslations();
     const money = useMoney();
 
-    const rate = percentage(tax.rate);
+    const rate = formatRate(tax.rate);
 
     return (
         <footer className="text-muted-foreground mt-8 space-y-1 px-5 text-xs leading-relaxed">
@@ -597,7 +586,7 @@ function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
                     {charge.rate !== null
                         ? t('menu.charge_rate', {
                               name: charge.name,
-                              rate: percentage(charge.rate),
+                              rate: formatRate(charge.rate),
                           })
                         : t('menu.charge_amount', {
                               name: charge.name,

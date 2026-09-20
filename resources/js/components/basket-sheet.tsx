@@ -16,12 +16,13 @@ import {
     MAX_LINE_QUANTITY,
 } from '@/hooks/use-basket';
 import {
-    type Quote,
-    type QuotedLine,
-    useBasketQuote,
-} from '@/hooks/use-basket-quote';
+    type PricedBasket,
+    type PricedLine,
+    type TaxParts,
+    useBasketPrice,
+} from '@/hooks/use-basket-price';
 import { useMoney } from '@/hooks/use-money';
-import { useTranslations } from '@/hooks/use-translations';
+import { type Translator, useTranslations } from '@/hooks/use-translations';
 import {
     type OrderLimits,
     isWithinLimits,
@@ -29,6 +30,7 @@ import {
     quantityHeld,
     roomFor,
 } from '@/lib/order-limits';
+import { formatRate, wholeRate } from '@/lib/rate';
 
 /** How a basket line reads: its name, its diet mark, and what it was customised with. */
 export interface LineDescription {
@@ -45,32 +47,38 @@ interface BasketSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     basket: Basket;
-    quoteUrl: string;
+    priceUrl: string;
     describe: (line: BasketLine) => LineDescription;
 }
 
 /**
  * What is in the basket, and what it comes to.
  *
- * Every number here is the server's (App\Actions\Menus\QuoteBasket) — each line,
- * the GST, each charge and the total — asked for again whenever the sheet is
- * open and the basket changes. A line the menu can no longer honour says so in
- * place and is left out of the total until it is changed or removed.
+ * Every number here is the server's (App\Actions\Menus\PriceBasket) — each
+ * line, its GST, each charge and the total — asked for again whenever the
+ * sheet is open and the basket changes. A line the menu can no longer honour
+ * says so in place and is left out of the total until it is changed or removed.
  *
- * Nothing is ordered from here yet: a guest shows this to a member of staff.
+ * GST is shown twice over, which is what a bill here does. The **rate and
+ * amount on each line**, because one basket can hold a 5% item beside an 18%
+ * one and a single figure at the foot would hide that. And the **parts at the
+ * foot** — CGST and SGST, or UTGST, or one IGST — because that is how the tax
+ * is actually levied and how it has to be shown.
+ *
+ * Nothing is ordered from here: a guest shows this to a member of staff.
  */
 export function BasketSheet({
     open,
     onOpenChange,
     basket,
-    quoteUrl,
+    priceUrl,
     describe,
 }: BasketSheetProps) {
     const { t } = useTranslations();
-    const { quote, isPricing } = useBasketQuote(quoteUrl, basket.lines, open);
+    const { priced, isPricing } = useBasketPrice(priceUrl, basket.lines, open);
 
-    const quoted = new Map(
-        (quote?.lines ?? []).map((line) => [line.key, line]),
+    const pricedLines = new Map(
+        (priced?.lines ?? []).map((line) => [line.key, line]),
     );
 
     return (
@@ -98,14 +106,17 @@ export function BasketSheet({
                                     key={line.key}
                                     line={line}
                                     description={describe(line)}
-                                    quoted={quoted.get(line.key)}
+                                    priced={pricedLines.get(line.key)}
+                                    pricesIncludeTax={
+                                        priced?.pricesIncludeTax ?? false
+                                    }
                                     basket={basket}
                                 />
                             ))}
                         </ul>
 
                         <SheetFooter className="gap-3 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                            <Totals quote={quote} isPricing={isPricing} />
+                            <Totals priced={priced} isPricing={isPricing} />
 
                             <Button
                                 type="button"
@@ -129,12 +140,14 @@ export function BasketSheet({
 function LineRow({
     line,
     description,
-    quoted,
+    priced,
+    pricesIncludeTax,
     basket,
 }: {
     line: BasketLine;
     description: LineDescription;
-    quoted: QuotedLine | undefined;
+    priced: PricedLine | undefined;
+    pricesIncludeTax: boolean;
     basket: Basket;
 }) {
     const { t } = useTranslations();
@@ -147,9 +160,9 @@ function LineRow({
     // A line refused for holding too many says how many one order may hold,
     // which is what the guest has to change.
     const problem =
-        quoted?.status === 'unavailable'
+        priced?.status === 'unavailable'
             ? t('basket.unavailable')
-            : quoted?.status === 'invalid'
+            : priced?.status === 'invalid'
               ? rule !== null && !isWithinLimits(description.limits, held)
                   ? t(rule.path, rule.replacements)
                   : t('basket.invalid')
@@ -218,43 +231,104 @@ function LineRow({
                 </div>
             </div>
 
-            {quoted?.status === 'ok' &&
-                (quoted.total === 0 ? (
-                    <p className="text-muted-foreground shrink-0 text-sm font-medium">
-                        {t('menu.complimentary')}
-                    </p>
-                ) : (
-                    <p className="shrink-0 font-semibold tabular-nums">
-                        {money(quoted.total)}
-                    </p>
-                ))}
+            {priced?.status === 'ok' && (
+                <div className="shrink-0 text-right">
+                    {priced.total === 0 ? (
+                        <p className="text-muted-foreground text-sm font-medium">
+                            {t('menu.complimentary')}
+                        </p>
+                    ) : (
+                        <p className="font-semibold tabular-nums">
+                            {money(priced.total)}
+                        </p>
+                    )}
+
+                    {/* A complimentary line is taxed at nothing, so it carries
+                        no GST line either — there is no bill to explain. */}
+                    {priced.tax > 0 && (
+                        <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                            {t(
+                                pricesIncludeTax
+                                    ? 'basket.line_gst_included'
+                                    : 'basket.line_gst',
+                                {
+                                    rate: formatRate(
+                                        wholeRate(priced.taxParts),
+                                    ),
+                                    amount: money(priced.tax),
+                                },
+                            )}
+                        </p>
+                    )}
+                </div>
+            )}
         </li>
     );
 }
 
 /**
+ * The parts of a bill's GST, each on its own line, in the order a bill lists them.
+ *
+ * Only the parts that carry something: an intra-state bill never shows an empty
+ * IGST, and a tenant charging no GST shows no rows at all rather than three
+ * zeroes. The state's half is called UTGST in a union territory, where the
+ * money is identical and only the wording differs.
+ */
+function gstRows(
+    parts: TaxParts,
+    t: Translator['t'],
+): { key: string; label: string; amount: number }[] {
+    return [
+        {
+            key: 'cgst',
+            label: t('basket.cgst', { rate: formatRate(parts.cgstRate) }),
+            amount: parts.cgst,
+        },
+        {
+            key: 'sgst',
+            label: t(
+                parts.treatment === 'union-territory'
+                    ? 'basket.utgst'
+                    : 'basket.sgst',
+                { rate: formatRate(parts.sgstRate) },
+            ),
+            amount: parts.sgst,
+        },
+        {
+            key: 'igst',
+            label: t('basket.igst', { rate: formatRate(parts.igstRate) }),
+            amount: parts.igst,
+        },
+    ].filter((row) => row.amount > 0);
+}
+
+/**
  * The bill as the server worked it out.
  *
- * GST is its own line when it is added on top, and a note under the total when
- * the prices already include it.
+ * GST sits between the subtotal and the total when it is added on top, because
+ * that is where it is added. When the prices already carry it, it moves below
+ * the total as a note — it is not part of the sum there, and putting it in the
+ * running list would read as though it were charged twice.
  */
 function Totals({
-    quote,
+    priced,
     isPricing,
 }: {
-    quote: Quote | null;
+    priced: PricedBasket | null;
     isPricing: boolean;
 }) {
     const { t } = useTranslations();
     const money = useMoney();
 
-    if (quote === null) {
+    if (priced === null) {
         return (
             <p className="text-muted-foreground text-sm" aria-live="polite">
                 {t('basket.pricing')}
             </p>
         );
     }
+
+    const gst = gstRows(priced.taxParts, t);
 
     return (
         // Dimmed rather than blanked while the next answer is fetched, so a
@@ -267,17 +341,19 @@ function Totals({
             <dl className="space-y-1 text-sm tabular-nums">
                 <TotalRow
                     label={t('basket.subtotal')}
-                    amount={money(quote.subtotal)}
+                    amount={money(priced.subtotal)}
                 />
 
-                {!quote.pricesIncludeTax && quote.tax > 0 && (
-                    <TotalRow
-                        label={t('basket.gst')}
-                        amount={money(quote.tax)}
-                    />
-                )}
+                {!priced.pricesIncludeTax &&
+                    gst.map((row) => (
+                        <TotalRow
+                            key={row.key}
+                            label={row.label}
+                            amount={money(row.amount)}
+                        />
+                    ))}
 
-                {quote.charges.map((charge) => (
+                {priced.charges.map((charge) => (
                     <TotalRow
                         key={charge.id}
                         label={charge.name}
@@ -288,16 +364,30 @@ function Totals({
                 <TotalRow
                     strong
                     label={t('basket.total')}
-                    amount={money(quote.total)}
+                    amount={money(priced.total)}
                 />
             </dl>
 
-            {quote.pricesIncludeTax && quote.tax > 0 && (
-                <p className="text-muted-foreground mt-1 text-xs">
-                    {t('basket.gst_included', {
-                        amount: money(quote.tax),
-                    })}
-                </p>
+            {priced.pricesIncludeTax && priced.tax > 0 && (
+                <div className="text-muted-foreground mt-1 text-xs">
+                    <p>
+                        {t('basket.gst_included', {
+                            amount: money(priced.tax),
+                        })}
+                    </p>
+
+                    <dl className="mt-0.5 space-y-0.5 tabular-nums">
+                        {gst.map((row) => (
+                            <div
+                                key={row.key}
+                                className="flex justify-between gap-3"
+                            >
+                                <dt>{row.label}</dt>
+                                <dd>{money(row.amount)}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
             )}
         </div>
     );

@@ -4,7 +4,7 @@ namespace App\Actions\Orders;
 
 use App\Actions\Inventory\ApplyStockChanges;
 use App\Actions\Inventory\StockDemand;
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Enums\Locale;
 use App\Enums\OrderLineType;
 use App\Enums\OrderRefusal;
@@ -30,24 +30,24 @@ use LogicException;
 /**
  * Place a guest's basket as an order, taking what it needs from stock.
  *
- * The basket is priced by the same QuoteBasket the guest app asks, and refused
+ * The basket is priced by the same PriceBasket the guest app asks, and refused
  * outright when any line no longer stands. Then, in one transaction, the order
  * is written, stock is taken under a lock (ApplyStockChanges) and the lines are
- * copied in. Something running out between the quote and the lock throws
+ * copied in. Something running out between the pricing and the lock throws
  * InsufficientStock and rolls the order back with it: an order either takes
  * everything it needs or never existed.
  *
  * Names are copied in every language they have, and money as it was priced, so
  * nothing a tenant changes later rewrites what a guest ordered.
  *
- * @phpstan-import-type BasketLine from QuoteBasket
- * @phpstan-import-type PricedLine from QuoteBasket
- * @phpstan-import-type PricedCharge from QuoteBasket
+ * @phpstan-import-type BasketLine from PriceBasket
+ * @phpstan-import-type PricedLine from PriceBasket
+ * @phpstan-import-type PricedCharge from PriceBasket
  */
 final readonly class PlaceOrder
 {
     public function __construct(
-        private QuoteBasket $quoteBasket,
+        private PriceBasket $priceBasket,
         private StockDemand $stockDemand,
         private ApplyStockChanges $applyStockChanges,
     ) {}
@@ -64,37 +64,37 @@ final readonly class PlaceOrder
 
         throw_unless($menu->isBeingServedAt(), OrderRefused::class, OrderRefusal::NotBeingServed);
 
-        $quote = ($this->quoteBasket)($tenant, $menu, $lines);
+        $priced = ($this->priceBasket)($tenant, $menu, $lines);
 
-        foreach ($quote['lines'] as $priced) {
-            if ($priced['status'] !== QuoteBasket::OK) {
-                throw new OrderRefused(OrderRefusal::LinesChanged, $quote['lines']);
+        foreach ($priced['lines'] as $line) {
+            if ($line['status'] !== PriceBasket::OK) {
+                throw new OrderRefused(OrderRefusal::LinesChanged, $priced['lines']);
             }
         }
 
-        return DB::transaction(function () use ($tenant, $menu, $lines, $locationLabel, $note, $quote): Order {
+        return DB::transaction(function () use ($tenant, $menu, $lines, $locationLabel, $note, $priced): Order {
             $order = new Order([
                 'location_label' => $locationLabel,
                 'note' => $note,
-                'subtotal' => $quote['subtotal'],
+                'subtotal' => $priced['subtotal'],
                 // The treatment and the split as the bill was actually priced,
                 // never worked out again: a tenant may change either later.
-                'gst_treatment' => $quote['taxParts']->treatment,
-                'tax' => $quote['tax'],
-                'cgst' => $quote['taxParts']->cgst,
-                'sgst' => $quote['taxParts']->sgst,
-                'igst' => $quote['taxParts']->igst,
-                'charges_total' => array_sum(array_column($quote['charges'], 'amount')),
-                'total' => $quote['total'],
-                'prices_include_tax' => $quote['pricesIncludeTax'],
+                'gst_treatment' => $priced['taxParts']->treatment,
+                'tax' => $priced['tax'],
+                'cgst' => $priced['taxParts']->cgst,
+                'sgst' => $priced['taxParts']->sgst,
+                'igst' => $priced['taxParts']->igst,
+                'charges_total' => array_sum(array_column($priced['charges'], 'amount')),
+                'total' => $priced['total'],
+                'prices_include_tax' => $priced['pricesIncludeTax'],
             ]);
 
             $order->forceFill(['tenant_id' => $tenant->getKey(), 'menu_id' => $menu->getKey()])->save();
 
             ($this->applyStockChanges)(($this->stockDemand)($lines), StockMovementReason::OrderPlaced, $order);
 
-            $this->copyLines($tenant, $order, $lines, $quote['lines']);
-            $this->copyCharges($order, $quote['charges']);
+            $this->copyLines($tenant, $order, $lines, $priced['lines']);
+            $this->copyCharges($order, $priced['charges']);
 
             return $order;
         });
@@ -111,12 +111,12 @@ final readonly class PlaceOrder
         $tenantRate = $tenant->taxRate();
         $tenantOverrides = $tenant->overridesItemTaxRates();
 
-        $items = $this->named(MenuItem::query(), $this->idsOf($lines, QuoteBasket::ITEM), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
-        $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, QuoteBasket::COMBO), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
+        $items = $this->named(MenuItem::query(), $this->idsOf($lines, PriceBasket::ITEM), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
+        $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, PriceBasket::COMBO), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
         $options = $this->named(MenuAddOnOption::query(), $this->optionIdsOf($lines), ['id', 'name', 'price']);
 
         foreach ($lines as $index => $line) {
-            $isCombo = $line['type'] === QuoteBasket::COMBO;
+            $isCombo = $line['type'] === PriceBasket::COMBO;
             $ordered = $isCombo ? $combos->get((int) $line['id']) : $items->get((int) $line['id']);
 
             throw_unless($ordered instanceof MenuItem || $ordered instanceof MenuCombo, LogicException::class, 'A line priced a moment ago has no item or combo to copy.');

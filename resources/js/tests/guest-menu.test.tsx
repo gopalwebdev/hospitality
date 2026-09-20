@@ -124,7 +124,7 @@ function renderMenu(overrides: Partial<Parameters<typeof Menu>[0]> = {}) {
             tax={tax}
             charges={[]}
             store={{ isOpen: true, opensAt: '09:00', closesAt: '23:00' }}
-            quoteUrl={`${homeUrl}/menus/1/basket-quotes`}
+            priceUrl={`${homeUrl}/menus/1/basket-prices`}
             homeUrl={homeUrl}
             {...overrides}
         />,

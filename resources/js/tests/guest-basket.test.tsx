@@ -2,28 +2,50 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import type { BasketLine } from '@/hooks/use-basket';
-import type { Quote } from '@/hooks/use-basket-quote';
+import type { PricedBasket, TaxParts } from '@/hooks/use-basket-price';
 import type { AddOnGroup } from '@/lib/add-on-rules';
 import Menu, { type MenuItem } from '@/pages/guest/menu';
 
 /*
- * The quote is the server's answer, so these tests stand in for it: what the
- * basket shows is whatever it is handed, and what it asked for is recorded.
+ * The priced basket is the server's answer, so these tests stand in for it:
+ * what the basket shows is whatever it is handed, and what it asked for is
+ * recorded.
  */
 const server = vi.hoisted(() => ({
-    quote: null as Quote | null,
+    priced: null as PricedBasket | null,
     asked: [] as { url: string; lines: BasketLine[]; isLookedAt: boolean }[],
 }));
 
-vi.mock('@/hooks/use-basket-quote', () => ({
-    useBasketQuote: (url: string, lines: BasketLine[], isLookedAt: boolean) => {
+vi.mock('@/hooks/use-basket-price', () => ({
+    useBasketPrice: (url: string, lines: BasketLine[], isLookedAt: boolean) => {
         server.asked.push({ url, lines, isLookedAt });
 
-        return { quote: server.quote, isPricing: false };
+        return { priced: server.priced, isPricing: false };
     },
 }));
 
-const quoteUrl = 'http://spice.hospitality.test/menus/1/basket-quotes';
+/**
+ * GST levied in halves, as the server splits it: half the rate each side, and
+ * the amounts it worked out. `treatment` is what the state's half is called.
+ */
+function halves(
+    cgst: number,
+    sgst: number,
+    rate = 500,
+    treatment: TaxParts['treatment'] = 'intra-state',
+): TaxParts {
+    return {
+        treatment,
+        cgstRate: Math.floor(rate / 2),
+        cgst,
+        sgstRate: rate - Math.floor(rate / 2),
+        sgst,
+        igstRate: 0,
+        igst: 0,
+    };
+}
+
+const priceUrl = 'http://spice.hospitality.test/menus/1/basket-prices';
 
 const extras: AddOnGroup = {
     id: 1,
@@ -96,7 +118,7 @@ function renderMenu(items: MenuItem[] = [masala]) {
             tax={{ rate: 500, pricesIncludeTax: false }}
             charges={[]}
             store={{ isOpen: true, opensAt: '09:00', closesAt: '23:00' }}
-            quoteUrl={quoteUrl}
+            priceUrl={priceUrl}
             homeUrl="http://spice.hospitality.test"
         />,
     );
@@ -114,7 +136,7 @@ function amountFor(
 describe('guest basket', () => {
     beforeEach(() => {
         localStorage.clear();
-        server.quote = null;
+        server.priced = null;
         server.asked = [];
     });
 
@@ -141,26 +163,42 @@ describe('guest basket', () => {
             },
         ]);
 
-        server.quote = {
+        server.priced = {
             lines: [
                 {
                     key: 'item:30:22x1:11x2',
                     status: 'ok',
                     unitPrice: 38900,
                     total: 38900,
+                    taxableValue: 38900,
+                    tax: 1945,
+                    taxParts: halves(973, 972),
                 },
                 {
                     key: 'item:99',
                     status: 'unavailable',
                     unitPrice: 0,
                     total: 0,
+                    taxableValue: 0,
+                    tax: 0,
+                    taxParts: halves(0, 0, 0),
                 },
             ],
             subtotal: 38900,
-            tax: 1945,
+            tax: 2140,
+            taxParts: halves(1070, 1070),
             pricesIncludeTax: false,
-            charges: [{ id: 1, name: 'Service Charge', amount: 3890 }],
-            total: 44735,
+            charges: [
+                {
+                    id: 1,
+                    name: 'Service Charge',
+                    amount: 3890,
+                    taxableValue: 3890,
+                    tax: 195,
+                    taxParts: halves(97, 98),
+                },
+            ],
+            total: 44930,
         };
 
         renderMenu();
@@ -179,15 +217,23 @@ describe('guest basket', () => {
             within(sheet).getByText('No longer available'),
         ).toBeInTheDocument();
 
+        // The line carries its own rate and GST, because one basket can hold
+        // a 5% item beside an 18% one.
+        expect(
+            within(sheet).getByText(/GST 5% · ₹?19\.45/),
+        ).toBeInTheDocument();
+
         expect(amountFor(sheet, 'Subtotal')).toMatch(/389\.00/);
-        expect(amountFor(sheet, 'GST')).toMatch(/19\.45/);
+        // Levied in halves, and shown that way.
+        expect(amountFor(sheet, 'CGST 2.5%')).toMatch(/10\.70/);
+        expect(amountFor(sheet, 'SGST 2.5%')).toMatch(/10\.70/);
         expect(amountFor(sheet, 'Service Charge')).toMatch(/38\.90/);
-        expect(amountFor(sheet, 'Total')).toMatch(/447\.35/);
+        expect(amountFor(sheet, 'Total')).toMatch(/449\.30/);
 
         // Priced against this menu, and only once the sheet was open.
         expect(server.asked[0]?.isLookedAt).toBe(false);
         expect(server.asked.at(-1)).toEqual(
-            expect.objectContaining({ url: quoteUrl, isLookedAt: true }),
+            expect.objectContaining({ url: priceUrl, isLookedAt: true }),
         );
     });
 
@@ -203,17 +249,21 @@ describe('guest basket', () => {
             },
         ]);
 
-        server.quote = {
+        server.priced = {
             lines: [
                 {
                     key: 'item:30:22x1',
                     status: 'ok',
                     unitPrice: 30900,
                     total: 30900,
+                    taxableValue: 29429,
+                    tax: 1471,
+                    taxParts: halves(736, 735),
                 },
             ],
             subtotal: 30900,
             tax: 1471,
+            taxParts: halves(736, 735),
             pricesIncludeTax: true,
             charges: [],
             total: 30900,
@@ -224,11 +274,16 @@ describe('guest basket', () => {
 
         const sheet = screen.getByRole('dialog');
 
-        // Already in the price, so a note rather than a line added to it.
-        expect(within(sheet).queryByText('GST')).not.toBeInTheDocument();
+        // Already in the price, so the line says "Incl." and the halves sit
+        // under the total as a note rather than being added to it.
+        expect(
+            within(sheet).getByText(/Incl. GST 5% · ₹?14\.71/),
+        ).toBeInTheDocument();
         expect(
             within(sheet).getByText(/Includes GST of ₹?14\.71/),
         ).toBeInTheDocument();
+        expect(amountFor(sheet, 'CGST 2.5%')).toMatch(/7\.36/);
+        expect(amountFor(sheet, 'Total')).toMatch(/309\.00/);
 
         fireEvent.click(
             within(sheet).getByRole('button', {

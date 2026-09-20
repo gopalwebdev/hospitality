@@ -32,7 +32,7 @@ export interface AddOnGroup {
 /** How many of each option a guest has picked, by option id. Absent is none. */
 export type Picks = Readonly<Record<number, number>>;
 
-/** One picked option and how many of it, as a basket stores it and a quote reads it. */
+/** One picked option and how many of it, as a basket stores it and the server reads it. */
 export interface Choice {
     optionId: number;
     quantity: number;
@@ -49,7 +49,7 @@ export interface Phrase {
  *
  * These only shape the sheet — which boxes can still be ticked, whether Add is
  * ready, what the button says. The server decides again when the basket is
- * priced (App\Actions\Menus\QuoteBasket), so nothing here is trusted.
+ * priced (App\Actions\Menus\PriceBasket), so nothing here is trusted.
  *
  * Picks are counted the way the server counts them: each option by its quantity,
  * so two of "Extra cheese" are two picks toward "up to 3".

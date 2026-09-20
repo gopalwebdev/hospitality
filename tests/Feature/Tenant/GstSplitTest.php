@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Actions\Orders\PlaceOrder;
 use App\Enums\GstTreatment;
 use App\Models\Charge;
@@ -60,7 +60,7 @@ function orderOneOf(Tenant $tenant, Menu $menu, MenuItem $item): Order
     return app(PlaceOrder::class)(
         $tenant,
         $menu,
-        [['key' => 'k', 'type' => QuoteBasket::ITEM, 'id' => $item->getKey(), 'quantity' => 1, 'choices' => []]],
+        [['key' => 'k', 'type' => PriceBasket::ITEM, 'id' => $item->getKey(), 'quantity' => 1, 'choices' => []]],
     );
 }
 

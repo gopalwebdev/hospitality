@@ -56,7 +56,7 @@ How a guest sees it:
 - **Optional with a maximum of one:** a checkbox that moves its tick.
 
 - **Counting:** picks are counted by quantity, as Square counts them, so two of "Extra cheese" are two picks toward "up to 3".
-- **`max_quantity`:** caps how many of one option a single item takes, always — there is no group-wide switch gating it any more. `MenuAddOnGroup::quantityAllowedFor()` is the one place that works out the effective cap: an option's own `max_quantity`, never more than the maximum picks in play (the group's own, or an item's own — see below). `picksOffered()` adds the options up with it. `Guest\MenuController` and `QuoteBasket` both go through them.
+- **`max_quantity`:** caps how many of one option a single item takes, always — there is no group-wide switch gating it any more. `MenuAddOnGroup::quantityAllowedFor()` is the one place that works out the effective cap: an option's own `max_quantity`, never more than the maximum picks in play (the group's own, or an item's own — see below). `picksOffered()` adds the options up with it. `Guest\MenuController` and `PriceBasket` both go through them.
 
 **Stated three times over:**
 - **CHECK constraints:**
@@ -66,16 +66,16 @@ How a guest sees it:
 - **Form validation:**
   - `MenuAddOnGroupForm`: the maximum is 1–99, or blank; no more options are set as the default than the maximum (this rule sits on the options repeater, so its message reads under the table); an option's Max each is not more than the group's own maximum; a group has at least one option.
   - `MenuItemForm`: an item's own cap on a group is 1–99 or blank, and not less than how many of that group's options are ticked as the default — `MenuAddOnGroupForm::defaultsCountOf()`, which reads the same cached lookup the select uses, so this costs no extra query per row. It reads `defaults_count` as an attribute rather than a property, because a `withCount()` aggregate is not a column and the model does not carry one.
-- **Pricing:** `QuoteBasket` refuses a line as `invalid` when a required group has nothing picked or a group's picks go over the maximum in play for that item.
+- **Pricing:** `PriceBasket` refuses a line as `invalid` when a required group has nothing picked or a group's picks go over the maximum in play for that item.
 
 `MenuAddOnGroupForm::ruleSummary()` words a rule for the panel's item form ("Required · Choose 1", "Optional · Up to 3", "Required · At least 1") from the *group's own* answers — the select's label does not know an item's own override. `resources/js/lib/add-on-rules.ts` `ruleOf()` words the same cases for a guest, from whatever `maxSelections` the item was actually sent. Change one, change the other.
 
 ## An item may cap a group's picks tighter or looser than the group's own
-`menu_item_add_on_groups.max_selections` is the one thing that is *not* "one rule everywhere": a "Portion" item might allow only one of an extras group that is "up to 3" everywhere else, or a large thali might allow more. Blank follows the group's own maximum, shown as the field's placeholder so "blank" reads as something rather than nothing. `MenuItemAddOnGroup::effectiveMaxSelections()` is the one place that resolves it (`$this->max_selections ?? $group->max_selections`), and every reader — `QuoteBasket`, `Guest\MenuController` — goes through it or through `MenuAddOnGroup::quantityAllowedFor()`/`picksOffered()`'s own `?? $this->max_selections` fallback, which is the same rule restated on the group side for a caller with no link at hand.
+`menu_item_add_on_groups.max_selections` is the one thing that is *not* "one rule everywhere": a "Portion" item might allow only one of an extras group that is "up to 3" everywhere else, or a large thali might allow more. Blank follows the group's own maximum, shown as the field's placeholder so "blank" reads as something rather than nothing. `MenuItemAddOnGroup::effectiveMaxSelections()` is the one place that resolves it (`$this->max_selections ?? $group->max_selections`), and every reader — `PriceBasket`, `Guest\MenuController` — goes through it or through `MenuAddOnGroup::quantityAllowedFor()`/`picksOffered()`'s own `?? $this->max_selections` fallback, which is the same rule restated on the group side for a caller with no link at hand.
 
 Required stays a property of the group alone: a guest either must pick from "Spice level" wherever it is offered, or need not, and only the *how many* varies per item. The project owner chose this over letting Required vary too, because a group required on one item and optional on another would complicate which items disappear when a required group runs out of options (`canBeMetBy()`), for a case nobody asked for.
 
-`resources/js/lib/add-on-rules.ts` `withItemMaxSelections()` applies an item's own cap to a shared group for the customise sheet: it lowers `maxSelections` and clamps every option's `maxQuantity` to it, so an item capped at one shows the same radio-like "moves the tick" behaviour a single-pick group shows everywhere else, without the group's *other* items losing their own higher cap. The server is what actually enforces it (`QuoteBasket`); the sheet only shapes itself around what it was sent.
+`resources/js/lib/add-on-rules.ts` `withItemMaxSelections()` applies an item's own cap to a shared group for the customise sheet: it lowers `maxSelections` and clamps every option's `maxQuantity` to it, so an item capped at one shows the same radio-like "moves the tick" behaviour a single-pick group shows everywhere else, without the group's *other* items losing their own higher cap. The server is what actually enforces it (`PriceBasket`); the sheet only shapes itself around what it was sent.
 
 ## Where groups are edited, and where they are linked
 `MenuAddOnGroupResource` lists the library under Menu, after Items. Groups are created and edited in 7xl modals, stacked so the options table gets the full width: the name and the two answers on top, then the options, dragged into the order a guest reads them.
@@ -116,17 +116,17 @@ An item links its groups in its own form: a table repeater on `addOnGroupLinks`,
 **The options table uses `TranslatedFields::textCell()`, never a bare `text()`.** A `->table()` repeater gives a row one cell per top-level component, so a translated name spread as two inputs split into two cells and shifted every column after it. That put a price under the since-removed GST column and dropped "Available" off the end before it was fixed. See `.ai/rules/filament.md`.
 
 ## An add-on is taxed at its item's rate
-An option has no `tax_rate`. Section 8(a) of the CGST Act taxes a composite supply at the rate of its principal supply, and extra cheese on a paneer tikka is part of the paneer tikka. So `QuoteBasket` taxes every part of an item's line at the item's rate.
+An option has no `tax_rate`. Section 8(a) of the CGST Act taxes a composite supply at the rate of its principal supply, and extra cheese on a paneer tikka is part of the paneer tikka. So `PriceBasket` taxes every part of an item's line at the item's rate.
 
 This replaced two things:
 - **The form:** a GST column on the options table, which was the form's most confusing field.
-- **`QuoteBasket`:** it taxed an option at its own rate or the tenant's, never the item's, which was wrong in law.
+- **`PriceBasket`:** it taxed an option at its own rate or the tenant's, never the item's, which was wrong in law.
 
 ## What a guest is sent, and when an item disappears
 `Guest\MenuController` reads the page's links and then its groups with their available options, in two queries whatever the menu's size:
 - **Unavailable options:** never sent — switched off, or counted down to none (`MenuAddOnOption::scopeAvailable()`).
 - **Groups with nothing left:** a group with no available option is dropped from every item that offered it.
-- **Items whose required group can't be met:** an item is left off the menu, like a sold-out one, when a required group has no available option left, checked against whatever maximum is in play for that item (`picksOffered($maxSelections)`). `QuoteBasket` calls the same line `unavailable`.
+- **Items whose required group can't be met:** an item is left off the menu, like a sold-out one, when a required group has no available option left, checked against whatever maximum is in play for that item (`picksOffered($maxSelections)`). `PriceBasket` calls the same line `unavailable`.
 
 A group is sent once, as `{id, name, isRequired, maxSelections, options}` — its own default answers (`.ai/rules/js.md`). Each item names its groups as `addOnGroupLinks: {id, maxSelections}[]`, where `maxSelections` is that item's own cap, null following the group's own; `withItemMaxSelections()` merges the two for the customise sheet.
 
@@ -136,7 +136,7 @@ Tests:
 - `tests/Feature/Tenant/AddOnGroupManagementTest.php`
 - `tests/Feature/Tenant/MenuManagementTest.php` (an item's own cap)
 - `tests/Feature/Tenant/GuestAppTest.php`
-- `tests/Feature/Tenant/BasketQuoteTest.php`
+- `tests/Feature/Tenant/BasketPriceTest.php`
 - `resources/js/tests/add-on-rules.test.ts`
 - `resources/js/tests/guest-menu.test.tsx`
 - `resources/js/tests/guest-basket.test.tsx`

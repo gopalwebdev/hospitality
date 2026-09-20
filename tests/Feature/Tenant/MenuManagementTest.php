@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
@@ -1016,15 +1016,15 @@ it('taxes an option at the rate of the item it is added to', function (): void {
     // An add-on is part of the item it is added to — a composite supply, taxed
     // at the rate of its principal supply (CGST Act, s. 8(a)) — so the cheese
     // pays the item's 12%, not the tenant's 5%.
-    $quote = app(QuoteBasket::class)($tenant, $menu, [[
+    $priced = app(PriceBasket::class)($tenant, $menu, [[
         'key' => 'tikka',
-        'type' => QuoteBasket::ITEM,
+        'type' => PriceBasket::ITEM,
         'id' => $menuItem->getKey(),
         'quantity' => 1,
         'choices' => [['optionId' => $cheese->getKey(), 'quantity' => 1]],
     ]]);
 
-    expect($quote['tax'])->toBe(1200 + 600);
+    expect($priced['tax'])->toBe(1200 + 600);
 });
 
 /*

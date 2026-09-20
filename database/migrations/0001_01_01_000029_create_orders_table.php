@@ -21,7 +21,7 @@ return new class extends Migration
             // Where to bring it, as the guest typed it: "Room 204", "Table 5". Guests have no account.
             $table->string('location_label', 40)->nullable();
             $table->string('note', 200)->nullable();
-            // What the basket came to when it was placed, as QuoteBasket priced it. Never worked out again.
+            // What the basket came to when it was placed, as PriceBasket priced it. Never worked out again.
             $table->integer('subtotal');
             // How this bill's GST was levied, settled once when it was placed:
             // App\Enums\GstTreatment. A rate changes and a tenant moves, so an

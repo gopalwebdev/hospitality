@@ -796,7 +796,7 @@ it('sends each add-on group once, and each item the groups it offers in its own 
             ])
             // Its own cap of two stands: nothing in the group forces it down to one.
             ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxQuantity'] ?? null) === 2)
-            ->where('quoteUrl', guestMenuUrl($tenant, $menu).'/basket-quotes'),
+            ->where('priceUrl', guestMenuUrl($tenant, $menu).'/basket-prices'),
         );
 });
 

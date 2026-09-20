@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Guest;
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Guest\QuoteBasketRequest;
+use App\Http\Requests\Guest\PriceBasketRequest;
 use App\Models\Menu;
 use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
@@ -13,11 +13,11 @@ use Illuminate\Http\JsonResponse;
  * What a guest's basket comes to, priced against the menu it was built on.
  *
  * The basket is kept on the phone, so the app asks again whenever it changes:
- * the answer is PHP's and the app only formats it. See QuoteBasket.
+ * the answer is PHP's and the app only formats it. See PriceBasket.
  */
-class BasketQuoteController extends Controller
+class BasketPriceController extends Controller
 {
-    public function __invoke(QuoteBasketRequest $request, Tenant $tenant, Menu $menu, QuoteBasket $quoteBasket): JsonResponse
+    public function __invoke(PriceBasketRequest $request, Tenant $tenant, Menu $menu, PriceBasket $priceBasket): JsonResponse
     {
         abort_unless($tenant->is_active, 404);
 
@@ -29,6 +29,6 @@ class BasketQuoteController extends Controller
         /** @var list<array{key: string, type: string, id: int, quantity: int, choices?: list<array{optionId: int, quantity: int}>}> $lines */
         $lines = $request->validated('lines');
 
-        return response()->json($quoteBasket($tenant, $menu, $lines));
+        return response()->json($priceBasket($tenant, $menu, $lines));
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Actions\Inventory;
 
-use App\Actions\Menus\QuoteBasket;
+use App\Actions\Menus\PriceBasket;
 use App\Models\MenuAddOnOption;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
@@ -17,7 +17,7 @@ use App\Models\MenuItem;
  * counts are asked for too — ApplyStockChanges and FindStockShortages are what
  * know which rows are counted, and skip the rest.
  *
- * @phpstan-import-type BasketLine from QuoteBasket
+ * @phpstan-import-type BasketLine from PriceBasket
  */
 final class StockDemand
 {
@@ -38,7 +38,7 @@ final class StockDemand
         foreach ($lines as $line) {
             $quantity = (int) $line['quantity'];
 
-            if ($line['type'] === QuoteBasket::COMBO) {
+            if ($line['type'] === PriceBasket::COMBO) {
                 foreach ($contents[(int) $line['id']] ?? [] as $itemId => $each) {
                     $this->ask($items, $itemId, $each * $quantity, $line['key']);
                 }
@@ -76,7 +76,7 @@ final class StockDemand
     {
         $comboIds = array_values(array_unique(array_map(
             static fn (array $line): int => (int) $line['id'],
-            array_filter($lines, static fn (array $line): bool => $line['type'] === QuoteBasket::COMBO),
+            array_filter($lines, static fn (array $line): bool => $line['type'] === PriceBasket::COMBO),
         )));
 
         if ($comboIds === []) {

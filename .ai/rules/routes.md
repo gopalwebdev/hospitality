@@ -13,7 +13,7 @@ Nest only to express ownership, one level where possible: `/tenants/{tenant}/men
 API routes are versioned from the first one: `/api/v1/...`. Route names are dot-separated and mirror the path (`menu-items.index`), and links are always built with `route()` or the generated Wayfinder helper, never a hand-written string.
 
 ## Tenant route names say which app they belong to
-Every route name on a tenant's subdomain carries its app's prefix — `guest.home`, `guest.menus.show`, `guest.menus.basket-quotes.store`, `guest.menus.orders.store`, `guest.tiles.document.show`, `guest.manifest`, `guest.service-worker` — so a second app there later cannot collide. The one exception is `preferences.language.update`, which the guest app and the tenant's panel both post to and neither owns.
+Every route name on a tenant's subdomain carries its app's prefix — `guest.home`, `guest.menus.show`, `guest.menus.basket-prices.store`, `guest.menus.orders.store`, `guest.tiles.document.show`, `guest.manifest`, `guest.service-worker` — so a second app there later cannot collide. The one exception is `preferences.language.update`, which the guest app and the tenant's panel both post to and neither owns.
 
 `manifest.webmanifest` and `service-worker.js` are the two paths that are not resource nouns: they are the filenames browsers expect. The guest app's are served from the root of the subdomain so the worker's scope is the whole app.
 
@@ -23,7 +23,7 @@ The panels serve the same two files under their own path, so a panel's worker ne
 
 The prefix is `FilamentPanel::path()`, never a typed `dashboard`. Filament registers nothing at those two paths.
 
-`POST /menus/{menu}/basket-quotes` is the guest app's one JSON endpoint: a basket kept on the phone, priced against the menu it came from (`Guest\BasketQuoteController`, `.ai/rules/actions-menus.md`). A quote is the resource created, so the path is a noun like every other. It sits in the guest middleware group beside the menu it belongs to, is throttled to 60 a minute because anyone at a table can reach it, and checks the tenant and the menu by hand like every guest controller.
+`POST /menus/{menu}/basket-prices` is the guest app's one JSON endpoint: a basket kept on the phone, priced against the menu it came from (`Guest\BasketPriceController`, `.ai/rules/actions-menus.md`). The price of that basket is the resource created, so the path is a noun like every other. It sits in the guest middleware group beside the menu it belongs to, is throttled to 60 a minute because anyone at a table can reach it, and checks the tenant and the menu by hand like every guest controller.
 
 Switching language needs two registrations of one controller, because a form must post to the host it was rendered on or the session cookie does not travel: `preferences.language.update` on a tenant's subdomain (the guest app and the tenant panel) and `panel.language.update` on the root domain (the product team's panel).
 

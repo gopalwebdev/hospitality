@@ -10,7 +10,7 @@ use RuntimeException;
  * An order refused before it touched stock: ordering is off, the menu is not being served, or a line no longer stands.
  *
  * Rendered for the guest app as 422 with the reason and, when a line is why,
- * every line as QuoteBasket priced it — the same statuses a quote carries.
+ * every line as PriceBasket priced it — the same statuses a priced basket carries.
  */
 final class OrderRefused extends RuntimeException
 {

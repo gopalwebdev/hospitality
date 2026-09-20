@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\FilamentPanel;
-use App\Http\Controllers\Guest\BasketQuoteController;
+use App\Http\Controllers\Guest\BasketPriceController;
 use App\Http\Controllers\Guest\HomeController;
 use App\Http\Controllers\Guest\MenuController;
 use App\Http\Controllers\Guest\PlaceOrderController;
@@ -45,12 +45,12 @@ Route::domain('{tenant}.'.config('app.domain'))->group(function (): void {
         // What a basket kept on the phone comes to. JSON the menu screen reads
         // back rather than a page, and throttled because anyone at a table can
         // reach it.
-        Route::post('menus/{menu}/basket-quotes', BasketQuoteController::class)
+        Route::post('menus/{menu}/basket-prices', BasketPriceController::class)
             ->middleware('throttle:60,1')
-            ->name('menus.basket-quotes.store');
+            ->name('menus.basket-prices.store');
 
         // Placing that basket as an order, which takes from stock. Throttled
-        // harder than a quote: a phone asks for a price often and orders rarely.
+        // harder than pricing: a phone asks for a price often and orders rarely.
         Route::post('menus/{menu}/orders', PlaceOrderController::class)
             ->middleware('throttle:10,1')
             ->name('menus.orders.store');

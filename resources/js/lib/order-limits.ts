@@ -9,7 +9,7 @@ import {
  * basket line it is on: a feather pillow and a memory foam one are two towards
  * a maximum of two. Null is no limit.
  *
- * The server checks the same (App\Actions\Menus\QuoteBasket). These only keep
+ * The server checks the same (App\Actions\Menus\PriceBasket). These only keep
  * the steppers and Add buttons from offering what it would refuse.
  */
 export interface OrderLimits {

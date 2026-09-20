@@ -53,14 +53,14 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 1. **Refused before stock is touched** with `OrderRefused` (422, `reason` from `App\Enums\OrderRefusal`) when:
    - the tenant is closed (`OrderRefusal::StoreClosed`, from its weekly opening hours — `.ai/rules/app.md`)
    - the menu is outside its service window
-   - any line is not `ok` in `QuoteBasket` — every priced line comes back as `lines`
+   - any line is not `ok` in `PriceBasket` — every priced line comes back as `lines`
 2. **One transaction:** the order row, then `ApplyStockChanges` with the lines' `StockDemand`, then the lines, their choices and the charges copied in.
 3. **Short under the lock:** `InsufficientStock` rolls the order back with it and renders 422 as `{message, reason: "insufficient-stock", shortages: [{type, id, requested, available, lineKeys}]}`.
    - "3 asked for, 1 left" is a shortage with `requested: 3, available: 1`.
    - The server's count needs no correcting. `available` is what the phone brings those lines down to, which is the PWA's job when it arrives.
 4. **Placed:** 201 `{orderId, total}`.
 
-`QuoteBasket` answers the same `shortages` shape without a lock — a reading, not a hold — beside line statuses it leaves unchanged, so the current basket sheet reads the quote exactly as before.
+`PriceBasket` answers the same `shortages` shape without a lock — a reading, not a hold — beside line statuses it leaves unchanged, so the basket sheet reads the priced basket exactly as before.
 
 **An order is a copy.**
 - `orders` keeps its totals as priced, and its GST as levied: `gst_treatment`, `tax`, and the `cgst` / `sgst` / `igst` the three of which add up to it.
@@ -107,4 +107,4 @@ Tests:
 - `tests/Feature/Tenant/PlaceOrderTest.php`
 - `tests/Feature/Tenant/StockManagementTest.php`
 - `tests/Feature/Tenant/OrderManagementTest.php`
-- `tests/Feature/Tenant/BasketQuoteTest.php`
+- `tests/Feature/Tenant/BasketPriceTest.php`
