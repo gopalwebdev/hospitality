@@ -17,6 +17,7 @@ use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
@@ -102,7 +103,9 @@ final class StockActions
             ->tooltip(__('panel.stock.history'))
             ->authorize('view')
             ->modalHeading(fn (MenuItem $record): string => (string) __('panel.stock.history_heading', ['name' => $record->name]))
-            ->modalWidth(Width::FourExtraLarge)
+            // Six columns, one of them a free-text note: 4xl wrapped the note
+            // to two lines on a laptop and squeezed the reason badge.
+            ->modalWidth(Width::SixExtraLarge)
             // Nothing to save: this only reads.
             ->modalSubmitAction(false)
             ->modalCancelActionLabel(__('panel.stock.close'))
@@ -120,13 +123,24 @@ final class StockActions
                         TableColumn::make(__('panel.stock.note')),
                     ])
                     ->schema([
-                        TextEntry::make('when')->dateTime(),
+                        // No format of its own: both panels read a date and a
+                        // time the one way, set in AppServiceProvider.
+                        TextEntry::make('when')
+                            ->dateTime()
+                            ->color('gray'),
                         TextEntry::make('reason')
                             ->badge()
                             ->formatStateUsing(fn (StockMovementReason $state): string => $state->label())
                             ->color(fn (StockMovementReason $state): string => $state->color()),
-                        TextEntry::make('change'),
-                        TextEntry::make('after'),
+                        // Stock arriving and stock leaving are the two things
+                        // this table is read for, and the sign alone is a
+                        // character wide. Green is a gain, red is a take.
+                        TextEntry::make('change')
+                            ->weight(FontWeight::SemiBold)
+                            ->color(fn (string $state): string => str_starts_with($state, '+') ? 'success' : 'danger'),
+                        // What the count came to is the answer the row exists
+                        // to give, so it reads at the weight of one.
+                        TextEntry::make('after')->weight(FontWeight::SemiBold),
                         TextEntry::make('by')->placeholder('—'),
                         TextEntry::make('note')->placeholder('—'),
                     ]),

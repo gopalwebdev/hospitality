@@ -31,12 +31,12 @@ class MenuItemFactory extends Factory
                 ->value('tenant_id'),
             'name' => [$english => ucfirst(fake()->unique()->word()).' '.fake()->unique()->numberBetween(1, 9999)],
             'description' => [$english => fake()->sentence()],
-            'price_minor_units' => fake()->numberBetween(5000, 90000),
+            'price' => fake()->numberBetween(5000, 90000),
             // Most items carry neither: no offer, and the tenant's own
             // GST slab. Both are set by a state when a test is about them.
-            'compare_at_price_minor_units' => null,
-            'tax_rate_basis_points' => null,
-            'hsn_code' => null,
+            'compare_at_price' => null,
+            'tax_rate' => null,
+            'hsn_sac_code' => null,
             'is_service_request' => false,
             'diets' => [fake()->randomElement(Diet::cases())],
             'availability' => ItemAvailability::Available,
@@ -65,7 +65,7 @@ class MenuItemFactory extends Factory
         return $this->state(fn (array $attributes): array => [
             'is_service_request' => true,
             'diets' => null,
-            'price_minor_units' => 0,
+            'price' => 0,
         ]);
     }
 
@@ -82,10 +82,10 @@ class MenuItemFactory extends Factory
     /**
      * An item advertised with a higher price struck through beside it.
      */
-    public function discounted(?int $compareAtMinorUnits = null): static
+    public function discounted(?int $compareAt = null): static
     {
         return $this->state(fn (array $attributes): array => [
-            'compare_at_price_minor_units' => $compareAtMinorUnits ?? $attributes['price_minor_units'] + 5000,
+            'compare_at_price' => $compareAt ?? $attributes['price'] + 5000,
         ]);
     }
 
@@ -97,7 +97,7 @@ class MenuItemFactory extends Factory
     public function taxedAt(int $basisPoints): static
     {
         return $this->state(fn (array $attributes): array => [
-            'tax_rate_basis_points' => $basisPoints,
+            'tax_rate' => $basisPoints,
         ]);
     }
 

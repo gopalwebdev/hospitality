@@ -156,7 +156,7 @@ return [
         'featured_tab' => 'Featured',
         'tax_section' => 'Tax',
         'tax_rate' => 'GST rate',
-        'hsn_code' => 'HSN / SAC code',
+        'hsn_sac_code' => 'HSN / SAC code',
         'type' => 'Type',
         'unique' => 'This category already has an item with that name.',
         'delete_warning' => 'Its add-on groups come off it, and it is taken out of any combo listing it. The groups stay for other items.',

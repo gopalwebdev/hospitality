@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GstTreatment;
 use App\Enums\OrderStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderFactory;
@@ -23,10 +24,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property OrderStatus $status
  * @property string|null $location_label
  * @property string|null $note
- * @property int $subtotal_minor_units
- * @property int $tax_minor_units
- * @property int $charges_minor_units
- * @property int $total_minor_units
+ * @property int $subtotal
+ * @property GstTreatment $gst_treatment
+ * @property int $tax
+ * @property int $cgst
+ * @property int $sgst
+ * @property int $igst
+ * @property int $charges_total
+ * @property int $total
  * @property bool $prices_include_tax
  * @property CarbonImmutable|null $cancelled_at
  * @property-read Collection<int, OrderLine> $lines
@@ -38,10 +43,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'status',
     'location_label',
     'note',
-    'subtotal_minor_units',
-    'tax_minor_units',
-    'charges_minor_units',
-    'total_minor_units',
+    'subtotal',
+    'gst_treatment',
+    'tax',
+    'cgst',
+    'sgst',
+    'igst',
+    'charges_total',
+    'total',
     'prices_include_tax',
     'cancelled_at',
 ])]
@@ -54,6 +63,10 @@ class Order extends Model
     #[\Override]
     protected $attributes = [
         'status' => OrderStatus::Placed->value,
+        'gst_treatment' => GstTreatment::IntraState->value,
+        'cgst' => 0,
+        'sgst' => 0,
+        'igst' => 0,
     ];
 
     /**
@@ -111,10 +124,14 @@ class Order extends Model
         return [
             'menu_id' => 'integer',
             'status' => OrderStatus::class,
-            'subtotal_minor_units' => 'integer',
-            'tax_minor_units' => 'integer',
-            'charges_minor_units' => 'integer',
-            'total_minor_units' => 'integer',
+            'subtotal' => 'integer',
+            'gst_treatment' => GstTreatment::class,
+            'tax' => 'integer',
+            'cgst' => 'integer',
+            'sgst' => 'integer',
+            'igst' => 'integer',
+            'charges_total' => 'integer',
+            'total' => 'integer',
             'prices_include_tax' => 'boolean',
             'cancelled_at' => 'datetime',
         ];

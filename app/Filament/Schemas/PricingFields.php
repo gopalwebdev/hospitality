@@ -75,7 +75,7 @@ final class PricingFields
      * number rather than `formatRate()`'s "5%": the field already carries its
      * own '%' suffix, and a placeholder of "5%" beside it read as "5%%".
      */
-    public static function taxRatePercentage(int $tenantRateBasisPoints): TextInput
+    public static function taxRatePercentage(int $tenantRate): TextInput
     {
         return TextInput::make('tax_rate_percentage')
             ->label(__('panel.items.tax_rate'))
@@ -84,16 +84,20 @@ final class PricingFields
             ->maxValue(100)
             ->step(0.01)
             ->suffix('%')
-            ->placeholder(self::formattedPercentage($tenantRateBasisPoints));
+            ->placeholder(self::formattedPercentage($tenantRate));
     }
 
     /**
      * The HSN or SAC code this line carries on a tax invoice.
+     *
+     * One field for both, as an invoice and GSTR-1 have one: HSN numbers goods
+     * and SAC numbers services, and this menu carries both — a bottle of water
+     * is goods, a bedsheet change is a service.
      */
-    public static function hsnCode(): TextInput
+    public static function hsnSacCode(): TextInput
     {
-        return TextInput::make('hsn_code')
-            ->label(__('panel.items.hsn_code'))
+        return TextInput::make('hsn_sac_code')
+            ->label(__('panel.items.hsn_sac_code'))
             ->maxLength(8);
     }
 
@@ -130,6 +134,13 @@ final class PricingFields
     /**
      * Turn the typed values into what gets stored.
      *
+     * The field and the column share a name and differ only in unit — a price
+     * is typed in rupees and stored in paise — so each is converted **in
+     * place**. Only `tax_rate_percentage`, which has no column of its own, is
+     * unset; unsetting the others here would throw away what was just worked
+     * out. That is not hypothetical: it is what dropping the `_minor_units`
+     * suffix from the columns did before this comment was written.
+     *
      * A blank compare-at price and a blank rate are both stored as null rather
      * than zero: null means "not on offer" and "follow the tenant", where a
      * zero would mean a price of nothing and a tax rate of nothing.
@@ -141,25 +152,27 @@ final class PricingFields
     {
         $currency ??= self::currency();
 
-        $data['price_minor_units'] = $currency->toMinorUnits($data['price'] ?? 0);
+        $data['price'] = $currency->toMinorUnits($data['price'] ?? 0);
 
-        $data['compare_at_price_minor_units'] = blank($data['compare_at_price'] ?? null)
+        $data['compare_at_price'] = blank($data['compare_at_price'] ?? null)
             ? null
             : $currency->toMinorUnits($data['compare_at_price']);
 
         if (array_key_exists('tax_rate_percentage', $data)) {
-            $data['tax_rate_basis_points'] = blank($data['tax_rate_percentage'])
+            $data['tax_rate'] = blank($data['tax_rate_percentage'])
                 ? null
                 : self::toBasisPoints($data['tax_rate_percentage']);
         }
 
-        unset($data['price'], $data['compare_at_price'], $data['tax_rate_percentage']);
+        unset($data['tax_rate_percentage']);
 
         return $data;
     }
 
     /**
      * Turn the stored values back into what the form edits.
+     *
+     * The reverse of store(), and in place for the same reason.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -168,15 +181,15 @@ final class PricingFields
     {
         $currency ??= self::currency();
 
-        $data['price'] = $currency->toMajorUnits((int) ($data['price_minor_units'] ?? 0));
+        $data['price'] = $currency->toMajorUnits((int) ($data['price'] ?? 0));
 
-        $data['compare_at_price'] = blank($data['compare_at_price_minor_units'] ?? null)
+        $data['compare_at_price'] = blank($data['compare_at_price'] ?? null)
             ? null
-            : $currency->toMajorUnits((int) $data['compare_at_price_minor_units']);
+            : $currency->toMajorUnits((int) $data['compare_at_price']);
 
-        $data['tax_rate_percentage'] = blank($data['tax_rate_basis_points'] ?? null)
+        $data['tax_rate_percentage'] = blank($data['tax_rate'] ?? null)
             ? null
-            : self::toPercentage((int) $data['tax_rate_basis_points']);
+            : self::toPercentage((int) $data['tax_rate']);
 
         return $data;
     }
@@ -232,12 +245,12 @@ final class PricingFields
     /**
      * The GST rate the tenant in this panel charges by default.
      */
-    public static function tenantTaxRateBasisPoints(): int
+    public static function tenantTaxRate(): int
     {
         $tenant = Filament::getTenant();
 
         return $tenant instanceof Tenant
-            ? $tenant->taxRateBasisPoints()
+            ? $tenant->taxRate()
             : TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 }

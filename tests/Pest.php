@@ -100,13 +100,13 @@ function enterTenantPanel(Tenant $tenant, Role $role): User
  * tax is levied and how an invoice has to show it. Almost every test cares
  * only about what the two come to, so the split is done once here.
  */
-function taxTenantAt(Tenant $tenant, int $totalBasisPoints, bool $pricesIncludeTax = false): void
+function taxTenantAt(Tenant $tenant, int $totalRate, bool $pricesIncludeTax = false): void
 {
-    $half = intdiv($totalBasisPoints, 2);
+    $half = intdiv($totalRate, 2);
 
     $tenant->settings->update([
-        'cgst_rate_basis_points' => $half,
-        'sgst_rate_basis_points' => $totalBasisPoints - $half,
+        'cgst_rate' => $half,
+        'sgst_rate' => $totalRate - $half,
         'prices_include_tax' => $pricesIncludeTax,
     ]);
 }

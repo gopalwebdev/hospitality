@@ -17,9 +17,11 @@ return new class extends Migration
             $table->jsonb('name');
             $table->jsonb('description')->nullable();
             // Its own price, never the sum of its items.
-            $table->integer('price_minor_units');
-            $table->integer('compare_at_price_minor_units')->nullable();
-            $table->smallInteger('tax_rate_basis_points')->nullable();
+            $table->integer('price');
+            $table->integer('compare_at_price')->nullable();
+            $table->smallInteger('tax_rate')->nullable();
+            // As on an item: HSN for goods, SAC for a service.
+            $table->string('hsn_sac_code', 8)->nullable();
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
             // The most one order may hold, across every basket line it is on; null is no limit.
             $table->smallInteger('max_quantity')->nullable();
@@ -29,8 +31,8 @@ return new class extends Migration
 
         DB::statement('ALTER TABLE menu_combos
             ADD CONSTRAINT menu_combos_position_not_negative CHECK ("position" >= 0),
-            ADD CONSTRAINT menu_combos_prices_not_negative CHECK (price_minor_units >= 0 AND (compare_at_price_minor_units IS NULL OR compare_at_price_minor_units >= 0)),
-            ADD CONSTRAINT menu_combos_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
+            ADD CONSTRAINT menu_combos_prices_not_negative CHECK (price >= 0 AND (compare_at_price IS NULL OR compare_at_price >= 0)),
+            ADD CONSTRAINT menu_combos_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_combos_max_quantity_in_range CHECK (max_quantity IS NULL OR max_quantity BETWEEN 1 AND 99)');
     }
 

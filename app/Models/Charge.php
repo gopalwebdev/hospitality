@@ -23,8 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int $tenant_id
  * @property string $name
  * @property ChargeCalculation $calculation
- * @property int|null $rate_basis_points
- * @property int|null $amount_minor_units
+ * @property int|null $rate
+ * @property int|null $amount
  * @property bool $is_active
  * @property int $position
  * @property CarbonImmutable|null $created_at
@@ -33,8 +33,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[Fillable([
     'name',
     'calculation',
-    'rate_basis_points',
-    'amount_minor_units',
+    'rate',
+    'amount',
     'is_active',
     'position',
 ])]
@@ -80,13 +80,13 @@ class Charge extends Model
      * A share is rounded to the nearest minor unit here, once; a fixed amount is
      * the same whatever the bill comes to.
      */
-    public function amountOn(int $subtotalMinorUnits): int
+    public function amountOn(int $subtotal): int
     {
         return match ($this->calculation) {
             ChargeCalculation::Percentage => (int) round(
-                $subtotalMinorUnits * ($this->rate_basis_points ?? 0) / TenantSetting::BASIS_POINTS_PER_WHOLE,
+                $subtotal * ($this->rate ?? 0) / TenantSetting::BASIS_POINTS_PER_WHOLE,
             ),
-            ChargeCalculation::FixedAmount => $this->amount_minor_units ?? 0,
+            ChargeCalculation::FixedAmount => $this->amount ?? 0,
         };
     }
 
@@ -123,8 +123,8 @@ class Charge extends Model
     {
         return [
             'calculation' => ChargeCalculation::class,
-            'rate_basis_points' => 'integer',
-            'amount_minor_units' => 'integer',
+            'rate' => 'integer',
+            'amount' => 'integer',
             'is_active' => 'boolean',
             'position' => 'integer',
         ];

@@ -48,6 +48,9 @@ The invariant that an item leaving a menu stops being featured lives in `MenuIte
 GST is worked out part by part and rounded once per part per line:
 - **Items:** every part of an item's line is taxed at the item's rate, its options included. An add-on is part of the item it is added to, a composite supply taxed at the rate of its principal supply (CGST Act, s. 8(a)).
 - **Combos:** taxed at their own rate.
+- **Charges are taxed too**, at the tenant's own rate — a service charge is consideration for the same supply, not something added after tax. The tenant's rate rather than an item's, because a bill spanning several slabs has no one principal supply to follow.
+
+**Every amount carries its split.** `App\Actions\Menus\GstSplit` is where the halves are worked out, once, and it is the only place that arithmetic lives: the rate halves in basis points (`intdiv`, remainder to the state) so the two always add to the rate, the centre's amount comes from its own rate, and the state's is whatever is left of the total — so CGST is what its stated rate produces and the two still sum to what was charged. A quote carries `taxParts` (a `GstSplit`) beside `tax` (the one number) at the top level, per line and per charge; `PlaceOrder` copies them onto `orders`, `order_lines` and `order_charges`. Never re-derive a split from a stored total: halving it does not reliably add back up. Which of the three treatments applies is `tenant_settings.gst_treatment`, a tenant's own statement (`.ai/rules/enums.md`).
 
 With `prices_include_tax` it is the share already inside the price and is not added to the total. Charges are `Charge::amountOn()` on the subtotal, and an empty basket carries none. The queries do not grow with the basket.
 

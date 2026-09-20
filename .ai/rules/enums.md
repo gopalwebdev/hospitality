@@ -37,14 +37,23 @@ Two methods carry the rules, and both are the only place they are stated:
 It replaced an enum whose name tied the menu to one kind of business, and whether an item is a service request is **not** a case here or an enum of its own: an `ItemKind` enum was built and replaced by the `menu_items.is_service_request` boolean on the project owner's instruction. The pairing — no marks at all exactly for a service request — is in `.ai/rules/models.md`.
 
 ## A charge is a share of the bill or a fixed sum
-`App\Enums\ChargeCalculation` is `Percentage` or `FixedAmount`, and `valueColumn()` is the single place that says which column holds the number (`rate_basis_points` or `amount_minor_units`) — the same shape as `HomeTileAction::targetColumn()`. `ChargeObserver` and `ChargeForm` both read it. A third calculation means a case, a column, a line in `valueColumn()`, and an edit to `charges_value_matches_calculation`.
+`App\Enums\ChargeCalculation` is `Percentage` or `FixedAmount`, and `valueColumn()` is the single place that says which column holds the number (`rate` or `amount`) — the same shape as `HomeTileAction::targetColumn()`. `ChargeObserver` and `ChargeForm` both read it. A third calculation means a case, a column, a line in `valueColumn()`, and an edit to `charges_value_matches_calculation`.
 
 ## A tax rate is a number, not an enum — this was tried and reverted
 GST rates are **not** a fixed value set, and modelling them as one was a mistake worth recording. `App\Enums\TaxRate` existed briefly with cases for the 0/5/12/18/28 slabs; India's GST 2.0 reform of 22 September 2025 collapsed those to 0/5/18 plus a 40% demerit rate, so the enum was wrong on the day it was written. Rates also vary by choice, not just by law — a standalone outlet may elect 5% without input tax credit or 18% with it.
 
-So `tax_rate_basis_points` is a plain nullable integer on `menu_items` and `menu_combos` — not on add-on options, which are taxed at their item's rate. On `tenant_settings` it is two non-nullable integers, `cgst_rate_basis_points` and `sgst_rate_basis_points`, added up by `TenantSetting::taxRateBasisPoints()`: GST on an intra-state supply is levied as two halves and an invoice has to show both. A tenant types the percentages its accountant gives it.
+So `tax_rate` is a plain nullable integer on `menu_items` and `menu_combos` — not on add-on options, which are taxed at their item's rate. On `tenant_settings` it is two non-nullable integers, `cgst_rate` and `sgst_rate`, added up by `TenantSetting::taxRate()`: GST on an intra-state supply is levied as two halves and an invoice has to show both. A tenant types the percentages its accountant gives it.
 
-Basis points rather than a percentage float, though — 5% is `500`. That keeps every rate an exact integer, exactly as money is an exact integer in minor units, so nothing between the database and a payment provider ever sees a float. `App\Filament\Schemas\PricingFields` is the only place a typed percentage becomes basis points and back, so the rounding happens once; `TenantSetting::BASIS_POINTS_PER_WHOLE` is the unit and `::DEFAULT_TAX_RATE_BASIS_POINTS` the starting point. A charge's rate is basis points for the same reason.
+Basis points rather than a percentage float, though — 5% is `500`. That keeps every rate an exact integer, exactly as money is an exact integer in minor units, so nothing between the database and a payment provider ever sees a float. `App\Filament\Schemas\PricingFields` is the only place a typed percentage becomes basis points and back, so the rounding happens once; `TenantSetting::BASIS_POINTS_PER_WHOLE` is the unit. The columns say `tax_rate`, `rate`, `cgst_rate` and never name the unit (`.ai/rules/migrations.md`).
+
+`::DEFAULT_TAX_RATE_BASIS_POINTS` is **0**, and that is the point: no tax information is hardcoded, so a tenant charges nothing until it says what it charges.
+
+## How GST is levied is a tenant's statement, not a lookup
+`App\Enums\GstTreatment` — `IntraState` (CGST + SGST), `UnionTerritory` (CGST + UTGST), `InterState` (IGST) — is on `tenant_settings.gst_treatment`, chosen on the Settings page, and copied onto every `orders.gst_treatment` when a bill is placed.
+
+`isSplitInHalves()` is the one question anything pricing asks; `stateTaxLabel()` is what the invoice calls the state's half. UTGST rides the SGST columns, because the money is identical and only the wording differs.
+
+**It is not worked out from where the tenant is.** A `GstStateCode` enum listing all 37 state codes and which union territories have a legislature was written and deleted: that is tax policy baked into the code, and the project owner's instruction is that a tenant states it. A tenant that moves, or whose accountant disagrees, changes a select.
 
 ## A tenant's type is data, and decides nothing yet
 `tenants.type` is `App\Enums\TenantType`: required on TenantForm with no default, editable by the product team, shown and filtered on in the tenants table, and CHECK-constrained as `tenants_type_is_known`, which its migration builds from the enum's cases. No copy varies by it — the application says "tenant" to everyone (`.ai/rules/lang.md`), and the enum's cases are the only place a kind of business is named.

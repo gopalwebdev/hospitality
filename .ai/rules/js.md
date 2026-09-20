@@ -68,14 +68,14 @@ An item carries a **list** of marks in the database (`menu_items.diets` — most
 
 An item's row reads name, price and description down the left and keeps the right for Add, with "Customisable" under it. A price of 0 reads "Complimentary" in quiet text, because on a card of room requests nearly every row is one; an option at 0 shows no price at all, because "Free" beside Mild, Medium and Hot is noise. The server sends the zero and never a word.
 
-The small print is `tax` (`rateBasisPoints`, `pricesIncludeTax`) and then `charges`: only the switched-on charges this menu carries, in the tenant's order, each with exactly one of `rateBasisPoints` or `amountMinorUnits` set. Which charges apply is decided in PHP; the page only words them, one line each.
+The small print is `tax` (`rate`, `pricesIncludeTax`) and then `charges`: only the switched-on charges this menu carries, in the tenant's order, each with exactly one of `rate` or `amount` set. Which charges apply is decided in PHP; the page only words them, one line each.
 
-The tenant's own hours arrive as `store` — `{isOpen, opensAt, closesAt}`, the times already read as `HH:MM` and both null on a day it does not open. `isOpen` is worked out on the server against the tenant's week (`.ai/rules/app.md`), never in the browser from the two times, because the phone's clock is not the tenant's. The page drives the Open/Closed badge and a line above the menu with it, so a guest reading a card after closing is told why the Add buttons are gone.
+The tenant's own hours arrive as `store` — `{isOpen, opensAt, closesAt}`, the times as the stored `HH:MM` and both null on a day it does not open. `useClockTime()` is what turns one into a reading — "9:00 AM", never "09:00" — in the guest's own language, beside the money formatting and for the same reasons; a menu's `servedFrom` / `servedUntil` go through it too. `isOpen` is worked out on the server against the tenant's week (`.ai/rules/app.md`), never in the browser from the two times, because the phone's clock is not the tenant's. The page drives the Open/Closed badge and a line above the menu with it, so a guest reading a card after closing is told why the Add buttons are gone.
 
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
-The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, priceMinorUnits, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, each option's `maxQuantity` already capped at the *group's own* maximum. Each item names its groups, in its own order, as `addOnGroupLinks: {id, maxSelections}[]` — `maxSelections` is that item's own cap on the group's picks, null following the group's own default. `withItemMaxSelections()` (`lib/add-on-rules.ts`) is what merges an item's own cap onto a shared group for the sheet, clamping every option's `maxQuantity` down with it; a group offered on twenty items is still one entry on the wire; only the small `{id, maxSelections}` link is per item.
+The menu is sent `addOnGroups` once — `{id, name, isRequired, maxSelections, options: [{id, name, price, maxQuantity, isDefault}]}`, only available options and only the groups an item on the page offers, each option's `maxQuantity` already capped at the *group's own* maximum. Each item names its groups, in its own order, as `addOnGroupLinks: {id, maxSelections}[]` — `maxSelections` is that item's own cap on the group's picks, null following the group's own default. `withItemMaxSelections()` (`lib/add-on-rules.ts`) is what merges an item's own cap onto a shared group for the sheet, clamping every option's `maxQuantity` down with it; a group offered on twenty items is still one entry on the wire; only the small `{id, maxSelections}` link is per item.
 
 Add buttons appear only while `store.isOpen` and the menu `isBeingServed`. An item with no groups goes straight in. One with groups says "Customisable" and opens `components/customise-sheet.tsx`, a shadcn `sheet` from the bottom:
 - a required pick-one is radios; anything else is checkboxes, with a stepper on an option allowed more than one
@@ -103,12 +103,16 @@ Nothing is ordered from here yet: the sheet tells the guest to show it to a memb
 
 `components/ui/sheet.tsx`, `radio-group.tsx` and `checkbox.tsx` were written from the shadcn registry with two changes: `cn` comes from `@/lib/utils`, and the icons come from `components/icons.tsx`. The registry imports `lucide-react`, which this app deliberately does not depend on, so do not let the CLI add it.
 
-## Money is formatted here, never in PHP
-Prices cross the wire as an integer count of the currency's minor unit — ₹249.50 is `priceMinorUnits: 24950` — exactly as the database stores them, and the tenant's currency arrives once in the shared `currency` prop as a code and a scale. `useMoney()` turns the two into a string.
+## Money and times are formatted here, never in PHP
+Prices cross the wire as an integer count of the currency's minor unit — ₹249.50 is `price: 24950` — exactly as the database stores them, and the tenant's currency arrives once in the shared `currency` prop as a code and a scale. `useMoney()` turns the two into a string.
 
 Two reasons, both load-bearing. The server does no per-row string building, which is the point of `.ai/rules/general.md`'s memory rule. And `Intl.NumberFormat` follows the guest's own language, so a rupee price groups as ₹2,49,500 rather than ₹249,500 — something `number_format()` cannot do.
 
-Formatters are cached per locale-and-currency in `resources/js/lib/money.ts`, because a menu formats one per row. The scale comes from the server so a zero-decimal currency is never silently divided by 100. The one place money is still formatted in PHP is a Filament table, which is server rendered — it goes through `MenuItem::formattedPrice()`.
+Formatters are cached per locale-and-currency in `resources/js/lib/money.ts`, because a menu formats one per row. The scale comes from the server so a zero-decimal currency is never silently divided by 100.
+
+**A time of day is the same story.** Opening hours and a menu's service window cross the wire as the stored `HH:MM`, and `resources/js/lib/time.ts` — cached per locale, like the money formatters — reads them on a 12-hour clock (`.ai/rules/general.md`). Never send a built time string.
+
+The one place money and dates are still formatted in PHP is **a Filament panel, which is server rendered**: there is no client to format in, so a price goes through `MenuItem::formattedPrice()` and a timestamp through Filament's own `->dateTime()`, whose house format is set once in `AppServiceProvider`. That is the exception, and it is the only one.
 
 ## Built assets are precompressed with Brotli and gzip, and pages stay lazy
 `vite.config.ts` carries a `precompress()` plugin that writes a `.br` (Brotli at maximum quality) and a `.gz` beside every built text asset over a kilobyte, using Node's own zlib — no dependency. Compressing once at build time beats compressing per request, but only if the server hands the copy over: nginx needs `brotli_static on;` and `gzip_static on;` for `/build`, or the CDN in front of Laravel Cloud does it. Herd's local nginx does neither, so locally the copies sit unused and the uncompressed asset is served; that is expected, not a bug.
@@ -125,7 +129,9 @@ Laravel's Vite integration decides whether to emit dev-server script tags (`http
 
 Symptom: pages load fine in a browser with the dev server running, but `curl`, `php artisan test`, or a browser after the dev server is gone all get dev-server URLs that resolve to nothing — `GuestAppTest`'s "loads only its own entry and page" fails with the built manifest hash missing from the HTML entirely. Fix is `rm public/hot`, not a rebuild. If `npm run build` was run afterward, the manifest is already correct — the hot file was the only thing lying.
 
-## vite is an alias of vite-plus-core, and npm carries no engine pin
+## vite is an alias of vite-plus-core; Node is pinned, npm is not
 vite-plus 0.3.1 refuses to build unless `vite` resolves to its own core, so `package.json` declares `"vite": "npm:@voidzero-dev/vite-plus-core@<version>"` in `dependencies` **and** in `overrides`, as `vp migrate` wrote it. Without the override, `npm update` installs the real `vite` and `vp build` fails with "Expected @voidzero-dev/vite-plus-core". Bump both together with `vite-plus`.
 
-`vp migrate` also writes a `devEngines.packageManager` pin to npm 12. It was taken out, because Node 24 — locally and in CI — ships npm 11, and the pin makes every npm command refuse to run. Take it out again if a later `vp migrate` puts it back.
+**Node is pinned to 24 and nothing else.** `package.json` declares `"engines": {"node": "~24"}`, `.npmrc` carries `engine-strict=true` so npm refuses rather than warns, and `.nvmrc` holds the bare `24` — the one place the version is written, which CI's setup action reads through `node-version-file`. A clean install of the whole tree passes under Node 24 with engine-strict on; that was checked, because engine-strict applies to dependencies' own `engines` too, not just this package's.
+
+**`devEngines.packageManager` stays out.** `vp migrate` writes a pin to npm 12. It was taken out, because Node 24 — locally and in CI — ships npm 11, and the pin makes every npm command refuse to run. Take it out again if a later `vp migrate` puts it back. Pinning `engines.node` is not the same thing and does not bring the problem back.

@@ -82,7 +82,7 @@ it('opens an order with what was ordered and what it came to, under the name it 
 
     $item = orderableItemFor($tenant, stock: 10, attributes: [
         'name' => [Locale::English->value => 'Paneer Tikka'],
-        'price_minor_units' => 24900,
+        'price' => 24900,
     ]);
     $order = placedOrderOf($item, 2);
 

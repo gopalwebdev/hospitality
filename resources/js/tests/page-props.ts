@@ -93,7 +93,7 @@ const DEFAULTS: TenantSharedProps = {
             { value: 'ta', label: 'தமிழ்', shortLabel: 'தமிழ்' },
         ],
     },
-    currency: { code: 'INR', minorUnitDigits: 2 },
+    currency: { code: 'INR', fractionDigits: 2 },
     translations: DEFAULT_TRANSLATIONS,
     appearance: 'light',
 };

@@ -5,7 +5,7 @@ export interface AddOnOption {
     id: number;
     name: string;
     /** What one of it adds, in the currency's minor unit; 0 is free. */
-    priceMinorUnits: number;
+    price: number;
     /** How many of this one option a guest may take on one item, already capped at the group's own maximum. */
     maxQuantity: number;
     /** Ticked for the guest when the sheet opens: "Medium" on a spice level. */
@@ -231,18 +231,17 @@ export function firstShortfall(
  * priced by the server.
  */
 export function unitPrice(
-    basePriceMinorUnits: number,
+    basePrice: number,
     groups: AddOnGroup[],
     picks: Picks,
 ): number {
     return groups.reduce(
         (total, group) =>
             group.options.reduce(
-                (sum, option) =>
-                    sum + option.priceMinorUnits * (picks[option.id] ?? 0),
+                (sum, option) => sum + option.price * (picks[option.id] ?? 0),
                 total,
             ),
-        basePriceMinorUnits,
+        basePrice,
     );
 }
 

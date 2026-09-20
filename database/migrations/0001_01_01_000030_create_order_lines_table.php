@@ -22,10 +22,26 @@ return new class extends Migration
             $table->jsonb('name');
             $table->integer('quantity');
             // One of it with its choices, and the whole line, as priced when it was placed.
-            $table->integer('unit_price_minor_units');
-            $table->integer('total_minor_units');
+            $table->integer('unit_price');
+            $table->integer('total');
             // The rate every part of the line was taxed at: the item's, add-ons included.
-            $table->smallInteger('tax_rate_basis_points');
+            $table->smallInteger('tax_rate');
+            // What that rate was charged on. It is the line total with tax added
+            // on top, and the line total less its tax when prices include it, so
+            // an invoice never has to work out which it was looking at.
+            $table->integer('taxable_value')->default(0);
+            // The rate and the amount of each part, which Rule 46 makes an
+            // invoice show separately. The rates add up to tax_rate
+            // (order_lines_tax_rates_add_up); UTGST rides the SGST columns.
+            $table->smallInteger('cgst_rate')->default(0);
+            $table->integer('cgst')->default(0);
+            $table->smallInteger('sgst_rate')->default(0);
+            $table->integer('sgst')->default(0);
+            $table->smallInteger('igst_rate')->default(0);
+            $table->integer('igst')->default(0);
+            // Copied from the item or combo, because an order outlives it and a
+            // tax invoice names a code per line.
+            $table->string('hsn_sac_code', 8)->nullable();
             $table->integer('position')->default(0);
             $table->timestamps();
         });
@@ -41,8 +57,10 @@ return new class extends Migration
             ADD CONSTRAINT order_lines_type_is_known CHECK (type IN ({$types})),
             ADD CONSTRAINT order_lines_key_matches_type CHECK ((type = '{$item}' AND menu_combo_id IS NULL) OR (type = '{$combo}' AND menu_item_id IS NULL)),
             ADD CONSTRAINT order_lines_quantity_at_least_one CHECK (quantity >= 1),
-            ADD CONSTRAINT order_lines_money_not_negative CHECK (unit_price_minor_units >= 0 AND total_minor_units >= 0),
-            ADD CONSTRAINT order_lines_tax_rate_in_range CHECK (tax_rate_basis_points BETWEEN 0 AND 10000),
+            ADD CONSTRAINT order_lines_money_not_negative CHECK (unit_price >= 0 AND total >= 0 AND taxable_value >= 0),
+            ADD CONSTRAINT order_lines_tax_rate_in_range CHECK (tax_rate BETWEEN 0 AND 10000),
+            ADD CONSTRAINT order_lines_tax_rates_add_up CHECK (cgst_rate + sgst_rate + igst_rate = tax_rate),
+            ADD CONSTRAINT order_lines_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0 AND igst >= 0),
             ADD CONSTRAINT order_lines_position_not_negative CHECK (\"position\" >= 0)");
     }
 

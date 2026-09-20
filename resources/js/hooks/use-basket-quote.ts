@@ -9,19 +9,19 @@ export type QuotedLineStatus = 'ok' | 'unavailable' | 'invalid';
 export interface QuotedLine {
     key: string;
     status: QuotedLineStatus;
-    unitPriceMinorUnits: number;
-    totalMinorUnits: number;
+    unitPrice: number;
+    total: number;
 }
 
 /** What the basket comes to: App\Actions\Menus\QuoteBasket's answer, in minor units throughout. */
 export interface Quote {
     lines: QuotedLine[];
-    subtotalMinorUnits: number;
+    subtotal: number;
     /** Added on top, or the share already inside the prices when `pricesIncludeTax`. */
-    taxMinorUnits: number;
+    tax: number;
     pricesIncludeTax: boolean;
-    charges: { id: number; name: string; amountMinorUnits: number }[];
-    totalMinorUnits: number;
+    charges: { id: number; name: string; amount: number }[];
+    total: number;
 }
 
 type QuoteRequest = {

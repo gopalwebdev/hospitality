@@ -57,8 +57,8 @@ it('types a share of the bill as a percentage and stores it as basis points', fu
     // Basis points, like a tax rate, so the arithmetic behind a bill stays in
     // integers: 10% of ₹500.00 is exactly ₹50.00.
     expect($charge->tenant_id)->toBe($tenant->getKey())
-        ->and($charge->rate_basis_points)->toBe(1000)
-        ->and($charge->amount_minor_units)->toBeNull()
+        ->and($charge->rate)->toBe(1000)
+        ->and($charge->amount)->toBeNull()
         ->and($charge->amountOn(50000))->toBe(5000)
         // No menu was unpicked, so it starts on every menu the tenant has.
         ->and($charge->menus()->orderBy('menus.id')->pluck('menus.id')->all())->toBe($menus->pluck('id')->sort()->values()->all());
@@ -81,8 +81,8 @@ it('types a fixed amount as money and stores it in minor units', function (): vo
     $charge = chargeNamed('Packing Charge');
 
     // The same sum whatever the bill comes to.
-    expect($charge->amount_minor_units)->toBe(2050)
-        ->and($charge->rate_basis_points)->toBeNull()
+    expect($charge->amount)->toBe(2050)
+        ->and($charge->rate)->toBeNull()
         ->and($charge->amountOn(50000))->toBe(2050)
         ->and($charge->amountOn(0))->toBe(2050);
 });
@@ -167,8 +167,8 @@ it('clears the number a charge stops using when its calculation changes', functi
         ->assertHasNoActionErrors();
 
     expect($charge->refresh()->calculation)->toBe(ChargeCalculation::FixedAmount)
-        ->and($charge->amount_minor_units)->toBe(5000)
-        ->and($charge->rate_basis_points)->toBeNull();
+        ->and($charge->amount)->toBe(5000)
+        ->and($charge->rate)->toBeNull();
 });
 
 it('refuses a charge with no number to add, even around the form', function (): void {
@@ -176,8 +176,8 @@ it('refuses a charge with no number to add, even around the form', function (): 
     // no amount to keep.
     expect(fn () => Charge::factory()->create([
         'calculation' => ChargeCalculation::FixedAmount,
-        'rate_basis_points' => 1000,
-        'amount_minor_units' => null,
+        'rate' => 1000,
+        'amount' => null,
     ]))->toThrow(LogicException::class);
 });
 

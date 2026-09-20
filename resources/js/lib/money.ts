@@ -13,7 +13,7 @@ export type CurrencyProp = {
     /** ISO 4217, e.g. "INR". */
     code: string;
     /** How many digits the minor unit has; 2 for rupees, 0 for yen. */
-    minorUnitDigits: number;
+    fractionDigits: number;
 };
 
 /**
@@ -26,7 +26,7 @@ function formatterFor(
     locale: string,
     currency: CurrencyProp,
 ): Intl.NumberFormat {
-    const key = `${locale}:${currency.code}:${currency.minorUnitDigits}`;
+    const key = `${locale}:${currency.code}:${currency.fractionDigits}`;
     const cached = formatters.get(key);
 
     if (cached !== undefined) {
@@ -36,8 +36,8 @@ function formatterFor(
     const formatter = new Intl.NumberFormat(locale, {
         style: 'currency',
         currency: currency.code,
-        minimumFractionDigits: currency.minorUnitDigits,
-        maximumFractionDigits: currency.minorUnitDigits,
+        minimumFractionDigits: currency.fractionDigits,
+        maximumFractionDigits: currency.fractionDigits,
     });
 
     formatters.set(key, formatter);
@@ -57,7 +57,7 @@ export function formatMoney(
     currency: CurrencyProp,
     locale: string,
 ): string {
-    const major = minorUnits / 10 ** currency.minorUnitDigits;
+    const major = minorUnits / 10 ** currency.fractionDigits;
 
     return formatterFor(locale, currency).format(major);
 }

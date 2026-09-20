@@ -18,7 +18,7 @@ const menu = {
 
 /** The common case: 5% GST added at the bill. */
 const tax = {
-    rateBasisPoints: 500,
+    rate: 500,
     pricesIncludeTax: false,
 };
 
@@ -33,8 +33,8 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         id: 10,
         name: 'Paneer Tikka',
         description: null,
-        priceMinorUnits: 24950,
-        compareAtPriceMinorUnits: null,
+        price: 24950,
+        compareAtPrice: null,
         isServiceRequest: false,
         diet: 'vegetarian',
         addOnGroupLinks: [],
@@ -53,14 +53,14 @@ const bread: AddOnGroup = {
         {
             id: 21,
             name: 'Butter naan',
-            priceMinorUnits: 0,
+            price: 0,
             maxQuantity: 1,
             isDefault: false,
         },
         {
             id: 22,
             name: 'Garlic naan',
-            priceMinorUnits: 2000,
+            price: 2000,
             maxQuantity: 1,
             isDefault: false,
         },
@@ -77,21 +77,21 @@ const extras: AddOnGroup = {
         {
             id: 11,
             name: 'Extra cheese',
-            priceMinorUnits: 4000,
+            price: 4000,
             maxQuantity: 2,
             isDefault: false,
         },
         {
             id: 12,
             name: 'Extra paneer',
-            priceMinorUnits: 6000,
+            price: 6000,
             maxQuantity: 1,
             isDefault: false,
         },
         {
             id: 13,
             name: 'Raita',
-            priceMinorUnits: 3000,
+            price: 3000,
             maxQuantity: 1,
             isDefault: false,
         },
@@ -211,7 +211,7 @@ describe('guest menu', () => {
                             name: 'Extra Pillow',
                             isServiceRequest: true,
                             diet: null,
-                            priceMinorUnits: 0,
+                            price: 0,
                         }),
                     ],
                     subSections: [],
@@ -302,7 +302,7 @@ describe('guest menu', () => {
                         item({
                             id: 30,
                             name: 'Paneer Butter Masala',
-                            priceMinorUnits: 28900,
+                            price: 28900,
                             // The item's own order, not the order the menu
                             // sent the groups in.
                             addOnGroupLinks: [
@@ -438,7 +438,7 @@ describe('guest menu', () => {
                             name: 'Extra Blanket',
                             isServiceRequest: true,
                             diet: null,
-                            priceMinorUnits: 0,
+                            price: 0,
                             maxQuantity: 2,
                         }),
                     ],
@@ -570,8 +570,8 @@ describe('guest menu', () => {
                     id: 1,
                     name: 'Family Feast',
                     description: null,
-                    priceMinorUnits: 99900,
-                    compareAtPriceMinorUnits: null,
+                    price: 99900,
+                    compareAtPrice: null,
                     maxQuantity: null,
                     contents: [],
                 },
@@ -601,8 +601,8 @@ describe('guest menu', () => {
                     name: 'Starters',
                     items: [
                         item({
-                            priceMinorUnits: 29900,
-                            compareAtPriceMinorUnits: 36000,
+                            price: 29900,
+                            compareAtPrice: 36000,
                         }),
                     ],
                     subSections: [],
@@ -621,8 +621,8 @@ describe('guest menu', () => {
                     id: 3,
                     name: 'Family Feast',
                     description: 'Enough for four.',
-                    priceMinorUnits: 99900,
-                    compareAtPriceMinorUnits: 120000,
+                    price: 99900,
+                    compareAtPrice: 120000,
                     maxQuantity: null,
                     contents: [
                         {
@@ -667,14 +667,14 @@ describe('guest menu', () => {
                 {
                     id: 1,
                     name: 'Service Charge',
-                    rateBasisPoints: 1000,
-                    amountMinorUnits: null,
+                    rate: 1000,
+                    amount: null,
                 },
                 {
                     id: 2,
                     name: 'Packing Charge',
-                    rateBasisPoints: null,
-                    amountMinorUnits: 2000,
+                    rate: null,
+                    amount: 2000,
                 },
             ],
         });
@@ -698,7 +698,7 @@ describe('guest menu', () => {
             sections: [
                 { id: 1, name: 'Starters', items: [item()], subSections: [] },
             ],
-            tax: { rateBasisPoints: 500, pricesIncludeTax: true },
+            tax: { rate: 500, pricesIncludeTax: true },
         });
 
         expect(
@@ -713,7 +713,8 @@ describe('guest menu', () => {
                 ...menu,
                 name: 'Breakfast',
                 // HH:MM, the one shape the server sends whichever driver
-                // stored the time.
+                // stored the time. The browser is what turns it into a clock
+                // reading, so what a guest sees is 12-hour.
                 servedFrom: '07:00',
                 servedUntil: '11:00',
                 isBeingServed: false,
@@ -721,7 +722,30 @@ describe('guest menu', () => {
         });
 
         expect(
-            screen.getByText(/Served 07:00 to 11:00.*Not being served/),
+            screen.getByText(/Served 7:00 AM to 11:00 AM.*Not being served/),
+        ).toBeInTheDocument();
+    });
+
+    it('reads every time of day on a 12-hour clock', () => {
+        renderMenu({
+            // 23:00 is the case that matters: a 24-hour reading of a tenant's
+            // closing time is the one a guest has to do arithmetic on.
+            store: { isOpen: true, opensAt: '09:00', closesAt: '23:00' },
+            menu: {
+                ...menu,
+                servedFrom: '12:00',
+                servedUntil: '00:30',
+                isBeingServed: true,
+            },
+        });
+
+        expect(
+            screen.getByText(/Open 9:00 AM to 11:00 PM/),
+        ).toBeInTheDocument();
+        // Noon and midnight are the two the 12-hour clock gets wrong when it
+        // is done by hand: 12 PM and 12 AM, never 0 AM.
+        expect(
+            screen.getByText(/Served 12:00 PM to 12:30 AM/),
         ).toBeInTheDocument();
     });
 

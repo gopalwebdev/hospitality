@@ -68,7 +68,7 @@ class MenuComboForm
                     ->schema([
                         PricingFields::price($currency),
                         PricingFields::compareAtPrice($currency),
-                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
+                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
                         PricingFields::availability(),
                         PricingFields::maxQuantity(),
                     ])

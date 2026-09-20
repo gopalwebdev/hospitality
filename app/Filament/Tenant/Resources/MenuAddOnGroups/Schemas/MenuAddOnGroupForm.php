@@ -381,13 +381,13 @@ class MenuAddOnGroupForm
      */
     private static function storeOption(array $data, Currency $currency, bool $isOnePick): array
     {
-        $data['price_minor_units'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
+        // Typed in rupees, stored in paise, under the same name — converted
+        // in place, so there is nothing left to unset. See PricingFields::store().
+        $data['price'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
         if ($isOnePick) {
             $data['max_quantity'] = 1;
         }
-
-        unset($data['price']);
 
         return $data;
     }
@@ -418,7 +418,7 @@ class MenuAddOnGroupForm
      */
     private static function fillOption(array $data, Currency $currency): array
     {
-        $minorUnits = (int) ($data['price_minor_units'] ?? 0);
+        $minorUnits = (int) ($data['price'] ?? 0);
 
         $data['price'] = $minorUnits === 0 ? null : $currency->toMajorUnits($minorUnits);
 

@@ -97,7 +97,7 @@ it('makes a required group of one pick, one of each option', function (): void {
         ->and($group->getTranslation('name', Locale::Tamil->value))->toBe('ரொட்டியைத் தேர்ந்தெடுக்கவும்')
         ->and($options->map(fn (MenuAddOnOption $option): string => $option->name)->all())->toBe(['Butter naan', 'Garlic naan'])
         // Left blank, a butter naan is free.
-        ->and($options->pluck('price_minor_units')->all())->toBe([0, 2050])
+        ->and($options->pluck('price')->all())->toBe([0, 2050])
         ->and($options->pluck('max_quantity')->all())->toBe([1, 1])
         ->and($options->pluck('is_default')->all())->toBe([true, false])
         ->and($options->pluck('tenant_id')->unique()->all())->toBe([$tenant->getKey()]);
@@ -185,7 +185,7 @@ it('refuses more of one option than the group\'s own maximum', function (): void
 it('opens a group with its answers, and each option as stored, a free one blank', function (): void {
     $tenant = Tenant::factory()->create();
     $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
-    $cheese = MenuAddOnOption::factory()->inGroup($group)->asDefault()->create(['price_minor_units' => 2050, 'max_quantity' => 2]);
+    $cheese = MenuAddOnOption::factory()->inGroup($group)->asDefault()->create(['price' => 2050, 'max_quantity' => 2]);
     $raita = MenuAddOnOption::factory()->inGroup($group)->free()->create();
 
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -214,7 +214,7 @@ it('opens a group with its answers, and each option as stored, a free one blank'
 it('edits a group from one pick to two, writing its options back exactly as they were stored', function (): void {
     $tenant = Tenant::factory()->create();
     $group = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 1)->create();
-    $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price_minor_units' => 4050, 'position' => 0]);
+    $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price' => 4050, 'position' => 0]);
     $raita = MenuAddOnOption::factory()->inGroup($group)->free()->create(['position' => 1]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
@@ -230,8 +230,8 @@ it('edits a group from one pick to two, writing its options back exactly as they
     expect($group->refresh()->max_selections)->toBe(2)
         ->and($group->is_required)->toBeFalse()
         ->and($group->options()->inMenuOrder()->pluck('id')->all())->toBe([$cheese->getKey(), $raita->getKey()])
-        ->and($cheese->refresh()->price_minor_units)->toBe(4050)
-        ->and($raita->refresh()->price_minor_units)->toBe(0);
+        ->and($cheese->refresh()->price)->toBe(4050)
+        ->and($raita->refresh()->price)->toBe(0);
 });
 
 it('attaches a group to items, after the groups each already offers', function (): void {

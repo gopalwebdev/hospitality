@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Pages;
 
+use App\Enums\GstTreatment;
 use App\Enums\Permission;
 use App\Enums\Weekday;
 use App\Filament\Forms\Components\ClockTimePicker;
@@ -10,9 +11,11 @@ use App\Models\Tenant;
 use App\Models\TenantOpeningHour;
 use App\Models\TenantSetting;
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -180,8 +183,20 @@ class Settings extends Page
                     ->maxLength(15)
                     ->columnSpanFull(),
 
+                // The tenant says how its GST is levied. Nothing works this
+                // out from an address or from the GSTIN: which union
+                // territories levy UTGST is tax policy, and a tenant has to be
+                // able to state it rather than have it assumed.
+                Select::make('gst_treatment')
+                    ->label('GST is levied as')
+                    ->options(GstTreatment::options())
+                    ->required()
+                    ->native(false)
+                    ->live()
+                    ->columnSpanFull(),
+
                 $this->halfRate('cgst_rate_percentage', 'CGST'),
-                $this->halfRate('sgst_rate_percentage', 'SGST'),
+                $this->halfRate('sgst_rate_percentage', fn (Get $get): string => $this->stateTaxLabel($get)),
 
                 // The two added up, which is what anything is actually taxed
                 // at — worked out as it is typed rather than typed again.
@@ -200,9 +215,22 @@ class Settings extends Page
     }
 
     /**
+     * What the state's half is called under the treatment currently chosen.
+     *
+     * SGST or UTGST, and "IGST" once the whole rate is one tax — the two
+     * inputs still hold halves that add up, which is what the labels say.
+     */
+    private function stateTaxLabel(Get $get): string
+    {
+        $treatment = GstTreatment::tryFrom((string) $get('gst_treatment'));
+
+        return $treatment?->stateTaxLabel() ?? 'IGST (second half)';
+    }
+
+    /**
      * One half of the rate, typed the way an accountant quotes it.
      */
-    private function halfRate(string $name, string $label): TextInput
+    private function halfRate(string $name, string|Closure $label): TextInput
     {
         return TextInput::make($name)
             ->label($label)
@@ -325,8 +353,8 @@ class Settings extends Page
     {
         $half = intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2);
 
-        $data['cgst_rate_percentage'] = PricingFields::toPercentage((int) ($data['cgst_rate_basis_points'] ?? $half));
-        $data['sgst_rate_percentage'] = PricingFields::toPercentage((int) ($data['sgst_rate_basis_points'] ?? $half));
+        $data['cgst_rate_percentage'] = PricingFields::toPercentage((int) ($data['cgst_rate'] ?? $half));
+        $data['sgst_rate_percentage'] = PricingFields::toPercentage((int) ($data['sgst_rate'] ?? $half));
 
         return $data;
     }
@@ -341,8 +369,8 @@ class Settings extends Page
      */
     private function storableRates(array $data): array
     {
-        $data['cgst_rate_basis_points'] = PricingFields::toBasisPoints($data['cgst_rate_percentage'] ?? 0);
-        $data['sgst_rate_basis_points'] = PricingFields::toBasisPoints($data['sgst_rate_percentage'] ?? 0);
+        $data['cgst_rate'] = PricingFields::toBasisPoints($data['cgst_rate_percentage'] ?? 0);
+        $data['sgst_rate'] = PricingFields::toBasisPoints($data['sgst_rate_percentage'] ?? 0);
 
         unset($data['cgst_rate_percentage'], $data['sgst_rate_percentage']);
 

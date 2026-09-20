@@ -31,7 +31,7 @@ enum Currency: string
      * the point: adding a zero-decimal currency such as JPY must not silently
      * divide by 100.
      */
-    public function minorUnitDigits(): int
+    public function fractionDigits(): int
     {
         return match ($this) {
             self::IndianRupee => 2,
@@ -43,7 +43,7 @@ enum Currency: string
      */
     public function minorUnitsPerMajor(): int
     {
-        return 10 ** $this->minorUnitDigits();
+        return 10 ** $this->fractionDigits();
     }
 
     /**
@@ -53,7 +53,7 @@ enum Currency: string
     {
         return $this->symbol().number_format(
             $minorUnits / $this->minorUnitsPerMajor(),
-            $this->minorUnitDigits(),
+            $this->fractionDigits(),
         );
     }
 

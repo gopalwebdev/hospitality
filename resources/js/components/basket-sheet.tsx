@@ -219,13 +219,13 @@ function LineRow({
             </div>
 
             {quoted?.status === 'ok' &&
-                (quoted.totalMinorUnits === 0 ? (
+                (quoted.total === 0 ? (
                     <p className="text-muted-foreground shrink-0 text-sm font-medium">
                         {t('menu.complimentary')}
                     </p>
                 ) : (
                     <p className="shrink-0 font-semibold tabular-nums">
-                        {money(quoted.totalMinorUnits)}
+                        {money(quoted.total)}
                     </p>
                 ))}
         </li>
@@ -267,13 +267,13 @@ function Totals({
             <dl className="space-y-1 text-sm tabular-nums">
                 <TotalRow
                     label={t('basket.subtotal')}
-                    amount={money(quote.subtotalMinorUnits)}
+                    amount={money(quote.subtotal)}
                 />
 
-                {!quote.pricesIncludeTax && quote.taxMinorUnits > 0 && (
+                {!quote.pricesIncludeTax && quote.tax > 0 && (
                     <TotalRow
                         label={t('basket.gst')}
-                        amount={money(quote.taxMinorUnits)}
+                        amount={money(quote.tax)}
                     />
                 )}
 
@@ -281,21 +281,21 @@ function Totals({
                     <TotalRow
                         key={charge.id}
                         label={charge.name}
-                        amount={money(charge.amountMinorUnits)}
+                        amount={money(charge.amount)}
                     />
                 ))}
 
                 <TotalRow
                     strong
                     label={t('basket.total')}
-                    amount={money(quote.totalMinorUnits)}
+                    amount={money(quote.total)}
                 />
             </dl>
 
-            {quote.pricesIncludeTax && quote.taxMinorUnits > 0 && (
+            {quote.pricesIncludeTax && quote.tax > 0 && (
                 <p className="text-muted-foreground mt-1 text-xs">
                     {t('basket.gst_included', {
-                        amount: money(quote.taxMinorUnits),
+                        amount: money(quote.tax),
                     })}
                 </p>
             )}

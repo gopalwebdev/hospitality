@@ -14,7 +14,7 @@ export function useMoney(): (minorUnits: number) => string {
 
     const resolved: CurrencyProp = currency ?? {
         code: 'INR',
-        minorUnitDigits: 2,
+        fractionDigits: 2,
     };
 
     return (minorUnits: number): string =>

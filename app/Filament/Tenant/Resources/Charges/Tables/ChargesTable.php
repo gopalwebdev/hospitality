@@ -41,8 +41,8 @@ class ChargesTable
                 TextColumn::make('calculation')
                     ->label(__('panel.charges.adds'))
                     ->formatStateUsing(fn (Charge $record): string => $record->calculation === ChargeCalculation::Percentage
-                        ? PricingFields::formatRate((int) $record->rate_basis_points)
-                        : $currency->format((int) $record->amount_minor_units))
+                        ? PricingFields::formatRate((int) $record->rate)
+                        : $currency->format((int) $record->amount))
                     ->badge()
                     ->color('gray'),
 

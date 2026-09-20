@@ -16,7 +16,7 @@ return new class extends Migration
             $table->jsonb('name');
             // What one of it adds to the item's price; zero is a real price. No tax
             // rate: an add-on is part of the item it is added to, taxed at its rate.
-            $table->integer('price_minor_units')->default(0);
+            $table->integer('price')->default(0);
             // How many of this one option a guest may take on one item: 2 × extra cheese.
             $table->smallInteger('max_quantity')->default(1);
             // Ticked for the guest when they open the item: "Medium" on a spice level.
@@ -33,7 +33,7 @@ return new class extends Migration
 
         DB::statement('ALTER TABLE menu_add_on_options
             ADD CONSTRAINT menu_add_on_options_position_not_negative CHECK ("position" >= 0),
-            ADD CONSTRAINT menu_add_on_options_price_not_negative CHECK (price_minor_units >= 0),
+            ADD CONSTRAINT menu_add_on_options_price_not_negative CHECK (price >= 0),
             ADD CONSTRAINT menu_add_on_options_max_quantity_in_range CHECK (max_quantity BETWEEN 1 AND 99),
             ADD CONSTRAINT menu_add_on_options_stock_not_negative CHECK (stock_quantity IS NULL OR stock_quantity >= 0)');
     }

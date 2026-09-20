@@ -162,15 +162,19 @@ class ChargeForm
      */
     public static function storeValue(array $data): array
     {
-        $data['rate_basis_points'] = blank($data['rate_percentage'] ?? null)
+        $data['rate'] = blank($data['rate_percentage'] ?? null)
             ? null
             : PricingFields::toBasisPoints($data['rate_percentage']);
 
-        $data['amount_minor_units'] = blank($data['amount'] ?? null)
+        $data['amount'] = blank($data['amount'] ?? null)
             ? null
             : PricingFields::currency()->toMinorUnits($data['amount']);
 
-        unset($data['rate_percentage'], $data['amount']);
+        // `amount` is typed in rupees and stored in paise under the same
+        // name, so it was converted in place above; only `rate_percentage`,
+        // which has no column, is dropped. Unsetting `amount` here would
+        // throw the converted value away.
+        unset($data['rate_percentage']);
 
         return $data;
     }
@@ -183,13 +187,13 @@ class ChargeForm
      */
     public static function fillValue(array $data): array
     {
-        $data['rate_percentage'] = blank($data['rate_basis_points'] ?? null)
+        $data['rate_percentage'] = blank($data['rate'] ?? null)
             ? null
-            : PricingFields::toPercentage((int) $data['rate_basis_points']);
+            : PricingFields::toPercentage((int) $data['rate']);
 
-        $data['amount'] = blank($data['amount_minor_units'] ?? null)
+        $data['amount'] = blank($data['amount'] ?? null)
             ? null
-            : PricingFields::currency()->toMajorUnits((int) $data['amount_minor_units']);
+            : PricingFields::currency()->toMajorUnits((int) $data['amount']);
 
         return $data;
     }

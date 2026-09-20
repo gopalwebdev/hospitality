@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $menu_add_on_group_id
  * @property-read MenuAddOnGroup $group
  * @property string $name
- * @property int $price_minor_units
+ * @property int $price
  * @property int $max_quantity
  * @property bool $is_default
  * @property bool $is_available
@@ -33,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'price_minor_units', 'max_quantity', 'is_default', 'is_available', 'stock_quantity', 'position'])]
+#[Fillable(['name', 'price', 'max_quantity', 'is_default', 'is_available', 'stock_quantity', 'position'])]
 #[ObservedBy([MenuAddOnOptionObserver::class])]
 class MenuAddOnOption extends Model
 {
@@ -48,7 +48,7 @@ class MenuAddOnOption extends Model
     /** @var array<string, mixed> */
     #[\Override]
     protected $attributes = [
-        'price_minor_units' => 0,
+        'price' => 0,
         'max_quantity' => 1,
         'is_default' => false,
         'is_available' => true,
@@ -84,7 +84,7 @@ class MenuAddOnOption extends Model
 
     public function isFree(): bool
     {
-        return $this->price_minor_units === 0;
+        return $this->price === 0;
     }
 
     /**
@@ -117,7 +117,7 @@ class MenuAddOnOption extends Model
     {
         return [
             'menu_add_on_group_id' => 'integer',
-            'price_minor_units' => 'integer',
+            'price' => 'integer',
             'max_quantity' => 'integer',
             'is_default' => 'boolean',
             'is_available' => 'boolean',

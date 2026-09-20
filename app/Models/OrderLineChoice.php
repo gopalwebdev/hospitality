@@ -18,11 +18,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $menu_add_on_option_id
  * @property string $name
  * @property int $quantity
- * @property int $price_minor_units
+ * @property int $price
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['menu_add_on_option_id', 'name', 'quantity', 'price_minor_units'])]
+#[Fillable(['menu_add_on_option_id', 'name', 'quantity', 'price'])]
 class OrderLineChoice extends Model
 {
     use HasTranslatedNames;
@@ -55,7 +55,7 @@ class OrderLineChoice extends Model
             'order_line_id' => 'integer',
             'menu_add_on_option_id' => 'integer',
             'quantity' => 'integer',
-            'price_minor_units' => 'integer',
+            'price' => 'integer',
         ];
     }
 }

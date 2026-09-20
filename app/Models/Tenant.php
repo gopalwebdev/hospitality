@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
+use App\Enums\GstTreatment;
 use App\Enums\Role as RoleEnum;
 use App\Enums\TenantType;
 use App\Enums\Weekday;
@@ -159,9 +160,20 @@ class Tenant extends Model
         return $this->resolvedSettings()->currency ?? Currency::IndianRupee;
     }
 
-    public function taxRateBasisPoints(): int
+    public function taxRate(): int
     {
-        return $this->resolvedSettings()?->taxRateBasisPoints() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+        return $this->resolvedSettings()?->taxRate() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+    }
+
+    /**
+     * How this tenant's GST is levied — the halves it splits into, or IGST.
+     *
+     * A tenant states this on its Settings page; nothing works it out from an
+     * address or a GSTIN. An order copies it when it is placed.
+     */
+    public function gstTreatment(): GstTreatment
+    {
+        return $this->resolvedSettings()?->gstTreatment() ?? GstTreatment::IntraState;
     }
 
     /**

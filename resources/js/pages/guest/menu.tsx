@@ -16,6 +16,7 @@ import {
     basketStorageKey,
     useBasket,
 } from '@/hooks/use-basket';
+import { useClockTime } from '@/hooks/use-clock-time';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
 import { type AddOnGroup, withItemMaxSelections } from '@/lib/add-on-rules';
@@ -34,9 +35,9 @@ export interface MenuItem extends OrderLimits {
     name: string;
     description: string | null;
     /** An integer count of the currency's minor unit; 0 means complimentary. */
-    priceMinorUnits: number;
+    price: number;
     /** A higher price to show struck through, or null when not on offer. */
-    compareAtPriceMinorUnits: number | null;
+    compareAtPrice: number | null;
     /** A service request — an extra pillow — rather than something to order. */
     isServiceRequest: boolean;
     /** Null for a service request, which carries a bell mark instead. */
@@ -57,8 +58,8 @@ export interface Combo extends OrderLimits {
     id: number;
     name: string;
     description: string | null;
-    priceMinorUnits: number;
-    compareAtPriceMinorUnits: number | null;
+    price: number;
+    compareAtPrice: number | null;
     contents: ComboContent[];
 }
 
@@ -78,7 +79,7 @@ export interface Section {
 
 export interface Tax {
     /** Basis points: 500 is 5%. */
-    rateBasisPoints: number;
+    rate: number;
     pricesIncludeTax: boolean;
 }
 
@@ -91,9 +92,9 @@ export interface Charge {
     id: number;
     name: string;
     /** Basis points: 1000 is 10%. */
-    rateBasisPoints: number | null;
+    rate: number | null;
     /** An integer count of the currency's minor unit. */
-    amountMinorUnits: number | null;
+    amount: number | null;
 }
 
 interface MenuProps {
@@ -201,6 +202,7 @@ export default function Menu({
     homeUrl,
 }: MenuProps) {
     const { t } = useTranslations();
+    const clock = useClockTime();
     const basket = useBasket(basketStorageKey(tenant?.slug ?? '', menu.id));
     const [customising, setCustomising] = useState<MenuItem | null>(null);
     const [isBasketOpen, setBasketOpen] = useState(false);
@@ -290,8 +292,8 @@ export default function Menu({
                         : [
                               store.isOpen ? null : t('menu.store_closed'),
                               t('menu.store_hours', {
-                                  from: store.opensAt,
-                                  until: store.closesAt,
+                                  from: clock(store.opensAt),
+                                  until: clock(store.closesAt),
                               }),
                           ]
                               .filter((part) => part !== null)
@@ -311,8 +313,8 @@ export default function Menu({
                         }`}
                     >
                         {t('menu.served_between', {
-                            from: menu.servedFrom,
-                            until: menu.servedUntil,
+                            from: clock(menu.servedFrom),
+                            until: clock(menu.servedUntil),
                         })}
                         {!menu.isBeingServed &&
                             ` · ${t('menu.not_being_served')}`}
@@ -580,7 +582,7 @@ function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
     const { t } = useTranslations();
     const money = useMoney();
 
-    const rate = percentage(tax.rateBasisPoints);
+    const rate = percentage(tax.rate);
 
     return (
         <footer className="text-muted-foreground mt-8 space-y-1 px-5 text-xs leading-relaxed">
@@ -592,14 +594,14 @@ function ChargesNote({ tax, charges }: { tax: Tax; charges: Charge[] }) {
 
             {charges.map((charge) => (
                 <p key={charge.id}>
-                    {charge.rateBasisPoints !== null
+                    {charge.rate !== null
                         ? t('menu.charge_rate', {
                               name: charge.name,
-                              rate: percentage(charge.rateBasisPoints),
+                              rate: percentage(charge.rate),
                           })
                         : t('menu.charge_amount', {
                               name: charge.name,
-                              amount: money(charge.amountMinorUnits ?? 0),
+                              amount: money(charge.amount ?? 0),
                           })}
                 </p>
             ))}
@@ -653,8 +655,8 @@ function ComboCard({ combo }: { combo: Combo }) {
 
             <div className="mt-3 flex items-center justify-between gap-3">
                 <Price
-                    priceMinorUnits={combo.priceMinorUnits}
-                    compareAtPriceMinorUnits={combo.compareAtPriceMinorUnits}
+                    price={combo.price}
+                    compareAtPrice={combo.compareAtPrice}
                 />
 
                 {ordering !== null && (
@@ -685,18 +687,18 @@ function ComboCard({ combo }: { combo: Combo }) {
  * the word in bold on each one outshouted the names.
  */
 function Price({
-    priceMinorUnits,
-    compareAtPriceMinorUnits,
+    price,
+    compareAtPrice,
     className = '',
 }: {
-    priceMinorUnits: number;
-    compareAtPriceMinorUnits: number | null;
+    price: number;
+    compareAtPrice: number | null;
     className?: string;
 }) {
     const { t } = useTranslations();
     const money = useMoney();
 
-    if (priceMinorUnits === 0) {
+    if (price === 0) {
         return (
             <p
                 className={`text-muted-foreground text-sm font-medium ${className}`}
@@ -708,14 +710,12 @@ function Price({
 
     return (
         <p className={`flex items-baseline gap-1.5 tabular-nums ${className}`}>
-            {compareAtPriceMinorUnits !== null && (
+            {compareAtPrice !== null && (
                 <span className="text-muted-foreground text-sm line-through">
-                    {money(compareAtPriceMinorUnits)}
+                    {money(compareAtPrice)}
                 </span>
             )}
-            <span className="text-primary font-semibold">
-                {money(priceMinorUnits)}
-            </span>
+            <span className="text-primary font-semibold">{money(price)}</span>
         </p>
     );
 }
@@ -807,8 +807,8 @@ function Item({
                 </Heading>
 
                 <Price
-                    priceMinorUnits={item.priceMinorUnits}
-                    compareAtPriceMinorUnits={item.compareAtPriceMinorUnits}
+                    price={item.price}
+                    compareAtPrice={item.compareAtPrice}
                     className="mt-0.5"
                 />
 

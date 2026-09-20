@@ -36,9 +36,9 @@ class MenuComboFactory extends Factory
                 ->getKey(),
             'name' => [Locale::English->value => $name],
             'description' => [Locale::English->value => fake()->sentence()],
-            'price_minor_units' => fake()->numberBetween(20000, 120000),
-            'compare_at_price_minor_units' => null,
-            'tax_rate_basis_points' => null,
+            'price' => fake()->numberBetween(20000, 120000),
+            'compare_at_price' => null,
+            'tax_rate' => null,
             'availability' => ItemAvailability::Available,
             'max_quantity' => null,
             'position' => fake()->numberBetween(0, 20),
@@ -79,7 +79,7 @@ class MenuComboFactory extends Factory
     public function discounted(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'compare_at_price_minor_units' => $attributes['price_minor_units'] + 5000,
+            'compare_at_price' => $attributes['price'] + 5000,
         ]);
     }
 
@@ -91,7 +91,7 @@ class MenuComboFactory extends Factory
     public function taxedAt(int $basisPoints): static
     {
         return $this->state(fn (array $attributes): array => [
-            'tax_rate_basis_points' => $basisPoints,
+            'tax_rate' => $basisPoints,
         ]);
     }
 

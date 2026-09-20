@@ -130,7 +130,7 @@ class CategoryItemsRelationManager extends RelationManager
 
             // Formatted here rather than in the browser: a panel is server
             // rendered, and the currency is resolved once for the table.
-            TextColumn::make('price_minor_units')
+            TextColumn::make('price')
                 ->label(__('panel.items.price'))
                 ->formatStateUsing(fn (MenuItem $record): string => $record->isComplimentary()
                     ? $complimentary

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Currency;
+use App\Enums\GstTreatment;
 use Carbon\CarbonImmutable;
 use Database\Factories\TenantSettingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,8 +30,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $landline_phone
  * @property Currency $currency
  * @property string|null $gstin
- * @property int $cgst_rate_basis_points
- * @property int $sgst_rate_basis_points
+ * @property GstTreatment $gst_treatment
+ * @property int $cgst_rate
+ * @property int $sgst_rate
  * @property bool $tax_overrides_item_rates
  * @property bool $prices_include_tax
  * @property CarbonImmutable|null $created_at
@@ -43,8 +45,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'landline_phone',
     'currency',
     'gstin',
-    'cgst_rate_basis_points',
-    'sgst_rate_basis_points',
+    'gst_treatment',
+    'cgst_rate',
+    'sgst_rate',
     'tax_overrides_item_rates',
     'prices_include_tax',
 ])]
@@ -56,8 +59,15 @@ class TenantSetting extends Model
     /** Every rate is stored in basis points: 100% is 10,000, so 5% is 500. */
     public const int BASIS_POINTS_PER_WHOLE = 10_000;
 
-    /** The GST a tenant starts on, in all, until it types its own. */
-    public const int DEFAULT_TAX_RATE_BASIS_POINTS = 500;
+    /**
+     * The GST a tenant charges before it has said what it charges: none.
+     *
+     * Standing instruction from the project owner — **no tax information is
+     * hardcoded**; a tenant states its rate on the Settings page. A starting
+     * value of 5% meant every tenant created silently charged a rate nobody
+     * had typed, and a wrong rate on a bill is worse than a blank one.
+     */
+    public const int DEFAULT_TAX_RATE_BASIS_POINTS = 0;
 
     /**
      * Database defaults only land on insert; an unsaved row still has to read under strict mode.
@@ -70,8 +80,9 @@ class TenantSetting extends Model
     #[\Override]
     protected $attributes = [
         'currency' => Currency::IndianRupee->value,
-        'cgst_rate_basis_points' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
-        'sgst_rate_basis_points' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
+        'gst_treatment' => GstTreatment::IntraState->value,
+        'cgst_rate' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
+        'sgst_rate' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
         'tax_overrides_item_rates' => false,
         'prices_include_tax' => false,
     ];
@@ -87,9 +98,17 @@ class TenantSetting extends Model
     /**
      * What anything is taxed at in all: the centre's half and the state's, added up.
      */
-    public function taxRateBasisPoints(): int
+    public function taxRate(): int
     {
-        return $this->cgst_rate_basis_points + $this->sgst_rate_basis_points;
+        return $this->cgst_rate + $this->sgst_rate;
+    }
+
+    /**
+     * How this tenant's GST is levied, as the tenant stated it.
+     */
+    public function gstTreatment(): GstTreatment
+    {
+        return $this->gst_treatment;
     }
 
     /**
@@ -107,8 +126,9 @@ class TenantSetting extends Model
     {
         return [
             'currency' => Currency::class,
-            'cgst_rate_basis_points' => 'integer',
-            'sgst_rate_basis_points' => 'integer',
+            'gst_treatment' => GstTreatment::class,
+            'cgst_rate' => 'integer',
+            'sgst_rate' => 'integer',
             'tax_overrides_item_rates' => 'boolean',
             'prices_include_tax' => 'boolean',
         ];

@@ -19,13 +19,13 @@ return new class extends Migration
             // How many on one of the line's item: 2 × extra cheese.
             $table->integer('quantity');
             // What one of it added, when the order was placed.
-            $table->integer('price_minor_units');
+            $table->integer('price');
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE order_line_choices
             ADD CONSTRAINT order_line_choices_quantity_at_least_one CHECK (quantity >= 1),
-            ADD CONSTRAINT order_line_choices_price_not_negative CHECK (price_minor_units >= 0)');
+            ADD CONSTRAINT order_line_choices_price_not_negative CHECK (price >= 0)');
     }
 
     public function down(): void

@@ -15,7 +15,7 @@ use RuntimeException;
 final class OrderRefused extends RuntimeException
 {
     /**
-     * @param  list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>  $lines
+     * @param  list<array{key: string, status: string, unitPrice: int, total: int}>  $lines
      */
     public function __construct(public readonly OrderRefusal $reason, public readonly array $lines = [])
     {

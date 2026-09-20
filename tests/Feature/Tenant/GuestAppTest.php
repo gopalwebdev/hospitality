@@ -458,7 +458,7 @@ it('sends the combos a menu leads with, in the order they were arranged', functi
             ->has('combos', 2)
             ->where('combos.0.id', $first->getKey())
             ->where('combos.0.name', 'Burger Meal')
-            ->where('combos.0.compareAtPriceMinorUnits', $first->compare_at_price_minor_units)
+            ->where('combos.0.compareAtPrice', $first->compare_at_price)
             ->has('combos.0.contents', 1)
             ->where('combos.0.contents.0.name', 'Burger')
             ->where('combos.0.contents.0.quantity', 2)
@@ -481,8 +481,8 @@ it('sends a struck-through price only when there is a real offer', function (): 
 
     $onOffer = MenuItem::factory()->inCategory($category)->create([
         'name' => [Locale::English->value => 'A Discounted'],
-        'price_minor_units' => 29900,
-        'compare_at_price_minor_units' => 36000,
+        'price' => 29900,
+        'compare_at_price' => 36000,
         'position' => 0,
     ]);
     MenuItem::factory()->inCategory($category)->create([
@@ -494,10 +494,10 @@ it('sends a struck-through price only when there is a real offer', function (): 
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $onOffer->getKey())
-            ->where('sections.0.items.0.compareAtPriceMinorUnits', 36000)
+            ->where('sections.0.items.0.compareAtPrice', 36000)
             // Null rather than the stored value, so the app never has to judge
             // whether what it was handed is believable.
-            ->where('sections.0.items.1.compareAtPriceMinorUnits', null),
+            ->where('sections.0.items.1.compareAtPrice', null),
         );
 });
 
@@ -530,7 +530,7 @@ it('tells a guest what the prices do not include before they order', function ()
     $this->get(guestMenuUrl($tenant, $menu))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->where('tax.rateBasisPoints', 500)
+            ->where('tax.rate', 500)
             ->where('tax.pricesIncludeTax', false)
             // A tenant that levies nothing sends nothing to say.
             ->where('charges', []),
@@ -603,12 +603,12 @@ it('sends only the charges a menu carries, switched on, in the order arranged', 
             ->where('charges.0.id', $service->getKey())
             ->where('charges.0.name', 'Service Charge')
             // A share of the bill arrives as basis points, with no amount...
-            ->where('charges.0.rateBasisPoints', 1000)
-            ->where('charges.0.amountMinorUnits', null)
+            ->where('charges.0.rate', 1000)
+            ->where('charges.0.amount', null)
             // ...and a fixed sum as minor units, with no rate.
             ->where('charges.1.id', $packing->getKey())
-            ->where('charges.1.rateBasisPoints', null)
-            ->where('charges.1.amountMinorUnits', 2000),
+            ->where('charges.1.rate', null)
+            ->where('charges.1.amount', 2000),
         );
 });
 
@@ -630,7 +630,7 @@ it('sends a service request with no diet mark, beside something to order', funct
             ->where('sections.0.items.0.isServiceRequest', true)
             ->where('sections.0.items.0.diet', null)
             // Zero goes out as zero; the app names it complimentary.
-            ->where('sections.0.items.0.priceMinorUnits', 0)
+            ->where('sections.0.items.0.price', 0)
             ->where('sections.0.items.1.id', $water->getKey())
             ->where('sections.0.items.1.isServiceRequest', false)
             ->where('sections.0.items.1.diet', Diet::Vegetarian->value),
@@ -762,7 +762,7 @@ it('sends each add-on group once, and each item the groups it offers in its own 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
 
-    $garlic = MenuAddOnOption::factory()->inGroup($bread)->asDefault()->create(['position' => 1, 'price_minor_units' => 2000]);
+    $garlic = MenuAddOnOption::factory()->inGroup($bread)->asDefault()->create(['position' => 1, 'price' => 2000]);
     $butter = MenuAddOnOption::factory()->inGroup($bread)->free()->create(['position' => 0]);
     MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create();
 
@@ -790,8 +790,8 @@ it('sends each add-on group once, and each item the groups it offers in its own 
                 'maxSelections' => 1,
                 // In the order they were dragged into.
                 'options' => [
-                    ['id' => $butter->getKey(), 'name' => $butter->name, 'priceMinorUnits' => 0, 'maxQuantity' => 1, 'isDefault' => false],
-                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'priceMinorUnits' => 2000, 'maxQuantity' => 1, 'isDefault' => true],
+                    ['id' => $butter->getKey(), 'name' => $butter->name, 'price' => 0, 'maxQuantity' => 1, 'isDefault' => false],
+                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'price' => 2000, 'maxQuantity' => 1, 'isDefault' => true],
                 ],
             ])
             // Its own cap of two stands: nothing in the group forces it down to one.

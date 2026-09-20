@@ -438,7 +438,7 @@ it('splits the items page into tabs by kind, by stock, by featuring and by diet 
         ->assertCanSeeTableRecords([$water, $idli, $omelette, $chicken, $pillow])
         ->assertTableColumnDoesNotExist('is_service_request')
         ->assertTableColumnDoesNotExist('is_featured')
-        ->assertTableColumnDoesNotExist('tax_rate_basis_points');
+        ->assertTableColumnDoesNotExist('tax_rate');
 
     $page->set('activeTab', 'items')
         ->assertCanSeeTableRecords([$water, $idli, $omelette, $chicken])
@@ -1107,7 +1107,7 @@ it('adds an item to the category or sub-category it was opened from', function (
     // it with the category instead would have skipped.
     expect($menuItem->menu_category_id)->toBe($chicken->getKey())
         ->and($menuItem->tenant_id)->toBe($tenant->getKey())
-        ->and($menuItem->price_minor_units)->toBe(22000)
+        ->and($menuItem->price)->toBe(22000)
         ->and($menuItem->availability)->toBe(ItemAvailability::Available)
         ->and($menuItem->dietMark())->toBe(Diet::Vegetarian)
         ->and($menuItem->position)->toBeGreaterThan($existing->position);
@@ -1137,7 +1137,7 @@ it('edits an item in its category\'s table, keeping the add-on groups and tax no
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $menuItem = MenuItem::factory()->inCategory($category)->taxedAt(1200)->create(['price_minor_units' => 10000]);
+    $menuItem = MenuItem::factory()->inCategory($category)->taxedAt(1200)->create(['price' => 10000]);
     $link = MenuItemAddOnGroup::factory()
         ->linking($menuItem, MenuAddOnGroup::factory()->ofTenant($tenant)->create())
         ->create();
@@ -1152,8 +1152,8 @@ it('edits an item in its category\'s table, keeping the add-on groups and tax no
         ])
         ->assertHasNoActionErrors();
 
-    expect($menuItem->refresh()->price_minor_units)->toBe(15000)
-        ->and($menuItem->tax_rate_basis_points)->toBe(1200)
+    expect($menuItem->refresh()->price)->toBe(15000)
+        ->and($menuItem->tax_rate)->toBe(1200)
         ->and($menuItem->addOnGroupLinks()->pluck('id')->all())->toBe([$link->getKey()]);
 });
 

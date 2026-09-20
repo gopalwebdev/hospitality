@@ -81,7 +81,7 @@ class MenuItemsTable
                 // Formatted here rather than in the browser, unlike the guest
                 // app: a panel is server rendered, and the currency
                 // is resolved once for the page rather than per row.
-                TextColumn::make('price_minor_units')
+                TextColumn::make('price')
                     ->label(__('panel.items.price'))
                     ->formatStateUsing(fn (MenuItem $record): string => $record->isComplimentary()
                         ? $complimentary
@@ -190,7 +190,7 @@ class MenuItemsTable
                 Filter::make('on_offer')
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('compare_at_price_minor_units')),
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('compare_at_price')),
             ])
             // Behind the table's filter button rather than laid out above it,
             // where they took half the screen before the first row. The cuts

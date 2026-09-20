@@ -4,6 +4,7 @@ namespace App\Actions\Menus;
 
 use App\Actions\Inventory\FindStockShortages;
 use App\Actions\Inventory\StockDemand;
+use App\Enums\GstTreatment;
 use App\Enums\ItemAvailability;
 use App\Exceptions\InsufficientStock;
 use App\Models\Charge;
@@ -39,6 +40,8 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  *
  * @phpstan-type BasketLine array{key: string, type: string, id: int, quantity: int, choices?: list<array{optionId: int, quantity: int}>}
  * @phpstan-type PricedPart array{amount: int, rate: int}
+ * @phpstan-type PricedLine array{key: string, status: string, unitPrice: int, total: int, taxableValue: int, tax: int, taxParts: GstSplit}
+ * @phpstan-type PricedCharge array{id: int, name: string, amount: int, taxableValue: int, tax: int, taxParts: GstSplit}
  *
  * @phpstan-import-type Shortage from InsufficientStock
  */
@@ -63,14 +66,18 @@ class QuoteBasket
 
     /**
      * @param  list<BasketLine>  $lines
-     * @return array{lines: list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>, subtotalMinorUnits: int, taxMinorUnits: int, pricesIncludeTax: bool, charges: list<array{id: int, name: string, amountMinorUnits: int}>, totalMinorUnits: int, shortages: list<Shortage>}
+     * @return array{lines: list<PricedLine>, subtotal: int, tax: int, taxParts: GstSplit, pricesIncludeTax: bool, charges: list<PricedCharge>, total: int, shortages: list<Shortage>}
      */
     public function __invoke(Tenant $tenant, Menu $menu, array $lines): array
     {
-        $tenantRate = $tenant->taxRateBasisPoints();
+        $tenantRate = $tenant->taxRate();
         $tenantOverrides = $tenant->overridesItemTaxRates();
         $settings = $tenant->resolvedSettings();
         $pricesIncludeTax = $settings instanceof TenantSetting && $settings->prices_include_tax;
+        // How this bill splits, as the tenant stated it on its Settings page.
+        // Settled once for the whole basket: it is a property of the supply,
+        // not of a line, and an order keeps the one it was placed under.
+        $treatment = $tenant->gstTreatment();
 
         $items = $this->items($tenant, $menu, $this->idsOf($lines, self::ITEM));
         $groups = $this->groups($tenant, $items);
@@ -79,7 +86,7 @@ class QuoteBasket
 
         $priced = [];
         $subtotal = 0;
-        $tax = 0;
+        $tax = GstSplit::none($treatment);
 
         foreach ($lines as $line) {
             $parts = $line['type'] === self::COMBO
@@ -87,7 +94,15 @@ class QuoteBasket
                 : $this->itemParts($items->get($line['id']), $groups, $line['choices'] ?? [], $held[self::ITEM][$line['id']], $tenantRate, $tenantOverrides);
 
             if (is_string($parts)) {
-                $priced[] = ['key' => $line['key'], 'status' => $parts, 'unitPriceMinorUnits' => 0, 'totalMinorUnits' => 0];
+                $priced[] = [
+                    'key' => $line['key'],
+                    'status' => $parts,
+                    'unitPrice' => 0,
+                    'total' => 0,
+                    'taxableValue' => 0,
+                    'tax' => 0,
+                    'taxParts' => GstSplit::none($treatment),
+                ];
 
                 continue;
             }
@@ -96,26 +111,48 @@ class QuoteBasket
             $lineTotal = $unit * $line['quantity'];
 
             // Taxed part by part, and rounded once for the whole line rather
-            // than per unit.
+            // than per unit. The line keeps its own split because an invoice
+            // shows CGST and SGST per line, and because the order copies it.
+            $lineTax = GstSplit::none($treatment);
+
             foreach ($parts as $part) {
-                $tax += $this->taxOn($part['amount'] * $line['quantity'], $part['rate'], $pricesIncludeTax);
+                $lineTax = $lineTax->plus(GstSplit::on($part['amount'] * $line['quantity'], $part['rate'], $treatment, $pricesIncludeTax));
             }
 
+            $tax = $tax->plus($lineTax);
             $subtotal += $lineTotal;
-            $priced[] = ['key' => $line['key'], 'status' => self::OK, 'unitPriceMinorUnits' => $unit, 'totalMinorUnits' => $lineTotal];
+
+            $priced[] = [
+                'key' => $line['key'],
+                'status' => self::OK,
+                'unitPrice' => $unit,
+                'total' => $lineTotal,
+                // What the rate was charged on: the line itself, or the line
+                // less the tax already inside it.
+                'taxableValue' => $pricesIncludeTax ? $lineTotal - $lineTax->total() : $lineTotal,
+                'tax' => $lineTax->total(),
+                'taxParts' => $lineTax,
+            ];
         }
 
-        $charges = $this->charges($tenant, $menu, $subtotal);
+        $charges = $this->charges($tenant, $menu, $subtotal, $tenantRate, $treatment, $pricesIncludeTax);
+
+        // A charge is part of the value of the supply and is taxed with it, so
+        // its tax joins the bill's rather than sitting outside it.
+        foreach ($charges as $charge) {
+            $tax = $tax->plus($charge['taxParts']);
+        }
 
         return [
             'lines' => $priced,
-            'subtotalMinorUnits' => $subtotal,
-            'taxMinorUnits' => $tax,
+            'subtotal' => $subtotal,
+            'tax' => $tax->total(),
+            'taxParts' => $tax,
             'pricesIncludeTax' => $pricesIncludeTax,
             'charges' => $charges,
-            'totalMinorUnits' => $subtotal
-                + ($pricesIncludeTax ? 0 : $tax)
-                + array_sum(array_column($charges, 'amountMinorUnits')),
+            'total' => $subtotal
+                + ($pricesIncludeTax ? 0 : $tax->total())
+                + array_sum(array_column($charges, 'amount')),
             'shortages' => $this->shortagesIn($lines, $priced),
         ];
     }
@@ -124,7 +161,7 @@ class QuoteBasket
      * What the lines that stand would take from a counted row with fewer left.
      *
      * @param  list<BasketLine>  $lines
-     * @param  list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>  $priced  in the same order as the lines
+     * @param  list<PricedLine>  $priced  in the same order as the lines
      * @return list<Shortage>
      */
     private function shortagesIn(array $lines, array $priced): array
@@ -192,8 +229,8 @@ class QuoteBasket
         // Every part of the line is taxed at the item's rate. An add-on is part of
         // the item it is added to — a composite supply, taxed at the rate of its
         // principal supply (CGST Act, s. 8(a)) — so an option has no rate of its own.
-        $rate = $item->taxRateBasisPoints($tenantRate, $tenantOverrides);
-        $parts = [['amount' => $item->price_minor_units, 'rate' => $rate]];
+        $rate = $item->taxRate($tenantRate, $tenantOverrides);
+        $parts = [['amount' => $item->price, 'rate' => $rate]];
         $picks = [];
 
         foreach ($quantities as $optionId => $quantity) {
@@ -213,7 +250,7 @@ class QuoteBasket
             }
 
             $picks[$group->getKey()] = ($picks[$group->getKey()] ?? 0) + $quantity;
-            $parts[] = ['amount' => $option->price_minor_units * $quantity, 'rate' => $rate];
+            $parts[] = ['amount' => $option->price * $quantity, 'rate' => $rate];
         }
 
         foreach ($offered as $group) {
@@ -243,7 +280,7 @@ class QuoteBasket
             return self::INVALID;
         }
 
-        return [['amount' => $combo->price_minor_units, 'rate' => $combo->taxRateBasisPoints($tenantRate, $tenantOverrides)]];
+        return [['amount' => $combo->price, 'rate' => $combo->taxRate($tenantRate, $tenantOverrides)]];
     }
 
     /**
@@ -274,12 +311,6 @@ class QuoteBasket
     /**
      * The GST on an amount: added on top, or the share already inside it.
      */
-    private function taxOn(int $amount, int $rate, bool $included): int
-    {
-        $whole = TenantSetting::BASIS_POINTS_PER_WHOLE;
-
-        return (int) round($included ? $amount * $rate / ($whole + $rate) : $amount * $rate / $whole);
-    }
 
     /**
      * The items asked for that a guest can order from this menu right now, with the groups each offers.
@@ -294,7 +325,7 @@ class QuoteBasket
         }
 
         return MenuItem::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_quantity'])
             ->where('tenant_id', $tenant->getKey())
             ->onMenu($menu->getKey())
             ->orderable()
@@ -327,7 +358,7 @@ class QuoteBasket
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price_minor_units', 'max_quantity'])
+                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price', 'max_quantity'])
                 ->available()])
             ->get()
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());
@@ -346,7 +377,7 @@ class QuoteBasket
         }
 
         return MenuCombo::query()
-            ->select(['id', 'tenant_id', 'price_minor_units', 'tax_rate_basis_points', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', ItemAvailability::orderableValues())
             ->whereKey($ids)
@@ -359,26 +390,40 @@ class QuoteBasket
      *
      * Nothing is charged on nothing: an empty basket carries no fixed fee.
      *
-     * @return list<array{id: int, name: string, amountMinorUnits: int}>
+     * @return list<PricedCharge>
      */
-    private function charges(Tenant $tenant, Menu $menu, int $subtotal): array
+    private function charges(Tenant $tenant, Menu $menu, int $subtotal, int $tenantRate, GstTreatment $treatment, bool $pricesIncludeTax): array
     {
         if ($subtotal === 0) {
             return [];
         }
 
         return array_values(Charge::query()
-            ->select(['id', 'name', 'calculation', 'rate_basis_points', 'amount_minor_units'])
+            ->select(['id', 'name', 'calculation', 'rate', 'amount'])
             ->where('tenant_id', $tenant->getKey())
             ->active()
             ->forMenu($menu->getKey())
             ->inMenuOrder()
             ->get()
-            ->map(fn (Charge $charge): array => [
-                'id' => $charge->getKey(),
-                'name' => $charge->name,
-                'amountMinorUnits' => $charge->amountOn($subtotal),
-            ])
+            ->map(function (Charge $charge) use ($subtotal, $tenantRate, $treatment, $pricesIncludeTax): array {
+                $amount = $charge->amountOn($subtotal);
+
+                // A service charge is consideration for the same supply, so it
+                // is taxed rather than added after tax. At the tenant's own
+                // rate: a bill spanning several slabs has no one principal
+                // supply to follow, and the tenant's rate is what it charges
+                // for serving. An item's own rate is for the item.
+                $tax = GstSplit::on($amount, $tenantRate, $treatment, $pricesIncludeTax);
+
+                return [
+                    'id' => $charge->getKey(),
+                    'name' => $charge->name,
+                    'amount' => $amount,
+                    'taxableValue' => $pricesIncludeTax ? $amount - $tax->total() : $amount,
+                    'tax' => $tax->total(),
+                    'taxParts' => $tax,
+                ];
+            })
             ->all());
     }
 

@@ -26,9 +26,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Menu $menu
  * @property string $name
  * @property string|null $description
- * @property int $price_minor_units
- * @property int|null $compare_at_price_minor_units
- * @property int|null $tax_rate_basis_points
+ * @property int $price
+ * @property int|null $compare_at_price
+ * @property int|null $tax_rate
+ * @property string|null $hsn_sac_code
  * @property ItemAvailability $availability
  * @property int|null $max_quantity
  * @property int $position
@@ -39,9 +40,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'menu_id',
     'name',
     'description',
-    'price_minor_units',
-    'compare_at_price_minor_units',
-    'tax_rate_basis_points',
+    'price',
+    'compare_at_price',
+    'tax_rate',
+    'hsn_sac_code',
     'availability',
     'max_quantity',
     'position',
@@ -102,10 +104,10 @@ class MenuCombo extends Model
     /**
      * What the items inside cost bought separately — shown beside the price, never used as it.
      */
-    public function contentsPriceMinorUnits(): int
+    public function contentsPrice(): int
     {
         return $this->comboItems->reduce(
-            static fn (int $total, MenuComboItem $comboItem): int => $total + ($comboItem->menuItem->price_minor_units * $comboItem->quantity),
+            static fn (int $total, MenuComboItem $comboItem): int => $total + ($comboItem->menuItem->price * $comboItem->quantity),
             0,
         );
     }
@@ -133,9 +135,9 @@ class MenuCombo extends Model
     protected function casts(): array
     {
         return [
-            'price_minor_units' => 'integer',
-            'compare_at_price_minor_units' => 'integer',
-            'tax_rate_basis_points' => 'integer',
+            'price' => 'integer',
+            'compare_at_price' => 'integer',
+            'tax_rate' => 'integer',
             'availability' => ItemAvailability::class,
             'max_quantity' => 'integer',
             'position' => 'integer',

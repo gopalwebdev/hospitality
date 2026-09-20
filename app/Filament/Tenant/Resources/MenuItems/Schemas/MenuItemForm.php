@@ -188,8 +188,8 @@ class MenuItemForm
             ->compact()
             ->columns(2)
             ->schema([
-                PricingFields::taxRatePercentage(PricingFields::tenantTaxRateBasisPoints()),
-                PricingFields::hsnCode(),
+                PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
+                PricingFields::hsnSacCode(),
             ]);
     }
 

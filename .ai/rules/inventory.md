@@ -58,12 +58,13 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 3. **Short under the lock:** `InsufficientStock` rolls the order back with it and renders 422 as `{message, reason: "insufficient-stock", shortages: [{type, id, requested, available, lineKeys}]}`.
    - "3 asked for, 1 left" is a shortage with `requested: 3, available: 1`.
    - The server's count needs no correcting. `available` is what the phone brings those lines down to, which is the PWA's job when it arrives.
-4. **Placed:** 201 `{orderId, totalMinorUnits}`.
+4. **Placed:** 201 `{orderId, total}`.
 
 `QuoteBasket` answers the same `shortages` shape without a lock — a reading, not a hold — beside line statuses it leaves unchanged, so the current basket sheet reads the quote exactly as before.
 
 **An order is a copy.**
-- `orders` keeps its totals as priced.
+- `orders` keeps its totals as priced, and its GST as levied: `gst_treatment`, `tax`, and the `cgst` / `sgst` / `igst` the three of which add up to it.
+- `order_lines` and `order_charges` each keep their own `taxable_value`, `tax_rate` and split, and a line keeps the item's `hsn_sac_code` — a tax invoice names a code per line, and the item may be recoded or deleted later. See `.ai/rules/actions-menus.md`.
 - `order_lines`, `order_line_choices` and `order_charges` keep names as `jsonb` in every language and money as it was then.
 - Their keys to the menu are `nullOnDelete`, so deleting or renaming an item never rewrites an order.
 - PlaceOrder sets `tenant_id` on every order row itself; no observer does, because nothing else writes them.

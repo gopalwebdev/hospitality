@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import { formatMoney } from '@/lib/money';
 
-const rupees = { code: 'INR', minorUnitDigits: 2 };
-const yen = { code: 'JPY', minorUnitDigits: 0 };
+const rupees = { code: 'INR', fractionDigits: 2 };
+const yen = { code: 'JPY', fractionDigits: 0 };
 
 describe('money', () => {
     it('turns a stored minor-unit integer into money', () => {

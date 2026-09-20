@@ -30,10 +30,10 @@ use Illuminate\Support\Collection;
  * @property-read MenuCategory $menuCategory
  * @property string $name
  * @property string|null $description
- * @property int $price_minor_units
- * @property int|null $compare_at_price_minor_units
- * @property int|null $tax_rate_basis_points
- * @property string|null $hsn_code
+ * @property int $price
+ * @property int|null $compare_at_price
+ * @property int|null $tax_rate
+ * @property string|null $hsn_sac_code
  * @property bool $is_service_request
  * @property Collection<int, Diet>|null $diets
  * @property ItemAvailability $availability
@@ -49,10 +49,10 @@ use Illuminate\Support\Collection;
     'menu_category_id',
     'name',
     'description',
-    'price_minor_units',
-    'compare_at_price_minor_units',
-    'tax_rate_basis_points',
-    'hsn_code',
+    'price',
+    'compare_at_price',
+    'tax_rate',
+    'hsn_sac_code',
     'is_service_request',
     'diets',
     'availability',
@@ -161,7 +161,7 @@ class MenuItem extends Model
      */
     public function isComplimentary(): bool
     {
-        return $this->price_minor_units === 0;
+        return $this->price === 0;
     }
 
     /**
@@ -230,9 +230,9 @@ class MenuItem extends Model
     protected function casts(): array
     {
         return [
-            'price_minor_units' => 'integer',
-            'compare_at_price_minor_units' => 'integer',
-            'tax_rate_basis_points' => 'integer',
+            'price' => 'integer',
+            'compare_at_price' => 'integer',
+            'tax_rate' => 'integer',
             'is_service_request' => 'boolean',
             'diets' => AsEnumCollection::of(Diet::class),
             'availability' => ItemAvailability::class,

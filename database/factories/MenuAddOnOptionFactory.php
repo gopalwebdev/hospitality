@@ -33,7 +33,7 @@ class MenuAddOnOptionFactory extends Factory
                 ->whereKey($attributes['menu_add_on_group_id'])
                 ->value('tenant_id'),
             'name' => [Locale::English->value => $name],
-            'price_minor_units' => fake()->numberBetween(0, 10000),
+            'price' => fake()->numberBetween(0, 10000),
             'max_quantity' => 1,
             'is_default' => false,
             'is_available' => true,
@@ -58,7 +58,7 @@ class MenuAddOnOptionFactory extends Factory
     public function free(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'price_minor_units' => 0,
+            'price' => 0,
         ]);
     }
 

@@ -168,8 +168,8 @@ it('starts a tenant on the default GST slab, tax added at the bill', function ()
     // The default in $attributes and TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS have to agree; a
     // property initialiser cannot call the static method, so this is what
     // keeps the two in step.
-    expect($tenant->settings->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
-        ->and($tenant->taxRateBasisPoints())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
+    expect($tenant->settings->taxRate())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
+        ->and($tenant->taxRate())->toBe(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)
         ->and($tenant->settings->prices_include_tax)->toBeFalse();
 });
 
@@ -206,10 +206,10 @@ it('saves GST as the two halves it is levied in, and whether prices already incl
     $settings = $tenant->refresh()->settings;
 
     expect($settings->gstin)->toBe('29ABCDE1234F1Z5')
-        ->and($settings->cgst_rate_basis_points)->toBe(900)
-        ->and($settings->sgst_rate_basis_points)->toBe(900)
+        ->and($settings->cgst_rate)->toBe(900)
+        ->and($settings->sgst_rate)->toBe(900)
         // What anything is actually taxed at is the two added up.
-        ->and($settings->taxRateBasisPoints())->toBe(1800)
+        ->and($settings->taxRate())->toBe(1800)
         ->and($settings->prices_include_tax)->toBeTrue();
 });
 
@@ -239,12 +239,12 @@ it('accepts a GST rate no fixed list of slabs would have held', function (): voi
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($tenant->refresh()->settings->taxRateBasisPoints())->toBe(1250);
+    expect($tenant->refresh()->settings->taxRate())->toBe(1250);
 });
 
 it('round-trips the GST halves through the form without drift', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->settings->update(['cgst_rate_basis_points' => 625, 'sgst_rate_basis_points' => 625]);
+    $tenant->settings->update(['cgst_rate' => 625, 'sgst_rate' => 625]);
 
     enterTenantPanel($tenant, Role::Owner);
 
@@ -253,7 +253,7 @@ it('round-trips the GST halves through the form without drift', function (): voi
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($tenant->refresh()->settings->taxRateBasisPoints())->toBe(1250);
+    expect($tenant->refresh()->settings->taxRate())->toBe(1250);
 });
 
 /*

@@ -90,8 +90,8 @@ it('creates a combo on the menu with the items it contains', function (): void {
         // At the end of the combos, where whoever added it looks for it.
         ->and($combo->position)->toBeGreaterThan($existing->position)
         // ₹299.00 is 29900 paise, exactly. No float reaches the column.
-        ->and($combo->price_minor_units)->toBe(29900)
-        ->and($combo->compare_at_price_minor_units)->toBe(36000)
+        ->and($combo->price)->toBe(29900)
+        ->and($combo->compare_at_price)->toBe(36000)
         ->and($combo->getTranslation('name', Locale::Tamil->value))->toBe('பர்கர் உணவு')
         ->and($combo->comboItems()->count())->toBe(2)
         ->and($combo->comboItems()->where('menu_item_id', $fries->getKey())->value('quantity'))->toBe(2);
@@ -112,7 +112,7 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
         ->assertHasNoActionErrors();
 
     // Null is "not on offer"; zero would be a price of nothing.
-    expect(comboNamed('Lunch Box')->compare_at_price_minor_units)->toBeNull();
+    expect(comboNamed('Lunch Box')->compare_at_price)->toBeNull();
 });
 
 it('keeps how many of a combo one order may hold', function (): void {
@@ -262,12 +262,12 @@ it('refuses the same item twice in one combo', function (): void {
 it('prices a combo on its own rather than from its contents', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 29900]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create(['price' => 29900]);
 
     $burger = itemOn($menu);
-    $burger->update(['price_minor_units' => 18000]);
+    $burger->update(['price' => 18000]);
     $fries = itemOn($menu);
-    $fries->update(['price_minor_units' => 9000]);
+    $fries->update(['price' => 9000]);
 
     MenuComboItem::factory()->pairing($combo, $burger)->create();
     MenuComboItem::factory()->pairing($combo, $fries)->quantity(2)->create();
@@ -276,8 +276,8 @@ it('prices a combo on its own rather than from its contents', function (): void 
 
     // The whole point of a combo is that it costs less than its parts, so the
     // contents total is only ever shown beside the price, never used as it.
-    expect($combo->contentsPriceMinorUnits())->toBe(36000)
-        ->and($combo->price_minor_units)->toBe(29900);
+    expect($combo->contentsPrice())->toBe(36000)
+        ->and($combo->price)->toBe(29900);
 });
 
 it('falls back to the tenant\'s GST rate, and overrides it when told', function (): void {
@@ -288,8 +288,8 @@ it('falls back to the tenant\'s GST rate, and overrides it when told', function 
     $following = MenuCombo::factory()->onMenu($menu)->create();
     $overriding = MenuCombo::factory()->onMenu($menu)->taxedAt(1200)->create();
 
-    expect($following->taxRateBasisPoints())->toBe(1800)
-        ->and($overriding->taxRateBasisPoints())->toBe(1200);
+    expect($following->taxRate())->toBe(1800)
+        ->and($overriding->taxRate())->toBe(1200);
 });
 
 /*
@@ -353,7 +353,7 @@ it('shows only this menu\'s combos', function (): void {
 it('edits a combo from its table, keeping what is in it', function (): void {
     $tenant = Tenant::factory()->create();
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
-    $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 29900]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create(['price' => 29900]);
     $burger = itemOn($menu);
 
     $line = MenuComboItem::factory()->pairing($combo, $burger)->quantity(2)->create();
@@ -368,7 +368,7 @@ it('edits a combo from its table, keeping what is in it', function (): void {
         ])
         ->assertHasNoActionErrors();
 
-    expect($combo->refresh()->price_minor_units)->toBe(24900)
+    expect($combo->refresh()->price)->toBe(24900)
         ->and($combo->comboItems()->pluck('id')->all())->toBe([$line->getKey()])
         ->and($line->refresh()->quantity)->toBe(2);
 });

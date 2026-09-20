@@ -34,7 +34,7 @@ const extras: AddOnGroup = {
         {
             id: 11,
             name: 'Extra cheese',
-            priceMinorUnits: 4000,
+            price: 4000,
             maxQuantity: 2,
             isDefault: false,
         },
@@ -50,7 +50,7 @@ const bread: AddOnGroup = {
         {
             id: 22,
             name: 'Garlic naan',
-            priceMinorUnits: 2000,
+            price: 2000,
             maxQuantity: 1,
             isDefault: false,
         },
@@ -61,8 +61,8 @@ const masala: MenuItem = {
     id: 30,
     name: 'Paneer Butter Masala',
     description: null,
-    priceMinorUnits: 28900,
-    compareAtPriceMinorUnits: null,
+    price: 28900,
+    compareAtPrice: null,
     isServiceRequest: false,
     diet: 'vegetarian',
     addOnGroupLinks: [
@@ -93,7 +93,7 @@ function renderMenu(items: MenuItem[] = [masala]) {
             sections={[{ id: 1, name: 'Curries', items, subSections: [] }]}
             order={[1]}
             addOnGroups={[extras, bread]}
-            tax={{ rateBasisPoints: 500, pricesIncludeTax: false }}
+            tax={{ rate: 500, pricesIncludeTax: false }}
             charges={[]}
             store={{ isOpen: true, opensAt: '09:00', closesAt: '23:00' }}
             quoteUrl={quoteUrl}
@@ -146,23 +146,21 @@ describe('guest basket', () => {
                 {
                     key: 'item:30:22x1:11x2',
                     status: 'ok',
-                    unitPriceMinorUnits: 38900,
-                    totalMinorUnits: 38900,
+                    unitPrice: 38900,
+                    total: 38900,
                 },
                 {
                     key: 'item:99',
                     status: 'unavailable',
-                    unitPriceMinorUnits: 0,
-                    totalMinorUnits: 0,
+                    unitPrice: 0,
+                    total: 0,
                 },
             ],
-            subtotalMinorUnits: 38900,
-            taxMinorUnits: 1945,
+            subtotal: 38900,
+            tax: 1945,
             pricesIncludeTax: false,
-            charges: [
-                { id: 1, name: 'Service Charge', amountMinorUnits: 3890 },
-            ],
-            totalMinorUnits: 44735,
+            charges: [{ id: 1, name: 'Service Charge', amount: 3890 }],
+            total: 44735,
         };
 
         renderMenu();
@@ -210,15 +208,15 @@ describe('guest basket', () => {
                 {
                     key: 'item:30:22x1',
                     status: 'ok',
-                    unitPriceMinorUnits: 30900,
-                    totalMinorUnits: 30900,
+                    unitPrice: 30900,
+                    total: 30900,
                 },
             ],
-            subtotalMinorUnits: 30900,
-            taxMinorUnits: 1471,
+            subtotal: 30900,
+            tax: 1471,
             pricesIncludeTax: true,
             charges: [],
-            totalMinorUnits: 30900,
+            total: 30900,
         };
 
         renderMenu();

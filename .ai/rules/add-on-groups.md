@@ -116,7 +116,7 @@ An item links its groups in its own form: a table repeater on `addOnGroupLinks`,
 **The options table uses `TranslatedFields::textCell()`, never a bare `text()`.** A `->table()` repeater gives a row one cell per top-level component, so a translated name spread as two inputs split into two cells and shifted every column after it. That put a price under the since-removed GST column and dropped "Available" off the end before it was fixed. See `.ai/rules/filament.md`.
 
 ## An add-on is taxed at its item's rate
-An option has no `tax_rate_basis_points`. Section 8(a) of the CGST Act taxes a composite supply at the rate of its principal supply, and extra cheese on a paneer tikka is part of the paneer tikka. So `QuoteBasket` taxes every part of an item's line at the item's rate.
+An option has no `tax_rate`. Section 8(a) of the CGST Act taxes a composite supply at the rate of its principal supply, and extra cheese on a paneer tikka is part of the paneer tikka. So `QuoteBasket` taxes every part of an item's line at the item's rate.
 
 This replaced two things:
 - **The form:** a GST column on the options table, which was the form's most confusing field.

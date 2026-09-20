@@ -374,8 +374,8 @@ it('stores a typed price as an exact integer count of minor units', function ():
     $item = byEnglishName(MenuItem::class, 'Paneer Tikka');
 
     // ₹249.50 is 24950 paise, exactly. No float ever reaches the column.
-    expect($item->price_minor_units)->toBe(24950)
-        ->and($item->price_minor_units)->toBeInt()
+    expect($item->price)->toBe(24950)
+        ->and($item->price)->toBeInt()
         ->and($item->formattedPrice())->toBe('₹249.50')
         ->and($item->tenant_id)->toBe($tenant->getKey());
 });
@@ -385,7 +385,7 @@ it('round-trips a price through the edit form without drift', function (): void 
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
-    $item = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 24950]);
+    $item = MenuItem::factory()->inCategory($category)->create(['price' => 24950]);
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
@@ -399,7 +399,7 @@ it('round-trips a price through the edit form without drift', function (): void 
         ])
         ->assertHasNoActionErrors();
 
-    expect($item->refresh()->price_minor_units)->toBe(24950);
+    expect($item->refresh()->price)->toBe(24950);
 });
 
 it('fills the edit form with every language, not just the current one', function (): void {
@@ -427,7 +427,7 @@ it('formats a price in rupees', function (): void {
     $category = MenuCategory::factory()
         ->inMenu(Menu::factory()->create(['tenant_id' => $tenant->getKey()]))
         ->create();
-    $item = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 1250]);
+    $item = MenuItem::factory()->inCategory($category)->create(['price' => 1250]);
 
     expect($item->formattedPrice())->toBe('₹12.50');
 });
@@ -884,10 +884,10 @@ it('stores a struck-through price beside the one being charged', function (): vo
 
     $item = byEnglishName(MenuItem::class, 'Paneer Tikka');
 
-    expect($item->price_minor_units)->toBe(29900)
-        ->and($item->compare_at_price_minor_units)->toBe(36000)
+    expect($item->price)->toBe(29900)
+        ->and($item->compare_at_price)->toBe(36000)
         ->and($item->hasComparePrice())->toBeTrue()
-        ->and($item->discountMinorUnits())->toBe(6100)
+        ->and($item->discount())->toBe(6100)
         ->and($item->formattedComparePrice())->toBe('₹360.00');
 });
 
@@ -942,10 +942,10 @@ it('leaves an item that is not on offer with no compare-at price at all', functi
 
     // Null is "not on offer". A zero would be a price of nothing, and the
     // guest app would have to decide whether to believe it.
-    expect($item->compare_at_price_minor_units)->toBeNull()
+    expect($item->compare_at_price)->toBeNull()
         ->and($item->hasComparePrice())->toBeFalse()
         ->and($item->formattedComparePrice())->toBeNull()
-        ->and($item->discountMinorUnits())->toBe(0);
+        ->and($item->discount())->toBe(0);
 });
 
 it('says why an item is off the menu rather than only that it is', function (): void {
@@ -971,8 +971,8 @@ it('falls back to the tenant GST rate on an item, and overrides it when told', f
     // A sealed bottle sold alongside the rest of the menu is taxed as goods, not service.
     $bottle = MenuItem::factory()->inCategory($category)->taxedAt(1800)->create();
 
-    expect($standard->taxRateBasisPoints())->toBe(500)
-        ->and($bottle->taxRateBasisPoints())->toBe(1800);
+    expect($standard->taxRate())->toBe(500)
+        ->and($bottle->taxRate())->toBe(1800);
 });
 
 it('accepts a rate no fixed list of GST slabs would have held', function (): void {
@@ -997,7 +997,7 @@ it('accepts a rate no fixed list of GST slabs would have held', function (): voi
         ])
         ->assertHasNoActionErrors();
 
-    expect(byEnglishName(MenuItem::class, 'Cola')->tax_rate_basis_points)->toBe(4000)
+    expect(byEnglishName(MenuItem::class, 'Cola')->tax_rate)->toBe(4000)
         ->and(PricingFields::toBasisPoints('12.5'))->toBe(1250);
 });
 
@@ -1008,10 +1008,10 @@ it('taxes an option at the rate of the item it is added to', function (): void {
     $menuItem = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
         ->taxedAt(1200)
-        ->create(['price_minor_units' => 10000]);
+        ->create(['price' => 10000]);
     $group = MenuAddOnGroup::factory()->ofTenant($tenant)->create();
     MenuItemAddOnGroup::factory()->linking($menuItem, $group)->create();
-    $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price_minor_units' => 5000]);
+    $cheese = MenuAddOnOption::factory()->inGroup($group)->create(['price' => 5000]);
 
     // An add-on is part of the item it is added to — a composite supply, taxed
     // at the rate of its principal supply (CGST Act, s. 8(a)) — so the cheese
@@ -1024,7 +1024,7 @@ it('taxes an option at the rate of the item it is added to', function (): void {
         'choices' => [['optionId' => $cheese->getKey(), 'quantity' => 1]],
     ]]);
 
-    expect($quote['taxMinorUnits'])->toBe(1200 + 600);
+    expect($quote['tax'])->toBe(1200 + 600);
 });
 
 /*

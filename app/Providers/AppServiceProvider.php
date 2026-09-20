@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Exceptions\DuplicateQueryException;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\DevCommands;
@@ -21,6 +23,15 @@ use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /** How a date reads wherever one is shown: "Aug 6, 2025". */
+    public const string DATE_FORMAT = 'M j, Y';
+
+    /** How a date and a time read together: "Aug 6, 2025 8:37 AM". */
+    public const string DATE_TIME_FORMAT = 'M j, Y g:i A';
+
+    /** How a time of day reads on its own: "8:37 AM". */
+    public const string TIME_FORMAT = 'g:i A';
+
     /**
      * Every query the current HTTP request has run, keyed by its SQL and
      * bindings, or null while no request is being handled.
@@ -43,10 +54,42 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureDateTimeDisplay();
         $this->configureRequestMemoization();
         $this->configureQueryGuards();
         $this->configureAuthorization();
         $this->configureDevProcesses();
+    }
+
+    /**
+     * One date format and one time format, across both panels.
+     *
+     * Filament's own defaults are `M j, Y H:i:s` and `H:i:s` — a 24-hour clock
+     * carrying seconds, which is neither how a time is read here nor a
+     * precision anything in either panel needs. `Table` and `Schema` each hold
+     * the defaults every `date()`, `dateTime()` and `time()` column and entry
+     * falls back to, so setting them once here is what stops a dozen call
+     * sites each naming a format of its own and drifting apart. A call site
+     * that passes its own format still wins.
+     *
+     * The guest app formats its own times in the browser, in the reader's
+     * language — see `resources/js/lib/time.ts`.
+     */
+    protected function configureDateTimeDisplay(): void
+    {
+        Table::configureUsing(static function (Table $table): void {
+            $table
+                ->defaultDateDisplayFormat(self::DATE_FORMAT)
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->defaultTimeDisplayFormat(self::TIME_FORMAT);
+        });
+
+        Schema::configureUsing(static function (Schema $schema): void {
+            $schema
+                ->defaultDateDisplayFormat(self::DATE_FORMAT)
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->defaultTimeDisplayFormat(self::TIME_FORMAT);
+        });
     }
 
     /**

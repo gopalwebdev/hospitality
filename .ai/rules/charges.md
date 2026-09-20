@@ -8,7 +8,7 @@ paths:
 ## Charges are a list with its own page, limited per menu
 `ChargeResource` lists what is added to a bill beyond the price — service charge, packing charge, room-service fee — created and edited in modals on `ListCharges` and dragged into the order a guest reads them. It replaced two fixed switches on the Settings page.
 
-`ChargeForm::storeValue()` / `::fillValue()` turn a typed % or ₹ into `rate_basis_points` / `amount_minor_units`; the hidden number is not saved and `ChargeObserver` clears it. The menus are a multi-select bound to `menus()`:
+`ChargeForm::storeValue()` / `::fillValue()` turn a typed % or ₹ into `rate` / `amount`; the hidden number is not saved and `ChargeObserver` clears it. The menus are a multi-select bound to `menus()`:
 - **Options:** `MenuCategoryForm::menuOptions()`, memoized and this tenant's.
 - **Validation:** a rule refuses any other id, because `charge_menu` has no tenant.
 

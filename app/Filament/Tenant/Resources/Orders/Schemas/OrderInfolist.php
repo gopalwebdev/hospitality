@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Orders\Schemas;
 
+use App\Enums\Currency;
 use App\Enums\OrderStatus;
 use App\Filament\Schemas\PricingFields;
 use App\Models\Order;
@@ -90,10 +91,10 @@ class OrderInfolist
 
                                 TextEntry::make('quantity'),
 
-                                TextEntry::make('unit_price_minor_units')
+                                TextEntry::make('unit_price')
                                     ->formatStateUsing($money),
 
-                                TextEntry::make('total_minor_units')
+                                TextEntry::make('total')
                                     ->formatStateUsing($money),
                             ]),
                     ]),
@@ -103,30 +104,65 @@ class OrderInfolist
                     ->compact()
                     ->columns(4)
                     ->schema([
-                        TextEntry::make('subtotal_minor_units')
+                        TextEntry::make('subtotal')
                             ->label(__('panel.orders.subtotal'))
                             ->formatStateUsing($money),
 
-                        TextEntry::make('tax_minor_units')
+                        // CGST and SGST read separately, because that is how
+                        // GST is levied and how a tax invoice has to show it.
+                        // The amounts are the order's own copies, not a sum
+                        // worked out again from the rate.
+                        TextEntry::make('tax_parts')
                             ->label(fn (Order $record): string => (string) ($record->prices_include_tax
                                 ? __('panel.orders.tax_included')
                                 : __('panel.orders.tax')))
-                            ->formatStateUsing($money),
+                            ->state(fn (Order $record): array => self::taxPartsOf($record, $currency))
+                            ->listWithLineBreaks()
+                            ->placeholder($currency->format(0)),
 
                         TextEntry::make('charges_list')
                             ->label(__('panel.orders.charges'))
                             ->state(fn (Order $record): array => $record->charges
-                                ->map(fn (OrderCharge $charge): string => $charge->name.' '.$currency->format($charge->amount_minor_units))
+                                ->map(fn (OrderCharge $charge): string => $charge->name.' '.$currency->format($charge->amount))
                                 ->all())
                             ->listWithLineBreaks()
                             ->placeholder('—'),
 
-                        TextEntry::make('total_minor_units')
+                        TextEntry::make('total')
                             ->label(__('panel.orders.total'))
                             ->formatStateUsing($money)
                             ->weight(FontWeight::Bold),
                     ]),
             ]);
+    }
+
+    /**
+     * An order's GST, part by part, as the invoice for it would show them.
+     *
+     * Only the parts that carry anything: a tenant charging no GST reads one
+     * blank line rather than three zeroes, and an intra-state bill never shows
+     * an empty IGST. The state's half is named by the treatment the order was
+     * placed under — SGST or UTGST.
+     *
+     * @return list<string>
+     */
+    private static function taxPartsOf(Order $order, Currency $currency): array
+    {
+        $parts = [
+            'CGST' => $order->cgst,
+            $order->gst_treatment->stateTaxLabel() ?? 'SGST' => $order->sgst,
+            'IGST' => $order->igst,
+        ];
+
+        $shown = [];
+
+        foreach ($parts as $label => $amount) {
+            if ($amount > 0) {
+                $shown[] = $label.' '.$currency->format($amount);
+            }
+        }
+
+        return $shown;
     }
 
     /**

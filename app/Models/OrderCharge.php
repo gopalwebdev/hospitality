@@ -17,12 +17,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Order $order
  * @property int|null $charge_id
  * @property string $name
- * @property int $amount_minor_units
+ * @property int $amount
+ * @property int $tax_rate
+ * @property int $taxable_value
+ * @property int $cgst_rate
+ * @property int $cgst
+ * @property int $sgst_rate
+ * @property int $sgst
+ * @property int $igst_rate
+ * @property int $igst
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['charge_id', 'name', 'amount_minor_units', 'position'])]
+#[Fillable([
+    'charge_id',
+    'name',
+    'amount',
+    'tax_rate',
+    'taxable_value',
+    'cgst_rate',
+    'cgst',
+    'sgst_rate',
+    'sgst',
+    'igst_rate',
+    'igst',
+    'position',
+])]
 class OrderCharge extends Model
 {
     use HasTranslatedNames;
@@ -34,6 +55,14 @@ class OrderCharge extends Model
     #[\Override]
     protected $attributes = [
         'position' => 0,
+        'tax_rate' => 0,
+        'taxable_value' => 0,
+        'cgst_rate' => 0,
+        'cgst' => 0,
+        'sgst_rate' => 0,
+        'sgst' => 0,
+        'igst_rate' => 0,
+        'igst' => 0,
     ];
 
     /**
@@ -60,7 +89,15 @@ class OrderCharge extends Model
         return [
             'order_id' => 'integer',
             'charge_id' => 'integer',
-            'amount_minor_units' => 'integer',
+            'amount' => 'integer',
+            'tax_rate' => 'integer',
+            'taxable_value' => 'integer',
+            'cgst_rate' => 'integer',
+            'cgst' => 'integer',
+            'sgst_rate' => 'integer',
+            'sgst' => 'integer',
+            'igst_rate' => 'integer',
+            'igst' => 'integer',
             'position' => 'integer',
         ];
     }

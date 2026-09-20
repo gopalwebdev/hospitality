@@ -25,9 +25,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $menu_combo_id
  * @property string $name
  * @property int $quantity
- * @property int $unit_price_minor_units
- * @property int $total_minor_units
- * @property int $tax_rate_basis_points
+ * @property int $unit_price
+ * @property int $total
+ * @property int $tax_rate
+ * @property int $taxable_value
+ * @property int $cgst_rate
+ * @property int $cgst
+ * @property int $sgst_rate
+ * @property int $sgst
+ * @property int $igst_rate
+ * @property int $igst
+ * @property string|null $hsn_sac_code
  * @property int $position
  * @property-read Collection<int, OrderLineChoice> $choices
  * @property CarbonImmutable|null $created_at
@@ -39,9 +47,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'menu_combo_id',
     'name',
     'quantity',
-    'unit_price_minor_units',
-    'total_minor_units',
-    'tax_rate_basis_points',
+    'unit_price',
+    'total',
+    'tax_rate',
+    'taxable_value',
+    'cgst_rate',
+    'cgst',
+    'sgst_rate',
+    'sgst',
+    'igst_rate',
+    'igst',
+    'hsn_sac_code',
     'position',
 ])]
 class OrderLine extends Model
@@ -58,6 +74,13 @@ class OrderLine extends Model
     #[\Override]
     protected $attributes = [
         'position' => 0,
+        'taxable_value' => 0,
+        'cgst_rate' => 0,
+        'cgst' => 0,
+        'sgst_rate' => 0,
+        'sgst' => 0,
+        'igst_rate' => 0,
+        'igst' => 0,
     ];
 
     /**
@@ -105,9 +128,16 @@ class OrderLine extends Model
             'menu_item_id' => 'integer',
             'menu_combo_id' => 'integer',
             'quantity' => 'integer',
-            'unit_price_minor_units' => 'integer',
-            'total_minor_units' => 'integer',
-            'tax_rate_basis_points' => 'integer',
+            'unit_price' => 'integer',
+            'total' => 'integer',
+            'tax_rate' => 'integer',
+            'taxable_value' => 'integer',
+            'cgst_rate' => 'integer',
+            'cgst' => 'integer',
+            'sgst_rate' => 'integer',
+            'sgst' => 'integer',
+            'igst_rate' => 'integer',
+            'igst' => 'integer',
             'position' => 'integer',
         ];
     }

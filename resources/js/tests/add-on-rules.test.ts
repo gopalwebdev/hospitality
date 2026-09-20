@@ -18,7 +18,7 @@ import {
 function option(overrides: Partial<AddOnOption> & { id: number }): AddOnOption {
     return {
         name: `Option ${String(overrides.id)}`,
-        priceMinorUnits: 0,
+        price: 0,
         maxQuantity: 1,
         isDefault: false,
         ...overrides,
@@ -28,11 +28,11 @@ function option(overrides: Partial<AddOnOption> & { id: number }): AddOnOption {
 const cheese = option({
     id: 11,
     name: 'Extra cheese',
-    priceMinorUnits: 4000,
+    price: 4000,
     maxQuantity: 2,
 });
-const paneer = option({ id: 12, name: 'Extra paneer', priceMinorUnits: 6000 });
-const raita = option({ id: 13, name: 'Raita', priceMinorUnits: 3000 });
+const paneer = option({ id: 12, name: 'Extra paneer', price: 6000 });
+const raita = option({ id: 13, name: 'Raita', price: 3000 });
 
 const extras: AddOnGroup = {
     id: 1,
@@ -46,7 +46,7 @@ const butterNaan = option({ id: 21, name: 'Butter naan' });
 const garlicNaan = option({
     id: 22,
     name: 'Garlic naan',
-    priceMinorUnits: 2000,
+    price: 2000,
     isDefault: true,
 });
 

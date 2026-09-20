@@ -36,7 +36,7 @@ export type Translations = {
  */
 export type CurrencyProp = {
     code: string;
-    minorUnitDigits: number;
+    fractionDigits: number;
 };
 
 export type TenantSharedProps = {

@@ -18,12 +18,14 @@ return new class extends Migration
             $table->jsonb('name');
             $table->jsonb('description')->nullable();
             // Zero is a real price: a complimentary pillow, a free glass of water.
-            $table->integer('price_minor_units');
+            $table->integer('price');
             // The struck-through "was" price; null unless the item is on offer.
-            $table->integer('compare_at_price_minor_units')->nullable();
-            // Null falls back to tenant_settings.tax_rate_basis_points.
-            $table->smallInteger('tax_rate_basis_points')->nullable();
-            $table->string('hsn_code', 8)->nullable();
+            $table->integer('compare_at_price')->nullable();
+            // Null falls back to tenant_settings.tax_rate.
+            $table->smallInteger('tax_rate')->nullable();
+            // HSN for goods, SAC for a service — a bedsheet change carries a
+            // SAC. One column, because an invoice and GSTR-1 have one field.
+            $table->string('hsn_sac_code', 8)->nullable();
             // A service request — an extra pillow, a bedsheet change — rather than something to order.
             $table->boolean('is_service_request')->default(false);
             // Every mark the item carries: vegetarian and vegan together, or
@@ -44,8 +46,8 @@ return new class extends Migration
 
         DB::statement('ALTER TABLE menu_items
             ADD CONSTRAINT menu_items_positions_not_negative CHECK ("position" >= 0 AND featured_position >= 0),
-            ADD CONSTRAINT menu_items_prices_not_negative CHECK (price_minor_units >= 0 AND (compare_at_price_minor_units IS NULL OR compare_at_price_minor_units >= 0)),
-            ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate_basis_points IS NULL OR tax_rate_basis_points BETWEEN 0 AND 10000),
+            ADD CONSTRAINT menu_items_prices_not_negative CHECK (price >= 0 AND (compare_at_price IS NULL OR compare_at_price >= 0)),
+            ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_items_diets_match_service_request CHECK (is_service_request = (diets IS NULL)),
             ADD CONSTRAINT menu_items_max_quantity_in_range CHECK (max_quantity IS NULL OR max_quantity BETWEEN 1 AND 99)');
 

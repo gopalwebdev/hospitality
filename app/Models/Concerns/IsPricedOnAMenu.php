@@ -14,8 +14,8 @@ use App\Models\TenantSetting;
  * a currency that belongs to the tenant rather than to them. This is where
  * that behaviour lives once, so the two models cannot drift.
  *
- * Using models must have `price_minor_units`, `compare_at_price_minor_units`
- * and `tax_rate_basis_points` columns, and a `tenant_id`.
+ * Using models must have `price`, `compare_at_price`
+ * and `tax_rate` columns, and a `tenant_id`.
  *
  * Every reader takes an optional override, and lists should pass one.
  * Resolving the currency or the tax rate per row is a query per row that
@@ -58,7 +58,7 @@ trait IsPricedOnAMenu
      *
      * Pass $tenantRate when rendering a list; every row shares it.
      */
-    public function taxRateBasisPoints(?int $tenantRate = null, bool $tenantOverrides = false): int
+    public function taxRate(?int $tenantRate = null, bool $tenantOverrides = false): int
     {
         // Settings can say the tenant's rate is the rate. An item's own is then
         // passed over rather than cleared, so switching the override back off
@@ -67,8 +67,8 @@ trait IsPricedOnAMenu
             return $tenantRate;
         }
 
-        if ($this->tax_rate_basis_points !== null) {
-            return $this->tax_rate_basis_points;
+        if ($this->tax_rate !== null) {
+            return $this->tax_rate;
         }
 
         if ($tenantRate !== null) {
@@ -78,15 +78,15 @@ trait IsPricedOnAMenu
         $tenant = $this->relationLoaded('tenant') ? $this->getRelation('tenant') : null;
 
         if ($tenant instanceof Tenant) {
-            return $tenant->taxRateBasisPoints();
+            return $tenant->taxRate();
         }
 
         // Both halves, because what anything is taxed at is the two added up.
         $stored = TenantSetting::query()
             ->where('tenant_id', $this->tenant_id)
-            ->first(['cgst_rate_basis_points', 'sgst_rate_basis_points']);
+            ->first(['cgst_rate', 'sgst_rate']);
 
-        return $stored?->taxRateBasisPoints() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
+        return $stored?->taxRate() ?? TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 
     /**
@@ -94,17 +94,17 @@ trait IsPricedOnAMenu
      */
     public function hasComparePrice(): bool
     {
-        return $this->compare_at_price_minor_units !== null
-            && $this->compare_at_price_minor_units > $this->price_minor_units;
+        return $this->compare_at_price !== null
+            && $this->compare_at_price > $this->price;
     }
 
     /**
      * What is knocked off, in minor units, or zero when nothing is.
      */
-    public function discountMinorUnits(): int
+    public function discount(): int
     {
         return $this->hasComparePrice()
-            ? $this->compare_at_price_minor_units - $this->price_minor_units
+            ? $this->compare_at_price - $this->price
             : 0;
     }
 
@@ -116,7 +116,7 @@ trait IsPricedOnAMenu
      */
     public function formattedPrice(?Currency $currency = null): string
     {
-        return ($currency ?? $this->currency())->format($this->price_minor_units);
+        return ($currency ?? $this->currency())->format($this->price);
     }
 
     /**
@@ -124,12 +124,12 @@ trait IsPricedOnAMenu
      */
     public function formattedComparePrice(?Currency $currency = null): ?string
     {
-        $compareAt = $this->compare_at_price_minor_units;
+        $compareAt = $this->compare_at_price;
 
         // Read into a local rather than checked through hasComparePrice(): the
         // two say the same thing, but only this makes the value non-null to a
         // reader and to static analysis.
-        if ($compareAt === null || $compareAt <= $this->price_minor_units) {
+        if ($compareAt === null || $compareAt <= $this->price) {
             return null;
         }
 

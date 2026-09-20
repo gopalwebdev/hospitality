@@ -80,7 +80,7 @@ class HandleGuestAppRequests extends Middleware
 
                 return $currency instanceof Currency ? [
                     'code' => $currency->value,
-                    'minorUnitDigits' => $currency->minorUnitDigits(),
+                    'fractionDigits' => $currency->fractionDigits(),
                 ] : null;
             }),
             'translations' => Inertia::once(fn (): array => $this->translations()),

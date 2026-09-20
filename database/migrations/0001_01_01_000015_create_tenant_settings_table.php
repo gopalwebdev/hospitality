@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Currency;
+use App\Enums\GstTreatment;
 use App\Models\TenantSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -21,23 +22,32 @@ return new class extends Migration
             $table->string('landline_phone', 32)->nullable();
             $table->string('currency', 3)->default(Currency::IndianRupee->value);
             $table->string('gstin', 15)->nullable();
+            // How this tenant's GST is levied, as the tenant states it on the
+            // Settings page: App\Enums\GstTreatment. Nothing here works it out
+            // from where the tenant is — a tenant says what it charges.
+            $table->string('gst_treatment', 32)->default(GstTreatment::IntraState->value);
             // GST is levied in halves on an intra-state supply: CGST to the centre
             // and SGST to the state. Both in basis points — 2.5% is 250 — and the
             // rate anything is taxed at is the two added up.
-            $table->smallInteger('cgst_rate_basis_points')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
-            $table->smallInteger('sgst_rate_basis_points')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
+            $table->smallInteger('cgst_rate')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
+            $table->smallInteger('sgst_rate')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
             // On: this rate is what every item is taxed at, whatever its own says.
             $table->boolean('tax_overrides_item_rates')->default(false);
             $table->boolean('prices_include_tax')->default(false);
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE tenant_settings
+        $treatments = collect(GstTreatment::cases())
+            ->map(fn (GstTreatment $treatment): string => "'{$treatment->value}'")
+            ->implode(', ');
+
+        DB::statement("ALTER TABLE tenant_settings
             ADD CONSTRAINT tenant_settings_tax_rates_in_range CHECK (
-                cgst_rate_basis_points BETWEEN 0 AND 10000
-                AND sgst_rate_basis_points BETWEEN 0 AND 10000
-                AND cgst_rate_basis_points + sgst_rate_basis_points <= 10000
-            )');
+                cgst_rate BETWEEN 0 AND 10000
+                AND sgst_rate BETWEEN 0 AND 10000
+                AND cgst_rate + sgst_rate <= 10000
+            ),
+            ADD CONSTRAINT tenant_settings_gst_treatment_is_known CHECK (gst_treatment IN ({$treatments}))");
     }
 
     public function down(): void

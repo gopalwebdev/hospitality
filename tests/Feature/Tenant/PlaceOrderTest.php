@@ -51,7 +51,7 @@ function seedCountedCurry(): array
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $curry = MenuItem::factory()->inCategory($category)->translated()->stocked(5)->create(['price_minor_units' => 28900]);
+    $curry = MenuItem::factory()->inCategory($category)->translated()->stocked(5)->create(['price' => 28900]);
 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
@@ -65,7 +65,7 @@ function seedCountedCurry(): array
         'category' => $category,
         'curry' => $curry,
         'butterNaan' => MenuAddOnOption::factory()->inGroup($bread)->free()->create(),
-        'cheese' => MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->stocked(4)->create(['price_minor_units' => 4000]),
+        'cheese' => MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->stocked(4)->create(['price' => 4000]),
     ];
 }
 
@@ -122,18 +122,18 @@ it('places an order, copying what was ordered and taking it from stock', functio
     $line = $order->lines->sole();
 
     // ₹289.00 with a free naan and two ₹40.00 cheese, twice, and 5% GST on top.
-    expect($response->json('totalMinorUnits'))->toBe(77490)
+    expect($response->json('total'))->toBe(77490)
         ->and($order->tenant_id)->toBe($tenant->getKey())
         ->and($order->menu_id)->toBe($menu->getKey())
         ->and($order->status)->toBe(OrderStatus::Placed)
         ->and([$order->location_label, $order->note])->toBe(['Room 204', 'Less oil'])
-        ->and([$order->subtotal_minor_units, $order->tax_minor_units, $order->charges_minor_units, $order->total_minor_units])->toBe([73800, 3690, 0, 77490])
+        ->and([$order->subtotal, $order->tax, $order->charges_total, $order->total])->toBe([73800, 3690, 0, 77490])
         ->and($line->type)->toBe(OrderLineType::Item)
         ->and($line->menu_item_id)->toBe($curry->getKey())
         // Every language the item had, not just the one the guest read.
         ->and($line->getTranslations('name'))->toBe($curry->getTranslations('name'))
-        ->and([$line->quantity, $line->unit_price_minor_units, $line->total_minor_units, $line->tax_rate_basis_points])->toBe([2, 36900, 73800, 500])
-        ->and($line->choices->map(fn ($choice): array => [$choice->menu_add_on_option_id, $choice->quantity, $choice->price_minor_units])->all())
+        ->and([$line->quantity, $line->unit_price, $line->total, $line->tax_rate])->toBe([2, 36900, 73800, 500])
+        ->and($line->choices->map(fn ($choice): array => [$choice->menu_add_on_option_id, $choice->quantity, $choice->price])->all())
         ->toBe([[$butterNaan->getKey(), 1, 0], [$cheese->getKey(), 2, 4000]])
         // Five curries less two, and four cheese less two on each curry.
         ->and($curry->refresh()->stock_quantity)->toBe(3)

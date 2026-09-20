@@ -50,5 +50,13 @@ it('reads a stored rate the way a menu prints it', function (): void {
 
 it('agrees with the unit every stored rate is counted in', function (): void {
     expect(PricingFields::toBasisPoints('100'))->toBe(TenantSetting::BASIS_POINTS_PER_WHOLE)
-        ->and(PricingFields::formatRate(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS))->toBe('5%');
+        ->and(PricingFields::formatRate(500))->toBe('5%');
+});
+
+it('starts a tenant on no rate at all, because the application states none', function (): void {
+    // No tax information is hardcoded: a tenant charges nothing until it says
+    // what it charges on its Settings page. A starting value of 5% meant every
+    // tenant created silently charged a rate nobody had typed.
+    expect(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS)->toBe(0)
+        ->and(PricingFields::formatRate(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS))->toBe('0%');
 });

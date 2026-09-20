@@ -41,7 +41,7 @@ export interface CustomisableItem extends OrderLimits {
     id: number;
     name: string;
     description: string | null;
-    priceMinorUnits: number;
+    price: number;
     isServiceRequest: boolean;
     diet: Diet | null;
 }
@@ -120,7 +120,7 @@ function Customiser({
     const [quantity, setQuantity] = useState(1);
 
     const shortfall = firstShortfall(groups, picks);
-    const total = unitPrice(item.priceMinorUnits, groups, picks) * quantity;
+    const total = unitPrice(item.price, groups, picks) * quantity;
 
     return (
         <>
@@ -376,13 +376,13 @@ function CheckboxOption({
 function OptionPrice({ option }: { option: AddOnOption }) {
     const money = useMoney();
 
-    if (option.priceMinorUnits === 0) {
+    if (option.price === 0) {
         return null;
     }
 
     return (
         <span className="text-muted-foreground shrink-0 text-sm tabular-nums">
-            {`+ ${money(option.priceMinorUnits)}`}
+            {`+ ${money(option.price)}`}
         </span>
     );
 }

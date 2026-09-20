@@ -44,7 +44,7 @@ class PlaceOrderController extends Controller
 
         return response()->json([
             'orderId' => $order->getKey(),
-            'totalMinorUnits' => $order->total_minor_units,
+            'total' => $order->total,
         ], 201);
     }
 }

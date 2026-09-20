@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\GstTreatment;
 use App\Enums\OrderStatus;
 use App\Models\Menu;
 use App\Models\Order;
@@ -26,6 +27,10 @@ class OrderFactory extends Factory
         $subtotal = fake()->numberBetween(10000, 90000);
         $tax = intdiv($subtotal * 5, 100);
 
+        // Split the way PlaceOrder splits it, because orders_tax_parts_add_up
+        // makes the database insist the parts come to the total.
+        $cgst = intdiv($tax, 2);
+
         // The menu brings the tenant with it.
         return [
             'menu_id' => Menu::factory(),
@@ -35,10 +40,14 @@ class OrderFactory extends Factory
             'status' => OrderStatus::Placed,
             'location_label' => 'Room '.fake()->numberBetween(101, 420),
             'note' => null,
-            'subtotal_minor_units' => $subtotal,
-            'tax_minor_units' => $tax,
-            'charges_minor_units' => 0,
-            'total_minor_units' => $subtotal + $tax,
+            'subtotal' => $subtotal,
+            'gst_treatment' => GstTreatment::IntraState,
+            'tax' => $tax,
+            'cgst' => $cgst,
+            'sgst' => $tax - $cgst,
+            'igst' => 0,
+            'charges_total' => 0,
+            'total' => $subtotal + $tax,
             'prices_include_tax' => false,
             'cancelled_at' => null,
         ];

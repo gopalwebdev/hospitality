@@ -16,8 +16,8 @@ return new class extends Migration
             $table->jsonb('name');
             $table->string('calculation', 32);
             // Exactly one of these is filled: the one ChargeCalculation::valueColumn() names.
-            $table->smallInteger('rate_basis_points')->nullable();
-            $table->integer('amount_minor_units')->nullable();
+            $table->smallInteger('rate')->nullable();
+            $table->integer('amount')->nullable();
             $table->boolean('is_active')->default(true);
             $table->integer('position')->default(0);
             $table->timestamps();
@@ -33,11 +33,11 @@ return new class extends Migration
         DB::statement("ALTER TABLE charges
             ADD CONSTRAINT charges_calculation_is_known CHECK (calculation IN ({$calculations})),
             ADD CONSTRAINT charges_value_matches_calculation CHECK (
-                (calculation = '{$percentage}' AND rate_basis_points IS NOT NULL AND amount_minor_units IS NULL)
-                OR (calculation = '{$fixedAmount}' AND amount_minor_units IS NOT NULL AND rate_basis_points IS NULL)
+                (calculation = '{$percentage}' AND rate IS NOT NULL AND amount IS NULL)
+                OR (calculation = '{$fixedAmount}' AND amount IS NOT NULL AND rate IS NULL)
             ),
-            ADD CONSTRAINT charges_rate_in_range CHECK (rate_basis_points IS NULL OR rate_basis_points BETWEEN 0 AND 10000),
-            ADD CONSTRAINT charges_amount_not_negative CHECK (amount_minor_units IS NULL OR amount_minor_units >= 0),
+            ADD CONSTRAINT charges_rate_in_range CHECK (rate IS NULL OR rate BETWEEN 0 AND 10000),
+            ADD CONSTRAINT charges_amount_not_negative CHECK (amount IS NULL OR amount >= 0),
             ADD CONSTRAINT charges_position_not_negative CHECK (\"position\" >= 0)");
     }
 

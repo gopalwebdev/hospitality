@@ -85,7 +85,7 @@ Featuring belongs to one menu, so an item carried to a category on **another** m
 ## Combos hang off the menu, and are priced on their own
 `menu_combos` sits beside the featured items rather than under a category: a combo is something a menu leads with, not something in a category, and "which category does a burger meal belong to" is a question with no answer worth having.
 
-Its price is typed, never derived from `menu_combo_items`. The whole point of a combo is that it costs less than the sum of its parts, so a derived price would either be that sum or a discount rule nobody asked for — `MenuCombo::contentsPriceMinorUnits()` exists only to show the saving beside the price, never to set it. Repricing an item therefore never silently reprices a combo.
+Its price is typed, never derived from `menu_combo_items`. The whole point of a combo is that it costs less than the sum of its parts, so a derived price would either be that sum or a discount rule nobody asked for — `MenuCombo::contentsPrice()` exists only to show the saving beside the price, never to set it. Repricing an item therefore never silently reprices a combo.
 
 What goes in a combo is an **item**, never a service request — a laundry pickup is asked for, not sold in a bundle. `MenuComboForm::itemOptions()` offers this menu's items grouped under the category each is filed in, in menu order, so each option is the item's name alone; the project owner found "Tiffin › Dosa · Masala Dosa" on every line hard to read. A single select's own `in` validation looks inside groups, so an id the picker did not offer is refused (`MenuComboTest`).
 

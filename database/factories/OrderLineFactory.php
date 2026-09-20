@@ -33,9 +33,18 @@ class OrderLineFactory extends Factory
             'menu_combo_id' => null,
             'name' => [Locale::English->value => ucfirst(fake()->word())],
             'quantity' => $quantity,
-            'unit_price_minor_units' => $price,
-            'total_minor_units' => $price * $quantity,
-            'tax_rate_basis_points' => 500,
+            'unit_price' => $price,
+            'total' => $price * $quantity,
+            // Levied in halves, as order_lines_tax_rates_add_up insists.
+            'tax_rate' => 500,
+            'taxable_value' => $price * $quantity,
+            'cgst_rate' => 250,
+            'cgst' => intdiv($price * $quantity * 250, 10000),
+            'sgst_rate' => 250,
+            'sgst' => intdiv($price * $quantity * 250, 10000),
+            'igst_rate' => 0,
+            'igst' => 0,
+            'hsn_sac_code' => null,
             'position' => 0,
         ];
     }

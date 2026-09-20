@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Menus\QuoteBasket;
+use App\Enums\GstTreatment;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
@@ -40,7 +41,7 @@ function seedCurryWithChoices(): array
 
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $category = MenuCategory::factory()->inMenu($menu)->create();
-    $curry = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 28900]);
+    $curry = MenuItem::factory()->inCategory($category)->create(['price' => 28900]);
 
     $bread = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: true, max: 1)->create();
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
@@ -56,9 +57,28 @@ function seedCurryWithChoices(): array
         'bread' => $bread,
         'extras' => $extras,
         'butterNaan' => MenuAddOnOption::factory()->inGroup($bread)->free()->create(),
-        'garlicNaan' => MenuAddOnOption::factory()->inGroup($bread)->create(['price_minor_units' => 2000]),
-        'cheese' => MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price_minor_units' => 4000]),
-        'paneer' => MenuAddOnOption::factory()->inGroup($extras)->create(['price_minor_units' => 6000]),
+        'garlicNaan' => MenuAddOnOption::factory()->inGroup($bread)->create(['price' => 2000]),
+        'cheese' => MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price' => 4000]),
+        'paneer' => MenuAddOnOption::factory()->inGroup($extras)->create(['price' => 6000]),
+    ];
+}
+
+/**
+ * A quote's GST as it comes back on the wire: levied in halves, so CGST and
+ * SGST each carry half the rate and whatever each was worked out to be.
+ *
+ * @return array<string, mixed>
+ */
+function splitOf(int $cgst, int $sgst, int $rate = 500): array
+{
+    return [
+        'treatment' => GstTreatment::IntraState->value,
+        'cgstRate' => intdiv($rate, 2),
+        'cgst' => $cgst,
+        'sgstRate' => $rate - intdiv($rate, 2),
+        'sgst' => $sgst,
+        'igstRate' => 0,
+        'igst' => 0,
     ];
 }
 
@@ -85,7 +105,7 @@ function basketLine(string $key, MenuItem|MenuCombo $thing, int $quantity = 1, a
 it('prices each line with its choices, taxes the add-ons at the item\'s rate, and adds the charges this menu carries', function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'curry' => $curry, 'garlicNaan' => $garlicNaan, 'cheese' => $cheese] = seedCurryWithChoices();
 
-    $combo = MenuCombo::factory()->onMenu($menu)->create(['price_minor_units' => 59900, 'tax_rate_basis_points' => null]);
+    $combo = MenuCombo::factory()->onMenu($menu)->create(['price' => 59900, 'tax_rate' => null]);
 
     $service = Charge::factory()->percentage(1000)->onMenus($menu)->create(['position' => 0]);
     $packing = Charge::factory()->ofTenant($tenant)->fixedAmount(2000)->onMenus($menu)->create(['position' => 1]);
@@ -101,19 +121,45 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
         ->assertExactJson([
             'lines' => [
                 // ₹289.00 with a ₹20.00 garlic naan and two ₹40.00 cheese, twice.
-                ['key' => 'curry', 'status' => QuoteBasket::OK, 'unitPriceMinorUnits' => 38900, 'totalMinorUnits' => 77800],
-                ['key' => 'combo', 'status' => QuoteBasket::OK, 'unitPriceMinorUnits' => 59900, 'totalMinorUnits' => 59900],
+                [
+                    'key' => 'curry', 'status' => QuoteBasket::OK,
+                    'unitPrice' => 38900, 'total' => 77800,
+                    'taxableValue' => 77800,
+                    'tax' => 2890 + 200 + 800,
+                    // Rounded once per part, so a line's halves are its parts'
+                    // halves added up rather than half of its total.
+                    'taxParts' => splitOf(cgst: 1945, sgst: 1945),
+                ],
+                [
+                    'key' => 'combo', 'status' => QuoteBasket::OK,
+                    'unitPrice' => 59900, 'total' => 59900,
+                    'taxableValue' => 59900,
+                    'tax' => 2995,
+                    // An odd total: the centre's half comes from its own rate
+                    // and the state's is the remainder, so the two still add up.
+                    'taxParts' => splitOf(cgst: 1498, sgst: 1497),
+                ],
             ],
-            'subtotalMinorUnits' => 137700,
+            'subtotal' => 137700,
             // 5% of every part: an add-on is taxed at the rate of the item it is
-            // added to, so the naan and the cheese pay the curry's 5%.
-            'taxMinorUnits' => 2890 + 200 + 800 + 2995,
+            // added to, so the naan and the cheese pay the curry's 5%. The
+            // charges are taxed too — a service charge is part of the supply.
+            'tax' => 2890 + 200 + 800 + 2995 + 689 + 100,
+            'taxParts' => splitOf(cgst: 3837, sgst: 3837),
             'pricesIncludeTax' => false,
             'charges' => [
-                ['id' => $service->getKey(), 'name' => $service->name, 'amountMinorUnits' => 13770],
-                ['id' => $packing->getKey(), 'name' => $packing->name, 'amountMinorUnits' => 2000],
+                [
+                    'id' => $service->getKey(), 'name' => $service->name, 'amount' => 13770,
+                    'taxableValue' => 13770, 'tax' => 689,
+                    'taxParts' => splitOf(cgst: 344, sgst: 345),
+                ],
+                [
+                    'id' => $packing->getKey(), 'name' => $packing->name, 'amount' => 2000,
+                    'taxableValue' => 2000, 'tax' => 100,
+                    'taxParts' => splitOf(cgst: 50, sgst: 50),
+                ],
             ],
-            'totalMinorUnits' => 137700 + 6885 + 13770 + 2000,
+            'total' => 137700 + 6885 + 789 + 13770 + 2000,
             // Nothing here is counted, so nothing can run short.
             'shortages' => [],
         ]);
@@ -180,16 +226,16 @@ it('flags a line whose choices break the rules of its groups, and prices the res
         'two-papadum' => QuoteBasket::INVALID,
     ])
         // A flagged line adds nothing until it is changed.
-        ->and($response->json('subtotalMinorUnits'))->toBe(28900 + 8000 + 6000);
+        ->and($response->json('subtotal'))->toBe(28900 + 8000 + 6000);
 });
 
 it("enforces an item's own cap on a group's picks, tighter than the group's own", function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'category' => $category] = seedCurryWithChoices();
 
-    $dal = MenuItem::factory()->inCategory($category)->create(['price_minor_units' => 19900]);
+    $dal = MenuItem::factory()->inCategory($category)->create(['price' => 19900]);
     $extras = MenuAddOnGroup::factory()->ofTenant($tenant)->choosing(required: false, max: 3)->create();
-    $cheese = MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price_minor_units' => 4000]);
-    $paneer = MenuAddOnOption::factory()->inGroup($extras)->create(['price_minor_units' => 6000]);
+    $cheese = MenuAddOnOption::factory()->inGroup($extras)->upTo(2)->create(['price' => 4000]);
+    $paneer = MenuAddOnOption::factory()->inGroup($extras)->create(['price' => 6000]);
 
     // The group's own library allows up to three; this item allows only one.
     MenuItemAddOnGroup::factory()->linking($dal, $extras)->capping(1)->create();
@@ -266,7 +312,7 @@ it('flags a line the menu can no longer offer, whatever was chosen', function ()
     ]])->assertOk();
 
     expect(collect($response->json('lines'))->pluck('status')->unique()->all())->toBe([QuoteBasket::UNAVAILABLE])
-        ->and($response->json('subtotalMinorUnits'))->toBe(0)
+        ->and($response->json('subtotal'))->toBe(0)
         ->and($response->json('charges'))->toBe([]);
 });
 
@@ -276,16 +322,16 @@ it('reports the GST already inside prices that include it, rather than adding it
     $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
     $item = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
-        ->create(['price_minor_units' => 10500]);
+        ->create(['price' => 10500]);
 
     // ₹105.00 including 5% is ₹100.00 and ₹5.00 of GST.
     $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
         ->assertOk()
         ->assertJson([
-            'subtotalMinorUnits' => 10500,
-            'taxMinorUnits' => 500,
+            'subtotal' => 10500,
+            'tax' => 500,
             'pricesIncludeTax' => true,
-            'totalMinorUnits' => 10500,
+            'total' => 10500,
         ]);
 });
 
@@ -298,15 +344,15 @@ it('taxes every line at the tenant rate once settings override the items own', f
     $item = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
         ->taxedAt(2800)
-        ->create(['price_minor_units' => 10000]);
+        ->create(['price' => 10000]);
 
     // The item says 28%, the tenant says everything it sells is 5%, and the
     // tenant wins — ₹100.00 plus ₹5.00 rather than plus ₹28.00.
     $this->postJson(basketQuoteUrl($tenant, $menu), ['lines' => [basketLine('tikka', $item)]])
         ->assertOk()
         ->assertJson([
-            'subtotalMinorUnits' => 10000,
-            'taxMinorUnits' => 500,
+            'subtotal' => 10000,
+            'tax' => 500,
         ]);
 });
 
@@ -320,11 +366,12 @@ it('adds no charge to an empty basket', function (): void {
         ->assertOk()
         ->assertExactJson([
             'lines' => [],
-            'subtotalMinorUnits' => 0,
-            'taxMinorUnits' => 0,
+            'subtotal' => 0,
+            'tax' => 0,
+            'taxParts' => splitOf(cgst: 0, sgst: 0, rate: 0),
             'pricesIncludeTax' => false,
             'charges' => [],
-            'totalMinorUnits' => 0,
+            'total' => 0,
             'shortages' => [],
         ]);
 });

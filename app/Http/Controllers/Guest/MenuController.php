@@ -132,7 +132,7 @@ class MenuController extends Controller
         $present = fn (MenuItem $item): array => $this->presentItem($item, $offeredGroupLinks($item));
 
         $combos = MenuCombo::query()
-            ->select(['id', 'name', 'description', 'price_minor_units', 'compare_at_price_minor_units', 'max_quantity'])
+            ->select(['id', 'name', 'description', 'price', 'compare_at_price', 'max_quantity'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', $orderable)
             // A combo has no count of its own and draws on its items', so one
@@ -161,8 +161,8 @@ class MenuController extends Controller
                 'id' => $combo->getKey(),
                 'name' => $combo->name,
                 'description' => $combo->description,
-                'priceMinorUnits' => $combo->price_minor_units,
-                'compareAtPriceMinorUnits' => $combo->hasComparePrice() ? $combo->compare_at_price_minor_units : null,
+                'price' => $combo->price,
+                'compareAtPrice' => $combo->hasComparePrice() ? $combo->compare_at_price : null,
                 'maxQuantity' => $combo->max_quantity,
                 'contents' => $combo->comboItems->map(fn (MenuComboItem $comboItem): array => [
                     'id' => $comboItem->getKey(),
@@ -264,7 +264,7 @@ class MenuController extends Controller
             ->select(['id', 'name', 'is_required', 'max_selections'])
             ->whereKey($groupIds)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'menu_add_on_group_id', 'name', 'price_minor_units', 'max_quantity', 'is_default'])
+                ->select(['id', 'menu_add_on_group_id', 'name', 'price', 'max_quantity', 'is_default'])
                 ->available()
                 ->inMenuOrder()])
             ->get()
@@ -314,7 +314,7 @@ class MenuController extends Controller
                     'name' => $option->name,
                     // Zero is a real price; the app shows no price beside it
                     // rather than "+ ₹0.00", which reads as a mistake.
-                    'priceMinorUnits' => $option->price_minor_units,
+                    'price' => $option->price,
                     // One whenever the group does not allow the same option
                     // twice, whatever the option's own cap says.
                     'maxQuantity' => $group->quantityAllowedFor($option),
@@ -375,8 +375,8 @@ class MenuController extends Controller
             'menu_category_id',
             'name',
             'description',
-            'price_minor_units',
-            'compare_at_price_minor_units',
+            'price',
+            'compare_at_price',
             'is_service_request',
             'diets',
             'max_quantity',
@@ -405,7 +405,7 @@ class MenuController extends Controller
      * that says "prices exclude GST", which a guest is entitled to know before
      * they order rather than at the bill.
      *
-     * @return array{rateBasisPoints: int, pricesIncludeTax: bool}
+     * @return array{rate: int, pricesIncludeTax: bool}
      */
     private function tax(Tenant $tenant): array
     {
@@ -414,7 +414,7 @@ class MenuController extends Controller
         $settings = $tenant->resolvedSettings();
 
         return [
-            'rateBasisPoints' => $tenant->taxRateBasisPoints(),
+            'rate' => $tenant->taxRate(),
             'pricesIncludeTax' => $settings instanceof TenantSetting && $settings->prices_include_tax,
         ];
     }
@@ -427,12 +427,12 @@ class MenuController extends Controller
      * wording. A charge that is switched off, or limited to other menus, is not
      * sent at all.
      *
-     * @return list<array{id: int, name: string, rateBasisPoints: int|null, amountMinorUnits: int|null}>
+     * @return list<array{id: int, name: string, rate: int|null, amount: int|null}>
      */
     private function charges(Tenant $tenant, Menu $menu): array
     {
         return array_values(Charge::query()
-            ->select(['id', 'name', 'rate_basis_points', 'amount_minor_units'])
+            ->select(['id', 'name', 'rate', 'amount'])
             ->where('tenant_id', $tenant->getKey())
             ->active()
             ->forMenu($menu->getKey())
@@ -441,8 +441,8 @@ class MenuController extends Controller
             ->map(fn (Charge $charge): array => [
                 'id' => $charge->getKey(),
                 'name' => $charge->name,
-                'rateBasisPoints' => $charge->rate_basis_points,
-                'amountMinorUnits' => $charge->amount_minor_units,
+                'rate' => $charge->rate,
+                'amount' => $charge->amount,
             ])
             ->all());
     }
@@ -459,11 +459,11 @@ class MenuController extends Controller
             'id' => $item->getKey(),
             'name' => $item->name,
             'description' => $item->description,
-            'priceMinorUnits' => $item->price_minor_units,
+            'price' => $item->price,
             // Null unless there is a real offer to show. hasComparePrice()
             // refuses one at or below the price being charged, so the app never
             // has to decide whether what it was handed is believable.
-            'compareAtPriceMinorUnits' => $item->hasComparePrice() ? $item->compare_at_price_minor_units : null,
+            'compareAtPrice' => $item->hasComparePrice() ? $item->compare_at_price : null,
             'isServiceRequest' => $item->is_service_request,
             // One mark, not the list the item carries: the strictest says
             // everything the others do, and the menu keeps one square per row.

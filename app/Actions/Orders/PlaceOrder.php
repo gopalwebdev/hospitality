@@ -41,6 +41,8 @@ use LogicException;
  * nothing a tenant changes later rewrites what a guest ordered.
  *
  * @phpstan-import-type BasketLine from QuoteBasket
+ * @phpstan-import-type PricedLine from QuoteBasket
+ * @phpstan-import-type PricedCharge from QuoteBasket
  */
 final readonly class PlaceOrder
 {
@@ -74,10 +76,16 @@ final readonly class PlaceOrder
             $order = new Order([
                 'location_label' => $locationLabel,
                 'note' => $note,
-                'subtotal_minor_units' => $quote['subtotalMinorUnits'],
-                'tax_minor_units' => $quote['taxMinorUnits'],
-                'charges_minor_units' => array_sum(array_column($quote['charges'], 'amountMinorUnits')),
-                'total_minor_units' => $quote['totalMinorUnits'],
+                'subtotal' => $quote['subtotal'],
+                // The treatment and the split as the bill was actually priced,
+                // never worked out again: a tenant may change either later.
+                'gst_treatment' => $quote['taxParts']->treatment,
+                'tax' => $quote['tax'],
+                'cgst' => $quote['taxParts']->cgst,
+                'sgst' => $quote['taxParts']->sgst,
+                'igst' => $quote['taxParts']->igst,
+                'charges_total' => array_sum(array_column($quote['charges'], 'amount')),
+                'total' => $quote['total'],
                 'prices_include_tax' => $quote['pricesIncludeTax'],
             ]);
 
@@ -96,16 +104,16 @@ final readonly class PlaceOrder
      * Copy each basket line onto the order, with the choices made on it.
      *
      * @param  list<BasketLine>  $lines
-     * @param  list<array{key: string, status: string, unitPriceMinorUnits: int, totalMinorUnits: int}>  $priced  in the same order as the lines
+     * @param  list<PricedLine>  $priced  in the same order as the lines
      */
     private function copyLines(Tenant $tenant, Order $order, array $lines, array $priced): void
     {
-        $tenantRate = $tenant->taxRateBasisPoints();
+        $tenantRate = $tenant->taxRate();
         $tenantOverrides = $tenant->overridesItemTaxRates();
 
-        $items = $this->named(MenuItem::query(), $this->idsOf($lines, QuoteBasket::ITEM), ['id', 'name', 'tax_rate_basis_points']);
-        $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, QuoteBasket::COMBO), ['id', 'name', 'tax_rate_basis_points']);
-        $options = $this->named(MenuAddOnOption::query(), $this->optionIdsOf($lines), ['id', 'name', 'price_minor_units']);
+        $items = $this->named(MenuItem::query(), $this->idsOf($lines, QuoteBasket::ITEM), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
+        $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, QuoteBasket::COMBO), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
+        $options = $this->named(MenuAddOnOption::query(), $this->optionIdsOf($lines), ['id', 'name', 'price']);
 
         foreach ($lines as $index => $line) {
             $isCombo = $line['type'] === QuoteBasket::COMBO;
@@ -119,9 +127,16 @@ final readonly class PlaceOrder
                 'menu_combo_id' => $isCombo ? $ordered->getKey() : null,
                 'name' => $ordered->getTranslations('name'),
                 'quantity' => (int) $line['quantity'],
-                'unit_price_minor_units' => $priced[$index]['unitPriceMinorUnits'],
-                'total_minor_units' => $priced[$index]['totalMinorUnits'],
-                'tax_rate_basis_points' => $ordered->taxRateBasisPoints($tenantRate, $tenantOverrides),
+                'unit_price' => $priced[$index]['unitPrice'],
+                'total' => $priced[$index]['total'],
+                'tax_rate' => $ordered->taxRate($tenantRate, $tenantOverrides),
+                'taxable_value' => $priced[$index]['taxableValue'],
+                // The line's own CGST and SGST, as priced. An invoice shows
+                // them per line, and re-deriving them from the rate later would
+                // not add back up to what the order charged.
+                ...$priced[$index]['taxParts']->columns(),
+                // Copied, because the item may be renamed, recoded or deleted.
+                'hsn_sac_code' => $ordered->hsn_sac_code,
                 'position' => $index,
             ]);
 
@@ -136,7 +151,7 @@ final readonly class PlaceOrder
                     'menu_add_on_option_id' => $option->getKey(),
                     'name' => $option->getTranslations('name'),
                     'quantity' => $quantity,
-                    'price_minor_units' => $option->price_minor_units,
+                    'price' => $option->price,
                 ]);
 
                 $choice->forceFill(['tenant_id' => $order->tenant_id, 'order_line_id' => $orderLine->getKey()])->save();
@@ -147,7 +162,7 @@ final readonly class PlaceOrder
     /**
      * Copy the charges the bill carried, at what they came to.
      *
-     * @param  list<array{id: int, name: string, amountMinorUnits: int}>  $charges
+     * @param  list<PricedCharge>  $charges
      */
     private function copyCharges(Order $order, array $charges): void
     {
@@ -161,7 +176,10 @@ final readonly class PlaceOrder
             $orderCharge = new OrderCharge([
                 'charge_id' => $charge['id'],
                 'name' => $names->get($charge['id'])?->getTranslations('name') ?? [Locale::default()->value => $charge['name']],
-                'amount_minor_units' => $charge['amountMinorUnits'],
+                'amount' => $charge['amount'],
+                'tax_rate' => $charge['taxParts']->rate(),
+                'taxable_value' => $charge['taxableValue'],
+                ...$charge['taxParts']->columns(),
                 'position' => $position,
             ]);
 

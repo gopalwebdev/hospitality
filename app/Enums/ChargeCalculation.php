@@ -24,8 +24,8 @@ enum ChargeCalculation: string
     public function valueColumn(): string
     {
         return match ($this) {
-            self::Percentage => 'rate_basis_points',
-            self::FixedAmount => 'amount_minor_units',
+            self::Percentage => 'rate',
+            self::FixedAmount => 'amount',
         };
     }
 

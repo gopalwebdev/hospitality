@@ -64,7 +64,7 @@ class CombosRelationManager extends RelationManager
 
                 // The struck-through price rides under the real one rather than
                 // taking a column that would be empty for most combos.
-                TextColumn::make('price_minor_units')
+                TextColumn::make('price')
                     ->label(__('panel.items.price'))
                     ->formatStateUsing(fn (MenuCombo $record): string => $record->formattedPrice($currency))
                     ->description(fn (MenuCombo $record): ?string => $record->formattedComparePrice($currency))

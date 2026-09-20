@@ -25,8 +25,8 @@ class ChargeFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'name' => [Locale::English->value => ucfirst(fake()->unique()->word()).' Charge '.fake()->unique()->numberBetween(1, 9999)],
             'calculation' => ChargeCalculation::Percentage,
-            'rate_basis_points' => 1000,
-            'amount_minor_units' => null,
+            'rate' => 1000,
+            'amount' => null,
             'is_active' => true,
             'position' => fake()->numberBetween(0, 10),
         ];
@@ -39,8 +39,8 @@ class ChargeFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'calculation' => ChargeCalculation::Percentage,
-            'rate_basis_points' => $basisPoints,
-            'amount_minor_units' => null,
+            'rate' => $basisPoints,
+            'amount' => null,
         ]);
     }
 
@@ -51,8 +51,8 @@ class ChargeFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'calculation' => ChargeCalculation::FixedAmount,
-            'rate_basis_points' => null,
-            'amount_minor_units' => $minorUnits,
+            'rate' => null,
+            'amount' => $minorUnits,
         ]);
     }
 

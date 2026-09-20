@@ -54,7 +54,7 @@ class OrdersTable
                     ->counts('lines')
                     ->alignEnd(),
 
-                TextColumn::make('total_minor_units')
+                TextColumn::make('total')
                     ->label(__('panel.orders.total'))
                     ->formatStateUsing(fn (int $state): string => $currency->format($state))
                     ->sortable()

@@ -108,7 +108,7 @@ it('never writes back a count the edit form did not change, and sets one it did'
         ->assertHasNoActionErrors();
 
     expect($item->refresh()->stock_quantity)->toBe(7)
-        ->and($item->price_minor_units)->toBe(19900);
+        ->and($item->price)->toBe(19900);
 
     Livewire::test(ListMenuItems::class)
         ->callAction(TestAction::make('edit')->table($item), ['stock_quantity' => '20'])
