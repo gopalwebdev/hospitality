@@ -6,7 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.5",
+        "php": "~8.5.0",
         "filament/filament": "^5.8.1",
         "inertiajs/inertia-laravel": "^3.3.4",
         "laravel/framework": "^13.31",
@@ -44,6 +44,15 @@
         }
     },
     "scripts": {
+        "pre-install-cmd": [
+            "@check-php"
+        ],
+        "pre-update-cmd": [
+            "@check-php"
+        ],
+        "check-php": [
+            "@php -r \"if (PHP_VERSION_ID < 80500 || PHP_VERSION_ID >= 80600) { fwrite(STDERR, PHP_EOL . 'This application runs on PHP 8.5 only. You are running ' . PHP_VERSION . '.' . PHP_EOL . PHP_EOL); exit(1); }\""
+        ],
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
@@ -126,6 +135,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.5.0"
         }
     },
     "minimum-stability": "stable",

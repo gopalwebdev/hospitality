@@ -6,10 +6,6 @@ inputs:
     description: PHP version to install.
     required: false
     default: '8.5'
-  node-version:
-    description: Node version to install. Ignored unless `node` is true.
-    required: false
-    default: '24'
   node:
     description: Install Node and the npm dependencies.
     required: false
@@ -74,7 +70,7 @@ runs:
       if: inputs.node == 'true'
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version-file: '.nvmrc'
         cache: npm
 
     # `npm ci` rather than `npm install`: it installs from the lockfile and
