@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Otp;
+namespace App\Actions\OneTimePasswords;
 
 use App\Enums\OtpRequestOutcome;
 use Illuminate\Support\Facades\RateLimiter;

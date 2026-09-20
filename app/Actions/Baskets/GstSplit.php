@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Menus;
+namespace App\Actions\Baskets;
 
 use App\Enums\GstTreatment;
 use App\Models\TenantSetting;

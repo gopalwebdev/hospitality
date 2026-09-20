@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\Otp\SendOneTimePassword;
-use App\Actions\Otp\VerifyOneTimePassword;
+use App\Actions\OneTimePasswords\SendOneTimePassword;
+use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Enums\OtpVerificationResult;
 use App\Models\OneTimePassword;
 use App\Models\User;

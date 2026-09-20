@@ -15,20 +15,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A set of choices items are customised with — a spice level, a bread, extras — kept once and linked to every item that offers it.
- * A guest must pick at least one when it `is_required`, and at most `max_selections` (null is no limit), each option counted by its quantity.
- * An item linking this group may cap its own picks tighter or looser, through `MenuItemAddOnGroup::$max_selections`.
- * An option may be taken more than once whenever its own `max_quantity` says so; there is no group-wide switch for it.
+ * A guest must pick at least one when it `is_required`, and at most `max_picks` (null is no limit), each option counted by its quantity.
+ * An item linking this group may cap its own picks tighter or looser, through `MenuItemAddOnGroup::$max_picks`.
+ * An option may be taken more than once whenever its own `max_per_item` says so; there is no group-wide switch for it.
  *
  * @property int $id
  * @property int $tenant_id
  * @property string $name
  * @property bool $is_required
- * @property int|null $max_selections
+ * @property int|null $max_picks
  * @property-read Collection<int, MenuAddOnOption> $options
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'is_required', 'max_selections'])]
+#[Fillable(['name', 'is_required', 'max_picks'])]
 class MenuAddOnGroup extends Model
 {
     /** @use HasFactory<MenuAddOnGroupFactory> */
@@ -84,24 +84,24 @@ class MenuAddOnGroup extends Model
     /**
      * How many of one option a guest may take here: its own cap, never more than the picks a guest may make in all.
      *
-     * $maxSelections is the effective maximum to check against — an item
+     * $maxPicks is the effective maximum to check against — an item
      * offering this group may cap it tighter or looser than the group's own,
-     * through `MenuItemAddOnGroup::$max_selections`. Left null, the group's
-     * own `max_selections` is used.
+     * through `MenuItemAddOnGroup::$max_picks`. Left null, the group's
+     * own `max_picks` is used.
      */
-    public function quantityAllowedFor(MenuAddOnOption $option, ?int $maxSelections = null): int
+    public function quantityAllowedFor(MenuAddOnOption $option, ?int $maxPicks = null): int
     {
-        $limit = $maxSelections ?? $this->max_selections;
+        $limit = $maxPicks ?? $this->max_picks;
 
-        return $limit === null ? $option->max_quantity : min($option->max_quantity, $limit);
+        return $limit === null ? $option->max_per_item : min($option->max_per_item, $limit);
     }
 
     /**
      * The most picks the loaded options can add up to — what a required group is checked against.
      */
-    public function picksOffered(?int $maxSelections = null): int
+    public function picksOffered(?int $maxPicks = null): int
     {
-        return (int) $this->options->sum(fn (MenuAddOnOption $option): int => $this->quantityAllowedFor($option, $maxSelections));
+        return (int) $this->options->sum(fn (MenuAddOnOption $option): int => $this->quantityAllowedFor($option, $maxPicks));
     }
 
     /**
@@ -119,7 +119,7 @@ class MenuAddOnGroup extends Model
     {
         return [
             'is_required' => 'boolean',
-            'max_selections' => 'integer',
+            'max_picks' => 'integer',
         ];
     }
 }

@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\MenuBlockType;
-use App\Observers\MenuBlockObserver;
+use App\Enums\MenuRailType;
+use App\Observers\MenuRailObserver;
 use Carbon\CarbonImmutable;
-use Database\Factories\MenuBlockFactory;
+use Database\Factories\MenuRailFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,16 +18,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $tenant_id
  * @property int $menu_id
- * @property MenuBlockType $type
+ * @property MenuRailType $type
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['menu_id', 'type', 'position'])]
-#[ObservedBy([MenuBlockObserver::class])]
-class MenuBlock extends Model
+#[ObservedBy([MenuRailObserver::class])]
+class MenuRail extends Model
 {
-    /** @use HasFactory<MenuBlockFactory> */
+    /** @use HasFactory<MenuRailFactory> */
     use HasFactory;
 
     /** @var array<string, mixed> */
@@ -58,7 +58,7 @@ class MenuBlock extends Model
     protected function casts(): array
     {
         return [
-            'type' => MenuBlockType::class,
+            'type' => MenuRailType::class,
             'position' => 'integer',
         ];
     }

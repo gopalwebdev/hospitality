@@ -204,7 +204,7 @@ it('never writes back an option count the group modal did not change, and sets t
     // Four cheese go out with orders while the modal is open.
     app(ApplyStockChanges::class)([StockChange::take(MenuAddOnOption::class, $cheese->getKey(), 4)], StockMovementReason::OrderPlaced);
 
-    $page->setActionData(['max_selections' => 2])
+    $page->setActionData(['max_picks' => 2])
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
@@ -231,11 +231,11 @@ it('starts counting a new option from the group modal', function (): void {
     Livewire::test(ManageMenuAddOnGroups::class)
         ->callAction('create', [
             'name' => [Locale::English->value => 'Extras'],
-            'max_selections' => 3,
+            'max_picks' => 3,
             'options' => [[
                 'name' => [Locale::English->value => 'Extra paneer'],
                 'price' => '60',
-                'max_quantity' => 1,
+                'max_per_item' => 1,
                 'stock_quantity' => '15',
                 'is_default' => false,
                 'is_available' => true,

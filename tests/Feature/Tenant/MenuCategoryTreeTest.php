@@ -4,7 +4,7 @@ use App\Actions\Menus\MoveCategoryToMenu;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
-use App\Enums\MenuBlockType;
+use App\Enums\MenuRailType;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\MenuItems\Pages\ListMenuItems;
 use App\Filament\Tenant\Resources\Menus\MenuResource;
@@ -13,12 +13,12 @@ use App\Filament\Tenant\Resources\Menus\RelationManagers\CategoryItemsRelationMa
 use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationManager;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
-use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
+use App\Models\MenuRail;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -47,7 +47,7 @@ function categoryNamed(string $name): MenuCategory
 /**
  * Open the menu page: the outline a menu is arranged on.
  *
- * Its blocks, categories and sub-categories are the rows of this one table — see MenuArrangementTable.
+ * Its rails, categories and sub-categories are the rows of this one table — see MenuArrangementTable.
  */
 function arrangementOf(Menu $menu): Testable
 {
@@ -867,7 +867,7 @@ it('drags the featured and combo rows in among the categories', function (): voi
 
     enterTenantPanel($tenant, RoleEnum::Owner);
 
-    // The blocks share the categories' number space, so moving one is the same
+    // The rails share the categories' number space, so moving one is the same
     // kind of drag as moving a category. Neither had a row before this.
     arrangementOf($menu)->call('reorderTable', [
         categoryRow($starters),
@@ -876,14 +876,14 @@ it('drags the featured and combo rows in among the categories', function (): voi
         'featured',
     ]);
 
-    $blocks = MenuBlock::query()
+    $rails = MenuRail::query()
         ->where('menu_id', $menu->getKey())
         ->get()
-        ->mapWithKeys(fn (MenuBlock $block): array => [$block->type->value => $block->position])
+        ->mapWithKeys(fn (MenuRail $rail): array => [$rail->type->value => $rail->position])
         ->all();
 
     expect($starters->refresh()->position)->toBe(0)
-        ->and($blocks)->toEqual([MenuBlockType::Combos->value => 1, MenuBlockType::Featured->value => 3])
+        ->and($rails)->toEqual([MenuRailType::Combos->value => 1, MenuRailType::Featured->value => 3])
         ->and($desserts->refresh()->position)->toBe(2);
 });
 
@@ -906,16 +906,16 @@ it('leaves an empty row where it was when the rows around it are dragged', funct
     ]);
 
     $categories = MenuCategory::query()->where('menu_id', $menu->getKey())->topLevel()->inMenuOrder()->get();
-    $blocks = MenuBlock::query()->where('menu_id', $menu->getKey())->get();
+    $rails = MenuRail::query()->where('menu_id', $menu->getKey())->get();
 
     $order = array_map(
-        fn (MenuBlock|MenuCategory $entry): string|int => $entry instanceof MenuBlock ? $entry->type->value : $entry->getKey(),
-        $menu->readingOrder($categories, $blocks),
+        fn (MenuRail|MenuCategory $entry): string|int => $entry instanceof MenuRail ? $entry->type->value : $entry->getKey(),
+        $menu->readingOrder($categories, $rails),
     );
 
-    expect($order)->toBe([MenuBlockType::Featured->value, MenuBlockType::Combos->value, $desserts->getKey(), $starters->getKey()])
+    expect($order)->toBe([MenuRailType::Featured->value, MenuRailType::Combos->value, $desserts->getKey(), $starters->getKey()])
         // The featured row is still at the top it never left, so it still has no row.
-        ->and($blocks->map(fn (MenuBlock $block): MenuBlockType => $block->type)->all())->toBe([MenuBlockType::Combos]);
+        ->and($rails->map(fn (MenuRail $rail): MenuRailType => $rail->type)->all())->toBe([MenuRailType::Combos]);
 });
 
 it('rearranges subdivisions within their own section', function (): void {

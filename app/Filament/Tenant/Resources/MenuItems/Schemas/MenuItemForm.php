@@ -163,7 +163,7 @@ class MenuItemForm
                 // database. Zero is a real price, and the guest app reads it as
                 // complimentary.
                 PricingFields::price($currency),
-                PricingFields::compareAtPrice($currency),
+                PricingFields::originalPrice($currency),
                 PricingFields::availability(),
 
                 // Featuring puts an item in the row above the sections on the
@@ -174,7 +174,7 @@ class MenuItemForm
                     ->default(false)
                     ->inline(false),
 
-                PricingFields::maxQuantity(),
+                PricingFields::maxPerOrder(),
             ]);
     }
 
@@ -238,7 +238,7 @@ class MenuItemForm
                     ->hiddenLabel()
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.section'))->markAsRequired(),
-                        TableColumn::make(__('panel.add_on_groups.item_max_selections'))->width('12rem'),
+                        TableColumn::make(__('panel.add_on_groups.item_max_picks'))->width('12rem'),
                     ])
                     ->schema([
                         Select::make('menu_add_on_group_id')
@@ -256,14 +256,14 @@ class MenuItemForm
 
                         // Blank follows the group's own Maximum, shown as the
                         // placeholder so an admin sees what "blank" means here.
-                        TextInput::make('max_selections')
-                            ->label(__('panel.add_on_groups.item_max_selections'))
+                        TextInput::make('max_picks')
+                            ->label(__('panel.add_on_groups.item_max_picks'))
                             ->integer()
                             ->minValue(1)
                             ->maxValue(99)
-                            ->placeholder(fn (Get $get): string => self::itemMaxSelectionsPlaceholder($get))
+                            ->placeholder(fn (Get $get): string => self::itemMaxPicksPlaceholder($get))
                             ->dehydrateStateUsing(fn (mixed $state): ?int => blank($state) ? null : (int) $state)
-                            ->rule(fn (Get $get): Closure => self::itemMaxSelectionsRule($get)),
+                            ->rule(fn (Get $get): Closure => self::itemMaxPicksRule($get)),
                     ])
                     ->orderColumn('position')
                     // Most items have none, and a blank row waiting to be filled
@@ -278,10 +278,10 @@ class MenuItemForm
     /**
      * What "blank" means for this row's Maximum on this item: the group's own Maximum, or no limit.
      */
-    private static function itemMaxSelectionsPlaceholder(Get $get): string
+    private static function itemMaxPicksPlaceholder(Get $get): string
     {
         $groupId = $get('menu_add_on_group_id');
-        $default = filled($groupId) ? MenuAddOnGroupForm::groupForItemForm((int) $groupId)?->max_selections : null;
+        $default = filled($groupId) ? MenuAddOnGroupForm::groupForItemForm((int) $groupId)?->max_picks : null;
 
         return $default === null ? __('panel.add_on_groups.no_limit') : (string) $default;
     }
@@ -289,7 +289,7 @@ class MenuItemForm
     /**
      * Refuse an item's own maximum lower than how many of the group's options it defaults to ticking.
      */
-    private static function itemMaxSelectionsRule(Get $get): Closure
+    private static function itemMaxPicksRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
             if (blank($value)) {
@@ -299,7 +299,7 @@ class MenuItemForm
             $groupId = $get('menu_add_on_group_id');
 
             if (filled($groupId) && (int) $value < MenuAddOnGroupForm::defaultsCountOf((int) $groupId)) {
-                $fail(__('panel.add_on_groups.item_max_selections_below_defaults'));
+                $fail(__('panel.add_on_groups.item_max_picks_below_defaults'));
             }
         };
     }

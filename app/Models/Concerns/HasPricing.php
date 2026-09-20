@@ -9,12 +9,13 @@ use App\Models\TenantSetting;
 /**
  * Something a guest can have off a menu: an item, or a combo of them.
  *
- * Both carry the same four things — a price in minor units, an optional higher
- * price shown struck through beside it, an optional GST rate of their own, and
- * a currency that belongs to the tenant rather than to them. This is where
- * that behaviour lives once, so the two models cannot drift.
+ * Both carry the same four things — a price that is an integer in the
+ * currency's minor unit, an optional higher price shown struck through beside
+ * it, an optional GST rate of their own, and a currency that belongs to the
+ * tenant rather than to them. This is where that behaviour lives once, so the
+ * two models cannot drift.
  *
- * Using models must have `price`, `compare_at_price`
+ * Using models must have `price`, `original_price`
  * and `tax_rate` columns, and a `tenant_id`.
  *
  * Every reader takes an optional override, and lists should pass one.
@@ -22,7 +23,7 @@ use App\Models\TenantSetting;
  * answers the same thing for every one of them — every item on a menu shares
  * one tenant. See .ai/rules/models.md.
  */
-trait IsPricedOnAMenu
+trait HasPricing
 {
     /**
      * The currency this is priced in.
@@ -94,8 +95,8 @@ trait IsPricedOnAMenu
      */
     public function hasComparePrice(): bool
     {
-        return $this->compare_at_price !== null
-            && $this->compare_at_price > $this->price;
+        return $this->original_price !== null
+            && $this->original_price > $this->price;
     }
 
     /**
@@ -104,7 +105,7 @@ trait IsPricedOnAMenu
     public function discount(): int
     {
         return $this->hasComparePrice()
-            ? $this->compare_at_price - $this->price
+            ? $this->original_price - $this->price
             : 0;
     }
 
@@ -124,7 +125,7 @@ trait IsPricedOnAMenu
      */
     public function formattedComparePrice(?Currency $currency = null): ?string
     {
-        $compareAt = $this->compare_at_price;
+        $compareAt = $this->original_price;
 
         // Read into a local rather than checked through hasComparePrice(): the
         // two say the same thing, but only this makes the value non-null to a

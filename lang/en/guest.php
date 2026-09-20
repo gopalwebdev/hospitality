@@ -84,7 +84,7 @@ return [
         'invalid' => 'Choices need changing',
         'pricing' => 'Working out the total…',
         'hint' => 'Show this to a member of staff to place your order.',
-        'clear' => 'Empty basket',
+        'clear' => 'Clear basket',
     ],
 
     'orders' => [

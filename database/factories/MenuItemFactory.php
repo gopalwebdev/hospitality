@@ -34,13 +34,13 @@ class MenuItemFactory extends Factory
             'price' => fake()->numberBetween(5000, 90000),
             // Most items carry neither: no offer, and the tenant's own
             // GST slab. Both are set by a state when a test is about them.
-            'compare_at_price' => null,
+            'original_price' => null,
             'tax_rate' => null,
             'hsn_sac_code' => null,
             'is_service_request' => false,
             'diets' => [fake()->randomElement(Diet::cases())],
             'availability' => ItemAvailability::Available,
-            'max_quantity' => null,
+            'max_per_order' => null,
             'position' => fake()->numberBetween(0, 20),
         ];
     }
@@ -85,7 +85,7 @@ class MenuItemFactory extends Factory
     public function discounted(?int $compareAt = null): static
     {
         return $this->state(fn (array $attributes): array => [
-            'compare_at_price' => $compareAt ?? $attributes['price'] + 5000,
+            'original_price' => $compareAt ?? $attributes['price'] + 5000,
         ]);
     }
 
@@ -107,7 +107,7 @@ class MenuItemFactory extends Factory
     public function limitedPerOrder(int $max): static
     {
         return $this->state(fn (array $attributes): array => [
-            'max_quantity' => $max,
+            'max_per_order' => $max,
         ]);
     }
 

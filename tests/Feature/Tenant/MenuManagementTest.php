@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Enums\Currency;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
@@ -511,16 +511,16 @@ it("saves an item's own cap on a group's picks, and leaves it blank to follow th
             'availability' => ItemAvailability::Available->value,
             'addOnGroupLinks' => [
                 // Capped tighter than the group's own three.
-                ['menu_add_on_group_id' => $extras->getKey(), 'max_selections' => 1],
+                ['menu_add_on_group_id' => $extras->getKey(), 'max_picks' => 1],
                 // Left blank: follows the bread group's own maximum.
-                ['menu_add_on_group_id' => $bread->getKey(), 'max_selections' => ''],
+                ['menu_add_on_group_id' => $bread->getKey(), 'max_picks' => ''],
             ],
         ])
         ->assertHasNoActionErrors();
 
     $links = byEnglishName(MenuItem::class, 'Chicken 65')->addOnGroupLinks()->inMenuOrder()->get();
 
-    expect($links->pluck('max_selections', 'menu_add_on_group_id')->all())
+    expect($links->pluck('max_picks', 'menu_add_on_group_id')->all())
         ->toBe([$extras->getKey() => 1, $bread->getKey() => null]);
 });
 
@@ -547,8 +547,8 @@ it("refuses an item's own cap out of range, or lower than how many options the g
 
     expect(MenuItem::query()->withoutGlobalScopes()->exists())->toBeFalse();
 })->with([
-    'out of range' => [['max_selections' => 100], 'addOnGroupLinks.*.max_selections'],
-    'below how many options default to ticked' => [['max_selections' => 1], 'addOnGroupLinks.*.max_selections'],
+    'out of range' => [['max_picks' => 100], 'addOnGroupLinks.*.max_picks'],
+    'below how many options default to ticked' => [['max_picks' => 1], 'addOnGroupLinks.*.max_picks'],
 ]);
 
 it('refuses the same group twice on one item, and a group this tenant does not have', function (array $pick): void {
@@ -877,7 +877,7 @@ it('stores a struck-through price beside the one being charged', function (): vo
             'menu_category_id' => $category->getKey(),
             'diets' => [Diet::Vegetarian->value],
             'price' => '299',
-            'compare_at_price' => '360',
+            'original_price' => '360',
             'availability' => ItemAvailability::Available->value,
         ])
         ->assertHasNoActionErrors();
@@ -885,7 +885,7 @@ it('stores a struck-through price beside the one being charged', function (): vo
     $item = byEnglishName(MenuItem::class, 'Paneer Tikka');
 
     expect($item->price)->toBe(29900)
-        ->and($item->compare_at_price)->toBe(36000)
+        ->and($item->original_price)->toBe(36000)
         ->and($item->hasComparePrice())->toBeTrue()
         ->and($item->discount())->toBe(6100)
         ->and($item->formattedComparePrice())->toBe('₹360.00');
@@ -905,10 +905,10 @@ it('refuses a struck-through price that is not above what is charged', function 
             'menu_category_id' => $category->getKey(),
             'diets' => [Diet::Vegetarian->value],
             'price' => '299',
-            'compare_at_price' => '250',
+            'original_price' => '250',
             'availability' => ItemAvailability::Available->value,
         ])
-        ->assertHasActionErrors(['compare_at_price']);
+        ->assertHasActionErrors(['original_price']);
 });
 
 it('keeps the most of an item one order may hold, blank for no limit', function (): void {
@@ -926,15 +926,15 @@ it('keeps the most of an item one order may hold, blank for no limit', function 
             'diets' => [Diet::Vegetarian->value],
             'price' => '60',
             'availability' => ItemAvailability::Available->value,
-            'max_quantity' => $maximum,
+            'max_per_order' => $maximum,
         ]);
 
     // A maximum of none would keep the item out of every basket.
-    $create('0')->assertHasActionErrors(['max_quantity']);
+    $create('0')->assertHasActionErrors(['max_per_order']);
     $create('')->assertHasNoActionErrors();
 
     // A blank maximum is no limit, not a limit of nothing.
-    expect(byEnglishName(MenuItem::class, 'Idli')->max_quantity)->toBeNull();
+    expect(byEnglishName(MenuItem::class, 'Idli')->max_per_order)->toBeNull();
 });
 
 it('leaves an item that is not on offer with no compare-at price at all', function (): void {
@@ -942,7 +942,7 @@ it('leaves an item that is not on offer with no compare-at price at all', functi
 
     // Null is "not on offer". A zero would be a price of nothing, and the
     // guest app would have to decide whether to believe it.
-    expect($item->compare_at_price)->toBeNull()
+    expect($item->original_price)->toBeNull()
         ->and($item->hasComparePrice())->toBeFalse()
         ->and($item->formattedComparePrice())->toBeNull()
         ->and($item->discount())->toBe(0);

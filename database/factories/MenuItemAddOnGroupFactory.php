@@ -50,10 +50,10 @@ class MenuItemAddOnGroupFactory extends Factory
     /**
      * Cap this item's own picks from the group, tighter or looser than the group's own maximum.
      */
-    public function capping(int $maxSelections): static
+    public function capping(int $maxPicks): static
     {
         return $this->state(fn (array $attributes): array => [
-            'max_selections' => $maxSelections,
+            'max_picks' => $maxPicks,
         ]);
     }
 }

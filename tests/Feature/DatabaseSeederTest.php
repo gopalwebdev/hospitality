@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\Diet;
+use App\Enums\HomeTileAction;
 use App\Enums\Role;
 use App\Models\Charge;
 use App\Models\HomeTile;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\MenuRail;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\AdminSeeder;
@@ -109,10 +111,36 @@ it('opens a way into every menu it seeds', function (): void {
 
         // A guest only ever reaches a menu through a tile, so a seeded card
         // with no tile is a card nobody at a table can get to. There were three
-        // menus and one tile.
+        // menus and one tile. Scoped to the menu-opening tiles: the seeder
+        // also seeds a couple of social links and a PDF, which name no menu
+        // at all (App\Enums\HomeTileAction::Link / ::Pdf).
         expect($menus)->toHaveCount(count($definition['menus']))
-            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->pluck('menu_id')->sort()->values()->all())
+            ->and(
+                HomeTile::query()
+                    ->where('tenant_id', $tenant->getKey())
+                    ->where('action', HomeTileAction::Menu)
+                    ->pluck('menu_id')
+                    ->sort()
+                    ->values()
+                    ->all(),
+            )
             ->toBe($menus->sort()->values()->all());
+    }
+});
+
+it('places every seeded menu\'s rails, never leaving menu_rails empty', function (): void {
+    // Every card in TenantSeeder::CARDS names at least one rail position
+    // (TenantSeeder::seedRails()), so a menu nobody has arranged by hand
+    // should never happen on a fresh install — that was the gap this
+    // seeder used to leave: menu_rails at zero rows, and Menu::readingOrder()
+    // never exercised beyond its own "nobody has arranged this" fallback.
+    expect(MenuRail::query()->count())->toBeGreaterThan(0);
+
+    foreach (Tenant::query()->get() as $tenant) {
+        foreach ($tenant->menus()->get() as $menu) {
+            expect(MenuRail::query()->where('menu_id', $menu->getKey())->exists())
+                ->toBeTrue("Expected {$menu->name} to have at least one placed rail.");
+        }
     }
 });
 
@@ -129,13 +157,26 @@ it('can be seeded again without duplicating anything', function (): void {
     foreach (TenantSeeder::TENANTS as $definition) {
         $tenant = Tenant::query()->where('slug', $definition['slug'])->sole();
 
+        // A tile that opens a menu is matched on the menu itself rather than
+        // on its label, so a relabelled tile is found rather than seeded
+        // again; a social link or the PDF is matched on its own English
+        // label the same way (HomeRowLayout::Links and ::Carousel — see
+        // TenantSeeder::seedHomeScreen()) — two links and one PDF, once per
+        // tenant, alongside its one tile per menu.
         expect($tenant->users()->count())->toBe($perTenant)
             ->and($tenant->settings()->count())->toBe(1)
-            // Tiles are matched on the menu they open rather than on their
-            // label, so a relabelled tile is found rather than seeded again.
-            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->count())->toBe(count($definition['menus']))
+            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->where('action', HomeTileAction::Menu)->count())->toBe(count($definition['menus']))
+            ->and(HomeTile::query()->where('tenant_id', $tenant->getKey())->count())->toBe(count($definition['menus']) + 3)
             // Charges are matched on their English name the same way.
-            ->and($tenant->charges()->count())->toBe(count(TenantSeeder::CHARGES[$definition['slug']] ?? []));
+            ->and($tenant->charges()->count())->toBe(count(TenantSeeder::CHARGES[$definition['slug']] ?? []))
+            // A rail is matched on its (menu, type) pair, which is exactly
+            // as stable across a re-seed as an English name is.
+            ->and(MenuRail::query()->where('tenant_id', $tenant->getKey())->count())->toBe(
+                array_sum(array_map(
+                    static fn (string $card): int => count(TenantSeeder::CARDS[$card]['rails']),
+                    $definition['menus'],
+                )),
+            );
     }
 });
 

@@ -26,7 +26,7 @@ use LogicException;
  * a table of its own, where those are ordered, added, edited and deleted.
  *
  * The table is built on custom data because those rows are categories and
- * blocks that may not be rows anywhere yet; see MenuArrangementTable for what
+ * rails that may not be rows anywhere yet; see MenuArrangementTable for what
  * that costs. What it means here is this page owns reordering itself:
  * Filament's own reorderTable() writes one UPDATE over an Eloquent query, and
  * there isn't one.

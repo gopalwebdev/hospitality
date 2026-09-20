@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Actions/Otp/**'
+  - 'app/Actions/OneTimePasswords/**'
 ---
 
 # Otp

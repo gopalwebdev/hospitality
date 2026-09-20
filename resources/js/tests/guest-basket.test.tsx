@@ -13,12 +13,12 @@ import Menu, { type MenuItem } from '@/pages/guest/menu';
  */
 const server = vi.hoisted(() => ({
     priced: null as PricedBasket | null,
-    asked: [] as { url: string; lines: BasketLine[]; isLookedAt: boolean }[],
+    asked: [] as { url: string; lines: BasketLine[]; isWanted: boolean }[],
 }));
 
 vi.mock('@/hooks/use-basket-price', () => ({
-    useBasketPrice: (url: string, lines: BasketLine[], isLookedAt: boolean) => {
-        server.asked.push({ url, lines, isLookedAt });
+    useBasketPrice: (url: string, lines: BasketLine[], isWanted: boolean) => {
+        server.asked.push({ url, lines, isWanted });
 
         return { priced: server.priced, isPricing: false };
     },
@@ -51,13 +51,13 @@ const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
     isRequired: false,
-    maxSelections: 3,
+    maxPicks: 3,
     options: [
         {
             id: 11,
             name: 'Extra cheese',
             price: 4000,
-            maxQuantity: 2,
+            maxPerItem: 2,
             isDefault: false,
         },
     ],
@@ -67,13 +67,13 @@ const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
     isRequired: true,
-    maxSelections: 1,
+    maxPicks: 1,
     options: [
         {
             id: 22,
             name: 'Garlic naan',
             price: 2000,
-            maxQuantity: 1,
+            maxPerItem: 1,
             isDefault: false,
         },
     ],
@@ -84,14 +84,14 @@ const masala: MenuItem = {
     name: 'Paneer Butter Masala',
     description: null,
     price: 28900,
-    compareAtPrice: null,
+    originalPrice: null,
     isServiceRequest: false,
     diet: 'vegetarian',
     addOnGroupLinks: [
-        { id: 2, maxSelections: null },
-        { id: 1, maxSelections: null },
+        { id: 2, maxPicks: null },
+        { id: 1, maxPicks: null },
     ],
-    maxQuantity: null,
+    maxPerOrder: null,
 };
 
 function keep(lines: BasketLine[]): void {
@@ -203,8 +203,14 @@ describe('guest basket', () => {
 
         renderMenu();
 
-        // Two lines, three things.
-        fireEvent.click(screen.getByRole('button', { name: /3 items/ }));
+        // Two lines, three things. The bar carries what they come to before
+        // the sheet has been opened at all, so a guest knows what the basket
+        // is worth without having to look inside it.
+        const bar = screen.getByRole('button', { name: /3 items/ });
+
+        expect(bar).toHaveTextContent(/449\.30/);
+
+        fireEvent.click(bar);
 
         const sheet = screen.getByRole('dialog');
 
@@ -230,10 +236,11 @@ describe('guest basket', () => {
         expect(amountFor(sheet, 'Service Charge')).toMatch(/38\.90/);
         expect(amountFor(sheet, 'Total')).toMatch(/449\.30/);
 
-        // Priced against this menu, and only once the sheet was open.
-        expect(server.asked[0]?.isLookedAt).toBe(false);
-        expect(server.asked.at(-1)).toEqual(
-            expect.objectContaining({ url: priceUrl, isLookedAt: true }),
+        // Priced against this menu as soon as the basket holds anything,
+        // without waiting for the sheet: the bar at the foot of the menu
+        // shows the same total and reads the same answer.
+        expect(server.asked[0]).toEqual(
+            expect.objectContaining({ url: priceUrl, isWanted: true }),
         );
     });
 
@@ -330,7 +337,7 @@ describe('guest basket', () => {
             },
         ]);
 
-        renderMenu([{ ...masala, maxQuantity: 2 }]);
+        renderMenu([{ ...masala, maxPerOrder: 2 }]);
         fireEvent.click(screen.getByRole('button', { name: /2 items/ }));
 
         const sheet = screen.getByRole('dialog');

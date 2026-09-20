@@ -34,11 +34,11 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
         name: 'Paneer Tikka',
         description: null,
         price: 24950,
-        compareAtPrice: null,
+        originalPrice: null,
         isServiceRequest: false,
         diet: 'vegetarian',
         addOnGroupLinks: [],
-        maxQuantity: null,
+        maxPerOrder: null,
         ...overrides,
     };
 }
@@ -48,20 +48,20 @@ const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
     isRequired: true,
-    maxSelections: 1,
+    maxPicks: 1,
     options: [
         {
             id: 21,
             name: 'Butter naan',
             price: 0,
-            maxQuantity: 1,
+            maxPerItem: 1,
             isDefault: false,
         },
         {
             id: 22,
             name: 'Garlic naan',
             price: 2000,
-            maxQuantity: 1,
+            maxPerItem: 1,
             isDefault: false,
         },
     ],
@@ -72,27 +72,27 @@ const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
     isRequired: false,
-    maxSelections: 3,
+    maxPicks: 3,
     options: [
         {
             id: 11,
             name: 'Extra cheese',
             price: 4000,
-            maxQuantity: 2,
+            maxPerItem: 2,
             isDefault: false,
         },
         {
             id: 12,
             name: 'Extra paneer',
             price: 6000,
-            maxQuantity: 1,
+            maxPerItem: 1,
             isDefault: false,
         },
         {
             id: 13,
             name: 'Raita',
             price: 3000,
-            maxQuantity: 1,
+            maxPerItem: 1,
             isDefault: false,
         },
     ],
@@ -306,8 +306,8 @@ describe('guest menu', () => {
                             // The item's own order, not the order the menu
                             // sent the groups in.
                             addOnGroupLinks: [
-                                { id: 2, maxSelections: null },
-                                { id: 1, maxSelections: null },
+                                { id: 2, maxPicks: null },
+                                { id: 1, maxPicks: null },
                             ],
                         }),
                     ],
@@ -394,7 +394,7 @@ describe('guest menu', () => {
                             name: 'Chicken 65',
                             // Extras is "up to 3" in the group's own library;
                             // this item caps it at one.
-                            addOnGroupLinks: [{ id: 1, maxSelections: 1 }],
+                            addOnGroupLinks: [{ id: 1, maxPicks: 1 }],
                         }),
                     ],
                     subSections: [],
@@ -439,7 +439,7 @@ describe('guest menu', () => {
                             isServiceRequest: true,
                             diet: null,
                             price: 0,
-                            maxQuantity: 2,
+                            maxPerOrder: 2,
                         }),
                     ],
                     subSections: [],
@@ -486,8 +486,8 @@ describe('guest menu', () => {
                         item({
                             id: 30,
                             name: 'Paneer Butter Masala',
-                            addOnGroupLinks: [{ id: 2, maxSelections: null }],
-                            maxQuantity: 3,
+                            addOnGroupLinks: [{ id: 2, maxPicks: null }],
+                            maxPerOrder: 3,
                         }),
                     ],
                     subSections: [],
@@ -571,8 +571,8 @@ describe('guest menu', () => {
                     name: 'Family Feast',
                     description: null,
                     price: 99900,
-                    compareAtPrice: null,
-                    maxQuantity: null,
+                    originalPrice: null,
+                    maxPerOrder: null,
                     contents: [],
                 },
             ],
@@ -602,7 +602,7 @@ describe('guest menu', () => {
                     items: [
                         item({
                             price: 29900,
-                            compareAtPrice: 36000,
+                            originalPrice: 36000,
                         }),
                     ],
                     subSections: [],
@@ -622,8 +622,8 @@ describe('guest menu', () => {
                     name: 'Family Feast',
                     description: 'Enough for four.',
                     price: 99900,
-                    compareAtPrice: 120000,
-                    maxQuantity: null,
+                    originalPrice: 120000,
+                    maxPerOrder: null,
                     contents: [
                         {
                             id: 30,

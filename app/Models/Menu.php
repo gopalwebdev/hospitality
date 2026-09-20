@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\MenuBlockType;
+use App\Enums\MenuRailType;
 use App\Models\Concerns\HasTranslatedNames;
 use App\Models\Concerns\ReadsClockTimes;
 use Carbon\CarbonImmutable;
@@ -84,11 +84,11 @@ class Menu extends Model
     /**
      * What has been placed on this menu's top level beside its categories. See readingOrder().
      *
-     * @return HasMany<MenuBlock, $this>
+     * @return HasMany<MenuRail, $this>
      */
-    public function blocks(): HasMany
+    public function rails(): HasMany
     {
-        return $this->hasMany(MenuBlock::class);
+        return $this->hasMany(MenuRail::class);
     }
 
     /**
@@ -128,32 +128,32 @@ class Menu extends Model
     }
 
     /**
-     * The blocks and top-level categories, in the order a guest reads them.
+     * The rails and top-level categories, in the order a guest reads them.
      *
-     * Both share one number space. A block every menu has but nobody has placed
-     * has no row, and reads at 0. Ties break blocks first, in MenuBlockType
+     * Both share one number space. A rail every menu has but nobody has placed
+     * has no row, and reads at 0. Ties break rails first, in MenuRailType
      * order, so a menu nobody has arranged opens with its featured items, then
      * its combos, then its categories.
      *
      * @param  iterable<MenuCategory>  $categories  this menu's top-level categories, in order
-     * @param  iterable<MenuBlock>  $blocks  this menu's saved blocks
-     * @return list<MenuBlock|MenuCategory>
+     * @param  iterable<MenuRail>  $rails  this menu's saved rails
+     * @return list<MenuRail|MenuCategory>
      */
-    public function readingOrder(iterable $categories, iterable $blocks): array
+    public function readingOrder(iterable $categories, iterable $rails): array
     {
-        $types = MenuBlockType::cases();
-        $rankOf = array_flip(array_map(static fn (MenuBlockType $type): string => $type->value, $types));
+        $types = MenuRailType::cases();
+        $rankOf = array_flip(array_map(static fn (MenuRailType $type): string => $type->value, $types));
         $entries = [];
         $placed = [];
 
-        foreach ($blocks as $block) {
-            $entries[] = [$block->position, $rankOf[$block->type->value], $block];
-            $placed[$block->type->value] = true;
+        foreach ($rails as $rail) {
+            $entries[] = [$rail->position, $rankOf[$rail->type->value], $rail];
+            $placed[$rail->type->value] = true;
         }
 
         foreach ($types as $type) {
             if ($type->isOnEveryMenu() && ! isset($placed[$type->value])) {
-                $entries[] = [0, $rankOf[$type->value], new MenuBlock(['menu_id' => $this->getKey(), 'type' => $type])];
+                $entries[] = [0, $rankOf[$type->value], new MenuRail(['menu_id' => $this->getKey(), 'type' => $type])];
             }
         }
 
@@ -164,7 +164,7 @@ class Menu extends Model
         // PHP sorts stably, so rows sharing a position keep the order they were handed in.
         usort($entries, static fn (array $a, array $b): int => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
 
-        return array_map(static fn (array $entry): MenuBlock|MenuCategory => $entry[2], $entries);
+        return array_map(static fn (array $entry): MenuRail|MenuCategory => $entry[2], $entries);
     }
 
     public function hasServiceWindow(): bool

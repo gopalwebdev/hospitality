@@ -74,7 +74,7 @@ it('creates a combo on the menu with the items it contains', function (): void {
             'name' => [Locale::English->value => 'Burger Meal', Locale::Tamil->value => 'பர்கர் உணவு'],
             'description' => [Locale::English->value => 'Burger, fries and a drink.'],
             'price' => '299',
-            'compare_at_price' => '360',
+            'original_price' => '360',
             'availability' => ItemAvailability::Available->value,
             'comboItems' => [
                 ['menu_item_id' => $burger->getKey(), 'quantity' => 1],
@@ -91,7 +91,7 @@ it('creates a combo on the menu with the items it contains', function (): void {
         ->and($combo->position)->toBeGreaterThan($existing->position)
         // ₹299.00 is 29900 paise, exactly. No float reaches the column.
         ->and($combo->price)->toBe(29900)
-        ->and($combo->compare_at_price)->toBe(36000)
+        ->and($combo->original_price)->toBe(36000)
         ->and($combo->getTranslation('name', Locale::Tamil->value))->toBe('பர்கர் உணவு')
         ->and($combo->comboItems()->count())->toBe(2)
         ->and($combo->comboItems()->where('menu_item_id', $fries->getKey())->value('quantity'))->toBe(2);
@@ -112,7 +112,7 @@ it('leaves the compare-at price empty rather than storing a zero', function (): 
         ->assertHasNoActionErrors();
 
     // Null is "not on offer"; zero would be a price of nothing.
-    expect(comboNamed('Lunch Box')->compare_at_price)->toBeNull();
+    expect(comboNamed('Lunch Box')->original_price)->toBeNull();
 });
 
 it('keeps how many of a combo one order may hold', function (): void {
@@ -126,11 +126,11 @@ it('keeps how many of a combo one order may hold', function (): void {
             'name' => [Locale::English->value => 'Party Platter'],
             'price' => '1200',
             'availability' => ItemAvailability::Available->value,
-            'max_quantity' => '1',
+            'max_per_order' => '1',
         ])
         ->assertHasNoActionErrors();
 
-    expect(comboNamed('Party Platter')->max_quantity)->toBe(1);
+    expect(comboNamed('Party Platter')->max_per_order)->toBe(1);
 });
 
 it('refuses a compare-at price that is not above what is charged', function (): void {
@@ -145,10 +145,10 @@ it('refuses a compare-at price that is not above what is charged', function (): 
         ->callAction(TestAction::make('create')->table(), [
             'name' => [Locale::English->value => 'Lunch Box'],
             'price' => '150',
-            'compare_at_price' => '150',
+            'original_price' => '150',
             'availability' => ItemAvailability::Available->value,
         ])
-        ->assertHasActionErrors(['compare_at_price']);
+        ->assertHasActionErrors(['original_price']);
 });
 
 it('refuses a combo name the same menu already uses', function (): void {

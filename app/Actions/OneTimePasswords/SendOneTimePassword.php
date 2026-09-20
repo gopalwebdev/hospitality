@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Otp;
+namespace App\Actions\OneTimePasswords;
 
 use App\Models\OneTimePassword;
 use App\Models\User;

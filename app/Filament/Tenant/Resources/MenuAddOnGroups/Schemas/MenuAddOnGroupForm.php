@@ -104,8 +104,8 @@ class MenuAddOnGroupForm
                 // group is required as well. Blank is any number. An item
                 // offering this group may cap its own picks differently
                 // (MenuItemForm); this is only the group's own default.
-                TextInput::make('max_selections')
-                    ->label(__('panel.add_on_groups.max_selections'))
+                TextInput::make('max_picks')
+                    ->label(__('panel.add_on_groups.max_picks'))
                     ->integer()
                     ->minValue(1)
                     ->maxValue(99)
@@ -138,7 +138,7 @@ class MenuAddOnGroupForm
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
                         TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
-                        TableColumn::make(__('panel.add_on_groups.max_quantity'))->width('7rem'),
+                        TableColumn::make(__('panel.add_on_groups.max_per_item'))->width('7rem'),
                         TableColumn::make(__('panel.stock.in_stock'))->width('8rem'),
                         TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
                         TableColumn::make(__('panel.add_on_groups.is_available'))->width('7rem')->alignment(Alignment::Center),
@@ -156,15 +156,15 @@ class MenuAddOnGroupForm
                             ->prefix('+ '.$currency->symbol())
                             ->placeholder(__('panel.add_on_groups.free')),
 
-                        TextInput::make('max_quantity')
-                            ->label(__('panel.add_on_groups.max_quantity'))
+                        TextInput::make('max_per_item')
+                            ->label(__('panel.add_on_groups.max_per_item'))
                             ->required()
                             ->integer()
                             ->minValue(1)
                             ->maxValue(99)
                             ->default(1)
                             ->disabled(fn (Get $get): bool => self::isOnePick($get, '../../'))
-                            ->rule(fn (Get $get): Closure => self::maxQuantityRule($get)),
+                            ->rule(fn (Get $get): Closure => self::maxPerItemRule($get)),
 
                         // The count and the count the modal opened with, grouped
                         // so the hidden half does not draw a cell of its own.
@@ -200,7 +200,7 @@ class MenuAddOnGroupForm
      */
     private static function maximum(Get $get, string $path = ''): ?int
     {
-        $maximum = $get($path.'max_selections');
+        $maximum = $get($path.'max_picks');
 
         return blank($maximum) ? null : (int) $maximum;
     }
@@ -246,7 +246,7 @@ class MenuAddOnGroupForm
      * levels up. Skipped for a single pick: the field is disabled there and
      * storeOption() forces it to one whatever was typed before it was disabled.
      */
-    private static function maxQuantityRule(Get $get): Closure
+    private static function maxPerItemRule(Get $get): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
             if (self::isOnePick($get, '../../')) {
@@ -256,7 +256,7 @@ class MenuAddOnGroupForm
             $maximum = self::maximum($get, '../../');
 
             if ($maximum !== null && (int) $value > $maximum) {
-                $fail(__('panel.add_on_groups.max_quantity_above_max'));
+                $fail(__('panel.add_on_groups.max_per_item_above_max'));
             }
         };
     }
@@ -304,7 +304,7 @@ class MenuAddOnGroupForm
             ->where('tenant_id', self::tenantKey())
             ->byName()
             ->withCount(['options as defaults_count' => fn (Builder $query): Builder => $query->where('is_default', true)])
-            ->get(['id', 'name', 'is_required', 'max_selections'])
+            ->get(['id', 'name', 'is_required', 'max_picks'])
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey()));
     }
 
@@ -337,7 +337,7 @@ class MenuAddOnGroupForm
     {
         return self::groupsForItemForm()
             ->mapWithKeys(fn (MenuAddOnGroup $group): array => [
-                $group->getKey() => sprintf('%s — %s', $group->name, self::ruleSummary($group->is_required, $group->max_selections)),
+                $group->getKey() => sprintf('%s — %s', $group->name, self::ruleSummary($group->is_required, $group->max_picks)),
             ])
             ->all();
     }
@@ -386,7 +386,7 @@ class MenuAddOnGroupForm
         $data['price'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
         if ($isOnePick) {
-            $data['max_quantity'] = 1;
+            $data['max_per_item'] = 1;
         }
 
         return $data;

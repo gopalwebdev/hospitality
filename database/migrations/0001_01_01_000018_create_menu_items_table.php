@@ -20,7 +20,7 @@ return new class extends Migration
             // Zero is a real price: a complimentary pillow, a free glass of water.
             $table->integer('price');
             // The struck-through "was" price; null unless the item is on offer.
-            $table->integer('compare_at_price')->nullable();
+            $table->integer('original_price')->nullable();
             // Null falls back to tenant_settings.tax_rate.
             $table->smallInteger('tax_rate')->nullable();
             // HSN for goods, SAC for a service — a bedsheet change carries a
@@ -34,7 +34,7 @@ return new class extends Migration
             $table->jsonb('diets')->nullable();
             $table->string('availability', 32)->default(ItemAvailability::Available->value);
             // The most one order may hold, across every basket line it is on; null is no limit.
-            $table->smallInteger('max_quantity')->nullable();
+            $table->smallInteger('max_per_order')->nullable();
             // How many are left; null is not counted. Changed on an existing item only
             // through App\Actions\Inventory\ApplyStockChanges, which locks the row.
             $table->integer('stock_quantity')->nullable();
@@ -46,10 +46,10 @@ return new class extends Migration
 
         DB::statement('ALTER TABLE menu_items
             ADD CONSTRAINT menu_items_positions_not_negative CHECK ("position" >= 0 AND featured_position >= 0),
-            ADD CONSTRAINT menu_items_prices_not_negative CHECK (price >= 0 AND (compare_at_price IS NULL OR compare_at_price >= 0)),
+            ADD CONSTRAINT menu_items_prices_not_negative CHECK (price >= 0 AND (original_price IS NULL OR original_price >= 0)),
             ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
             ADD CONSTRAINT menu_items_diets_match_service_request CHECK (is_service_request = (diets IS NULL)),
-            ADD CONSTRAINT menu_items_max_quantity_in_range CHECK (max_quantity IS NULL OR max_quantity BETWEEN 1 AND 99)');
+            ADD CONSTRAINT menu_items_max_per_order_in_range CHECK (max_per_order IS NULL OR max_per_order BETWEEN 1 AND 99)');
 
         // Which marks contradict each other comes from the enum, so a case
         // added later cannot leave the database accepting a combination the

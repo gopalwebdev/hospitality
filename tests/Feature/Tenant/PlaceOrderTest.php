@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Actions\Orders\CancelOrder;
 use App\Enums\ItemAvailability;
 use App\Enums\OrderLineType;

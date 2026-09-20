@@ -55,7 +55,7 @@ export function basketStorageKey(tenantSlug: string, menuId: number): string {
  * A basket kept on the guest's phone, for one menu.
  *
  * Nothing is ordered through it yet: it is a list to show a member of staff,
- * priced by the server (App\Actions\Menus\PriceBasket). It survives a reload and
+ * priced by the server (App\Actions\Baskets\PriceBasket). It survives a reload and
  * follows another tab of the same app. Read through useSyncExternalStore, like
  * the appearance, so the first render agrees with a page painted without it.
  */

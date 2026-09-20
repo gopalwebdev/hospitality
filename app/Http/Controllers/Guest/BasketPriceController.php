@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Guest;
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Guest\PriceBasketRequest;
 use App\Models\Menu;

@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Otp\ThrottleOneTimePasswordRequests;
+use App\Actions\OneTimePasswords\ThrottleOneTimePasswordRequests;
 use App\Enums\OtpRequestOutcome;
 
 /**

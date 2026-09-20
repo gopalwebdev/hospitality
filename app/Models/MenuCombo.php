@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ItemAvailability;
+use App\Models\Concerns\HasPricing;
 use App\Models\Concerns\HasTranslatedNames;
-use App\Models\Concerns\IsPricedOnAMenu;
 use App\Observers\MenuComboObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MenuComboFactory;
@@ -27,11 +27,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $description
  * @property int $price
- * @property int|null $compare_at_price
+ * @property int|null $original_price
  * @property int|null $tax_rate
  * @property string|null $hsn_sac_code
  * @property ItemAvailability $availability
- * @property int|null $max_quantity
+ * @property int|null $max_per_order
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -41,11 +41,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'name',
     'description',
     'price',
-    'compare_at_price',
+    'original_price',
     'tax_rate',
     'hsn_sac_code',
     'availability',
-    'max_quantity',
+    'max_per_order',
     'position',
 ])]
 #[ObservedBy([MenuComboObserver::class])]
@@ -54,8 +54,8 @@ class MenuCombo extends Model
     /** @use HasFactory<MenuComboFactory> */
     use HasFactory;
 
+    use HasPricing;
     use HasTranslatedNames;
-    use IsPricedOnAMenu;
 
     /** @var list<string> */
     public array $translatable = ['name', 'description'];
@@ -136,10 +136,10 @@ class MenuCombo extends Model
     {
         return [
             'price' => 'integer',
-            'compare_at_price' => 'integer',
+            'original_price' => 'integer',
             'tax_rate' => 'integer',
             'availability' => ItemAvailability::class,
-            'max_quantity' => 'integer',
+            'max_per_order' => 'integer',
             'position' => 'integer',
         ];
     }

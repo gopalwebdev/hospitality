@@ -50,17 +50,17 @@ final class PricingFields
      * exist, which is the one way this field can mislead a guest. Left blank
      * when the item is not on offer — a zero would be a price of nothing.
      */
-    public static function compareAtPrice(Currency $currency): TextInput
+    public static function originalPrice(Currency $currency): TextInput
     {
-        return TextInput::make('compare_at_price')
-            ->label(__('panel.items.compare_at_price'))
+        return TextInput::make('original_price')
+            ->label(__('panel.items.original_price'))
             ->numeric()
             ->minValue(0)
             ->maxValue(99999)
             ->step(0.01)
             ->prefix($currency->symbol())
             ->gt('price')
-            ->validationMessages(['gt' => __('panel.items.compare_at_price_invalid')]);
+            ->validationMessages(['gt' => __('panel.items.original_price_invalid')]);
     }
 
     /**
@@ -120,10 +120,10 @@ final class PricingFields
      * A feather pillow and a memory foam one are two towards a maximum of two. A
      * blank maximum is no limit, stored as null rather than as a limit of nothing.
      */
-    public static function maxQuantity(): TextInput
+    public static function maxPerOrder(): TextInput
     {
-        return TextInput::make('max_quantity')
-            ->label(__('panel.items.max_quantity'))
+        return TextInput::make('max_per_order')
+            ->label(__('panel.items.max_per_order'))
             ->integer()
             ->minValue(1)
             ->maxValue(99)
@@ -154,9 +154,9 @@ final class PricingFields
 
         $data['price'] = $currency->toMinorUnits($data['price'] ?? 0);
 
-        $data['compare_at_price'] = blank($data['compare_at_price'] ?? null)
+        $data['original_price'] = blank($data['original_price'] ?? null)
             ? null
-            : $currency->toMinorUnits($data['compare_at_price']);
+            : $currency->toMinorUnits($data['original_price']);
 
         if (array_key_exists('tax_rate_percentage', $data)) {
             $data['tax_rate'] = blank($data['tax_rate_percentage'])
@@ -183,9 +183,9 @@ final class PricingFields
 
         $data['price'] = $currency->toMajorUnits((int) ($data['price'] ?? 0));
 
-        $data['compare_at_price'] = blank($data['compare_at_price'] ?? null)
+        $data['original_price'] = blank($data['original_price'] ?? null)
             ? null
-            : $currency->toMajorUnits((int) $data['compare_at_price']);
+            : $currency->toMajorUnits((int) $data['original_price']);
 
         $data['tax_rate_percentage'] = blank($data['tax_rate'] ?? null)
             ? null

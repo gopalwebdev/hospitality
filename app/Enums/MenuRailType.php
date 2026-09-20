@@ -6,15 +6,15 @@ namespace App\Enums;
  * The kinds of thing on a menu's top level that are not a category.
  *
  * A menu is read as one sequence: its top-level categories, with these placed
- * among them. A category keeps its own `position`; a block keeps one on its
- * `menu_blocks` row, in the same number space, so both are dragged into one
+ * among them. A category keeps its own `position`; a rail keeps one on its
+ * `menu_rails` row, in the same number space, so both are dragged into one
  * order on the menu page.
  *
  * A kind a menu may hold several of — a banner, say — is a case here, its
- * columns on `menu_blocks` and a line in that table's constraints. The code that
+ * columns on `menu_rails` and a line in that table's constraints. The code that
  * orders a menu reads rows, not cases, and does not change.
  */
-enum MenuBlockType: string
+enum MenuRailType: string
 {
     /** The items a menu opens with — menu_items.is_featured, in featured_position order. */
     case Featured = 'featured';
@@ -36,7 +36,7 @@ enum MenuBlockType: string
     }
 
     /**
-     * What the panel calls this block.
+     * What the panel calls this rail.
      */
     public function label(): string
     {

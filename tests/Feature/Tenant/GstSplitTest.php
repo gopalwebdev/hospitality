@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Actions\Orders\PlaceOrder;
 use App\Enums\GstTreatment;
 use App\Models\Charge;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Menus;
+namespace App\Actions\Baskets;
 
 use App\Actions\Inventory\FindStockShortages;
 use App\Actions\Inventory\StockDemand;
@@ -198,15 +198,15 @@ class PriceBasket
         // This item's own cap on each group's picks, tighter or looser than
         // the group's own maximum; a group with no link of its own (there
         // should always be one) falls back to the group's maximum.
-        $maxSelections = $offered->map(function (MenuAddOnGroup $group) use ($item): ?int {
+        $maxPicks = $offered->map(function (MenuAddOnGroup $group) use ($item): ?int {
             $link = $item->addOnGroupLinks->firstWhere('menu_add_on_group_id', $group->getKey());
 
-            return $link instanceof MenuItemAddOnGroup ? $link->effectiveMaxSelections($group) : $group->max_selections;
+            return $link instanceof MenuItemAddOnGroup ? $link->effectiveMaxPicks($group) : $group->max_picks;
         });
 
         // The decision the menu screen makes: a required group that its
         // available options can no longer meet takes the item off the menu.
-        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered($maxSelections->get($group->getKey()))))) {
+        if ($offered->contains(fn (MenuAddOnGroup $group): bool => ! $group->canBeMetBy($group->picksOffered($maxPicks->get($group->getKey()))))) {
             return self::UNAVAILABLE;
         }
 
@@ -245,7 +245,7 @@ class PriceBasket
 
             // Or more of it than its group — or this item's own cap on it —
             // lets a guest take.
-            if (! $group instanceof MenuAddOnGroup || $quantity > $group->quantityAllowedFor($option, $maxSelections->get($group->getKey()))) {
+            if (! $group instanceof MenuAddOnGroup || $quantity > $group->quantityAllowedFor($option, $maxPicks->get($group->getKey()))) {
                 return self::INVALID;
             }
 
@@ -255,7 +255,7 @@ class PriceBasket
 
         foreach ($offered as $group) {
             $count = $picks[$group->getKey()] ?? 0;
-            $max = $maxSelections->get($group->getKey());
+            $max = $maxPicks->get($group->getKey());
 
             if (($group->is_required && $count === 0) || ($max !== null && $count > $max)) {
                 return self::INVALID;
@@ -288,7 +288,7 @@ class PriceBasket
      */
     private function isWithinLimits(MenuItem|MenuCombo $thing, int $held): bool
     {
-        return $thing->max_quantity === null || $held <= $thing->max_quantity;
+        return $thing->max_per_order === null || $held <= $thing->max_per_order;
     }
 
     /**
@@ -325,12 +325,12 @@ class PriceBasket
         }
 
         return MenuItem::query()
-            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_per_order'])
             ->where('tenant_id', $tenant->getKey())
             ->onMenu($menu->getKey())
             ->orderable()
             ->whereKey($ids)
-            ->with(['addOnGroupLinks' => fn ($links) => $links->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'max_selections'])])
+            ->with(['addOnGroupLinks' => fn ($links) => $links->select(['id', 'menu_item_id', 'menu_add_on_group_id', 'max_picks'])])
             ->get()
             ->keyBy(fn (MenuItem $item): int => $item->getKey());
     }
@@ -354,11 +354,11 @@ class PriceBasket
         }
 
         return MenuAddOnGroup::query()
-            ->select(['id', 'tenant_id', 'is_required', 'max_selections'])
+            ->select(['id', 'tenant_id', 'is_required', 'max_picks'])
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price', 'max_quantity'])
+                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price', 'max_per_item'])
                 ->available()])
             ->get()
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());
@@ -377,7 +377,7 @@ class PriceBasket
         }
 
         return MenuCombo::query()
-            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_quantity'])
+            ->select(['id', 'tenant_id', 'price', 'tax_rate', 'max_per_order'])
             ->where('menu_id', $menu->getKey())
             ->whereIn('availability', ItemAvailability::orderableValues())
             ->whereKey($ids)

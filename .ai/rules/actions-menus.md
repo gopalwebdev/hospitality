@@ -1,9 +1,10 @@
 ---
 paths:
   - 'app/Actions/Menus/**'
+  - 'app/Actions/Baskets/**'
 ---
 
-# Actions Menus
+# Menu and basket actions
 
 ## A category can move between a tenant's menus, everything under it and all
 `MoveCategoryToMenu` rewrites `menu_categories.menu_id` on the category and on its sub-categories, then unfeatures the items under both, in one transaction. Items follow untouched because they carry `menu_category_id`, not `menu_id`. Sub-categories carry `menu_id` too; they used to follow by an `ON UPDATE CASCADE` on a composite key, which the schema no longer has (`.ai/rules/migrations.md`), so the action moves them itself.
@@ -13,15 +14,15 @@ The unfeaturing is the one thing it does beyond the move: the featured items bel
 Both of its guards are backstops, thrown as LogicException: the target menu must belong to the same tenant (`MenuCategoryObserver` would refuse anyway, but as a 500), and the English name must be free on the target (uniqueness is per menu, and nothing else refuses a duplicate). `MenuArrangementTable`'s `moveToMenu` action states both as validation, which is what an admin actually sees — the action is what stops code going around the panel.
 
 ## One drag renumbers the outline, and never re-parents anything
-`ApplyMenuArrangement` takes the flat order Filament hands back from the menu page — its blocks, categories and sub-categories together — and turns it into the positions a menu stores: `menu_blocks.position` and `menu_categories.position`. What is inside a category or a block is not on that page. It is ordered in the table the row opens, by Filament's own reorder (`.ai/rules/menus.md`), so this action no longer touches `menu_items` or `menu_combos`.
+`ApplyMenuArrangement` takes the flat order Filament hands back from the menu page — its rails, categories and sub-categories together — and turns it into the positions a menu stores: `menu_rails.position` and `menu_categories.position`. What is inside a category or a rail is not on that page. It is ordered in the table the row opens, by Filament's own reorder (`.ai/rules/menus.md`), so this action no longer touches `menu_items` or `menu_combos`.
 
-**A row only moves within its own list.** The lists are the top level (blocks and top-level categories, ordered against each other) and the sub-categories of one category. A sub-category dropped under another category keeps the parent it had and lands at the matching place among its own siblings, so no drag can produce a menu that could not exist.
+**A row only moves within its own list.** The lists are the top level (rails and top-level categories, ordered against each other) and the sub-categories of one category. A sub-category dropped under another category keeps the parent it had and lands at the matching place among its own siblings, so no drag can produce a menu that could not exist.
 
 That is deliberate, and it is the rule below rather than a limitation of the drag: re-filing a subdivision is an edit on its own form, where the parent is a select and the name is revalidated against where it is going. A drag that re-parented would be a second mechanism repeating that uniqueness rule, and getting it wrong would store a duplicate name that nothing else refuses.
 
-**A row the table did not draw keeps its place.** An empty block is not drawn, so it is missing from the order Filament sends. `renumber()` shuffles only the rows that were sent, among the slots they already held, and does not write a list none of whose rows were sent. Before this, a row missing from the order sorted last, which would have pushed an empty featured block to the bottom of the menu whenever anything else was dragged. A block every menu has but nobody has placed is an unsaved `MenuBlock` reading at 0, and is saved the first time it lands anywhere else.
+**A row the table did not draw keeps its place.** An empty rail is not drawn, so it is missing from the order Filament sends. `renumber()` shuffles only the rows that were sent, among the slots they already held, and does not write a list none of whose rows were sent. Before this, a row missing from the order sorted last, which would have pushed an empty featured rail to the bottom of the menu whenever anything else was dragged. A rail every menu has but nobody has placed is an unsaved `MenuRail` reading at 0, and is saved the first time it lands anywhere else.
 
-Row keys (`featured`, `combos`, `block-<id>`, `category-<id>`) are formatted by this class as well as parsed by it, so the table that renders them cannot drift from the action that reads them.
+Row keys (`featured`, `combos`, `rail-<id>`, `category-<id>`) are formatted by this class as well as parsed by it, so the table that renders them cannot drift from the action that reads them.
 
 ## Re-parenting is an edit, not an action — MoveCategoryToMenu is the exception
 A record's parent is chosen on its own form. There is no `MoveSubCategoryToParent` and no `MoveItemToCategory`; both existed, both were deleted, and the reason is worth keeping: each was a second mechanism that had to repeat rules the form already enforces.
@@ -42,7 +43,7 @@ The invariant that an item leaving a menu stops being featured lives in `MenuIte
 `PriceBasket` is what `POST /menus/{menu}/basket-prices` answers (`Guest\BasketPriceController`, shape checked by `PriceBasketRequest`). The basket is the guest's claim, so every line is read again against the menu as it is now — orderable items on this menu with their linked groups and available options, and orderable combos — and priced only if it still stands. Arithmetic and rules are here and not in the browser, which only formats the answer.
 
 - A line comes back **`unavailable`** when its item or combo is gone, sold out, on another menu or another tenant's, or when a required group has no available option left — the same decision `Guest\MenuController` makes to leave the item off the menu.
-- It comes back **`invalid`** when an option is not an available option of one of the item's groups, when more of one is asked for than its own `max_quantity` allows (`MenuAddOnGroup::quantityAllowedFor()`, never more than the maximum picks in play for that item), when a required group has no pick or a group's picks, each counted by quantity, go over that same maximum — the linked item's own `max_selections`, or the group's own when the item has none (`MenuItemAddOnGroup::effectiveMaxSelections()`) — or when the basket holds more of an item or combo than one order may (`max_quantity`). That last count is across every line the item or combo is on, so it flags every one of those lines.
+- It comes back **`invalid`** when an option is not an available option of one of the item's groups, when more of one is asked for than its own `max_per_item` allows (`MenuAddOnGroup::quantityAllowedFor()`, never more than the maximum picks in play for that item), when a required group has no pick or a group's picks, each counted by quantity, go over that same maximum — the linked item's own `max_picks`, or the group's own when the item has none (`MenuItemAddOnGroup::effectiveMaxPicks()`) — or when the basket holds more of an item or combo than one order may (`max_per_order`). That last count is across every line the item or combo is on, so it flags every one of those lines.
 - A flagged line is priced at nothing and the rest of the basket is still priced.
 
 GST is worked out part by part and rounded once per part per line:
@@ -50,7 +51,7 @@ GST is worked out part by part and rounded once per part per line:
 - **Combos:** taxed at their own rate.
 - **Charges are taxed too**, at the tenant's own rate — a service charge is consideration for the same supply, not something added after tax. The tenant's rate rather than an item's, because a bill spanning several slabs has no one principal supply to follow.
 
-**Every amount carries its split.** `App\Actions\Menus\GstSplit` is where the halves are worked out, once, and it is the only place that arithmetic lives: the rate halves in basis points (`intdiv`, remainder to the state) so the two always add to the rate, the centre's amount comes from its own rate, and the state's is whatever is left of the total — so CGST is what its stated rate produces and the two still sum to what was charged. A priced basket carries `taxParts` (a `GstSplit`) beside `tax` (the one number) at the top level, per line and per charge; `PlaceOrder` copies them onto `orders`, `order_lines` and `order_charges`. Never re-derive a split from a stored total: halving it does not reliably add back up. Which of the three treatments applies is `tenant_settings.gst_treatment`, a tenant's own statement (`.ai/rules/enums.md`).
+**Every amount carries its split.** `App\Actions\Baskets\GstSplit` is where the halves are worked out, once, and it is the only place that arithmetic lives: the rate halves in basis points (`intdiv`, remainder to the state) so the two always add to the rate, the centre's amount comes from its own rate, and the state's is whatever is left of the total — so CGST is what its stated rate produces and the two still sum to what was charged. A priced basket carries `taxParts` (a `GstSplit`) beside `tax` (the one number) at the top level, per line and per charge; `PlaceOrder` copies them onto `orders`, `order_lines` and `order_charges`. Never re-derive a split from a stored total: halving it does not reliably add back up. Which of the three treatments applies is `tenant_settings.gst_treatment`, a tenant's own statement (`.ai/rules/enums.md`).
 
 With `prices_include_tax` it is the share already inside the price and is not added to the total. Charges are `Charge::amountOn()` on the subtotal, and an empty basket carries none. The queries do not grow with the basket.
 

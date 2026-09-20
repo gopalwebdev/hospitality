@@ -4,7 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
-| app/Actions/Menus/** | .ai/rules/actions-menus.md |
+| app/Actions/Menus/**, app/Actions/Baskets/** | .ai/rules/actions-menus.md |
 | app/Filament/Tenant/Resources/MenuAddOnGroups/**, app/Models/MenuAddOnGroup.php, app/Models/MenuAddOnOption.php, app/Models/MenuItemAddOnGroup.php | .ai/rules/add-on-groups.md |
 | app/** | .ai/rules/app.md |
 | app/Filament/Tenant/Resources/Charges/** | .ai/rules/charges.md |
@@ -20,7 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Middleware/**, app/Http/Middleware/SetLocale.php | .ai/rules/middleware.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Models/User.php, app/Models/**, app/Models/MenuItem.php, app/Models/HomeTile.php | .ai/rules/models.md |
-| app/Actions/Otp/** | .ai/rules/otp.md |
+| app/Actions/OneTimePasswords/** | .ai/rules/otp.md |
 | app/Policies/** | .ai/rules/policies.md |
 | app/Providers/Filament/*.php, app/Providers/Filament/TenantPanelProvider.php | .ai/rules/providers-filament.md |
 | app/Providers/AppServiceProvider.php | .ai/rules/providers.md |

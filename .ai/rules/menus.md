@@ -11,7 +11,7 @@ paths:
 There were four. Featured items and Combos were tabs of their own (`ManageMenuFeaturedItems`, `ManageMenuCombos`), and before those the page carried four relation managers. The Items page (`MenuItemResource`) stays as the flat list of every item across every menu, for finding one without knowing where it is filed.
 
 ## The arrangement is an outline, and what is inside a row opens in a modal
-`MenuArrangementTable` lists, in the order a guest reads them, a menu's **blocks** (the featured items and the combos), its **categories**, and each category's **sub-categories** under it — and nothing else. A click on a row, or its Open button, opens a modal holding a table of what is inside it:
+`MenuArrangementTable` lists, in the order a guest reads them, a menu's **rails** (the featured items and the combos), its **categories**, and each category's **sub-categories** under it — and nothing else. A click on a row, or its Open button, opens a modal holding a table of what is inside it:
 
 | Row | Table in the modal | Ordered by |
 | --- | --- | --- |
@@ -26,13 +26,13 @@ The three are relation managers in `Menus/RelationManagers/` that **no resource 
 What the modal needs, all in `contentsModal()`:
 - **`formWrapper(false)`.** Filament makes every action modal a `<form>`. The table inside opens modals of its own, which are forms too, and a browser's parser drops a form nested in a form — their save buttons would have submitted the outer modal instead.
 - **No submit button** (`modalSubmitAction(false)`): every change inside is saved as it is made.
-- **Nothing refreshes the outline while the modal is open.** Closing it calls `unmountAction()`, which re-renders the page in full, so the counts and the blocks drawn — a block emptied from inside its modal disappears — come from what is now saved. Filament resolves an open modal's row again on every render of the page, and a block that has just been emptied has no row to resolve.
+- **Nothing refreshes the outline while the modal is open.** Closing it calls `unmountAction()`, which re-renders the page in full, so the counts and the rails drawn — a rail emptied from inside its modal disappears — come from what is now saved. Filament resolves an open modal's row again on every render of the page, and a rail that has just been emptied has no row to resolve.
 
-**A block with nothing in it is not drawn.** The header carries **New category**, **Featured items** and **Combos**; the last two open the same modals as their rows, and are the way into a block that is still empty.
+**A rail with nothing in it is not drawn.** The header carries **New category**, **Featured items** and **Combos**; the last two open the same modals as their rows, and are the way into a rail that is still empty.
 
-A row's actions are **separate icon buttons**, each named by a tooltip (`iconButton()`) and coloured by what it does: Open (primary), New sub-category (info, top-level categories only), Edit and Move to another menu (gray), Delete (danger). A block's row has only Open. They were one `ActionGroup::buttonGroup()` strip, which drew misaligned icons and a solid red delete button.
+A row's actions are **separate icon buttons**, each named by a tooltip (`iconButton()`) and coloured by what it does: Open (primary), New sub-category (info, top-level categories only), Edit and Move to another menu (gray), Delete (danger). A rail's row has only Open. They were one `ActionGroup::buttonGroup()` strip, which drew misaligned icons and a solid red delete button.
 
-The outline is a Filament **custom data** table (`->records()`), because its rows are categories plus blocks that may not be rows anywhere yet. What follows from that:
+The outline is a Filament **custom data** table (`->records()`), because its rows are categories plus rails that may not be rows anywhere yet. What follows from that:
 
 - Records are plain arrays keyed by `__key` (`ArrayRecord::getKeyName()`), so `$record` in every action and column closure is an `array`. **Nothing in that file may be typed `Model`.** Keys are formatted by `ApplyMenuArrangement` so the table and the action that reads them cannot drift.
 - `ArrangeMenu::reorderTable()` overrides Filament's, which writes one UPDATE over an Eloquent query there isn't one of. `reorderable('position', condition: ...)` still matters: it renders the handles and Filament short-circuits the write on the same call, which is `MenuCategoryPolicy::reorder()`.
@@ -41,7 +41,7 @@ The outline is a Filament **custom data** table (`->records()`), because its row
 - A category form opened from here is handed the category it edits (`MenuCategoryForm::configure($schema, $menuId, $editing)`), because a schema's own `$record` is whatever surrounds it — for an action modal on a page, the page's **menu** — so the uniqueness rule cannot find the category to exclude on its own. See `.ai/rules/filament.md`.
 - **The page redraws from saved rows after every action** (`ArrangeMenu::afterActionCalled()` flushes the cached records). Filament reads all the rows to find the one a row action is about and keeps that copy for the request, so without it a rename left the old name on screen and a deleted row stayed in the list until a reload.
 
-**Three queries build the outline, however big the menu**: categories at both levels with a count of their items, the menu's placed blocks, and one query counting its combos and its featured items. `MenuCategoryTreeTest` asserts neither the page's query count nor the featured items table's grows with the menu.
+**Three queries build the outline, however big the menu**: categories at both levels with a count of their items, the menu's placed rails, and one query counting its combos and its featured items. `MenuCategoryTreeTest` asserts neither the page's query count nor the featured items table's grows with the menu.
 
 The items table creates through `MenuItem::query()->create()` rather than through the relationship, because the item form keeps its category select: created through the relationship, a different choice there would be silently overruled.
 
@@ -66,14 +66,16 @@ It guards only the outline's own list (`closest('[wire\\:id]')` is the page), ne
 
 The `list` values — `top` and `sub-<parent id>` — mirror the lists `ApplyMenuArrangement` renumbers. Change one and change the other; `MenuCategoryTreeTest` pins them. The server still puts a stray row back among its own siblings, because the guard is only in the browser.
 
-## Blocks are what sits on a menu's top level beside its categories
-`menu_blocks` holds a menu's top level that is not a category: `type` is `App\Enums\MenuBlockType` (`Featured`, `Combos`), and `position` shares one number space with the top-level `menu_categories.position`, so moving a block is the same drag as moving a category. `Menu::readingOrder($categories, $blocks)` merges the two, and both the panel and `Guest\MenuController` read it — the guest app is *sent* the order (`order`, a list of `'featured' | 'combos' | <section id>`), because what a guest reads first is a decision and decisions stay in PHP.
+## Rails are what sit on a menu's top level beside its categories
+`menu_rails` holds a menu's top level that is not a category: `type` is `App\Enums\MenuRailType` (`Featured`, `Combos`), and `position` shares one number space with the top-level `menu_categories.position`, so moving a rail is the same drag as moving a category. `Menu::readingOrder($categories, $rails)` merges the two, and both the panel and `Guest\MenuController` read it — the guest app is *sent* the order (`order`, a list of `'featured' | 'combos' | <section id>`), because what a guest reads first is a decision and decisions stay in PHP.
 
-**A block every menu has (`MenuBlockType::isOnEveryMenu()`) has no row until it is placed.** Without one it reads at position 0, and ties break blocks first, in enum order — so a menu nobody has arranged opens with its featured items, then its combos, then its categories. `ApplyMenuArrangement` saves the row the first time a drag puts the block anywhere else. Nothing creates rows when a menu is created, which is why the seeder (which runs without model events) and the factories need nothing.
+**A rail every menu has (`MenuRailType::isOnEveryMenu()`) has no row until it is placed.** Without one it reads at position 0, and ties break rails first, in enum order — so a menu nobody has arranged opens with its featured items, then its combos, then its categories. `ApplyMenuArrangement` saves the row the first time a drag puts the rail anywhere else. Nothing creates rows when a menu is created, so the factories need nothing.
 
-This replaced `menus.featured_position` and `menus.combos_position`, a column per rail, because the project owner wants menus to grow new kinds of content — a banner image with or without text over it was the example given — and a column per kind cannot hold several banners. **Adding a kind** is a case on `MenuBlockType` (false from `isOnEveryMenu()` if a menu may hold several), its columns on `menu_blocks` with a CHECK tying them to the type the way `home_tiles` ties a destination to its action, a form, its row on the outline and what its row opens, and a component in the guest app. `readingOrder()` and `ApplyMenuArrangement` read rows rather than cases and do not change; a block that is not on every menu is keyed `block-<id>`.
+`TenantSeeder` does place them, through `seedRails()` and a `rails` key on every `CARDS` entry — deliberately arranged differently from one card to the next (one menu leads with featured, another trails it after the last category) so a fresh install exercises `readingOrder()` rather than only its no-rows fallback. It writes the rows itself because the seeder runs `WithoutModelEvents`.
 
-What a block *holds* stays where it was: featured items are `menu_items.is_featured` in `featured_position` order, and combos are `menu_combos` on the menu.
+This replaced `menus.featured_position` and `menus.combos_position`, a column per rail, because the project owner wants menus to grow new kinds of content — a banner image with or without text over it was the example given — and a column per kind cannot hold several banners. **Adding a kind** is a case on `MenuRailType` (false from `isOnEveryMenu()` if a menu may hold several), its columns on `menu_rails` with a CHECK tying them to the type the way `home_tiles` ties a destination to its action, a form, its row on the outline and what its row opens, and a component in the guest app. `readingOrder()` and `ApplyMenuArrangement` read rows rather than cases and do not change; a rail that is not on every menu is keyed `rail-<id>`.
+
+What a rail *holds* stays where it was: featured items are `menu_items.is_featured` in `featured_position` order, and combos are `menu_combos` on the menu.
 
 ## Featured items are one flag, set from the item form or the featured items table
 `menu_items.is_featured` plus `featured_position` are what a menu leads with. The **Featured** toggle on the item form sets it, and so does **Feature items** in the featured items table, which offers this menu's items that are not featured yet and puts the chosen ones at the end of the featured order, in the order picked. **Remove from featured** clears the flag and the position. See `.ai/rules/actions-menus.md` for why there are exactly two.

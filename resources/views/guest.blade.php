@@ -13,6 +13,12 @@
              home screen. The manifest and the worker are served per tenant
              from the root of its subdomain — see ProgressiveWebAppController. --}}
         <link rel="manifest" href="{{ route('guest.manifest', ['tenant' => $tenantSlug]) }}">
+        {{-- Both spellings, and both are needed. `mobile-web-app-capable` is
+             the standard one, and Chrome logs a deprecation warning without
+             it; the `apple-` prefixed one is what iOS read before 11.3 took
+             the manifest's `display` instead, and a guest on an older phone
+             still installs by it. --}}
+        <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="{{ $theme['name'] }}">

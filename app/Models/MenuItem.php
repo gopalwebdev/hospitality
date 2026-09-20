@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
+use App\Models\Concerns\HasPricing;
 use App\Models\Concerns\HasTranslatedNames;
-use App\Models\Concerns\IsPricedOnAMenu;
 use App\Observers\MenuItemObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MenuItemFactory;
@@ -31,13 +31,13 @@ use Illuminate\Support\Collection;
  * @property string $name
  * @property string|null $description
  * @property int $price
- * @property int|null $compare_at_price
+ * @property int|null $original_price
  * @property int|null $tax_rate
  * @property string|null $hsn_sac_code
  * @property bool $is_service_request
  * @property Collection<int, Diet>|null $diets
  * @property ItemAvailability $availability
- * @property int|null $max_quantity
+ * @property int|null $max_per_order
  * @property int|null $stock_quantity
  * @property bool $is_featured
  * @property int $featured_position
@@ -50,13 +50,13 @@ use Illuminate\Support\Collection;
     'name',
     'description',
     'price',
-    'compare_at_price',
+    'original_price',
     'tax_rate',
     'hsn_sac_code',
     'is_service_request',
     'diets',
     'availability',
-    'max_quantity',
+    'max_per_order',
     'stock_quantity',
     'is_featured',
     'featured_position',
@@ -68,8 +68,8 @@ class MenuItem extends Model
     /** @use HasFactory<MenuItemFactory> */
     use HasFactory;
 
+    use HasPricing;
     use HasTranslatedNames;
-    use IsPricedOnAMenu;
 
     /** @var list<string> */
     public array $translatable = ['name', 'description'];
@@ -231,12 +231,12 @@ class MenuItem extends Model
     {
         return [
             'price' => 'integer',
-            'compare_at_price' => 'integer',
+            'original_price' => 'integer',
             'tax_rate' => 'integer',
             'is_service_request' => 'boolean',
             'diets' => AsEnumCollection::of(Diet::class),
             'availability' => ItemAvailability::class,
-            'max_quantity' => 'integer',
+            'max_per_order' => 'integer',
             'stock_quantity' => 'integer',
             'is_featured' => 'boolean',
             'featured_position' => 'integer',

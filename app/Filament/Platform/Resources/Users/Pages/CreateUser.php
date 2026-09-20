@@ -2,9 +2,9 @@
 
 namespace App\Filament\Platform\Resources\Users\Pages;
 
-use App\Actions\Otp\SendOneTimePassword;
-use App\Actions\Otp\ThrottleOneTimePasswordRequests;
-use App\Actions\Otp\VerifyOneTimePassword;
+use App\Actions\OneTimePasswords\SendOneTimePassword;
+use App\Actions\OneTimePasswords\ThrottleOneTimePasswordRequests;
+use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Actions\Users\CreateUserAccount;
 use App\Filament\Platform\Resources\Users\UserResource;
 use App\Models\User;

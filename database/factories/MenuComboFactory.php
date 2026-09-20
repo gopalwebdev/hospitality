@@ -37,10 +37,10 @@ class MenuComboFactory extends Factory
             'name' => [Locale::English->value => $name],
             'description' => [Locale::English->value => fake()->sentence()],
             'price' => fake()->numberBetween(20000, 120000),
-            'compare_at_price' => null,
+            'original_price' => null,
             'tax_rate' => null,
             'availability' => ItemAvailability::Available,
-            'max_quantity' => null,
+            'max_per_order' => null,
             'position' => fake()->numberBetween(0, 20),
         ];
     }
@@ -79,7 +79,7 @@ class MenuComboFactory extends Factory
     public function discounted(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'compare_at_price' => $attributes['price'] + 5000,
+            'original_price' => $attributes['price'] + 5000,
         ]);
     }
 
@@ -101,7 +101,7 @@ class MenuComboFactory extends Factory
     public function limitedPerOrder(int $max): static
     {
         return $this->state(fn (array $attributes): array => [
-            'max_quantity' => $max,
+            'max_per_order' => $max,
         ]);
     }
 

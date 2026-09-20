@@ -7,7 +7,7 @@ export interface AddOnOption {
     /** What one of it adds, in the currency's minor unit; 0 is free. */
     price: number;
     /** How many of this one option a guest may take on one item, already capped at the group's own maximum. */
-    maxQuantity: number;
+    maxPerItem: number;
     /** Ticked for the guest when the sheet opens: "Medium" on a spice level. */
     isDefault: boolean;
 }
@@ -16,7 +16,7 @@ export interface AddOnOption {
  * A set of choices an item is customised with: a spice level, a bread, extras.
  *
  * Sent once per menu and named by id on each item that offers it, so this is
- * the group's own default rule — see withItemMaxSelections() for an item that
+ * the group's own default rule — see withItemMaxPicks() for an item that
  * caps it differently.
  */
 export interface AddOnGroup {
@@ -25,7 +25,7 @@ export interface AddOnGroup {
     /** Whether a guest has to pick at least one option. */
     isRequired: boolean;
     /** Null is no limit. */
-    maxSelections: number | null;
+    maxPicks: number | null;
     options: AddOnOption[];
 }
 
@@ -49,7 +49,7 @@ export interface Phrase {
  *
  * These only shape the sheet — which boxes can still be ticked, whether Add is
  * ready, what the button says. The server decides again when the basket is
- * priced (App\Actions\Menus\PriceBasket), so nothing here is trusted.
+ * priced (App\Actions\Baskets\PriceBasket), so nothing here is trusted.
  *
  * Picks are counted the way the server counts them: each option by its quantity,
  * so two of "Extra cheese" are two picks toward "up to 3".
@@ -62,25 +62,25 @@ export function isRequired(group: AddOnGroup): boolean {
 /**
  * A group as one item caps its picks, tighter or looser than the group's own maximum.
  *
- * `maxSelections` is the item's own answer — null follows the group's own, so
+ * `maxPicks` is the item's own answer — null follows the group's own, so
  * there is nothing to do then. Each option's own cap is capped again here,
  * because an option allowed more than the item's new maximum could otherwise
  * be ticked past what the item as a whole permits.
  */
-export function withItemMaxSelections(
+export function withItemMaxPicks(
     group: AddOnGroup,
-    maxSelections: number | null,
+    maxPicks: number | null,
 ): AddOnGroup {
-    if (maxSelections === null) {
+    if (maxPicks === null) {
         return group;
     }
 
     return {
         ...group,
-        maxSelections,
+        maxPicks,
         options: group.options.map((option) => ({
             ...option,
-            maxQuantity: Math.min(option.maxQuantity, maxSelections),
+            maxPerItem: Math.min(option.maxPerItem, maxPicks),
         })),
     };
 }
@@ -89,7 +89,7 @@ export function withItemMaxSelections(
  * The group's rule in words, the same cases as MenuAddOnGroupForm::ruleSummary() in the panel.
  */
 export function ruleOf(group: AddOnGroup): Phrase {
-    const { isRequired: required, maxSelections: max } = group;
+    const { isRequired: required, maxPicks: max } = group;
 
     if (required && max === 1) {
         return {
@@ -115,8 +115,8 @@ export function ruleOf(group: AddOnGroup): Phrase {
 export function isSingleChoice(group: AddOnGroup): boolean {
     return (
         group.isRequired &&
-        group.maxSelections === 1 &&
-        group.options.every((option) => option.maxQuantity === 1)
+        group.maxPicks === 1 &&
+        group.options.every((option) => option.maxPerItem === 1)
     );
 }
 
@@ -130,10 +130,7 @@ export function pickedIn(group: AddOnGroup, picks: Picks): number {
 
 /** Whether one more pick fits under the group's maximum. */
 export function hasRoomIn(group: AddOnGroup, picks: Picks): boolean {
-    return (
-        group.maxSelections === null ||
-        pickedIn(group, picks) < group.maxSelections
-    );
+    return group.maxPicks === null || pickedIn(group, picks) < group.maxPicks;
 }
 
 /** Whether one more of this option may be taken: its own cap, and the group's. */
@@ -143,7 +140,7 @@ export function canAddOne(
     picks: Picks,
 ): boolean {
     return (
-        (picks[option.id] ?? 0) < option.maxQuantity && hasRoomIn(group, picks)
+        (picks[option.id] ?? 0) < option.maxPerItem && hasRoomIn(group, picks)
     );
 }
 
@@ -171,7 +168,7 @@ export function toggle(
         return withQuantity(option.id, 0, picks);
     }
 
-    if (group.maxSelections === 1) {
+    if (group.maxPicks === 1) {
         return choose(group, option, picks);
     }
 

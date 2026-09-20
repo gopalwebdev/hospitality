@@ -6,10 +6,12 @@ use App\Enums\ChargeCalculation;
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
 use App\Enums\Diet;
+use App\Enums\GstTreatment;
 use App\Enums\HomeRowLayout;
 use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\MenuRailType;
 use App\Enums\Role;
 use App\Enums\TenantType;
 use App\Enums\Weekday;
@@ -24,6 +26,7 @@ use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
+use App\Models\MenuRail;
 use App\Models\Tenant;
 use App\Models\User;
 use Closure;
@@ -49,7 +52,26 @@ class TenantSeeder extends Seeder
      * read them: a restaurant and a hotel serve different things, and the
      * hotel is what shows items and service requests sharing one menu.
      *
-     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string, menus: list<string>}>
+     * The GST fields make the three demonstrate every `GstTreatment` and both
+     * `prices_include_tax` states, because a fresh install otherwise shows
+     * "GST 0%" everywhere and neither tax display path is visible:
+     * - **Spice Garden** (Chennai, Tamil Nadu) is the plain case — intra-state,
+     *   5% the way a standalone restaurant usually is, prices quoted before
+     *   tax the way a printed menu usually is.
+     * - **Seaview Residency** sits in Puducherry, a union territory, so its
+     *   own statement is `UnionTerritory` (CGST + UTGST, the same money as
+     *   SGST under a different name — `.ai/rules/enums.md`) rather than
+     *   picked for variety's sake. Its rate is 18%, the hotel-tariff slab, and
+     *   its prices already include it, the way an in-room rate card usually
+     *   quotes.
+     * - **Sunrise Multispecialty Hospital** rounds out `TenantType` — hospital
+     *   was wholly unseeded — and states `InterState`, so an order there
+     *   shows one IGST line rather than a CGST/SGST split. It also switches
+     *   `tax_overrides_item_rates` on, so every line on its bill is taxed at
+     *   its own 5% however an item's own `tax_rate` reads — the one seeded
+     *   tenant demonstrating that override.
+     *
+     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string, menus: list<string>, gstin: string, gst_treatment: GstTreatment, cgst_rate: int, sgst_rate: int, tax_overrides_item_rates: bool, prices_include_tax: bool}>
      */
     public const array TENANTS = [
         [
@@ -65,6 +87,13 @@ class TenantSeeder extends Seeder
             'staff_name' => 'Spice Garden Staff',
             'staff_email' => 'gopalwebdev+spice-staff@gmail.com',
             'menus' => ['main', 'drinks', 'breakfast'],
+            // Tamil Nadu (state code 33). Intra-state, 5%, quoted before tax.
+            'gstin' => '33AAACS1429K1Z1',
+            'gst_treatment' => GstTreatment::IntraState,
+            'cgst_rate' => 250,
+            'sgst_rate' => 250,
+            'tax_overrides_item_rates' => false,
+            'prices_include_tax' => false,
         ],
         [
             'slug' => 'seaview',
@@ -79,6 +108,38 @@ class TenantSeeder extends Seeder
             'staff_name' => 'Seaview Residency Staff',
             'staff_email' => 'gopalwebdev+seaview-staff@gmail.com',
             'menus' => ['in_room_dining', 'breakfast', 'room_requests'],
+            // Puducherry (state code 34), a union territory with no
+            // legislature — CGST + UTGST, riding the SGST columns. 18%, the
+            // hotel-tariff slab, already inside the rate card's prices.
+            'gstin' => '34AAACS5821H1Z7',
+            'gst_treatment' => GstTreatment::UnionTerritory,
+            'cgst_rate' => 900,
+            'sgst_rate' => 900,
+            'tax_overrides_item_rates' => false,
+            'prices_include_tax' => true,
+        ],
+        [
+            'slug' => 'sunrise',
+            'type' => TenantType::Hospital,
+            'name' => 'Sunrise Multispecialty Hospital',
+            'address' => '45 Residency Road, Bengaluru',
+            'pincode' => '560025',
+            'email' => 'hello@sunrisehospital.example.com',
+            'phone' => '9945012345',
+            'owner_name' => 'Sunrise Hospital Owner',
+            'owner_email' => 'gopalwebdev+sunrise@gmail.com',
+            'staff_name' => 'Sunrise Hospital Staff',
+            'staff_email' => 'gopalwebdev+sunrise-staff@gmail.com',
+            'menus' => ['patient_care'],
+            // Karnataka (state code 29). Its own statement is inter-state —
+            // one IGST line, no CGST/SGST split — and it taxes its whole bill
+            // at this rate whatever an item's own tax_rate says.
+            'gstin' => '29AAACS7734L1Z4',
+            'gst_treatment' => GstTreatment::InterState,
+            'cgst_rate' => 250,
+            'sgst_rate' => 250,
+            'tax_overrides_item_rates' => true,
+            'prices_include_tax' => false,
         ],
     ];
 
@@ -86,21 +147,68 @@ class TenantSeeder extends Seeder
      * Every card a tenant can be seeded with, keyed by the name TENANTS uses.
      *
      * Each is a menu's name in both languages, its sections, whether the combos
-     * are seeded onto it, and an optional service window.
+     * are seeded onto it, an optional service window, and where its rails —
+     * its featured items, its combos — are placed among its categories.
      *
-     * @var array<string, array{name: array<string, string>, sections: list<array<string, mixed>>, combos?: bool, available_from?: string, available_until?: string}>
+     * `rails` is deliberately arranged differently from one card to the next,
+     * so `Menu::readingOrder()` is exercised beyond the "nobody has arranged
+     * this" default it falls back to when a rail has no row at all: leading
+     * on one card, sitting mid-card on another, closing a third. See
+     * `seedRails()`.
+     *
+     * @var array<string, array{name: array<string, string>, sections: list<array<string, mixed>>, combos?: bool, available_from?: string, available_until?: string, rails: list<array{type: MenuRailType, position: int}>}>
      */
     public const array CARDS = [
-        'main' => ['name' => self::MENU_NAME, 'sections' => self::MENU, 'combos' => true],
-        'in_room_dining' => ['name' => self::IN_ROOM_DINING_MENU_NAME, 'sections' => self::MENU, 'combos' => true],
-        'drinks' => ['name' => self::DRINKS_MENU_NAME, 'sections' => self::DRINKS],
+        'main' => [
+            'name' => self::MENU_NAME,
+            'sections' => self::MENU,
+            'combos' => true,
+            // Untouched at the top, the way a menu nobody has dragged reads
+            // anyway — and the combos rail pulled into the middle of the
+            // card, ahead of Curries, so the two cards sharing this content
+            // (this one and in_room_dining below) read differently.
+            'rails' => [
+                ['type' => MenuRailType::Featured, 'position' => 0],
+                ['type' => MenuRailType::Combos, 'position' => 3],
+            ],
+        ],
+        'in_room_dining' => [
+            'name' => self::IN_ROOM_DINING_MENU_NAME,
+            'sections' => self::MENU,
+            'combos' => true,
+            // The opposite arrangement: combos mid-card, featured items
+            // closing it out after Desserts.
+            'rails' => [
+                ['type' => MenuRailType::Combos, 'position' => 5],
+                ['type' => MenuRailType::Featured, 'position' => 6],
+            ],
+        ],
+        'drinks' => [
+            'name' => self::DRINKS_MENU_NAME,
+            'sections' => self::DRINKS,
+            // Between Hot and Cold.
+            'rails' => [['type' => MenuRailType::Featured, 'position' => 1]],
+        ],
         'breakfast' => [
             'name' => self::BREAKFAST_MENU_NAME,
             'sections' => self::BREAKFAST,
             'available_from' => self::BREAKFAST_FROM,
             'available_until' => self::BREAKFAST_UNTIL,
+            // Between Tiffin and Egg Specials.
+            'rails' => [['type' => MenuRailType::Featured, 'position' => 1]],
         ],
-        'room_requests' => ['name' => self::ROOM_REQUESTS_MENU_NAME, 'sections' => self::ROOM_REQUESTS],
+        'room_requests' => [
+            'name' => self::ROOM_REQUESTS_MENU_NAME,
+            'sections' => self::ROOM_REQUESTS,
+            // Closing the card, after Bathroom and Drinks.
+            'rails' => [['type' => MenuRailType::Featured, 'position' => 2]],
+        ],
+        'patient_care' => [
+            'name' => self::PATIENT_CARE_MENU_NAME,
+            'sections' => self::PATIENT_CARE,
+            // Between Meals and Requests.
+            'rails' => [['type' => MenuRailType::Featured, 'position' => 1]],
+        ],
     ];
 
     /**
@@ -134,6 +242,12 @@ class TenantSeeder extends Seeder
                 'menus' => ['in_room_dining', 'breakfast'],
             ],
         ],
+        'sunrise' => [
+            [
+                'name' => ['en' => 'Tray Delivery Charge', 'ta' => 'தட்டு விநியோக கட்டணம்'],
+                'amount' => 1500,
+            ],
+        ],
     ];
 
     /**
@@ -147,13 +261,18 @@ class TenantSeeder extends Seeder
      * two of. `items` is the order a group is linked in, and a group earlier in
      * this list comes first on an item that has several.
      *
-     * @var list<array{name: array<string, string>, is_required: bool, max_selections: int|null, options: list<array{name: array<string, string>, price: int, max_quantity?: int, is_default?: bool, stock_quantity?: int}>, items: list<string>}>
+     * `item_max_picks` is the subtle path: `MenuItemAddOnGroup::max_picks`,
+     * set only for the item named, tighter than the group's own — an
+     * override rather than the group's default, which every other item
+     * offering the group leaves at null and simply inherits.
+     *
+     * @var list<array{name: array<string, string>, is_required: bool, max_picks: int|null, options: list<array{name: array<string, string>, price: int, max_per_item?: int, is_default?: bool, stock_quantity?: int}>, items: list<string>, item_max_picks?: array<string, int>}>
      */
     public const array ADD_ON_GROUPS = [
         [
             'name' => ['en' => 'Portion', 'ta' => 'அளவு'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Half', 'ta' => 'அரை'], 'price' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Full', 'ta' => 'முழு'], 'price' => 15000],
@@ -163,7 +282,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Spice level', 'ta' => 'காரம்'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Mild', 'ta' => 'குறைவு'], 'price' => 0],
                 ['name' => ['en' => 'Medium', 'ta' => 'நடுத்தரம்'], 'price' => 0, 'is_default' => true],
@@ -174,7 +293,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Choose your bread', 'ta' => 'ரொட்டியைத் தேர்ந்தெடுக்கவும்'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Butter naan', 'ta' => 'பட்டர் நான்'], 'price' => 0],
                 ['name' => ['en' => 'Garlic naan', 'ta' => 'பூண்டு நான்'], 'price' => 2000],
@@ -185,21 +304,28 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Extras', 'ta' => 'கூடுதல்'],
             'is_required' => false,
-            'max_selections' => 3,
+            'max_picks' => 3,
             'options' => [
-                ['name' => ['en' => 'Extra cheese', 'ta' => 'கூடுதல் சீஸ்'], 'price' => 4000, 'max_quantity' => 2],
+                ['name' => ['en' => 'Extra cheese', 'ta' => 'கூடுதல் சீஸ்'], 'price' => 4000, 'max_per_item' => 2],
                 ['name' => ['en' => 'Extra paneer', 'ta' => 'கூடுதல் பன்னீர்'], 'price' => 6000, 'stock_quantity' => 15],
                 ['name' => ['en' => 'Raita', 'ta' => 'ராய்தா'], 'price' => 3000],
             ],
             'items' => ['Paneer Tikka', 'Paneer Butter Masala', 'Hyderabadi Chicken Biryani', 'Vegetable Dum Biryani'],
+            // A vegetable biryani already comes heavier on vegetables than the
+            // meat ones, so this one item caps the group's usual three picks
+            // down to one — MenuItemAddOnGroup::max_picks, tighter than
+            // MenuAddOnGroup::max_picks, rather than the group's own default.
+            'item_max_picks' => ['Vegetable Dum Biryani' => 1],
         ],
         [
             'name' => ['en' => 'Dosa sides', 'ta' => 'தோசை துணைகள்'],
             'is_required' => false,
-            'max_selections' => 4,
+            // Null rather than a number: a dosa may take as much of each side
+            // as its own max_per_item allows, with nothing capping the total.
+            'max_picks' => null,
             'options' => [
-                ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price' => 1500, 'max_quantity' => 2],
-                ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price' => 1500, 'max_quantity' => 2],
+                ['name' => ['en' => 'Extra chutney', 'ta' => 'கூடுதல் சட்னி'], 'price' => 1500, 'max_per_item' => 2],
+                ['name' => ['en' => 'Extra sambar', 'ta' => 'கூடுதல் சாம்பார்'], 'price' => 1500, 'max_per_item' => 2],
                 ['name' => ['en' => 'Ghee', 'ta' => 'நெய்'], 'price' => 2500],
             ],
             'items' => ['Masala Dosa', 'Ghee Roast', 'Idli Plate'],
@@ -207,7 +333,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Sugar', 'ta' => 'சர்க்கரை'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Regular', 'ta' => 'வழக்கம்'], 'price' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Less sugar', 'ta' => 'குறைந்த சர்க்கரை'], 'price' => 0],
@@ -218,7 +344,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Strength', 'ta' => 'கடுமை'],
             'is_required' => false,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Extra strong', 'ta' => 'கூடுதல் கடுமையான'], 'price' => 1000],
             ],
@@ -227,7 +353,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Sweet or salted', 'ta' => 'இனிப்பு அல்லது உப்பு'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Sweet', 'ta' => 'இனிப்பு'], 'price' => 0, 'is_default' => true],
                 ['name' => ['en' => 'Salted', 'ta' => 'உப்பு'], 'price' => 0],
@@ -238,7 +364,7 @@ class TenantSeeder extends Seeder
             // A service request customised like anything else: which pillow.
             'name' => ['en' => 'Pillow type', 'ta' => 'தலையணை வகை'],
             'is_required' => true,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Feather', 'ta' => 'இறகு'], 'price' => 0],
                 ['name' => ['en' => 'Memory foam', 'ta' => 'மெமரி ஃபோம்'], 'price' => 0],
@@ -248,7 +374,7 @@ class TenantSeeder extends Seeder
         [
             'name' => ['en' => 'Delivery time', 'ta' => 'கொண்டுவரும் நேரம்'],
             'is_required' => false,
-            'max_selections' => 1,
+            'max_picks' => 1,
             'options' => [
                 ['name' => ['en' => 'Now', 'ta' => 'இப்போது'], 'price' => 0],
                 ['name' => ['en' => 'In 30 minutes', 'ta' => '30 நிமிடங்களில்'], 'price' => 0],
@@ -323,7 +449,7 @@ class TenantSeeder extends Seeder
                     'is_service_request' => true,
                     'price' => 0,
                     // Two to an order, however they are split between kinds.
-                    'max_quantity' => 2,
+                    'max_per_order' => 2,
                     // Counted: the linen room has only so many.
                     'stock_quantity' => 30,
                     'is_featured' => true,
@@ -333,13 +459,13 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Extra Blanket', 'ta' => 'கூடுதல் போர்வை'],
                     'is_service_request' => true,
                     'price' => 0,
-                    'max_quantity' => 2,
+                    'max_per_order' => 2,
                 ],
                 [
                     'name' => ['en' => 'Bedsheet Change', 'ta' => 'படுக்கை விரிப்பு மாற்றம்'],
                     'is_service_request' => true,
                     'price' => 0,
-                    'max_quantity' => 1,
+                    'max_per_order' => 1,
                 ],
                 [
                     'name' => ['en' => 'Towel Set', 'ta' => 'துண்டு தொகுப்பு'],
@@ -352,6 +478,8 @@ class TenantSeeder extends Seeder
                     'is_service_request' => true,
                     'price' => 15000,
                     'tax_rate' => 1800,
+                    // A SAC, not an HSN: this is a service, not a good.
+                    'hsn_sac_code' => '999721',
                 ],
             ],
         ],
@@ -370,6 +498,84 @@ class TenantSeeder extends Seeder
                     'price' => 4000,
                     'diets' => [Diet::Vegetarian],
                     'tax_rate' => 1800,
+                    // A sealed good, not a served drink: HSN, not SAC.
+                    'hsn_sac_code' => '2201',
+                ],
+            ],
+        ],
+    ];
+
+    /**
+     * The hospital's one card, in both languages.
+     *
+     * @var array<string, string>
+     */
+    public const array PATIENT_CARE_MENU_NAME = ['en' => 'Patient Care', 'ta' => 'நோயாளர் பராமரிப்பு'];
+
+    /**
+     * What the hospital's card carries: meals a ward orders, and a handful of
+     * requests beside them — the same "things to order and service requests
+     * side by side" shape the hotel's room requests card shows, in a
+     * hospital's own words rather than a hotel's.
+     *
+     * Reuses a few of the restaurant and hotel's own English names on
+     * purpose — Filter Coffee, Extra Pillow — so `seedAddOnGroups()` links
+     * this tenant's own copy of those items to its own copy of the Sugar,
+     * Strength and Pillow type groups, exactly as the breakfast card both
+     * tenants already share does.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public const array PATIENT_CARE = [
+        [
+            'name' => ['en' => 'Meals', 'ta' => 'உணவுகள்'],
+            'items' => [
+                [
+                    'name' => ['en' => 'Diabetic Thali', 'ta' => 'நீரிழிவு தாலி'],
+                    'price' => 9000,
+                    'diets' => [Diet::Vegetarian],
+                    'stock_quantity' => 20,
+                ],
+                [
+                    'name' => ['en' => 'Regular Thali', 'ta' => 'சாதாரண தாலி'],
+                    'price' => 8000,
+                    'diets' => [Diet::Vegetarian],
+                ],
+                [
+                    'name' => ['en' => 'Filter Coffee', 'ta' => 'ஃபில்டர் காபி'],
+                    'price' => 5000,
+                    'diets' => [Diet::Vegetarian],
+                    'is_featured' => true,
+                    'featured_position' => 1,
+                ],
+            ],
+        ],
+        [
+            'name' => ['en' => 'Requests', 'ta' => 'கோரிக்கைகள்'],
+            'items' => [
+                [
+                    // Complimentary, like the hotel's housekeeping requests —
+                    // and still worth a SAC, because a support service is
+                    // billed to the stay even at a price of nothing.
+                    'name' => ['en' => 'Wheelchair Assistance', 'ta' => 'சக்கர நாற்காலி உதவி'],
+                    'is_service_request' => true,
+                    'price' => 0,
+                    'max_per_order' => 1,
+                    'hsn_sac_code' => '999312',
+                ],
+                [
+                    'name' => ['en' => 'Extra Pillow', 'ta' => 'கூடுதல் தலையணை'],
+                    'is_service_request' => true,
+                    'price' => 0,
+                    'max_per_order' => 2,
+                    'stock_quantity' => 15,
+                ],
+                [
+                    // Something to order beside the requests, the way the
+                    // hotel's water bottle sits beside its pillows.
+                    'name' => ['en' => 'Attender Meal Tray', 'ta' => 'உதவியாளர் உணவு தட்டு'],
+                    'price' => 7000,
+                    'diets' => [Diet::Vegetarian],
                 ],
             ],
         ],
@@ -418,6 +624,10 @@ class TenantSeeder extends Seeder
                             'name' => ['en' => 'Idli Plate', 'ta' => 'இட்லி பிளேட்'],
                             'price' => 8000,
                             'diets' => [Diet::Vegetarian, Diet::Vegan],
+                            // A staple steamed in the merit slab, called out
+                            // explicitly rather than left to whatever the
+                            // tenant's own rate happens to be.
+                            'tax_rate' => 500,
                         ],
                         [
                             'name' => ['en' => 'Medu Vada', 'ta' => 'மெது வடை'],
@@ -456,8 +666,11 @@ class TenantSeeder extends Seeder
      *     name: array<string, string>,
      *     description: array<string, string>,
      *     price: int,
-     *     compare_at_price: int,
-     *     contents: list<array{name: array<string, string>, quantity: int}>
+     *     original_price: int,
+     *     contents: list<array{name: array<string, string>, quantity: int}>,
+     *     tax_rate?: int,
+     *     hsn_sac_code?: string,
+     *     max_per_order?: int
      * }>
      */
     public const array COMBOS = [
@@ -468,7 +681,7 @@ class TenantSeeder extends Seeder
                 'ta' => 'சிக்கன் பிரியாணி, ஒரு தொடக்கம், இரண்டு ரொட்டிகள்.',
             ],
             'price' => 59900,
-            'compare_at_price' => 75900,
+            'original_price' => 75900,
             'contents' => [
                 ['name' => ['en' => 'Hyderabadi Chicken Biryani'], 'quantity' => 1],
                 ['name' => ['en' => 'Chicken 65'], 'quantity' => 1],
@@ -482,7 +695,7 @@ class TenantSeeder extends Seeder
                 'ta' => 'பன்னீர் பட்டர் மசாலா, தால், இரண்டு ரொட்டிகள், ஒரு இனிப்பு.',
             ],
             'price' => 44900,
-            'compare_at_price' => 58800,
+            'original_price' => 58800,
             'contents' => [
                 ['name' => ['en' => 'Paneer Butter Masala'], 'quantity' => 1],
                 ['name' => ['en' => 'Dal Tadka'], 'quantity' => 1],
@@ -497,12 +710,16 @@ class TenantSeeder extends Seeder
                 'ta' => 'நான்கு பேருக்கு போதுமான பிரியாணி, கிரேவி, ரொட்டி.',
             ],
             'price' => 129900,
-            'compare_at_price' => 159600,
+            'original_price' => 159600,
             'contents' => [
                 ['name' => ['en' => 'Mutton Dum Biryani'], 'quantity' => 2],
                 ['name' => ['en' => 'Butter Chicken'], 'quantity' => 1],
                 ['name' => ['en' => 'Butter Naan'], 'quantity' => 4],
             ],
+            // Feeds four, so more than a handful of these on one order reads
+            // as a mistake rather than a large table — a larger cap than the
+            // 1 or 2 the other combos carry.
+            'max_per_order' => 3,
         ],
         [
             'name' => ['en' => 'Lunch Box', 'ta' => 'மதிய உணவுப் பெட்டி'],
@@ -511,11 +728,17 @@ class TenantSeeder extends Seeder
                 'ta' => 'ஒரு சைவ பிரியாணி, ஒரு சூப் — பார்சலாக.',
             ],
             'price' => 39900,
-            'compare_at_price' => 44900,
+            'original_price' => 44900,
             'contents' => [
                 ['name' => ['en' => 'Vegetable Dum Biryani'], 'quantity' => 1],
                 ['name' => ['en' => 'Sweet Corn Soup'], 'quantity' => 1],
             ],
+            // Packed and sealed to go rather than served, so it is billed
+            // under a different slab from the rest of the card.
+            'tax_rate' => 1200,
+            'hsn_sac_code' => '2106',
+            // One box per order: it is meant for one person to carry out.
+            'max_per_order' => 1,
         ],
     ];
 
@@ -566,7 +789,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Mango Lassi', 'ta' => 'மாம்பழ லஸ்ஸி'],
                             'price' => 11000,
-                            'compare_at_price' => 13000,
+                            'original_price' => 13000,
                             'diets' => [Diet::Vegetarian],
                             'is_featured' => true,
                             'featured_position' => 2,
@@ -588,12 +811,14 @@ class TenantSeeder extends Seeder
                             'price' => 6000,
                             'diets' => [Diet::Vegetarian],
                             'tax_rate' => 4000,
+                            'hsn_sac_code' => '2202',
                         ],
                         [
                             'name' => ['en' => 'Mineral Water', 'ta' => 'மினரல் வாட்டர்'],
                             'price' => 2000,
                             'diets' => [Diet::Vegetarian],
                             'tax_rate' => 1800,
+                            'hsn_sac_code' => '2201',
                         ],
                     ],
                 ],
@@ -633,7 +858,7 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Chicken 65', 'ta' => 'சிக்கன் 65'],
                             'price' => 29900,
-                            'compare_at_price' => 34900,
+                            'original_price' => 34900,
                             'diets' => [Diet::NonVegetarian],
                             'is_featured' => true,
                             'featured_position' => 2,
@@ -696,10 +921,14 @@ class TenantSeeder extends Seeder
                         [
                             'name' => ['en' => 'Hyderabadi Chicken Biryani', 'ta' => 'ஹைதராபாதி சிக்கன் பிரியாணி'],
                             'price' => 38000,
-                            'compare_at_price' => 45000,
+                            'original_price' => 45000,
                             'diets' => [Diet::NonVegetarian],
                             'is_featured' => true,
                             'featured_position' => 3,
+                            // Counted too, unlike most of the card, so an
+                            // order and the Biryani Feast combo both draw on
+                            // the same pot without either running it dry.
+                            'stock_quantity' => 25,
                         ],
                         [
                             'name' => ['en' => 'Chicken 65 Biryani', 'ta' => 'சிக்கன் 65 பிரியாணி'],
@@ -716,8 +945,16 @@ class TenantSeeder extends Seeder
                             'price' => 46000,
                             'diets' => [Diet::NonVegetarian],
                             // Made in one pot a day, so it is counted — and the
-                            // biryani combo draws on the same count.
-                            'stock_quantity' => 20,
+                            // biryani combo draws on the same count. Today's
+                            // pot sold out before service even opened, at
+                            // exactly zero rather than merely marked off, so
+                            // both `ItemAvailability::OutOfStock` and "a combo
+                            // holding a counted item with none left is
+                            // unorderable" are visible on a fresh install —
+                            // the Family Pack combo above holds this item and
+                            // so is unorderable until it is restocked.
+                            'stock_quantity' => 0,
+                            'availability' => ItemAvailability::OutOfStock,
                         ],
                         [
                             'name' => ['en' => 'Mutton Keema Biryani', 'ta' => 'மட்டன் கீமா பிரியாணி'],
@@ -793,6 +1030,10 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Butter Naan', 'ta' => 'பட்டர் நான்'],
                     'price' => 8000,
                     'diets' => [Diet::Vegetarian],
+                    // A table sharing curries orders these by the half-dozen,
+                    // so its cap is a genuinely large one rather than the 1 or
+                    // 2 the rest of the card carries.
+                    'max_per_order' => 10,
                 ],
                 [
                     'name' => ['en' => 'Tandoori Roti', 'ta' => 'தந்தூரி ரொட்டி'],
@@ -818,6 +1059,12 @@ class TenantSeeder extends Seeder
                     'name' => ['en' => 'Gulab Jamun', 'ta' => 'குலாப் ஜாமூன்'],
                     'price' => 12000,
                     'diets' => [Diet::Vegetarian],
+                    // The seeded 12% example: a rate this application never
+                    // hardcodes as a slab, but one a tenant's own accountant
+                    // may still type in on an item priced before GST 2.0
+                    // collapsed the public rate list (.ai/rules/enums.md).
+                    'tax_rate' => 1200,
+                    'hsn_sac_code' => '2106',
                 ],
                 [
                     'name' => ['en' => 'Rasmalai', 'ta' => 'ரஸ்மலாய்'],
@@ -839,6 +1086,7 @@ class TenantSeeder extends Seeder
                     'price' => 18000,
                     'diets' => [Diet::Vegetarian],
                     'tax_rate' => 1800,
+                    'hsn_sac_code' => '2105',
                 ],
             ],
         ],
@@ -870,6 +1118,12 @@ class TenantSeeder extends Seeder
                 'alternate_phone' => '+91 98765 43211',
                 'landline_phone' => '+91 44 2345 6789',
                 'currency' => Currency::IndianRupee,
+                'gstin' => $definition['gstin'],
+                'gst_treatment' => $definition['gst_treatment'],
+                'cgst_rate' => $definition['cgst_rate'],
+                'sgst_rate' => $definition['sgst_rate'],
+                'tax_overrides_item_rates' => $definition['tax_overrides_item_rates'],
+                'prices_include_tax' => $definition['prices_include_tax'],
             ]);
 
             $this->seedOpeningHours($tenant);
@@ -964,6 +1218,10 @@ class TenantSeeder extends Seeder
             if ($card['combos'] ?? false) {
                 $this->seedCombos($tenant, $menu);
             }
+
+            // After the card and its combos, because a rail's position is
+            // read against the categories it is dragged among.
+            $this->seedRails($tenant, $menu, $card['rails']);
 
             $menus[$key] = $menu;
         }
@@ -1098,17 +1356,21 @@ class TenantSeeder extends Seeder
                 'price' => $item['price'],
                 // Null on almost every item: not on offer. A zero would be a
                 // price of nothing.
-                'compare_at_price' => $item['compare_at_price'] ?? null,
+                'original_price' => $item['original_price'] ?? null,
                 'is_service_request' => $item['is_service_request'] ?? false,
                 'diets' => $item['diets'] ?? null,
                 'availability' => $item['availability'] ?? ItemAvailability::Available,
                 // Null is no limit.
-                'max_quantity' => $item['max_quantity'] ?? null,
+                'max_per_order' => $item['max_per_order'] ?? null,
                 // Null is nobody counting.
                 'stock_quantity' => $item['stock_quantity'] ?? null,
                 'is_featured' => $item['is_featured'] ?? false,
                 'featured_position' => $item['featured_position'] ?? 0,
+                // Null falls back to the tenant's own rate — almost every item.
                 'tax_rate' => $item['tax_rate'] ?? null,
+                // HSN for goods, SAC for a service; null on most items, which
+                // is a fair invoice with no code rather than a wrong one.
+                'hsn_sac_code' => $item['hsn_sac_code'] ?? null,
                 'position' => $position,
             ]),
             [
@@ -1131,21 +1393,23 @@ class TenantSeeder extends Seeder
     private function seedAddOnGroups(Tenant $tenant): void
     {
         foreach (self::ADD_ON_GROUPS as $position => $definition) {
-            $itemIds = MenuItem::query()
+            $items = MenuItem::query()
                 ->where('tenant_id', $tenant->getKey())
                 ->whereIn('name->'.Locale::English->value, $definition['items'])
-                ->pluck('id');
+                ->get(['id', 'name']);
 
-            if ($itemIds->isEmpty()) {
+            if ($items->isEmpty()) {
                 continue;
             }
+
+            $itemMaxPicks = $definition['item_max_picks'] ?? [];
 
             $group = $this->firstOrCreateByEnglishName(
                 MenuAddOnGroup::query()->where('tenant_id', $tenant->getKey()),
                 $definition['name'],
                 fn (): MenuAddOnGroup => new MenuAddOnGroup([
                     'is_required' => $definition['is_required'],
-                    'max_selections' => $definition['max_selections'],
+                    'max_picks' => $definition['max_picks'],
                 ]),
                 ['tenant_id' => $tenant->getKey()],
             );
@@ -1156,7 +1420,7 @@ class TenantSeeder extends Seeder
                     $option['name'],
                     fn (): MenuAddOnOption => new MenuAddOnOption([
                         'price' => $option['price'],
-                        'max_quantity' => $option['max_quantity'] ?? 1,
+                        'max_per_item' => $option['max_per_item'] ?? 1,
                         'is_default' => $option['is_default'] ?? false,
                         'is_available' => true,
                         // Null is nobody counting.
@@ -1167,10 +1431,16 @@ class TenantSeeder extends Seeder
                 );
             }
 
-            foreach ($itemIds as $itemId) {
+            foreach ($items as $item) {
                 MenuItemAddOnGroup::query()->firstOrCreate(
-                    ['menu_item_id' => $itemId, 'menu_add_on_group_id' => $group->getKey()],
-                    ['tenant_id' => $tenant->getKey(), 'position' => $position],
+                    ['menu_item_id' => $item->getKey(), 'menu_add_on_group_id' => $group->getKey()],
+                    [
+                        'tenant_id' => $tenant->getKey(),
+                        'position' => $position,
+                        // Null follows the group's own maximum; only the item
+                        // named in item_max_picks caps it tighter.
+                        'max_picks' => $itemMaxPicks[$item->getTranslation('name', Locale::English->value)] ?? null,
+                    ],
                 );
             }
         }
@@ -1193,8 +1463,12 @@ class TenantSeeder extends Seeder
                 fn (): MenuCombo => new MenuCombo([
                     'description' => $definition['description'],
                     'price' => $definition['price'],
-                    'compare_at_price' => $definition['compare_at_price'],
+                    'original_price' => $definition['original_price'],
+                    'tax_rate' => $definition['tax_rate'] ?? null,
+                    'hsn_sac_code' => $definition['hsn_sac_code'] ?? null,
                     'availability' => ItemAvailability::Available,
+                    // Null is no limit.
+                    'max_per_order' => $definition['max_per_order'] ?? null,
                     'position' => $position,
                 ]),
                 ['tenant_id' => $tenant->getKey(), 'menu_id' => $menu->getKey()],
@@ -1220,6 +1494,45 @@ class TenantSeeder extends Seeder
                     ],
                 );
             }
+        }
+    }
+
+    /**
+     * Place a menu's featured and combos rails among its categories.
+     *
+     * `menu_rails.position` shares the same number space as
+     * `menu_categories.position` (`Menu::readingOrder()`), and ties break a
+     * rail before a category sharing its number, in `MenuRailType` order
+     * (`ApplyMenuArrangement`) — so a rail placed at the same position as an
+     * existing category sits immediately ahead of it rather than needing the
+     * category renumbered to make room. That is what lets CARDS give each
+     * card its own arrangement — leading, mid-card, closing — by naming a
+     * position alone.
+     *
+     * A rail every menu is entitled to but nobody has placed reads at the top
+     * regardless (`Menu::readingOrder()`), so a card left out of CARDS'
+     * `rails` — one with nothing featured and no combos — is not missing
+     * anything a guest would notice; it is simply one this seeder leaves for
+     * `ApplyMenuArrangement` to write the first time someone drags it.
+     *
+     * Loosely typed like every other CARDS-shaped parameter here
+     * (`seedCard()`, `seedCategory()`): CARDS is looked up by a variable key
+     * (`self::CARDS[$key]`), which is as far as static analysis can follow
+     * the precise shape documented on the constant itself.
+     *
+     * @param  list<array<string, mixed>>  $rails  each a MenuRailType and the position to place it at
+     */
+    private function seedRails(Tenant $tenant, Menu $menu, array $rails): void
+    {
+        foreach ($rails as $rail) {
+            // MenuRail::type casts to MenuRailType, and Eloquent's query
+            // builder reads a backed enum's own value when it is used in a
+            // where clause — the same way seedOpeningHours() hands Weekday
+            // straight to firstOrCreate().
+            MenuRail::query()->firstOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'menu_id' => $menu->getKey(), 'type' => $rail['type']],
+                ['position' => $rail['position']],
+            );
         }
     }
 
@@ -1271,6 +1584,66 @@ class TenantSeeder extends Seeder
                 'menu_id' => $menu->getKey(),
             ]);
         }
+
+        // A second row, of small circles: App\Enums\HomeRowLayout::Links,
+        // for the places this tenant is also found — the guest app draws
+        // these as circular rather than the banner's rectangles.
+        $links = HomeRow::query()->firstOrCreate(
+            ['tenant_id' => $tenant->getKey(), 'position' => 1],
+            ['layout' => HomeRowLayout::Links, 'is_active' => true],
+        );
+
+        $this->firstOrCreateByEnglishName(
+            HomeTile::query()->where('home_row_id', $links->getKey()),
+            ['en' => 'Instagram', 'ta' => 'இன்ஸ்டாகிராம்'],
+            fn (): HomeTile => new HomeTile([
+                'action' => HomeTileAction::Link,
+                'url' => 'https://instagram.com/'.$tenant->slug,
+                'position' => 0,
+                'is_active' => true,
+            ]),
+            ['tenant_id' => $tenant->getKey(), 'home_row_id' => $links->getKey()],
+            'label',
+        );
+
+        $this->firstOrCreateByEnglishName(
+            HomeTile::query()->where('home_row_id', $links->getKey()),
+            ['en' => 'WhatsApp', 'ta' => 'வாட்ஸ்அப்'],
+            fn (): HomeTile => new HomeTile([
+                'action' => HomeTileAction::Link,
+                'url' => 'https://wa.me/91'.$tenant->phone,
+                'position' => 1,
+                'is_active' => true,
+            ]),
+            ['tenant_id' => $tenant->getKey(), 'home_row_id' => $links->getKey()],
+            'label',
+        );
+
+        // A third row, App\Enums\HomeRowLayout::Carousel, holding the one
+        // App\Enums\HomeTileAction::Pdf tile in the seed: there is no
+        // photography to seed (see the banner's own comment above), so a
+        // document is what this layout carries instead of pictures.
+        $carousel = HomeRow::query()->firstOrCreate(
+            ['tenant_id' => $tenant->getKey(), 'position' => 2],
+            ['layout' => HomeRowLayout::Carousel, 'is_active' => true],
+        );
+
+        $this->firstOrCreateByEnglishName(
+            HomeTile::query()->where('home_row_id', $carousel->getKey()),
+            ['en' => 'FSSAI License', 'ta' => 'FSSAI உரிமம்'],
+            fn (): HomeTile => new HomeTile([
+                'action' => HomeTileAction::Pdf,
+                // No file actually sits at this path — there is nothing to
+                // upload for a seeder — but TileController 404s a missing
+                // one rather than erroring, and the row demonstrates the
+                // shape an admin's own upload would take.
+                'document_path' => 'documents/'.$tenant->slug.'-fssai-license.pdf',
+                'position' => 0,
+                'is_active' => true,
+            ]),
+            ['tenant_id' => $tenant->getKey(), 'home_row_id' => $carousel->getKey()],
+            'label',
+        );
     }
 
     /**

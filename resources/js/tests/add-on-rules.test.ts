@@ -12,14 +12,14 @@ import {
     step,
     toggle,
     unitPrice,
-    withItemMaxSelections,
+    withItemMaxPicks,
 } from '@/lib/add-on-rules';
 
 function option(overrides: Partial<AddOnOption> & { id: number }): AddOnOption {
     return {
         name: `Option ${String(overrides.id)}`,
         price: 0,
-        maxQuantity: 1,
+        maxPerItem: 1,
         isDefault: false,
         ...overrides,
     };
@@ -29,7 +29,7 @@ const cheese = option({
     id: 11,
     name: 'Extra cheese',
     price: 4000,
-    maxQuantity: 2,
+    maxPerItem: 2,
 });
 const paneer = option({ id: 12, name: 'Extra paneer', price: 6000 });
 const raita = option({ id: 13, name: 'Raita', price: 3000 });
@@ -38,7 +38,7 @@ const extras: AddOnGroup = {
     id: 1,
     name: 'Extras',
     isRequired: false,
-    maxSelections: 3,
+    maxPicks: 3,
     options: [cheese, paneer, raita],
 };
 
@@ -54,7 +54,7 @@ const bread: AddOnGroup = {
     id: 2,
     name: 'Bread',
     isRequired: true,
-    maxSelections: 1,
+    maxPicks: 1,
     options: [butterNaan, garlicNaan],
 };
 
@@ -73,13 +73,13 @@ describe('add-on rules', () => {
             path: 'customise.choose_up_to',
             replacements: { count: 3 },
         });
-        expect(
-            ruleOf({ ...extras, isRequired: true, maxSelections: null }),
-        ).toEqual({
-            path: 'customise.choose_at_least',
-            replacements: { count: 1 },
-        });
-        expect(ruleOf({ ...extras, maxSelections: null })).toEqual({
+        expect(ruleOf({ ...extras, isRequired: true, maxPicks: null })).toEqual(
+            {
+                path: 'customise.choose_at_least',
+                replacements: { count: 1 },
+            },
+        );
+        expect(ruleOf({ ...extras, maxPicks: null })).toEqual({
             path: 'customise.choose_any',
         });
     });
@@ -124,17 +124,17 @@ describe('add-on rules', () => {
     });
 
     it("caps a group's own maximum and each option's to an item's own, tighter maximum", () => {
-        const capped = withItemMaxSelections(extras, 1);
+        const capped = withItemMaxPicks(extras, 1);
 
-        expect(capped.maxSelections).toBe(1);
+        expect(capped.maxPicks).toBe(1);
         // Extra cheese was allowed twice; this item allows only one pick in all.
-        expect(capped.options.map((option) => option.maxQuantity)).toEqual([
+        expect(capped.options.map((option) => option.maxPerItem)).toEqual([
             1, 1, 1,
         ]);
     });
 
     it('leaves a group untouched when an item names no maximum of its own', () => {
-        expect(withItemMaxSelections(extras, null)).toBe(extras);
+        expect(withItemMaxPicks(extras, null)).toBe(extras);
     });
 
     it('prices one of the item with its picks, and keeps the picks in the order they are read', () => {

@@ -10,10 +10,13 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the product team owner and the tenants that exist so far.
+     * Seed the product team owner, the tenants that exist so far, and a
+     * spread of orders and stock history against them.
      *
-     * Every seeder here is idempotent, so this is safe to re-run. Run
-     * `php artisan accounts:list` afterwards to see who can now sign in.
+     * Order matters: roles and the tenants' menus have to exist before
+     * OrderSeeder can place anything against them, and every seeder here is
+     * idempotent, so this is safe to re-run. Run `php artisan accounts:list`
+     * afterwards to see who can now sign in.
      */
     public function run(): void
     {
@@ -21,6 +24,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             AdminSeeder::class,
             TenantSeeder::class,
+            OrderSeeder::class,
         ]);
     }
 }

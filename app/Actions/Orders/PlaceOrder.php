@@ -2,9 +2,9 @@
 
 namespace App\Actions\Orders;
 
+use App\Actions\Baskets\PriceBasket;
 use App\Actions\Inventory\ApplyStockChanges;
 use App\Actions\Inventory\StockDemand;
-use App\Actions\Menus\PriceBasket;
 use App\Enums\Locale;
 use App\Enums\OrderLineType;
 use App\Enums\OrderRefusal;

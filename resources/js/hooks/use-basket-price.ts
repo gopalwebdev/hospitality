@@ -49,7 +49,7 @@ export interface PricedCharge {
     taxParts: TaxParts;
 }
 
-/** What the basket comes to: App\Actions\Menus\PriceBasket's answer, in minor units throughout. */
+/** What the basket comes to: App\Actions\Baskets\PriceBasket's answer, in minor units throughout. */
 export interface PricedBasket {
     lines: PricedLine[];
     subtotal: number;
@@ -67,16 +67,31 @@ type PriceRequest = {
 };
 
 /**
- * Ask the server what the basket comes to, whenever it is being looked at and changes.
+ * How long the basket has to stop changing before it is priced again.
+ *
+ * A tap on a stepper is a whole request, and a guest settling on a quantity
+ * taps several times in a second. Waiting for them to stop sends one request
+ * instead of four, which matters because the endpoint is rate limited and a
+ * table of guests shares the limit.
+ */
+const SETTLE_MS = 250;
+
+/**
+ * Ask the server what the basket comes to, whenever it is wanted and changes.
  *
  * The phone's copy is only a claim: a price, the stock or a group's rules may
  * have changed since a line was added. `priced` is the last answer, kept on
  * screen while the next one is fetched.
+ *
+ * `isWanted` is the menu page's, not the sheet's: the bar at the foot of the
+ * menu shows the total too, so a basket with anything in it is priced whether
+ * or not the sheet has been opened. An empty basket is never priced — there is
+ * nothing to ask about, and the bar is not on screen.
  */
 export function useBasketPrice(
     url: string,
     lines: BasketLine[],
-    isLookedAt: boolean,
+    isWanted: boolean,
 ): { priced: PricedBasket | null; isPricing: boolean } {
     const http = useHttp<PriceRequest, PricedBasket>({ lines: [] });
 
@@ -89,23 +104,29 @@ export function useBasketPrice(
     });
 
     useEffect(() => {
-        if (!isLookedAt || lines.length === 0) {
+        if (!isWanted || lines.length === 0) {
             return;
         }
 
-        latest.current.transform(() => ({
-            lines: lines.map(({ key, type, id, choices, quantity }) => ({
-                key,
-                type,
-                id,
-                choices,
-                quantity,
-            })),
-        }));
+        const settled = setTimeout(() => {
+            latest.current.transform(() => ({
+                lines: lines.map(({ key, type, id, choices, quantity }) => ({
+                    key,
+                    type,
+                    id,
+                    choices,
+                    quantity,
+                })),
+            }));
 
-        // A failed request leaves the last answer on screen.
-        latest.current.post(url).catch(() => null);
-    }, [isLookedAt, lines, url]);
+            // A failed request leaves the last answer on screen.
+            latest.current.post(url).catch(() => null);
+        }, SETTLE_MS);
+
+        return () => {
+            clearTimeout(settled);
+        };
+    }, [isWanted, lines, url]);
 
     return { priced: http.response, isPricing: http.processing };
 }

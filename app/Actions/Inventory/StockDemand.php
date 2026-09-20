@@ -2,7 +2,7 @@
 
 namespace App\Actions\Inventory;
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Models\MenuAddOnOption;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;

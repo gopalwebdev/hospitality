@@ -16,10 +16,11 @@ import {
     basketStorageKey,
     useBasket,
 } from '@/hooks/use-basket';
+import { useBasketPrice } from '@/hooks/use-basket-price';
 import { useClockTime } from '@/hooks/use-clock-time';
 import { useMoney } from '@/hooks/use-money';
 import { useTranslations } from '@/hooks/use-translations';
-import { type AddOnGroup, withItemMaxSelections } from '@/lib/add-on-rules';
+import { type AddOnGroup, withItemMaxPicks } from '@/lib/add-on-rules';
 import { type OrderLimits, quantityHeld, roomFor } from '@/lib/order-limits';
 import { formatRate } from '@/lib/rate';
 
@@ -28,7 +29,7 @@ export interface AddOnGroupLink {
     /** One of the page's `addOnGroups`. */
     id: number;
     /** This item's own cap, tighter or looser than the group's own; null follows the group. */
-    maxSelections: number | null;
+    maxPicks: number | null;
 }
 
 export interface MenuItem extends OrderLimits {
@@ -38,7 +39,7 @@ export interface MenuItem extends OrderLimits {
     /** An integer count of the currency's minor unit; 0 means complimentary. */
     price: number;
     /** A higher price to show struck through, or null when not on offer. */
-    compareAtPrice: number | null;
+    originalPrice: number | null;
     /** A service request — an extra pillow — rather than something to order. */
     isServiceRequest: boolean;
     /** Null for a service request, which carries a bell mark instead. */
@@ -60,7 +61,7 @@ export interface Combo extends OrderLimits {
     name: string;
     description: string | null;
     price: number;
-    compareAtPrice: number | null;
+    originalPrice: number | null;
     contents: ComboContent[];
 }
 
@@ -196,6 +197,14 @@ export default function Menu({
     const [customising, setCustomising] = useState<MenuItem | null>(null);
     const [isBasketOpen, setBasketOpen] = useState(false);
 
+    // Priced here rather than inside the sheet, because the bar at the foot of
+    // the menu shows the total as well and both have to read the same answer.
+    const { priced, isPricing } = useBasketPrice(
+        priceUrl,
+        basket.lines,
+        basket.count > 0,
+    );
+
     const isEmpty =
         sections.length === 0 && featured.length === 0 && combos.length === 0;
 
@@ -206,12 +215,12 @@ export default function Menu({
     const groupsById = new Map(addOnGroups.map((group) => [group.id, group]));
 
     const groupsOf = (item: MenuItem): AddOnGroup[] =>
-        item.addOnGroupLinks.flatMap(({ id, maxSelections }) => {
+        item.addOnGroupLinks.flatMap(({ id, maxPicks }) => {
             const group = groupsById.get(id);
 
             return group === undefined
                 ? []
-                : [withItemMaxSelections(group, maxSelections)];
+                : [withItemMaxPicks(group, maxPicks)];
         });
 
     const heldOf = (type: BasketLineType, id: number): number =>
@@ -345,6 +354,7 @@ export default function Menu({
             {basket.count > 0 && (
                 <BasketBar
                     count={basket.count}
+                    total={priced?.total ?? null}
                     onOpen={() => {
                         setBasketOpen(true);
                     }}
@@ -377,7 +387,8 @@ export default function Menu({
                 open={isBasketOpen}
                 onOpenChange={setBasketOpen}
                 basket={basket}
-                priceUrl={priceUrl}
+                priced={priced}
+                isPricing={isPricing}
                 describe={describeLine({
                     items: [
                         ...featured,
@@ -429,7 +440,7 @@ function describeLine({
             name: item?.name ?? combo?.name ?? line.name,
             diet: item?.diet ?? null,
             isServiceRequest: item?.isServiceRequest ?? false,
-            limits: item ?? combo ?? { maxQuantity: null },
+            limits: item ?? combo ?? { maxPerOrder: null },
             choices: line.choices.flatMap((choice) => {
                 const option = optionsById.get(choice.optionId);
 
@@ -645,7 +656,7 @@ function ComboCard({ combo }: { combo: Combo }) {
             <div className="mt-3 flex items-center justify-between gap-3">
                 <Price
                     price={combo.price}
-                    compareAtPrice={combo.compareAtPrice}
+                    originalPrice={combo.originalPrice}
                 />
 
                 {ordering !== null && (
@@ -677,11 +688,11 @@ function ComboCard({ combo }: { combo: Combo }) {
  */
 function Price({
     price,
-    compareAtPrice,
+    originalPrice,
     className = '',
 }: {
     price: number;
-    compareAtPrice: number | null;
+    originalPrice: number | null;
     className?: string;
 }) {
     const { t } = useTranslations();
@@ -699,9 +710,9 @@ function Price({
 
     return (
         <p className={`flex items-baseline gap-1.5 tabular-nums ${className}`}>
-            {compareAtPrice !== null && (
+            {originalPrice !== null && (
                 <span className="text-muted-foreground text-sm line-through">
-                    {money(compareAtPrice)}
+                    {money(originalPrice)}
                 </span>
             )}
             <span className="text-primary font-semibold">{money(price)}</span>
@@ -797,7 +808,7 @@ function Item({
 
                 <Price
                     price={item.price}
-                    compareAtPrice={item.compareAtPrice}
+                    originalPrice={item.originalPrice}
                     className="mt-0.5"
                 />
 

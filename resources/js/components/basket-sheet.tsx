@@ -1,5 +1,6 @@
 import { XIcon } from '@/components/icons';
 import { ItemMark, type Diet } from '@/components/item-mark';
+import { Money } from '@/components/money';
 import { QuantityStepper } from '@/components/quantity-stepper';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +20,6 @@ import {
     type PricedBasket,
     type PricedLine,
     type TaxParts,
-    useBasketPrice,
 } from '@/hooks/use-basket-price';
 import { useMoney } from '@/hooks/use-money';
 import { type Translator, useTranslations } from '@/hooks/use-translations';
@@ -47,17 +47,21 @@ interface BasketSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     basket: Basket;
-    priceUrl: string;
+    /** The server's answer, or null until it has given one. */
+    priced: PricedBasket | null;
+    /** Whether the next answer is on its way, which assistive tech is told. */
+    isPricing: boolean;
     describe: (line: BasketLine) => LineDescription;
 }
 
 /**
  * What is in the basket, and what it comes to.
  *
- * Every number here is the server's (App\Actions\Menus\PriceBasket) — each
- * line, its GST, each charge and the total — asked for again whenever the
- * sheet is open and the basket changes. A line the menu can no longer honour
- * says so in place and is left out of the total until it is changed or removed.
+ * Every number here is the server's (App\Actions\Baskets\PriceBasket) — each
+ * line, its GST, each charge and the total. The menu page owns the asking, so
+ * the same answer feeds this sheet and the bar at the foot of the menu; this
+ * component only reads it. A line the menu can no longer honour says so in
+ * place and is left out of the total until it is changed or removed.
  *
  * GST is shown twice over, which is what a bill here does. The **rate and
  * amount on each line**, because one basket can hold a 5% item beside an 18%
@@ -71,11 +75,11 @@ export function BasketSheet({
     open,
     onOpenChange,
     basket,
-    priceUrl,
+    priced,
+    isPricing,
     describe,
 }: BasketSheetProps) {
     const { t } = useTranslations();
-    const { priced, isPricing } = useBasketPrice(priceUrl, basket.lines, open);
 
     const pricedLines = new Map(
         (priced?.lines ?? []).map((line) => [line.key, line]),
@@ -118,15 +122,20 @@ export function BasketSheet({
                         <SheetFooter className="gap-3 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
                             <Totals priced={priced} isPricing={isPricing} />
 
+                            {/* Worded as the action it is and set apart from
+                                the totals, because "Empty basket" sitting
+                                under a total read as a statement that the
+                                basket was empty. */}
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="self-start"
+                                className="text-muted-foreground hover:text-destructive self-center"
                                 onClick={() => {
                                     basket.clear();
                                 }}
                             >
+                                <XIcon className="size-4" />
                                 {t('basket.clear')}
                             </Button>
                         </SheetFooter>
@@ -238,8 +247,8 @@ function LineRow({
                             {t('menu.complimentary')}
                         </p>
                     ) : (
-                        <p className="font-semibold tabular-nums">
-                            {money(priced.total)}
+                        <p className="font-semibold">
+                            <Money amount={priced.total} />
                         </p>
                     )}
 
@@ -331,17 +340,14 @@ function Totals({
     const gst = gstRows(priced.taxParts, t);
 
     return (
-        // Dimmed rather than blanked while the next answer is fetched, so a
-        // tap on a stepper does not make the total vanish and come back.
-        <div
-            className={isPricing ? 'opacity-60' : undefined}
-            aria-live="polite"
-            aria-busy={isPricing}
-        >
-            <dl className="space-y-1 text-sm tabular-nums">
+        // Nothing is dimmed or blanked while the next answer is fetched. The
+        // figures themselves count from the old total to the new one, which
+        // shows the change without the rest of the row flickering under it.
+        <div aria-live="polite" aria-busy={isPricing}>
+            <dl className="space-y-1 text-sm">
                 <TotalRow
                     label={t('basket.subtotal')}
-                    amount={money(priced.subtotal)}
+                    amount={priced.subtotal}
                 />
 
                 {!priced.pricesIncludeTax &&
@@ -349,7 +355,7 @@ function Totals({
                         <TotalRow
                             key={row.key}
                             label={row.label}
-                            amount={money(row.amount)}
+                            amount={row.amount}
                         />
                     ))}
 
@@ -357,14 +363,14 @@ function Totals({
                     <TotalRow
                         key={charge.id}
                         label={charge.name}
-                        amount={money(charge.amount)}
+                        amount={charge.amount}
                     />
                 ))}
 
                 <TotalRow
                     strong
                     label={t('basket.total')}
-                    amount={money(priced.total)}
+                    amount={priced.total}
                 />
             </dl>
 
@@ -376,14 +382,16 @@ function Totals({
                         })}
                     </p>
 
-                    <dl className="mt-0.5 space-y-0.5 tabular-nums">
+                    <dl className="mt-0.5 space-y-0.5">
                         {gst.map((row) => (
                             <div
                                 key={row.key}
                                 className="flex justify-between gap-3"
                             >
                                 <dt>{row.label}</dt>
-                                <dd>{money(row.amount)}</dd>
+                                <dd>
+                                    <Money amount={row.amount} />
+                                </dd>
                             </div>
                         ))}
                     </dl>
@@ -399,7 +407,7 @@ function TotalRow({
     strong = false,
 }: {
     label: string;
-    amount: string;
+    amount: number;
     strong?: boolean;
 }) {
     return (
@@ -409,7 +417,9 @@ function TotalRow({
             }`}
         >
             <dt>{label}</dt>
-            <dd>{amount}</dd>
+            <dd>
+                <Money amount={amount} />
+            </dd>
         </div>
     );
 }

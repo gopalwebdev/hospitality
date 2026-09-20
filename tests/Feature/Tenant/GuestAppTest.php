@@ -4,18 +4,18 @@ use App\Enums\Appearance;
 use App\Enums\Diet;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
-use App\Enums\MenuBlockType;
+use App\Enums\MenuRailType;
 use App\Enums\Weekday;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuAddOnOption;
-use App\Models\MenuBlock;
 use App\Models\MenuCategory;
 use App\Models\MenuCombo;
 use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
+use App\Models\MenuRail;
 use App\Models\Tenant;
 use App\Models\TenantOpeningHour;
 use Carbon\CarbonImmutable;
@@ -322,8 +322,8 @@ it('reads a menu in the order the tenant arranged, rails and all', function (): 
     // Untouched, a menu opens with its featured items and its combos. This one
     // has been dragged: the combos sit between the two sections and the
     // featured rail closes the menu.
-    MenuBlock::factory()->onMenu($menu)->ofType(MenuBlockType::Combos)->create(['position' => 1]);
-    MenuBlock::factory()->onMenu($menu)->ofType(MenuBlockType::Featured)->create(['position' => 3]);
+    MenuRail::factory()->onMenu($menu)->ofType(MenuRailType::Combos)->create(['position' => 1]);
+    MenuRail::factory()->onMenu($menu)->ofType(MenuRailType::Featured)->create(['position' => 3]);
 
     $this->get('http://'.$tenant->slug.'.hospitality.test/menus/'.$menu->getKey())
         ->assertOk()
@@ -458,7 +458,7 @@ it('sends the combos a menu leads with, in the order they were arranged', functi
             ->has('combos', 2)
             ->where('combos.0.id', $first->getKey())
             ->where('combos.0.name', 'Burger Meal')
-            ->where('combos.0.compareAtPrice', $first->compare_at_price)
+            ->where('combos.0.originalPrice', $first->original_price)
             ->has('combos.0.contents', 1)
             ->where('combos.0.contents.0.name', 'Burger')
             ->where('combos.0.contents.0.quantity', 2)
@@ -482,7 +482,7 @@ it('sends a struck-through price only when there is a real offer', function (): 
     $onOffer = MenuItem::factory()->inCategory($category)->create([
         'name' => [Locale::English->value => 'A Discounted'],
         'price' => 29900,
-        'compare_at_price' => 36000,
+        'original_price' => 36000,
         'position' => 0,
     ]);
     MenuItem::factory()->inCategory($category)->create([
@@ -494,10 +494,10 @@ it('sends a struck-through price only when there is a real offer', function (): 
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $onOffer->getKey())
-            ->where('sections.0.items.0.compareAtPrice', 36000)
+            ->where('sections.0.items.0.originalPrice', 36000)
             // Null rather than the stored value, so the app never has to judge
             // whether what it was handed is believable.
-            ->where('sections.0.items.1.compareAtPrice', null),
+            ->where('sections.0.items.1.originalPrice', null),
         );
 });
 
@@ -514,10 +514,10 @@ it('sends how many of an item or a combo one order may hold', function (): void 
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.id', $pillow->getKey())
-            ->where('sections.0.items.0.maxQuantity', 2)
+            ->where('sections.0.items.0.maxPerOrder', 2)
             // Null is no limit, and the app reads it that way.
-            ->where('sections.0.items.1.maxQuantity', null)
-            ->where('combos.0.maxQuantity', 4),
+            ->where('sections.0.items.1.maxPerOrder', null)
+            ->where('combos.0.maxPerOrder', 4),
         );
 });
 
@@ -775,11 +775,11 @@ it('sends each add-on group once, and each item the groups it offers in its own 
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
             ->where('sections.0.items.0.addOnGroupLinks', [
-                ['id' => $extras->getKey(), 'maxSelections' => null],
-                ['id' => $bread->getKey(), 'maxSelections' => null],
+                ['id' => $extras->getKey(), 'maxPicks' => null],
+                ['id' => $bread->getKey(), 'maxPicks' => null],
             ])
             ->where('sections.0.items.1.addOnGroupLinks', [
-                ['id' => $bread->getKey(), 'maxSelections' => null],
+                ['id' => $bread->getKey(), 'maxPicks' => null],
             ])
             // Offered on two items, sent once.
             ->has('addOnGroups', 2)
@@ -787,15 +787,15 @@ it('sends each add-on group once, and each item the groups it offers in its own 
                 'id' => $bread->getKey(),
                 'name' => $bread->name,
                 'isRequired' => true,
-                'maxSelections' => 1,
+                'maxPicks' => 1,
                 // In the order they were dragged into.
                 'options' => [
-                    ['id' => $butter->getKey(), 'name' => $butter->name, 'price' => 0, 'maxQuantity' => 1, 'isDefault' => false],
-                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'price' => 2000, 'maxQuantity' => 1, 'isDefault' => true],
+                    ['id' => $butter->getKey(), 'name' => $butter->name, 'price' => 0, 'maxPerItem' => 1, 'isDefault' => false],
+                    ['id' => $garlic->getKey(), 'name' => $garlic->name, 'price' => 2000, 'maxPerItem' => 1, 'isDefault' => true],
                 ],
             ])
             // Its own cap of two stands: nothing in the group forces it down to one.
-            ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxQuantity'] ?? null) === 2)
+            ->where('addOnGroups', fn (Collection $groups): bool => ($groups->firstWhere('id', $extras->getKey())['options'][0]['maxPerItem'] ?? null) === 2)
             ->where('priceUrl', guestMenuUrl($tenant, $menu).'/basket-prices'),
         );
 });

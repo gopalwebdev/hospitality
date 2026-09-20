@@ -3,28 +3,28 @@
 namespace App\Actions\Menus;
 
 use App\Models\Menu;
-use App\Models\MenuBlock;
 use App\Models\MenuCategory;
+use App\Models\MenuRail;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Put a menu's outline in the order an admin has just dragged it into.
  *
- * The menu page lists a menu's blocks (its featured items and its combos), its
+ * The menu page lists a menu's rails (its featured items and its combos), its
  * categories and, under each, its sub-categories, so a drag arrives as one flat
  * list of keys. This turns that back into the positions the menu stores, on
- * `menu_blocks` and `menu_categories`. What is *inside* a category or a block is
+ * `menu_rails` and `menu_categories`. What is *inside* a category or a rail is
  * not on that page: it is ordered in the table the row opens, by Filament's own
  * reorder.
  *
- * **A row only moves within its own list.** The lists are the top level (blocks
+ * **A row only moves within its own list.** The lists are the top level (rails
  * and categories ordered against each other) and the sub-categories of one
  * category. A sub-category dropped under another category keeps the parent it
  * had and lands at the matching place among its own siblings, so no drag can
  * produce a menu that could not exist. Re-parenting is an edit on the row's own
  * form (.ai/rules/actions-menus.md).
  *
- * **A row the table did not draw keeps its place.** A block with nothing in it
+ * **A row the table did not draw keeps its place.** A rail with nothing in it
  * is not drawn, so it is not in the order; only the rows that were sent are
  * shuffled, among the slots they already held.
  *
@@ -34,11 +34,11 @@ use Illuminate\Support\Facades\DB;
 class ApplyMenuArrangement
 {
     /**
-     * The key identifying a block's row: its type for a block every menu has, its id for any other.
+     * The key identifying a rail's row: its type for a rail every menu has, its id for any other.
      */
-    public static function blockKey(MenuBlock $block): string
+    public static function railKey(MenuRail $rail): string
     {
-        return $block->type->isOnEveryMenu() ? $block->type->value : 'block-'.$block->getKey();
+        return $rail->type->isOnEveryMenu() ? $rail->type->value : 'rail-'.$rail->getKey();
     }
 
     /**
@@ -67,17 +67,17 @@ class ApplyMenuArrangement
             ->inMenuOrder()
             ->get();
 
-        $blocks = MenuBlock::query()
+        $rails = MenuRail::query()
             ->select(['id', 'menu_id', 'tenant_id', 'type', 'position'])
             ->where('menu_id', $menu->getKey())
             ->get();
 
-        DB::transaction(function () use ($menu, $rank, $categories, $blocks): void {
+        DB::transaction(function () use ($menu, $rank, $categories, $rails): void {
             $this->renumber(
-                $menu->readingOrder($categories->whereNull('parent_id'), $blocks),
+                $menu->readingOrder($categories->whereNull('parent_id'), $rails),
                 $rank,
-                static fn (MenuBlock|MenuCategory $row): string => $row instanceof MenuBlock
-                    ? static::blockKey($row)
+                static fn (MenuRail|MenuCategory $row): string => $row instanceof MenuRail
+                    ? static::railKey($row)
                     : static::categoryKey($row->getKey()),
             );
 
@@ -94,10 +94,10 @@ class ApplyMenuArrangement
      * not sent stays in its slot. A list the drag did not touch is left alone
      * entirely, gaps in its numbering and all.
      *
-     * A block every menu has but nobody has placed is unsaved and reads at 0,
+     * A rail every menu has but nobody has placed is unsaved and reads at 0,
      * so it is written the first time it lands anywhere else.
      *
-     * @template TRow of MenuBlock|MenuCategory
+     * @template TRow of MenuRail|MenuCategory
      *
      * @param  array<int, TRow>  $siblings  in their current order
      * @param  array<string, int>  $rank

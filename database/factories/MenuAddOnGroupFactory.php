@@ -28,7 +28,7 @@ class MenuAddOnGroupFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'name' => [Locale::English->value => $name],
             'is_required' => false,
-            'max_selections' => null,
+            'max_picks' => null,
         ];
     }
 
@@ -49,7 +49,7 @@ class MenuAddOnGroupFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'is_required' => $required,
-            'max_selections' => $max,
+            'max_picks' => $max,
         ]);
     }
 

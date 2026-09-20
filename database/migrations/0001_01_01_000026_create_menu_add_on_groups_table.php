@@ -18,13 +18,13 @@ return new class extends Migration
             $table->boolean('is_required')->default(false);
             // The most picks a guest may make here; null is no limit. An item
             // linking this group may set its own, tighter or looser
-            // (menu_item_add_on_groups.max_selections).
-            $table->smallInteger('max_selections')->nullable();
+            // (menu_item_add_on_groups.max_picks).
+            $table->smallInteger('max_picks')->nullable();
             $table->timestamps();
         });
 
         DB::statement('ALTER TABLE menu_add_on_groups
-            ADD CONSTRAINT menu_add_on_groups_max_in_range CHECK (max_selections IS NULL OR max_selections BETWEEN 1 AND 99)');
+            ADD CONSTRAINT menu_add_on_groups_max_picks_in_range CHECK (max_picks IS NULL OR max_picks BETWEEN 1 AND 99)');
     }
 
     public function down(): void

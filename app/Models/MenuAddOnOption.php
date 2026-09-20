@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read MenuAddOnGroup $group
  * @property string $name
  * @property int $price
- * @property int $max_quantity
+ * @property int $max_per_item
  * @property bool $is_default
  * @property bool $is_available
  * @property int|null $stock_quantity
@@ -33,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'price', 'max_quantity', 'is_default', 'is_available', 'stock_quantity', 'position'])]
+#[Fillable(['name', 'price', 'max_per_item', 'is_default', 'is_available', 'stock_quantity', 'position'])]
 #[ObservedBy([MenuAddOnOptionObserver::class])]
 class MenuAddOnOption extends Model
 {
@@ -49,7 +49,7 @@ class MenuAddOnOption extends Model
     #[\Override]
     protected $attributes = [
         'price' => 0,
-        'max_quantity' => 1,
+        'max_per_item' => 1,
         'is_default' => false,
         'is_available' => true,
         'stock_quantity' => null,
@@ -118,7 +118,7 @@ class MenuAddOnOption extends Model
         return [
             'menu_add_on_group_id' => 'integer',
             'price' => 'integer',
-            'max_quantity' => 'integer',
+            'max_per_item' => 'integer',
             'is_default' => 'boolean',
             'is_available' => 'boolean',
             'stock_quantity' => 'integer',

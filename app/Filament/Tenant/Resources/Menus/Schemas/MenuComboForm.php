@@ -67,10 +67,10 @@ class MenuComboForm
                     ->icon(Heroicon::OutlinedBanknotes)
                     ->schema([
                         PricingFields::price($currency),
-                        PricingFields::compareAtPrice($currency),
+                        PricingFields::originalPrice($currency),
                         PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
                         PricingFields::availability(),
-                        PricingFields::maxQuantity(),
+                        PricingFields::maxPerOrder(),
                     ])
                     ->columns(2),
 

@@ -4,7 +4,7 @@ namespace App\Filament\Tenant\Resources\Menus\Tables;
 
 use App\Actions\Menus\ApplyMenuArrangement;
 use App\Actions\Menus\MoveCategoryToMenu;
-use App\Enums\MenuBlockType;
+use App\Enums\MenuRailType;
 use App\Filament\Tables\Reordering;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\RelationManagers\CategoryItemsRelationManager;
@@ -13,8 +13,8 @@ use App\Filament\Tenant\Resources\Menus\RelationManagers\FeaturedItemsRelationMa
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuCategoryForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Models\Menu;
-use App\Models\MenuBlock;
 use App\Models\MenuCategory;
+use App\Models\MenuRail;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\Gate;
  * featured item dropped among a category's items looked filed there.
  *
  * It is built on Filament's custom data (`records()`) rather than on a query,
- * because the rows are categories plus blocks that may not be rows anywhere
+ * because the rows are categories plus rails that may not be rows anywhere
  * yet. Two consequences before editing:
  *
  * - Every record is a plain array keyed by `__key`, so an action's `$record` is
@@ -55,7 +55,7 @@ use Illuminate\Support\Facades\Gate;
  */
 class MenuArrangementTable
 {
-    private const string BLOCK = 'block';
+    private const string RAIL = 'rail';
 
     private const string CATEGORY = 'category';
 
@@ -104,7 +104,7 @@ class MenuArrangementTable
                     ->label(__('panel.shared.showing'))
                     ->badge()
                     ->color(fn (array $record): string => $record['state_color'] ?? 'gray')
-                    // A block is neither showing nor hidden: it is drawn when it
+                    // A rail is neither showing nor hidden: it is drawn when it
                     // has something in it.
                     ->placeholder(''),
             ])
@@ -113,14 +113,14 @@ class MenuArrangementTable
             // resources/views/filament/tenant/resources/menus/pages/arrange-menu.blade.php.
             ->recordClasses(fn (array $record): array => [
                 'menu-row',
-                'menu-row--'.($record['block'] ?? $record['kind']),
+                'menu-row--'.($record['rail'] ?? $record['kind']),
                 'menu-list--'.$record['list'],
             ])
             ->headerActions([
                 self::createCategoryAction('createCategory', $menu)->visible($mayManage),
-                // Always here, because a block with nothing in it has no row to click.
-                self::blockAction('openFeatured', MenuBlockType::Featured, $menu),
-                self::blockAction('openCombos', MenuBlockType::Combos, $menu),
+                // Always here, because a rail with nothing in it has no row to click.
+                self::railAction('openFeatured', MenuRailType::Featured, $menu),
+                self::railAction('openCombos', MenuRailType::Combos, $menu),
             ])
             // Separate icon buttons, each named on hover and coloured by what it
             // does. A row shows only the ones that apply to it.
@@ -155,8 +155,8 @@ class MenuArrangementTable
      * Every row of this menu's outline, in reading order and keyed for the table.
      *
      * Three queries whatever the menu holds: its categories at both levels with
-     * a count of the items in each, its placed blocks, and a count of what is in
-     * each block.
+     * a count of the items in each, its placed rails, and a count of what is in
+     * each rail.
      *
      * @return Collection<string, array<string, mixed>>
      */
@@ -169,7 +169,7 @@ class MenuArrangementTable
             ->inMenuOrder()
             ->get();
 
-        $blocks = MenuBlock::query()
+        $rails = MenuRail::query()
             ->select(['id', 'menu_id', 'type', 'position'])
             ->where('menu_id', $menu->getKey())
             ->get();
@@ -191,18 +191,18 @@ class MenuArrangementTable
 
         $rows = [];
 
-        foreach ($menu->readingOrder($topLevel, $blocks) as $entry) {
-            if ($entry instanceof MenuBlock) {
+        foreach ($menu->readingOrder($topLevel, $rails) as $entry) {
+            if ($entry instanceof MenuRail) {
                 $count = (int) $contents->getAttribute(match ($entry->type) {
-                    MenuBlockType::Featured => 'featured_items_count',
-                    MenuBlockType::Combos => 'combos_count',
+                    MenuRailType::Featured => 'featured_items_count',
+                    MenuRailType::Combos => 'combos_count',
                 });
 
                 // An empty "Featured items · No items" row used to head every
-                // menu. A block with nothing in it is not drawn; the header's
+                // menu. A rail with nothing in it is not drawn; the header's
                 // buttons open it instead.
                 if ($count > 0) {
-                    $rows[] = self::blockRow($entry, $count);
+                    $rows[] = self::railRow($entry, $count);
                 }
 
                 continue;
@@ -221,25 +221,25 @@ class MenuArrangementTable
     }
 
     /**
-     * A block: what it is and how much is in it.
+     * A rail: what it is and how much is in it.
      *
      * @return array<string, mixed>
      */
-    private static function blockRow(MenuBlock $block, int $count): array
+    private static function railRow(MenuRail $rail, int $count): array
     {
         return [
-            '__key' => ApplyMenuArrangement::blockKey($block),
-            'kind' => self::BLOCK,
+            '__key' => ApplyMenuArrangement::railKey($rail),
+            'kind' => self::RAIL,
             'list' => self::TOP_LEVEL_LIST,
-            'block' => $block->type->value,
-            'id' => $block->getKey(),
-            'name' => $block->type->label(),
-            'type' => __('panel.arrangement.block'),
-            'type_icon' => self::blockIcon($block->type),
-            'type_color' => self::blockColor($block->type),
-            'meta' => match ($block->type) {
-                MenuBlockType::Featured => trans_choice('panel.arrangement.items_count', $count, ['count' => $count]),
-                MenuBlockType::Combos => trans_choice('panel.arrangement.combos_count', $count, ['count' => $count]),
+            'rail' => $rail->type->value,
+            'id' => $rail->getKey(),
+            'name' => $rail->type->label(),
+            'type' => __('panel.arrangement.rail'),
+            'type_icon' => self::railIcon($rail->type),
+            'type_color' => self::railColor($rail->type),
+            'meta' => match ($rail->type) {
+                MenuRailType::Featured => trans_choice('panel.arrangement.items_count', $count, ['count' => $count]),
+                MenuRailType::Combos => trans_choice('panel.arrangement.combos_count', $count, ['count' => $count]),
             },
             'state' => null,
             'state_color' => null,
@@ -261,7 +261,7 @@ class MenuArrangementTable
             '__key' => ApplyMenuArrangement::categoryKey($category->getKey()),
             'kind' => $kind,
             'list' => $isTopLevel ? self::TOP_LEVEL_LIST : 'sub-'.$category->parent_id,
-            'block' => null,
+            'rail' => null,
             'id' => $category->getKey(),
             'name' => $category->name,
             'type' => $isTopLevel
@@ -303,24 +303,24 @@ class MenuArrangementTable
             .'</span>';
     }
 
-    private static function blockIcon(MenuBlockType $type): Heroicon
+    private static function railIcon(MenuRailType $type): Heroicon
     {
         return match ($type) {
-            MenuBlockType::Featured => Heroicon::OutlinedStar,
-            MenuBlockType::Combos => Heroicon::OutlinedSparkles,
+            MenuRailType::Featured => Heroicon::OutlinedStar,
+            MenuRailType::Combos => Heroicon::OutlinedSparkles,
         };
     }
 
-    private static function blockColor(MenuBlockType $type): string
+    private static function railColor(MenuRailType $type): string
     {
         return match ($type) {
-            MenuBlockType::Featured => 'warning',
-            MenuBlockType::Combos => 'success',
+            MenuRailType::Featured => 'warning',
+            MenuRailType::Combos => 'success',
         };
     }
 
     /**
-     * What a row holds, in a modal over the menu: a category's items, or what is in a block.
+     * What a row holds, in a modal over the menu: a category's items, or what is in a rail.
      */
     private static function openAction(Menu $menu): Action
     {
@@ -335,19 +335,19 @@ class MenuArrangementTable
     }
 
     /**
-     * A block's contents opened from the header, the only way into a block with nothing in it yet.
+     * A rail's contents opened from the header, the only way into a rail with nothing in it yet.
      */
-    private static function blockAction(string $name, MenuBlockType $type, Menu $menu): Action
+    private static function railAction(string $name, MenuRailType $type, Menu $menu): Action
     {
         return self::contentsModal(Action::make($name))
             ->label($type->label())
-            ->icon(self::blockIcon($type))
-            ->color(self::blockColor($type))
+            ->icon(self::railIcon($type))
+            ->color(self::railColor($type))
             ->outlined()
             ->modalHeading($type->label())
-            ->modalIcon(self::blockIcon($type))
-            ->modalIconColor(self::blockColor($type))
-            ->schema([self::blockContents($type, $menu)]);
+            ->modalIcon(self::railIcon($type))
+            ->modalIconColor(self::railColor($type))
+            ->schema([self::railContents($type, $menu)]);
     }
 
     /**
@@ -378,8 +378,8 @@ class MenuArrangementTable
      */
     private static function contentsOf(array $record, Menu $menu): Livewire
     {
-        if ($record['kind'] === self::BLOCK) {
-            return self::blockContents(MenuBlockType::from((string) $record['block']), $menu);
+        if ($record['kind'] === self::RAIL) {
+            return self::railContents(MenuRailType::from((string) $record['rail']), $menu);
         }
 
         return Livewire::make(CategoryItemsRelationManager::class, fn (): array => [
@@ -388,11 +388,11 @@ class MenuArrangementTable
         ])->key('contents-category-'.$record['id']);
     }
 
-    private static function blockContents(MenuBlockType $type, Menu $menu): Livewire
+    private static function railContents(MenuRailType $type, Menu $menu): Livewire
     {
         $manager = match ($type) {
-            MenuBlockType::Featured => FeaturedItemsRelationManager::class,
-            MenuBlockType::Combos => CombosRelationManager::class,
+            MenuRailType::Featured => FeaturedItemsRelationManager::class,
+            MenuRailType::Combos => CombosRelationManager::class,
         };
 
         return Livewire::make($manager, ['ownerRecord' => $menu, 'pageClass' => ArrangeMenu::class])
@@ -605,11 +605,11 @@ class MenuArrangementTable
     }
 
     /**
-     * The place at the end of the menu's top level, which its categories and blocks share.
+     * The place at the end of the menu's top level, which its categories and rails share.
      */
     private static function nextTopLevelPosition(Menu $menu): int
     {
-        return max((int) $menu->categories()->max('position'), (int) $menu->blocks()->max('position')) + 1;
+        return max((int) $menu->categories()->max('position'), (int) $menu->rails()->max('position')) + 1;
     }
 
     /**

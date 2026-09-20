@@ -13,7 +13,7 @@ User::getAuthPassword() deliberately returns '' rather than being removed. Larav
 Do not reintroduce a password field, a "forgot password" flow, or passkeys without saying so explicitly.
 
 ## Thin controllers, behaviour in invokable action classes
-HTTP and Livewire/Filament classes stay thin: they validate, call one thing, and return a response. Every unit of behaviour is a single-purpose invokable class under app/Actions/<Area>/ (see app/Actions/Otp/), resolved with app(...) and called as $action($args).
+HTTP and Livewire/Filament classes stay thin: they validate, call one thing, and return a response. Every unit of behaviour is a single-purpose invokable class under app/Actions/<Area>/ (see app/Actions/OneTimePasswords/), resolved with app(...) and called as $action($args).
 
 Follow SOLID: one reason to change per class, depend on the abstraction, extend rather than branch on a type. Prefer a model query scope over repeating a where clause in a controller or page (see User::scopeWithEmail).
 
@@ -77,20 +77,20 @@ What a guest sees first is `home_rows`, each holding its own `home_tiles`. The *
 
 "Row" and not "section": the panel already calls `menu_categories` sections, and one word for two different things is how a reader ends up on the wrong page.
 
-A menu carries two **rails** as well as its categories: the items the tenant leads with (`menu_items.is_featured`, ordered by `featured_position`) and its combos. Where they sit among the categories is the tenant's own decision — each is a `menu_blocks` row whose `position` shares the number space of `menu_categories.position`, and `Menu::readingOrder()` merges the two. A rail has no row until it is placed, and one without a row reads at the top, featured first, so a menu nobody has arranged opens with its featured items and then its combos. `menu_blocks` is also where a later kind of menu content, a banner say, goes (`.ai/rules/menus.md`). A featured item still appears under its own category further down, so a guest scrolling finds it where they expect it.
+A menu carries two **rails** as well as its categories: the items the tenant leads with (`menu_items.is_featured`, ordered by `featured_position`) and its combos. Where they sit among the categories is the tenant's own decision — each is a `menu_rails` row whose `position` shares the number space of `menu_categories.position`, and `Menu::readingOrder()` merges the two. A rail has no row until it is placed, and one without a row reads at the top, featured first, so a menu nobody has arranged opens with its featured items and then its combos. `menu_rails` is also where a later kind of menu content, a banner say, goes (`.ai/rules/menus.md`). A featured item still appears under its own category further down, so a guest scrolling finds it where they expect it.
 
 Every list a guest reads is ordered by `position` within its own parent — the blocks of a menu, subdivisions within a category, items within a category, the add-on groups on an item, the options in a group — and each is dragged into that order in the panel: the blocks and categories on the menu's outline, what is inside each in the table its row opens (`.ai/rules/menus.md`), an item's groups in the item's form and a group's options in the group's. Nothing is ordered alphabetically, and nothing is ordered across parents.
 
 Featuring belongs to **one menu**, so an item that leaves a menu stops being featured — `MenuItemObserver` clears the flag when an item's category crosses menus, and `MoveCategoryToMenu` clears it for a whole branch, rather than letting an item appear at the top of a menu nobody chose it for.
 
-Prices carry an optional `compare_at_price` — the higher "was" price shown struck through — which is null on almost every row, because null is how an item says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option. A price of zero is complimentary.
+Prices carry an optional `original_price` — the higher "was" price shown struck through — which is null on almost every row, because null is how an item says it is not on offer and a zero would be a price of nothing. It is refused unless it is strictly above what is charged. Named for what it is rather than "strike price", which in every other software context means the exercise price of an option. A price of zero is complimentary.
 
-An item and a combo each say the most one order may hold (`max_quantity`, null for no limit), counted across every basket line it is on:
+An item and a combo each say the most one order may hold (`max_per_order`, null for no limit), counted across every basket line it is on:
 - **Counting:** a feather pillow and a memory foam one are two towards a maximum of two.
 - **Where it is set and checked:** the item and combo forms ask for it, and `PriceBasket` refuses a basket over it.
 - **No minimum:** one was built beside it and taken out on the project owner's instruction.
 
-An option's `max_quantity` is a different limit: how many of it one item takes.
+An option's `max_per_item` is a different limit: how many of it one item takes. The two used to share the name `max_quantity`, which is why they now say which maximum they are.
 
 `menu_items` and `menu_combos` each carry a nullable `tax_rate` that falls back to the tenant's own rate, so a tenant sets its rate once and only genuinely different lines — a sealed bottle taxed as goods rather than as a served drink, a laundry pickup taxed as a service — override it. An add-on option carries no rate: it is taxed at the rate of the item it is added to (`.ai/rules/add-on-groups.md`).
 
@@ -98,7 +98,7 @@ The tenant's rate is stored as **two halves**, `tenant_settings.cgst_rate` and `
 
 **No tax information is hardcoded.** Standing instruction from the project owner: a tenant states what it charges on its Settings page and the application assumes nothing. `TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS` is therefore **0** — a starting value of 5% meant every tenant created silently charged a rate nobody had typed. `tenant_settings.gst_treatment` (`App\Enums\GstTreatment`: CGST+SGST, CGST+UTGST, or IGST) is a tenant's own statement too; there is deliberately **no** table of which union territories levy UTGST, and an earlier `GstStateCode` enum holding one was deleted for exactly that reason. Do not put tax policy back into the code.
 
-`tenant_settings.tax_overrides_item_rates` reverses the fallback: with it on, the tenant's rate is charged on **everything** and an item's own is ignored. `IsPricedOnAMenu::taxRate($tenantRate, $tenantOverrides)` is where that is decided, and `PriceBasket` and `PlaceOrder` are what pass the flag in — a tenant whose accountant moves the whole menu to one slab changes one toggle rather than every item.
+`tenant_settings.tax_overrides_item_rates` reverses the fallback: with it on, the tenant's rate is charged on **everything** and an item's own is ignored. `HasPricing::taxRate($tenantRate, $tenantOverrides)` is where that is decided, and `PriceBasket` and `PlaceOrder` are what pass the flag in — a tenant whose accountant moves the whole menu to one slab changes one toggle rather than every item.
 
 ## A tenant keeps weekly opening hours, and being closed refuses orders
 `tenant_opening_hours` is a row per `App\Enums\Weekday` per tenant: closed for the day, or open between two wall-clock times. Hours **repeat weekly and name no date** — a tenant says "closed on Mondays", not "closed on the 14th". A dated calendar of one-off holidays is a different feature and deliberately not this one.
@@ -112,7 +112,7 @@ Times are compared as `HH:MM:SS` strings against `config('app.timezone')`, the o
 ## Charges are their own module, on every menu or only some
 What is added to a bill beyond the price — a service charge, a packing charge, a room-service fee — is `charges`, managed on its own Charges page in the tenant panel rather than as settings: a tenant may levy any number, each is a share of the bill or a fixed amount, and each applies to the menus picked for it (a room-service fee on in-room dining and not on housekeeping requests). Two fixed switches on `tenant_settings` existed and were replaced, because they could say a service charge and a packing charge and nothing else, and could not say which menus either belonged on.
 
-The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Menus\PriceBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
+The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Baskets\PriceBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
 
 ## Two languages a tenant writes in; the application itself is English
 `App\Enums\Locale` has one case per language a tenant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.

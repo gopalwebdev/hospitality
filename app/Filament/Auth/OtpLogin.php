@@ -2,9 +2,9 @@
 
 namespace App\Filament\Auth;
 
-use App\Actions\Otp\SendOneTimePassword;
-use App\Actions\Otp\ThrottleOneTimePasswordRequests;
-use App\Actions\Otp\VerifyOneTimePassword;
+use App\Actions\OneTimePasswords\SendOneTimePassword;
+use App\Actions\OneTimePasswords\ThrottleOneTimePasswordRequests;
+use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Enums\FilamentPanel;
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;

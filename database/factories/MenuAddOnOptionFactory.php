@@ -34,7 +34,7 @@ class MenuAddOnOptionFactory extends Factory
                 ->value('tenant_id'),
             'name' => [Locale::English->value => $name],
             'price' => fake()->numberBetween(0, 10000),
-            'max_quantity' => 1,
+            'max_per_item' => 1,
             'is_default' => false,
             'is_available' => true,
             'position' => fake()->numberBetween(0, 10),
@@ -68,7 +68,7 @@ class MenuAddOnOptionFactory extends Factory
     public function upTo(int $quantity): static
     {
         return $this->state(fn (array $attributes): array => [
-            'max_quantity' => $quantity,
+            'max_per_item' => $quantity,
         ]);
     }
 

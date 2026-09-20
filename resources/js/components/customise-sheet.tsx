@@ -313,7 +313,7 @@ function CheckboxOption({
     const isPicked = quantity > 0;
     // A group of one pick moves its tick instead, so it never locks.
     const isFull =
-        !isPicked && group.maxSelections !== 1 && !hasRoomIn(group, picks);
+        !isPicked && group.maxPicks !== 1 && !hasRoomIn(group, picks);
 
     return (
         <div className="flex min-h-12 items-center gap-3 py-1">
@@ -338,17 +338,17 @@ function CheckboxOption({
                         rather than the checkbox's own accessible name — and a
                         guest sees it before they tick, not only once the
                         stepper appears. */}
-                    {option.maxQuantity > 1 && (
+                    {option.maxPerItem > 1 && (
                         <span className="text-muted-foreground ml-1.5 text-xs">
                             {t('customise.option_up_to', {
-                                count: option.maxQuantity,
+                                count: option.maxPerItem,
                             })}
                         </span>
                     )}
                 </span>
             </label>
 
-            {isPicked && option.maxQuantity > 1 && (
+            {isPicked && option.maxPerItem > 1 && (
                 <QuantityStepper
                     compact
                     value={quantity}

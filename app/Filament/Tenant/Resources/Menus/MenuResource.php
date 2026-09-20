@@ -96,7 +96,7 @@ class MenuResource extends Resource
      * A menu is two tabs across the top of one record.
      *
      * Arrangement comes first because it is what a menu mostly *is*: its
-     * blocks, categories and sub-categories in the order a guest reads them,
+     * rails, categories and sub-categories in the order a guest reads them,
      * each opening a table of what is inside it. Edit is the menu itself — its
      * name, its hours and whether guests see it.
      *

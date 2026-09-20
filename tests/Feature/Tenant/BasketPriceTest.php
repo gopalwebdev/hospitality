@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Menus\PriceBasket;
+use App\Actions\Baskets\PriceBasket;
 use App\Enums\GstTreatment;
 use App\Models\Charge;
 use App\Models\Menu;
@@ -257,7 +257,7 @@ it('flags every line of an item or combo the basket holds more of than one order
         'butterNaan' => $butterNaan, 'garlicNaan' => $garlicNaan,
     ] = seedCurryWithChoices();
 
-    $curry->update(['max_quantity' => 2]);
+    $curry->update(['max_per_order' => 2]);
     $platter = MenuCombo::factory()->onMenu($menu)->limitedPerOrder(1)->create();
 
     $statuses = fn (array $lines): array => collect($this->postJson(basketPriceUrl($tenant, $menu), ['lines' => $lines])->assertOk()->json('lines'))

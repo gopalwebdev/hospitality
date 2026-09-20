@@ -190,7 +190,7 @@ class MenuItemsTable
                 Filter::make('on_offer')
                     ->label(__('panel.items.on_offer'))
                     ->toggle()
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('compare_at_price')),
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('original_price')),
             ])
             // Behind the table's filter button rather than laid out above it,
             // where they took half the screen before the first row. The cuts
