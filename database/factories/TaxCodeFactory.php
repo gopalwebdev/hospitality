@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class TaxCodeFactory extends Factory
 {
+    #[\Override]
     protected $model = TaxCode::class;
 
     /**
