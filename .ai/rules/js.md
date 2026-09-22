@@ -85,6 +85,8 @@ The small print is `tax` (`rate`, `pricesIncludeTax`) and then `charges`: only t
 
 The tenant's own hours arrive as `store` — `{isOpen, opensAt, closesAt}`, the times as the stored `HH:MM` and both null on a day it does not open. `useClockTime()` is what turns one into a reading — "9:00 AM", never "09:00" — in the guest's own language, beside the money formatting and for the same reasons; a menu's `servedFrom` / `servedUntil` go through it too. `isOpen` is worked out on the server against the tenant's week (`.ai/rules/app.md`), never in the browser from the two times, because the phone's clock is not the tenant's. The page drives the Open/Closed badge and a line above the menu with it, so a guest reading a card after closing is told why the Add buttons are gone.
 
+**The two windows sit in one block, each a `HoursRow` with a clock.** The tenant's hours and the menu's service window used to be two loose paragraphs with their own padding; they are one `space-y-1.5` block now, and the icon is what makes them read as times at a glance rather than as more grey prose. `emphasised` turns a row from muted to foreground, and it is set by whichever window is the reason nothing can be ordered — that row has to be what the eye lands on. **`menu.store_hours` does not say "Open"** any more: the badge in the sticky header already does, and the two together put the word on screen twice.
+
 Vitest specs render a page directly, outside `createInertiaApp`, so `usePage()` has nowhere to read from. `resources/js/tests/setup.ts` mocks it against `resources/js/tests/page-props.ts`; call `stubPageProps()` to change what a test sees. Its strings are a stand-in, not the real ones — what each app actually says is pinned by `tests/Feature/LocalizationTest.php`.
 
 ## An item is customised in a sheet, and the basket lives on the phone
@@ -140,6 +142,10 @@ The reason is a complaint worth keeping: the totals used to be wrapped in `opaci
 Three cases snap instead of travelling, and all three matter: the **first render** (a figure counting up from zero would be wrong for the whole of that first journey, and every test reads the number straight after rendering), a guest who has asked for **reduced motion**, and anywhere `requestAnimationFrame` is missing. `Money` carries `tabular-nums` itself — without it each frame is a different width and the row jitters.
 
 A price that cannot change, such as one on the menu itself, does not need this and goes through `useMoney()` directly.
+
+**The basket's instruction sits at the foot, not in the subtitle.** "Show this to a member of staff to place your order" is the only thing a guest is asked to *do* on that sheet, and as `SheetDescription` it was small grey text four inches above the total, styled exactly like the filler around it. It is a `bg-muted/60` callout with the bag icon, after the totals and before Clear basket — where a guest is once they have read what they owe. The `SheetDescription` stays, `sr-only`, because Radix describes the dialog by it.
+
+The **total is ruled off** (`border-t`) from the rows it sums. Without the rule it read as a fourth row that happened to be bold, and "Includes GST of ₹x" now hangs under it as that row's note rather than as a loose paragraph below the list.
 
 The basket's **"Clear basket"** button is worded as the action it is. It read "Empty basket" and, sitting under a total, was taken for a statement that the basket *was* empty.
 

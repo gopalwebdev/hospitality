@@ -43,6 +43,16 @@ export function MoonIcon(props: IconProps) {
     );
 }
 
+/** Beside a tenant's opening hours and a menu's service window. */
+export function ClockIcon(props: IconProps) {
+    return (
+        <svg {...base} {...props}>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+        </svg>
+    );
+}
+
 /** The back arrow out of a menu or a document. */
 export function ChevronLeftIcon(props: IconProps) {
     return (

@@ -739,9 +739,9 @@ describe('guest menu', () => {
             },
         });
 
-        expect(
-            screen.getByText(/Open 9:00 AM to 11:00 PM/),
-        ).toBeInTheDocument();
+        // No "Open" in front of the times: the badge in the sticky header
+        // already says so, and the two together read as the word twice.
+        expect(screen.getByText(/^9:00 AM to 11:00 PM$/)).toBeInTheDocument();
         // Noon and midnight are the two the 12-hour clock gets wrong when it
         // is done by hand: 12 PM and 12 AM, never 0 AM.
         expect(

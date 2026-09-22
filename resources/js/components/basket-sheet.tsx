@@ -1,4 +1,4 @@
-import { XIcon } from '@/components/icons';
+import { BagIcon, XIcon } from '@/components/icons';
 import { ItemMark, type Diet, type MenuItemKind } from '@/components/item-mark';
 import { Money } from '@/components/money';
 import { QuantityStepper } from '@/components/quantity-stepper';
@@ -90,7 +90,9 @@ export function BasketSheet({
                     <SheetTitle className="text-lg">
                         {t('basket.title')}
                     </SheetTitle>
-                    <SheetDescription>{t('basket.hint')}</SheetDescription>
+                    <SheetDescription className="sr-only">
+                        {t('basket.hint')}
+                    </SheetDescription>
                 </SheetHeader>
 
                 {basket.lines.length === 0 ? (
@@ -116,6 +118,17 @@ export function BasketSheet({
 
                         <SheetFooter className="gap-3 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
                             <Totals priced={priced} isPricing={isPricing} />
+
+                            {/* What a guest is actually meant to do, where they
+                                are when they have finished reading the total.
+                                It was the sheet's subtitle, four inches above
+                                and in the same grey as everything else — the
+                                one instruction on the screen, styled as filler.
+                                The header keeps it for screen readers. */}
+                            <p className="bg-muted/60 text-foreground flex items-start gap-2 rounded-lg px-3 py-2 text-sm">
+                                <BagIcon className="mt-0.5 size-4 shrink-0" />
+                                <span>{t('basket.hint')}</span>
+                            </p>
 
                             {/* Worded as the action it is and set apart from
                                 the totals, because "Empty basket" sitting
@@ -347,18 +360,24 @@ function Totals({
                     <TotalRow label={t('basket.gst')} amount={priced.tax} />
                 )}
 
-                <TotalRow
-                    strong
-                    label={t('basket.total')}
-                    amount={priced.total}
-                />
+                {/* Ruled off, because a total is a sum and the rows above it
+                    are what it sums. Without the rule it read as a fourth row
+                    that happened to be in bold. */}
+                <div className="mt-2 border-t pt-2">
+                    <TotalRow
+                        strong
+                        label={t('basket.total')}
+                        amount={priced.total}
+                        note={
+                            priced.pricesIncludeTax && priced.tax > 0
+                                ? t('basket.gst_included', {
+                                      amount: money(priced.tax),
+                                  })
+                                : null
+                        }
+                    />
+                </div>
             </dl>
-
-            {priced.pricesIncludeTax && priced.tax > 0 && (
-                <p className="text-muted-foreground mt-1 text-xs">
-                    {t('basket.gst_included', { amount: money(priced.tax) })}
-                </p>
-            )}
         </div>
     );
 }

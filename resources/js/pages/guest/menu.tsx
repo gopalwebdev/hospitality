@@ -1,11 +1,11 @@
 import { Head } from '@inertiajs/react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 import { AppBar } from '@/components/app-bar';
 import { BasketBar } from '@/components/basket-bar';
 import { BasketSheet, type LineDescription } from '@/components/basket-sheet';
 import { CustomiseSheet } from '@/components/customise-sheet';
-import { PlusIcon, StarIcon } from '@/components/icons';
+import { ClockIcon, PlusIcon, StarIcon } from '@/components/icons';
 import { ItemMark, type Diet, type MenuItemKind } from '@/components/item-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -177,6 +177,36 @@ const OrderingContext = createContext<Ordering | null>(null);
  * one in. Prices arrive as integers and are formatted here, so they follow that
  * same language — see resources/js/lib/money.ts.
  */
+
+/**
+ * One time window, read at a glance.
+ *
+ * The clock is what makes these rows read as times rather than as two more
+ * lines of grey prose, and it is why they sit in a block together. Emphasised
+ * turns the row from quiet to foreground: it is the state where the window is
+ * the reason nothing can be ordered, so it has to be the thing the eye lands on.
+ */
+function HoursRow({
+    children,
+    emphasised,
+}: {
+    children: ReactNode;
+    emphasised: boolean;
+}) {
+    return (
+        <p
+            className={`flex items-center gap-2 text-sm ${
+                emphasised
+                    ? 'text-foreground font-medium'
+                    : 'text-muted-foreground'
+            }`}
+        >
+            <ClockIcon className="size-4 shrink-0" />
+            <span>{children}</span>
+        </p>
+    );
+}
+
 export default function Menu({
     tenant,
     menu,
@@ -275,49 +305,43 @@ export default function Menu({
                     </p>
                 )}
 
-                {/* The tenant's own hours, above the menu's: a guest who cannot
-                    order at all should read why here rather than work it out
-                    from a missing button. A day it never opens says just that. */}
-                <p
-                    className={`px-5 pt-4 text-sm ${
-                        store.isOpen
-                            ? 'text-muted-foreground'
-                            : 'text-foreground font-medium'
-                    }`}
-                >
-                    {store.opensAt === null || store.closesAt === null
-                        ? t('menu.store_closed_today')
-                        : [
-                              store.isOpen ? null : t('menu.store_closed'),
-                              t('menu.store_hours', {
-                                  from: clock(store.opensAt),
-                                  until: clock(store.closesAt),
-                              }),
-                          ]
-                              .filter((part) => part !== null)
-                              .join(' · ')}
-                </p>
+                {/* The two windows a guest is actually governed by, in one
+                    block rather than as two loose paragraphs: when the tenant's
+                    doors are open, and when this card is served. Each is a row
+                    with a clock, so they read as times at a glance; each turns
+                    from quiet to emphasised once it is the reason nothing can
+                    be ordered. A guest who cannot order should read why here
+                    rather than work it out from a missing button. */}
+                <div className="space-y-1.5 px-5 pt-4">
+                    <HoursRow emphasised={!store.isOpen}>
+                        {store.opensAt === null || store.closesAt === null
+                            ? t('menu.store_closed_today')
+                            : [
+                                  store.isOpen ? null : t('menu.store_closed'),
+                                  t('menu.store_hours', {
+                                      from: clock(store.opensAt),
+                                      until: clock(store.closesAt),
+                                  }),
+                              ]
+                                  .filter((part) => part !== null)
+                                  .join(' · ')}
+                    </HoursRow>
 
-                {/* A menu served only at certain hours says so, and says it
-                    louder once those hours have passed — a guest reading the
-                    breakfast card at three should not have to work out why
-                    nobody will bring them any. */}
-                {menu.servedFrom !== null && menu.servedUntil !== null && (
-                    <p
-                        className={`px-5 pt-3 text-sm ${
-                            menu.isBeingServed
-                                ? 'text-muted-foreground'
-                                : 'text-foreground font-medium'
-                        }`}
-                    >
-                        {t('menu.served_between', {
-                            from: clock(menu.servedFrom),
-                            until: clock(menu.servedUntil),
-                        })}
-                        {!menu.isBeingServed &&
-                            ` · ${t('menu.not_being_served')}`}
-                    </p>
-                )}
+                    {/* A menu served only at certain hours says so, and says it
+                        louder once those hours have passed — a guest reading
+                        the breakfast card at three should not have to work out
+                        why nobody will bring them any. */}
+                    {menu.servedFrom !== null && menu.servedUntil !== null && (
+                        <HoursRow emphasised={!menu.isBeingServed}>
+                            {t('menu.served_between', {
+                                from: clock(menu.servedFrom),
+                                until: clock(menu.servedUntil),
+                            })}
+                            {!menu.isBeingServed &&
+                                ` · ${t('menu.not_being_served')}`}
+                        </HoursRow>
+                    )}
+                </div>
 
                 {isEmpty ? (
                     <p className="text-muted-foreground px-5 py-16 text-center text-sm">

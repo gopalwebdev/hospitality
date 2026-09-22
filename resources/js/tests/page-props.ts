@@ -24,7 +24,7 @@ const DEFAULT_TRANSLATIONS: Translations = {
         complimentary: 'Complimentary',
         served_between: 'Served :from to :until',
         not_being_served: 'Not being served right now',
-        store_hours: 'Open :from to :until',
+        store_hours: ':from to :until',
         store_closed: 'Closed right now',
         store_closed_today: 'Closed today',
         tax_included: 'Prices include GST at :rate.',

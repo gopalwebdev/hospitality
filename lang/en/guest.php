@@ -32,7 +32,9 @@ return [
         'complimentary' => 'Complimentary',
         'served_between' => 'Served :from to :until',
         'not_being_served' => 'Not being served right now',
-        'store_hours' => 'Open :from to :until',
+        // No "Open" here: the badge in the sticky header already says so,
+        // and the two together read as the word twice on one screen.
+        'store_hours' => ':from to :until',
         'store_closed' => 'Closed right now',
         'store_closed_today' => 'Closed today',
         'tax_included' => 'Prices include GST at :rate.',

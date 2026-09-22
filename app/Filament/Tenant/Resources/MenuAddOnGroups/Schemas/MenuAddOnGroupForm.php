@@ -143,7 +143,7 @@ class MenuAddOnGroupForm
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
                         TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
-                        TableColumn::make(__('panel.add_on_groups.tax_code'))->width('16rem'),
+                        TableColumn::make(__('panel.add_on_groups.tax_code'))->width('24rem'),
                         TableColumn::make(__('panel.add_on_groups.max_per_item'))->width('7rem'),
                         TableColumn::make(__('panel.stock.in_stock'))->width('8rem'),
                         TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
