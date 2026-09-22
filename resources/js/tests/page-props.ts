@@ -59,7 +59,6 @@ const DEFAULT_TRANSLATIONS: Translations = {
         cgst: 'CGST :rate',
         sgst: 'SGST :rate',
         utgst: 'UTGST :rate',
-        igst: 'IGST :rate',
         gst_included: 'Includes GST of :amount',
         line_gst: 'GST :rate · :amount',
         line_gst_included: 'Incl. GST :rate · :amount',

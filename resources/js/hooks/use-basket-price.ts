@@ -5,25 +5,22 @@ import type { BasketLine } from '@/hooks/use-basket';
 
 export type PricedLineStatus = 'ok' | 'unavailable' | 'invalid';
 
-/** How this bill's GST is levied, which decides what the state's half is called. */
-export type GstTreatment = 'intra-state' | 'union-territory' | 'inter-state';
-
 /**
- * One amount's GST, split into the parts a bill shows separately.
+ * One amount's GST, split into the two parts a bill shows separately.
  *
  * Rates are basis points and amounts are minor units, both integers, exactly as
  * the server works them out — the split is never re-derived here, because
  * halving a total does not reliably add back up to what was charged.
- * UTGST rides the SGST fields: only the wording differs.
+ *
+ * There is no IGST: everything sold here is consumed where it is served, so
+ * every bill is CGST plus the state's half. UTGST rides the SGST fields, and
+ * `PricedBasket.isUnionTerritory` is the only thing that says so.
  */
 export interface TaxParts {
-    treatment: GstTreatment;
     cgstRate: number;
     cgst: number;
     sgstRate: number;
     sgst: number;
-    igstRate: number;
-    igst: number;
 }
 
 /** One basket line as the server priced it. A line that is not `ok` is priced at nothing. */
@@ -58,6 +55,8 @@ export interface PricedBasket {
     /** The same total, split into the parts a bill shows separately. */
     taxParts: TaxParts;
     pricesIncludeTax: boolean;
+    /** Whether to call the state's half UTGST. Wording only — the money is identical. */
+    isUnionTerritory: boolean;
     charges: PricedCharge[];
     total: number;
 }

@@ -63,7 +63,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 `PriceBasket` answers the same `shortages` shape without a lock — a reading, not a hold — beside line statuses it leaves unchanged, so the basket sheet reads the priced basket exactly as before.
 
 **An order is a copy.**
-- `orders` keeps its totals as priced, and its GST as levied: `gst_treatment`, `tax`, and the `cgst` / `sgst` / `igst` the three of which add up to it.
+- `orders` keeps its totals as priced, and its GST as levied: `is_union_territory` (what the state's half was called), `tax`, and the `cgst` / `sgst` the two of which add up to it.
 - `order_lines` and `order_charges` each keep their own `taxable_value`, `tax_rate` and split, and a line keeps the item's `hsn_sac_code` — a tax invoice names a code per line, and the item may be recoded or deleted later. See `.ai/rules/actions-menus.md`.
 - `order_lines`, `order_line_choices` and `order_charges` keep names as `jsonb` in every language and money as it was then.
 - Their keys to the menu are `nullOnDelete`, so deleting or renaming an item never rewrites an order.

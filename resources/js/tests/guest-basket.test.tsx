@@ -26,22 +26,15 @@ vi.mock('@/hooks/use-basket-price', () => ({
 
 /**
  * GST levied in halves, as the server splits it: half the rate each side, and
- * the amounts it worked out. `treatment` is what the state's half is called.
+ * the amount each half came to. One amount, because each half is worked out
+ * from its own rate, so an equal rate always produces an equal amount.
  */
-function halves(
-    cgst: number,
-    sgst: number,
-    rate = 500,
-    treatment: TaxParts['treatment'] = 'intra-state',
-): TaxParts {
+function half(amount: number, rate = 500): TaxParts {
     return {
-        treatment,
         cgstRate: Math.floor(rate / 2),
-        cgst,
+        cgst: amount,
         sgstRate: rate - Math.floor(rate / 2),
-        sgst,
-        igstRate: 0,
-        igst: 0,
+        sgst: amount,
     };
 }
 
@@ -171,8 +164,8 @@ describe('guest basket', () => {
                     unitPrice: 38900,
                     total: 38900,
                     taxableValue: 38900,
-                    tax: 1945,
-                    taxParts: halves(973, 972),
+                    tax: 1946,
+                    taxParts: half(973),
                 },
                 {
                     key: 'item:99',
@@ -181,21 +174,22 @@ describe('guest basket', () => {
                     total: 0,
                     taxableValue: 0,
                     tax: 0,
-                    taxParts: halves(0, 0, 0),
+                    taxParts: half(0, 0),
                 },
             ],
             subtotal: 38900,
             tax: 2140,
-            taxParts: halves(1070, 1070),
+            taxParts: half(1070),
             pricesIncludeTax: false,
+            isUnionTerritory: false,
             charges: [
                 {
                     id: 1,
                     name: 'Service Charge',
                     amount: 3890,
                     taxableValue: 3890,
-                    tax: 195,
-                    taxParts: halves(97, 98),
+                    tax: 194,
+                    taxParts: half(97),
                 },
             ],
             total: 44930,
@@ -226,7 +220,7 @@ describe('guest basket', () => {
         // The line carries its own rate and GST, because one basket can hold
         // a 5% item beside an 18% one.
         expect(
-            within(sheet).getByText(/GST 5% · ₹?19\.45/),
+            within(sheet).getByText(/GST 5% · ₹?19\.46/),
         ).toBeInTheDocument();
 
         expect(amountFor(sheet, 'Subtotal')).toMatch(/389\.00/);
@@ -263,15 +257,16 @@ describe('guest basket', () => {
                     status: 'ok',
                     unitPrice: 30900,
                     total: 30900,
-                    taxableValue: 29429,
-                    tax: 1471,
-                    taxParts: halves(736, 735),
+                    taxableValue: 29428,
+                    tax: 1472,
+                    taxParts: half(736),
                 },
             ],
             subtotal: 30900,
-            tax: 1471,
-            taxParts: halves(736, 735),
+            tax: 1472,
+            taxParts: half(736),
             pricesIncludeTax: true,
+            isUnionTerritory: false,
             charges: [],
             total: 30900,
         };
@@ -284,10 +279,10 @@ describe('guest basket', () => {
         // Already in the price, so the line says "Incl." and the halves sit
         // under the total as a note rather than being added to it.
         expect(
-            within(sheet).getByText(/Incl. GST 5% · ₹?14\.71/),
+            within(sheet).getByText(/Incl. GST 5% · ₹?14\.72/),
         ).toBeInTheDocument();
         expect(
-            within(sheet).getByText(/Includes GST of ₹?14\.71/),
+            within(sheet).getByText(/Includes GST of ₹?14\.72/),
         ).toBeInTheDocument();
         expect(amountFor(sheet, 'CGST 2.5%')).toMatch(/7\.36/);
         expect(amountFor(sheet, 'Total')).toMatch(/309\.00/);

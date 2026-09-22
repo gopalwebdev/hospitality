@@ -139,10 +139,9 @@ class OrderInfolist
     /**
      * An order's GST, part by part, as the invoice for it would show them.
      *
-     * Only the parts that carry anything: a tenant charging no GST reads one
-     * blank line rather than three zeroes, and an intra-state bill never shows
-     * an empty IGST. The state's half is named by the treatment the order was
-     * placed under — SGST or UTGST.
+     * Only the parts that carry anything, so a tenant charging no GST reads one
+     * blank line rather than two zeroes. The state's half is named as the order
+     * was placed — SGST, or UTGST where the tenant said it was in one.
      *
      * @return list<string>
      */
@@ -150,8 +149,7 @@ class OrderInfolist
     {
         $parts = [
             'CGST' => $order->cgst,
-            $order->gst_treatment->stateTaxLabel() ?? 'SGST' => $order->sgst,
-            'IGST' => $order->igst,
+            $order->is_union_territory ? 'UTGST' : 'SGST' => $order->sgst,
         ];
 
         $shown = [];

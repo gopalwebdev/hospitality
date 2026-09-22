@@ -28,6 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Platform/Resources/Tenants/** | .ai/rules/resources-tenants.md |
 | routes/** | .ai/rules/routes.md |
 | app/Filament/**/Tables/*.php, app/Filament/Tables/**, app/Filament/**/RelationManagers/*.php | .ai/rules/tables.md |
+| app/Filament/Tenant/Resources/TaxCodes/**, app/Models/TaxCode.php, app/Policies/TaxCodePolicy.php, database/seeders/TaxCodeSeeder.php | .ai/rules/tax-codes.md |
 | app/Actions/Tenants/** | .ai/rules/tenants.md |
 | app/Filament/Platform/Resources/Users/** | .ai/rules/users.md |
 | resources/views/** | .ai/rules/views.md |

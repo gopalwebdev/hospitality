@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\GstTreatment;
 use App\Enums\OrderStatus;
 use App\Models\Menu;
 use App\Models\Order;
@@ -41,11 +40,10 @@ class OrderFactory extends Factory
             'location_label' => 'Room '.fake()->numberBetween(101, 420),
             'note' => null,
             'subtotal' => $subtotal,
-            'gst_treatment' => GstTreatment::IntraState,
+            'is_union_territory' => false,
             'tax' => $tax,
             'cgst' => $cgst,
             'sgst' => $tax - $cgst,
-            'igst' => 0,
             'charges_total' => 0,
             'total' => $subtotal + $tax,
             'prices_include_tax' => false,

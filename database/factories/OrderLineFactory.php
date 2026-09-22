@@ -42,8 +42,6 @@ class OrderLineFactory extends Factory
             'cgst' => intdiv($price * $quantity * 250, 10000),
             'sgst_rate' => 250,
             'sgst' => intdiv($price * $quantity * 250, 10000),
-            'igst_rate' => 0,
-            'igst' => 0,
             'hsn_sac_code' => null,
             'position' => 0,
         ];

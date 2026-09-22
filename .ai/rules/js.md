@@ -46,6 +46,19 @@ Everything a tenant wrote — menu, category, item, add-on group, option, charge
 
 A chrome string that names the business says "tenant", whatever the tenant's type. The guest app is sent no type at all.
 
+## The app renders in the browser, and nowhere else
+`config/inertia.php` sets `ssr.enabled` to **false**. No Inertia page is pre-rendered: the server sends props and React paints from them, in development exactly as in production.
+
+It was on, and being on was worse than either answer chosen deliberately. Inertia v3's Vite plugin serves SSR from the dev server (`HttpGateway` posts to `/__inertia_ssr` whenever `Vite::isRunningHot()`), while a deployed page has never been pre-rendered — there is no bundle under `bootstrap/ssr`, and `php artisan dev` starts Horizon, Pail and Vite and nothing else (`DevProcessesTest`). So every page was server rendered on the machine it was written on and client rendered once it shipped: the one arrangement where a hydration mismatch, or a render that reaches for `window`, breaks nowhere it would be seen.
+
+What follows from it:
+- **The boot loader is the first paint**, on every load rather than only a deployed one. `#app` is empty until React mounts, which is what the section below is about.
+- **`getServerSnapshot` is dead.** The third argument to `useSyncExternalStore` in `hooks/use-basket.ts` and `hooks/use-appearance.tsx` is never called; nothing may be built on it.
+- **The theme is still painted by the server** — `resources/views/partials/theme.blade.php` reads the `appearance` cookie before any JavaScript runs. That is Blade, not SSR, and it is untouched by this (`.ai/rules/views.md`).
+- Turning it back on is not a flag: it means building the bundle, running `inertia:start-ssr` under the process manager, and re-reading every browser API touched during a first render.
+
+The Filament panels are a different stack. Livewire renders its HTML on the server by definition, so a panel has no client-rendered mode to choose; `->spa(hasPrefetching: true)` is as far toward the browser as they go (`.ai/rules/filament.md`).
+
 ## Nothing waits on a blank screen
 Two layers, and both are needed because they cover different gaps:
 
@@ -86,7 +99,7 @@ Add buttons appear only while `store.isOpen` and the menu `isBeingServed`. An it
 
 `lib/add-on-rules.ts` holds those rules as pure functions and counts picks as the server does, each option by its quantity. It only shapes the sheet: nothing it decides is trusted.
 
-`hooks/use-basket.ts` keeps the lines in localStorage under `basket:{tenant slug}:{menu id}`, read through `useSyncExternalStore` with an empty server snapshot, because SSR is on and the first render has to match a page painted without the phone's storage. The same item with the same choices is one line. A line keeps ids and the name it was added under; the basket sheet names its lines from the page's props, so a language switch renames them.
+`hooks/use-basket.ts` keeps the lines in localStorage under `basket:{tenant slug}:{menu id}`, read through `useSyncExternalStore`. Its empty server snapshot is never reached now that the app is client rendered ("The app renders in the browser, and nowhere else"); what the hook is here for is the **stable `lines` reference** it hands back, which the pricing effect below depends on. The same item with the same choices is one line. A line keeps ids and the name it was added under; the basket sheet names its lines from the page's props, so a language switch renames them.
 
 **Items and combos carry a maximum per order**, sent as `maxPerOrder` (null is no limit) and counted across every basket line the item or combo is on. The project owner asked for it after a guest could ask for 27 pillows; a minimum per order was built beside it and taken out again. `lib/order-limits.ts` holds the arithmetic:
 - **Customise sheet:** starts at one, and its stepper stops at what the maximum leaves.
@@ -104,7 +117,7 @@ Three traps in that hook:
 - It calls `transform()` before `post()`, because `post()` sends from a ref that a `setData()` in the same tick has not updated yet.
 - It waits `SETTLE_MS` before posting and clears the timer on cleanup, because a guest settling on a quantity taps a stepper several times a second and the endpoint is rate limited (60/min, shared by everyone at the table). This is only safe because `useBasket()` hands back a stable `lines` reference from `useSyncExternalStore` — if `lines` were rebuilt each render the effect would reschedule forever and never post at all.
 
-**GST is shown twice over, which is what a bill here does.** Each line carries its own rate and amount ("GST 5% · ₹19.45"), because one basket can hold a 5% item beside an 18% one and a single figure at the foot would hide that. The foot carries the **parts** — CGST and SGST, or UTGST in a union territory, or one IGST — from `taxParts`, which is the server's split and is never re-derived in the browser (halving a total does not reliably add back up; see `.ai/rules/actions-menus.md`). A part that carries nothing is not drawn, so a tenant charging no GST shows no rows rather than three zeroes, and a complimentary line shows no GST line at all.
+**GST is shown twice over, which is what a bill here does.** Each line carries its own rate and amount ("GST 5% · ₹19.45"), because one basket can hold a 5% item beside an 18% one and a single figure at the foot would hide that. The foot carries the **two parts** — CGST and SGST, or UTGST where `priced.isUnionTerritory` says so — from `taxParts`, which is the server's split and is never re-derived in the browser (halving a total does not reliably add back up; see `.ai/rules/actions-menus.md`). There is no IGST row: every bill here is an intra-state supply (`.ai/rules/enums.md`). A part that carries nothing is not drawn, so a tenant charging no GST shows no rows rather than two zeroes, and a complimentary line shows no GST line at all.
 
 Where the prices already include GST, the parts move **below** the total as a note rather than sitting in the running list, because they are not being added — and the per-line label reads "Incl.". `lib/rate.ts` turns the basis points the server sends into "5%", beside the money and time formatting and for the same reason.
 

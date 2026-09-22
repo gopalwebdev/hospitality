@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\Currency;
-use App\Enums\GstTreatment;
 use App\Models\TenantSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -22,13 +21,14 @@ return new class extends Migration
             $table->string('landline_phone', 32)->nullable();
             $table->string('currency', 3)->default(Currency::IndianRupee->value);
             $table->string('gstin', 15)->nullable();
-            // How this tenant's GST is levied, as the tenant states it on the
-            // Settings page: App\Enums\GstTreatment. Nothing here works it out
-            // from where the tenant is — a tenant says what it charges.
-            $table->string('gst_treatment', 32)->default(GstTreatment::IntraState->value);
-            // GST is levied in halves on an intra-state supply: CGST to the centre
-            // and SGST to the state. Both in basis points — 2.5% is 250 — and the
-            // rate anything is taxed at is the two added up.
+            // On: the state's half of a bill reads UTGST rather than SGST. It
+            // rides the same columns and moves no money, and a tenant states it
+            // on the Settings page — nothing works it out from where it is.
+            $table->boolean('is_union_territory')->default(false);
+            // GST is levied in halves: CGST to the centre and SGST to the state.
+            // Both in basis points — 2.5% is 250 — and the rate anything is
+            // taxed at is the two added up. This is the tenant's default: an
+            // item with a tax_rate of its own is halved the same way.
             $table->smallInteger('cgst_rate')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
             $table->smallInteger('sgst_rate')->default(intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2));
             // On: this rate is what every item is taxed at, whatever its own says.
@@ -37,17 +37,12 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        $treatments = collect(GstTreatment::cases())
-            ->map(fn (GstTreatment $treatment): string => "'{$treatment->value}'")
-            ->implode(', ');
-
-        DB::statement("ALTER TABLE tenant_settings
+        DB::statement('ALTER TABLE tenant_settings
             ADD CONSTRAINT tenant_settings_tax_rates_in_range CHECK (
                 cgst_rate BETWEEN 0 AND 10000
                 AND sgst_rate BETWEEN 0 AND 10000
                 AND cgst_rate + sgst_rate <= 10000
-            ),
-            ADD CONSTRAINT tenant_settings_gst_treatment_is_known CHECK (gst_treatment IN ({$treatments}))");
+            )');
     }
 
     public function down(): void

@@ -6,7 +6,6 @@ use App\Enums\ChargeCalculation;
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
 use App\Enums\Diet;
-use App\Enums\GstTreatment;
 use App\Enums\HomeRowLayout;
 use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
@@ -53,26 +52,24 @@ class TenantSeeder extends Seeder
      * read them: a restaurant and a hotel serve different things, and the
      * hotel is what shows Consumable, Goods and Service items sharing one menu.
      *
-     * The GST fields make the three demonstrate every `GstTreatment` and both
-     * `prices_include_tax` states, because a fresh install otherwise shows
-     * "GST 0%" everywhere and neither tax display path is visible:
-     * - **Spice Garden** (Chennai, Tamil Nadu) is the plain case — intra-state,
-     *   5% the way a standalone restaurant usually is, prices quoted before
-     *   tax the way a printed menu usually is.
-     * - **Seaview Residency** sits in Puducherry, a union territory, so its
-     *   own statement is `UnionTerritory` (CGST + UTGST, the same money as
-     *   SGST under a different name — `.ai/rules/enums.md`) rather than
-     *   picked for variety's sake. Its rate is 18%, the hotel-tariff slab, and
-     *   its prices already include it, the way an in-room rate card usually
-     *   quotes.
+     * The GST fields make the three demonstrate both wordings of the state's
+     * half and both `prices_include_tax` states, because a fresh install
+     * otherwise shows "GST 0%" everywhere and neither tax display path is
+     * visible:
+     * - **Spice Garden** (Chennai, Tamil Nadu) is the plain case — CGST and
+     *   SGST, 5% the way a standalone restaurant usually is, prices quoted
+     *   before tax the way a printed menu usually is.
+     * - **Seaview Residency** sits in Puducherry, a union territory, so
+     *   `is_union_territory` is on and its bills read UTGST in place of SGST —
+     *   the same money under a different name. Its rate is 18%, the
+     *   hotel-tariff slab, and its prices already include it, the way an
+     *   in-room rate card usually quotes.
      * - **Sunrise Multispecialty Hospital** rounds out `TenantType` — hospital
-     *   was wholly unseeded — and states `InterState`, so an order there
-     *   shows one IGST line rather than a CGST/SGST split. It also switches
-     *   `tax_overrides_item_rates` on, so every line on its bill is taxed at
-     *   its own 5% however an item's own `tax_rate` reads — the one seeded
-     *   tenant demonstrating that override.
+     *   was wholly unseeded — and switches `tax_overrides_item_rates` on, so
+     *   every line on its bill is taxed at its own 5% however an item's own
+     *   `tax_rate` reads. It is the one seeded tenant demonstrating that.
      *
-     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string, menus: list<string>, gstin: string, gst_treatment: GstTreatment, cgst_rate: int, sgst_rate: int, tax_overrides_item_rates: bool, prices_include_tax: bool}>
+     * @var list<array{slug: string, name: string, type: TenantType, address: string, pincode: string, email: string, phone: string, owner_name: string, owner_email: string, staff_name: string, staff_email: string, menus: list<string>, gstin: string, is_union_territory: bool, cgst_rate: int, sgst_rate: int, tax_overrides_item_rates: bool, prices_include_tax: bool}>
      */
     public const array TENANTS = [
         [
@@ -90,7 +87,7 @@ class TenantSeeder extends Seeder
             'menus' => ['main', 'drinks', 'breakfast'],
             // Tamil Nadu (state code 33). Intra-state, 5%, quoted before tax.
             'gstin' => '33AAACS1429K1Z1',
-            'gst_treatment' => GstTreatment::IntraState,
+            'is_union_territory' => false,
             'cgst_rate' => 250,
             'sgst_rate' => 250,
             'tax_overrides_item_rates' => false,
@@ -113,7 +110,7 @@ class TenantSeeder extends Seeder
             // legislature — CGST + UTGST, riding the SGST columns. 18%, the
             // hotel-tariff slab, already inside the rate card's prices.
             'gstin' => '34AAACS5821H1Z7',
-            'gst_treatment' => GstTreatment::UnionTerritory,
+            'is_union_territory' => true,
             'cgst_rate' => 900,
             'sgst_rate' => 900,
             'tax_overrides_item_rates' => false,
@@ -136,7 +133,7 @@ class TenantSeeder extends Seeder
             // one IGST line, no CGST/SGST split — and it taxes its whole bill
             // at this rate whatever an item's own tax_rate says.
             'gstin' => '29AAACS7734L1Z4',
-            'gst_treatment' => GstTreatment::InterState,
+            'is_union_territory' => false,
             'cgst_rate' => 250,
             'sgst_rate' => 250,
             'tax_overrides_item_rates' => true,
@@ -1145,7 +1142,7 @@ class TenantSeeder extends Seeder
                 'landline_phone' => '+91 44 2345 6789',
                 'currency' => Currency::IndianRupee,
                 'gstin' => $definition['gstin'],
-                'gst_treatment' => $definition['gst_treatment'],
+                'is_union_territory' => $definition['is_union_territory'],
                 'cgst_rate' => $definition['cgst_rate'],
                 'sgst_rate' => $definition['sgst_rate'],
                 'tax_overrides_item_rates' => $definition['tax_overrides_item_rates'],

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Pages;
 
-use App\Enums\GstTreatment;
 use App\Enums\Permission;
 use App\Enums\Weekday;
 use App\Filament\Forms\Components\ClockTimePicker;
@@ -15,7 +14,6 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -183,15 +181,12 @@ class Settings extends Page
                     ->maxLength(15)
                     ->columnSpanFull(),
 
-                // The tenant says how its GST is levied. Nothing works this
-                // out from an address or from the GSTIN: which union
-                // territories levy UTGST is tax policy, and a tenant has to be
-                // able to state it rather than have it assumed.
-                Select::make('gst_treatment')
-                    ->label('GST is levied as')
-                    ->options(GstTreatment::options())
-                    ->required()
-                    ->native(false)
+                // The tenant says where it is. Nothing works this out from an
+                // address or from the GSTIN: which union territories levy
+                // UTGST is tax policy, and a tenant has to be able to state it
+                // rather than have it assumed. It changes one word and no money.
+                Toggle::make('is_union_territory')
+                    ->label('This is a union territory (UTGST, not SGST)')
                     ->live()
                     ->columnSpanFull(),
 
@@ -215,16 +210,11 @@ class Settings extends Page
     }
 
     /**
-     * What the state's half is called under the treatment currently chosen.
-     *
-     * SGST or UTGST, and "IGST" once the whole rate is one tax — the two
-     * inputs still hold halves that add up, which is what the labels say.
+     * What the state's half is called where the tenant says it is.
      */
     private function stateTaxLabel(Get $get): string
     {
-        $treatment = GstTreatment::tryFrom((string) $get('gst_treatment'));
-
-        return $treatment?->stateTaxLabel() ?? 'IGST (second half)';
+        return $get('is_union_territory') === true ? 'UTGST' : 'SGST';
     }
 
     /**

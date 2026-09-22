@@ -33,8 +33,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $cgst
  * @property int $sgst_rate
  * @property int $sgst
- * @property int $igst_rate
- * @property int $igst
  * @property string|null $hsn_sac_code
  * @property int $position
  * @property-read Collection<int, OrderLineChoice> $choices
@@ -55,8 +53,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'cgst',
     'sgst_rate',
     'sgst',
-    'igst_rate',
-    'igst',
     'hsn_sac_code',
     'position',
 ])]
@@ -79,8 +75,6 @@ class OrderLine extends Model
         'cgst' => 0,
         'sgst_rate' => 0,
         'sgst' => 0,
-        'igst_rate' => 0,
-        'igst' => 0,
     ];
 
     /**
@@ -136,8 +130,6 @@ class OrderLine extends Model
             'cgst' => 'integer',
             'sgst_rate' => 'integer',
             'sgst' => 'integer',
-            'igst_rate' => 'integer',
-            'igst' => 'integer',
             'position' => 'integer',
         ];
     }

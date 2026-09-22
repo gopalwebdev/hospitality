@@ -16,5 +16,8 @@ When you add a resource or a table capability, write the policy method in the sa
 
 `OrderPolicy` has a `cancel()` that no generator writes, asked by the cancel action's `->authorize('cancel')`, and answers `create`, `update`, `delete` and `deleteAny` with false outright: orders are placed by guests and never edited in the panel.
 
+## TaxCodePolicy is settings.manage, minus the shared catalogue
+`TaxCodePolicy` reads like `ChargePolicy` — `settings.manage` throughout — with one addition: `update()` and `delete()` also refuse a row whose `tenant_id` is null, because that row is the product team's catalogue and every tenant is offered it. A tenant sees it, fills items from it, and cannot change it. See `.ai/rules/tax-codes.md`.
+
 ## ChargePolicy is settings.manage for everything
 `ChargePolicy` answers every method — looking included — with `settings.manage`, which a tenant owner holds and floor staff do not. Charges moved off the Settings page onto their own, and the same people change them; do not split them onto `menu.view` / `menu.manage`, which staff and guests partly hold.

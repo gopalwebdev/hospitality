@@ -2,7 +2,6 @@
 
 use App\Actions\Baskets\PriceBasket;
 use App\Actions\Orders\PlaceOrder;
-use App\Enums\GstTreatment;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuCategory;
@@ -17,29 +16,39 @@ use App\Models\Tenant;
 | Splitting GST the way an invoice has to show it
 |--------------------------------------------------------------------------
 |
-| A tax invoice states the rate and the amount of CGST and SGST (or UTGST, or
-| IGST) each on its own, so the split is decided when a bill is priced and
-| copied onto the order. Nothing re-derives it later: halving a stored total
-| does not reliably add back up to what was charged.
+| A tax invoice states the rate and the amount of CGST and SGST (or UTGST) each
+| on its own, so the split is decided when a bill is priced and copied onto the
+| order. Nothing re-derives it later: halving a stored total does not reliably
+| add back up to what was charged.
 |
-| Which of the three a tenant charges under is a tenant's own statement on its
-| Settings page. Nothing here works it out from an address or a GSTIN.
+| There is no IGST. Everything sold here is consumed where it is served, so the
+| place of supply is always the premises (IGST Act, s. 12(3)) and every bill is
+| CGST plus the state's half. Whether that half reads SGST or UTGST is the
+| tenant's own statement on its Settings page — one toggle, and no money.
 |
 */
 
 /**
  * A tenant charging $rate, with one item on one menu priced at $price.
  *
+ * `$itemRate` gives the item a rate of its own, which is what a bill spanning
+ * two slabs is made of; null leaves it taxed at the tenant's.
+ *
  * @return array{tenant: Tenant, menu: Menu, item: MenuItem}
  */
-function taxedTenantWithItem(int $rate, int $price, GstTreatment $treatment = GstTreatment::IntraState, bool $pricesIncludeTax = false): array
-{
+function taxedTenantWithItem(
+    int $rate,
+    int $price,
+    bool $isUnionTerritory = false,
+    bool $pricesIncludeTax = false,
+    ?int $itemRate = null,
+): array {
     $tenant = Tenant::factory()->create();
 
     $tenant->settings->update([
         'cgst_rate' => intdiv($rate, 2),
         'sgst_rate' => $rate - intdiv($rate, 2),
-        'gst_treatment' => $treatment,
+        'is_union_territory' => $isUnionTerritory,
         'prices_include_tax' => $pricesIncludeTax,
     ]);
 
@@ -47,7 +56,7 @@ function taxedTenantWithItem(int $rate, int $price, GstTreatment $treatment = Gs
 
     $item = MenuItem::factory()
         ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
-        ->create(['price' => $price, 'tax_rate' => null, 'hsn_sac_code' => '996331']);
+        ->create(['price' => $price, 'tax_rate' => $itemRate, 'hsn_sac_code' => '996331']);
 
     return ['tenant' => $tenant->fresh() ?? $tenant, 'menu' => $menu, 'item' => $item];
 }
@@ -70,65 +79,91 @@ it('stores an order\'s GST as halves that add back up to what was charged', func
 
     $order = orderOneOf($tenant, $menu, $item);
 
-    expect($order->gst_treatment)->toBe(GstTreatment::IntraState)
-        ->and($order->tax)->toBe(500)
+    expect($order->tax)->toBe(500)
         ->and($order->cgst)->toBe(250)
         ->and($order->sgst)->toBe(250)
-        ->and($order->igst)->toBe(0)
         // The invariant the database also states, as orders_tax_parts_add_up.
-        ->and($order->cgst + $order->sgst + $order->igst)
-        ->toBe($order->tax);
+        ->and($order->cgst + $order->sgst)->toBe($order->tax);
 });
 
-it('gives the odd paisa to the state rather than losing it', function (): void {
-    // ₹99.90 at 5% is ₹4.995 — 500 paisa rounded, which will not halve evenly.
-    ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(rate: 500, price: 9990);
+it('works each half out from its own rate, so an equal rate is an equal amount', function (): void {
+    // ₹10.05 at 18% is ₹1.809. Working the whole rate out first and handing the
+    // state what was left of it gave the centre ₹0.90 and the state ₹0.91, so a
+    // bill stated 9% twice and showed two amounts. 9% of ₹10.05 is ₹0.90 a side.
+    ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(rate: 1800, price: 1005);
 
     $order = orderOneOf($tenant, $menu, $item);
     $line = OrderLine::query()->where('order_id', $order->getKey())->sole();
 
-    // The centre's half comes from its own 2.5% — 9990 × 250 / 10000 is 249.75,
-    // rounded to 250 — and the state's is whatever is left of the 500 charged.
-    expect($order->tax)->toBe(500)
-        ->and($order->cgst)->toBe(250)
-        ->and($order->sgst)->toBe(250)
+    expect($order->cgst)->toBe(90)
+        ->and($order->sgst)->toBe(90)
+        // The tax charged is what the two come to, which orders_tax_parts_add_up restates.
+        ->and($order->tax)->toBe(180)
         // One line and no charges, so the line's halves are the order's.
         ->and($line->cgst)->toBe($order->cgst)
         ->and($line->sgst)->toBe($order->sgst)
-        ->and($line->taxable_value)->toBe(9990);
+        ->and($line->taxable_value)->toBe(1005);
 });
 
-it('levies one IGST and no halves when the tenant says it supplies inter-state', function (): void {
+it('splits a charge evenly on a bill whose prices already carry the tax', function (): void {
+    // The bill this was found on: ₹499.00 including 18%, plus a ₹50.00 fee. The
+    // item's ₹76.12 halves cleanly and the fee's ₹7.63 does not, so the fee was
+    // where a bill came apart — ₹3.81 against ₹3.82, both labelled 9%.
     ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(
         rate: 1800,
+        price: 49900,
+        isUnionTerritory: true,
+        pricesIncludeTax: true,
+    );
+
+    Charge::factory()->ofTenant($tenant)->fixedAmount(5000)->onMenus($menu)->create();
+
+    $order = orderOneOf($tenant, $menu, $item);
+    $charge = OrderCharge::query()->where('order_id', $order->getKey())->sole();
+
+    // 9% of the ₹42.38 the fee is worth before tax, read either way round.
+    expect($charge->cgst)->toBe(381)
+        ->and($charge->sgst)->toBe(381)
+        ->and($charge->taxable_value)->toBe(4238)
+        ->and($order->cgst)->toBe(4187)
+        ->and($order->sgst)->toBe(4187)
+        ->and($order->tax)->toBe(8374)
+        // Included in the prices, so only the fee is added to what is paid.
+        ->and($order->total)->toBe(54900);
+});
+
+it('splits an item\'s own rate rather than the tenant\'s', function (): void {
+    // The tenant's default is 5%, but this item states 18% — a menu holds both,
+    // and each line is halved at the rate that line is actually taxed at.
+    ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(
+        rate: 500,
         price: 10000,
-        treatment: GstTreatment::InterState,
+        itemRate: 1800,
     );
 
     $order = orderOneOf($tenant, $menu, $item);
     $line = OrderLine::query()->where('order_id', $order->getKey())->sole();
 
-    expect($order->gst_treatment)->toBe(GstTreatment::InterState)
-        ->and($order->tax)->toBe(1800)
-        ->and($order->igst)->toBe(1800)
-        ->and($order->cgst)->toBe(0)
-        ->and($order->sgst)->toBe(0)
-        ->and($line->igst_rate)->toBe(1800)
-        ->and($line->cgst_rate)->toBe(0);
+    expect($line->tax_rate)->toBe(1800)
+        ->and($line->cgst_rate)->toBe(900)
+        ->and($line->sgst_rate)->toBe(900)
+        ->and($line->cgst)->toBe(900)
+        ->and($line->sgst)->toBe(900)
+        ->and($order->tax)->toBe(1800);
 });
 
 it('calls the state\'s half UTGST without moving any money', function (): void {
     ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(
         rate: 500,
         price: 10000,
-        treatment: GstTreatment::UnionTerritory,
+        isUnionTerritory: true,
     );
 
     $order = orderOneOf($tenant, $menu, $item);
 
-    // UTGST rides the SGST columns: only the wording of the invoice differs.
-    expect($order->gst_treatment)->toBe(GstTreatment::UnionTerritory)
-        ->and($order->gst_treatment->stateTaxLabel())->toBe('UTGST')
+    // UTGST rides the SGST columns: only the wording of the invoice differs,
+    // and the order keeps its own wording because a tenant can move.
+    expect($order->is_union_territory)->toBeTrue()
         ->and($order->cgst)->toBe(250)
         ->and($order->sgst)->toBe(250);
 });

@@ -7,18 +7,20 @@ return [
     | Server Side Rendering
     |--------------------------------------------------------------------------
     |
-    | These options configures if and how Inertia uses Server Side Rendering
-    | to pre-render each initial request made to your application's pages
-    | so that server rendered HTML is delivered for the user's browser.
+    | Off: the app is rendered in the browser and nowhere else. Inertia's
+    | Vite plugin pre-renders through the dev server whenever Vite is
+    | running hot, and nothing has ever pre-rendered a deployed page —
+    | there is no bundle under bootstrap/ssr and no inertia:start-ssr
+    | process — so leaving this on meant a page server rendered while it
+    | was being written and client rendered once it shipped.
     |
     | See: https://inertiajs.com/server-side-rendering
     |
     */
 
     'ssr' => [
-        'enabled' => true,
-        'url' => 'http://127.0.0.1:13714',
-        // 'bundle' => base_path('bootstrap/ssr/ssr.mjs'),
+
+        'enabled' => false,
 
     ],
 

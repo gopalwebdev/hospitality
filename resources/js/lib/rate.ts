@@ -28,7 +28,6 @@ export function formatRate(basisPoints: number): string {
 export function wholeRate(parts: {
     cgstRate: number;
     sgstRate: number;
-    igstRate: number;
 }): number {
-    return parts.cgstRate + parts.sgstRate + parts.igstRate;
+    return parts.cgstRate + parts.sgstRate;
 }

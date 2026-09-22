@@ -4,7 +4,6 @@ namespace App\Actions\Baskets;
 
 use App\Actions\Inventory\FindStockShortages;
 use App\Actions\Inventory\StockDemand;
-use App\Enums\GstTreatment;
 use App\Enums\ItemAvailability;
 use App\Exceptions\InsufficientStock;
 use App\Models\Charge;
@@ -66,7 +65,7 @@ class PriceBasket
 
     /**
      * @param  list<BasketLine>  $lines
-     * @return array{lines: list<PricedLine>, subtotal: int, tax: int, taxParts: GstSplit, pricesIncludeTax: bool, charges: list<PricedCharge>, total: int, shortages: list<Shortage>}
+     * @return array{lines: list<PricedLine>, subtotal: int, tax: int, taxParts: GstSplit, pricesIncludeTax: bool, isUnionTerritory: bool, charges: list<PricedCharge>, total: int, shortages: list<Shortage>}
      */
     public function __invoke(Tenant $tenant, Menu $menu, array $lines): array
     {
@@ -74,10 +73,10 @@ class PriceBasket
         $tenantOverrides = $tenant->overridesItemTaxRates();
         $settings = $tenant->resolvedSettings();
         $pricesIncludeTax = $settings instanceof TenantSetting && $settings->prices_include_tax;
-        // How this bill splits, as the tenant stated it on its Settings page.
-        // Settled once for the whole basket: it is a property of the supply,
-        // not of a line, and an order keeps the one it was placed under.
-        $treatment = $tenant->gstTreatment();
+        // Wording, not money: the state's half rides the SGST columns either
+        // way. Settled once for the whole bill because it is a property of
+        // where the supply happens, and an order keeps what it was placed under.
+        $isUnionTerritory = $tenant->isInUnionTerritory();
 
         $items = $this->items($tenant, $menu, $this->idsOf($lines, self::ITEM));
         $groups = $this->groups($tenant, $items);
@@ -86,7 +85,7 @@ class PriceBasket
 
         $priced = [];
         $subtotal = 0;
-        $tax = GstSplit::none($treatment);
+        $tax = GstSplit::none();
 
         foreach ($lines as $line) {
             $parts = $line['type'] === self::COMBO
@@ -101,7 +100,7 @@ class PriceBasket
                     'total' => 0,
                     'taxableValue' => 0,
                     'tax' => 0,
-                    'taxParts' => GstSplit::none($treatment),
+                    'taxParts' => GstSplit::none(),
                 ];
 
                 continue;
@@ -113,10 +112,10 @@ class PriceBasket
             // Taxed part by part, and rounded once for the whole line rather
             // than per unit. The line keeps its own split because an invoice
             // shows CGST and SGST per line, and because the order copies it.
-            $lineTax = GstSplit::none($treatment);
+            $lineTax = GstSplit::none();
 
             foreach ($parts as $part) {
-                $lineTax = $lineTax->plus(GstSplit::on($part['amount'] * $line['quantity'], $part['rate'], $treatment, $pricesIncludeTax));
+                $lineTax = $lineTax->plus(GstSplit::on($part['amount'] * $line['quantity'], $part['rate'], $pricesIncludeTax));
             }
 
             $tax = $tax->plus($lineTax);
@@ -135,7 +134,7 @@ class PriceBasket
             ];
         }
 
-        $charges = $this->charges($tenant, $menu, $subtotal, $tenantRate, $treatment, $pricesIncludeTax);
+        $charges = $this->charges($tenant, $menu, $subtotal, $tenantRate, $pricesIncludeTax);
 
         // A charge is part of the value of the supply and is taxed with it, so
         // its tax joins the bill's rather than sitting outside it.
@@ -149,6 +148,8 @@ class PriceBasket
             'tax' => $tax->total(),
             'taxParts' => $tax,
             'pricesIncludeTax' => $pricesIncludeTax,
+            // Only so the app knows whether to call the state's half UTGST.
+            'isUnionTerritory' => $isUnionTerritory,
             'charges' => $charges,
             'total' => $subtotal
                 + ($pricesIncludeTax ? 0 : $tax->total())
@@ -392,7 +393,7 @@ class PriceBasket
      *
      * @return list<PricedCharge>
      */
-    private function charges(Tenant $tenant, Menu $menu, int $subtotal, int $tenantRate, GstTreatment $treatment, bool $pricesIncludeTax): array
+    private function charges(Tenant $tenant, Menu $menu, int $subtotal, int $tenantRate, bool $pricesIncludeTax): array
     {
         if ($subtotal === 0) {
             return [];
@@ -405,7 +406,7 @@ class PriceBasket
             ->forMenu($menu->getKey())
             ->inMenuOrder()
             ->get()
-            ->map(function (Charge $charge) use ($subtotal, $tenantRate, $treatment, $pricesIncludeTax): array {
+            ->map(function (Charge $charge) use ($subtotal, $tenantRate, $pricesIncludeTax): array {
                 $amount = $charge->amountOn($subtotal);
 
                 // A service charge is consideration for the same supply, so it
@@ -413,7 +414,7 @@ class PriceBasket
                 // rate: a bill spanning several slabs has no one principal
                 // supply to follow, and the tenant's rate is what it charges
                 // for serving. An item's own rate is for the item.
-                $tax = GstSplit::on($amount, $tenantRate, $treatment, $pricesIncludeTax);
+                $tax = GstSplit::on($amount, $tenantRate, $pricesIncludeTax);
 
                 return [
                     'id' => $charge->getKey(),

@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Enums\Currency;
-use App\Enums\GstTreatment;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,10 +28,11 @@ class TenantSettingFactory extends Factory
             'landline_phone' => null,
             'currency' => Currency::IndianRupee,
             'gstin' => null,
-            // How a tenant starts out: levied in halves, charging nothing until
-            // it says what it charges, prices quoted before tax and an item's
-            // own rate left to stand. A test that needs a rate says taxedAt().
-            'gst_treatment' => GstTreatment::IntraState,
+            // How a tenant starts out: in a state rather than a union
+            // territory, charging nothing until it says what it charges,
+            // prices quoted before tax and an item's own rate left to stand.
+            // A test that needs a rate says taxedAt().
+            'is_union_territory' => false,
             'cgst_rate' => intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2),
             'sgst_rate' => TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS - intdiv(TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS, 2),
             'tax_overrides_item_rates' => false,
@@ -61,12 +61,12 @@ class TenantSettingFactory extends Factory
     }
 
     /**
-     * Levied as one inter-state tax rather than in halves.
+     * A tenant whose bills call the state's half UTGST.
      */
-    public function interState(): static
+    public function inUnionTerritory(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'gst_treatment' => GstTreatment::InterState,
+            'is_union_territory' => true,
         ]);
     }
 

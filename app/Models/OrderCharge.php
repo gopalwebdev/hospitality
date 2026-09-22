@@ -24,8 +24,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $cgst
  * @property int $sgst_rate
  * @property int $sgst
- * @property int $igst_rate
- * @property int $igst
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -40,8 +38,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cgst',
     'sgst_rate',
     'sgst',
-    'igst_rate',
-    'igst',
     'position',
 ])]
 class OrderCharge extends Model
@@ -61,8 +57,6 @@ class OrderCharge extends Model
         'cgst' => 0,
         'sgst_rate' => 0,
         'sgst' => 0,
-        'igst_rate' => 0,
-        'igst' => 0,
     ];
 
     /**
@@ -96,8 +90,6 @@ class OrderCharge extends Model
             'cgst' => 'integer',
             'sgst_rate' => 'integer',
             'sgst' => 'integer',
-            'igst_rate' => 'integer',
-            'igst' => 'integer',
             'position' => 'integer',
         ];
     }

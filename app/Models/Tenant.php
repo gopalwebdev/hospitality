@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\CountryCallingCode;
 use App\Enums\Currency;
-use App\Enums\GstTreatment;
 use App\Enums\Role as RoleEnum;
 use App\Enums\TenantType;
 use App\Enums\Weekday;
@@ -166,14 +165,15 @@ class Tenant extends Model
     }
 
     /**
-     * How this tenant's GST is levied — the halves it splits into, or IGST.
+     * Whether a bill here calls the state's half UTGST rather than SGST.
      *
      * A tenant states this on its Settings page; nothing works it out from an
-     * address or a GSTIN. An order copies it when it is placed.
+     * address or a GSTIN. An order copies it when it is placed, because a
+     * tenant can move and a placed bill is a copy of what was charged.
      */
-    public function gstTreatment(): GstTreatment
+    public function isInUnionTerritory(): bool
     {
-        return $this->resolvedSettings()?->gstTreatment() ?? GstTreatment::IntraState;
+        return $this->resolvedSettings()?->isInUnionTerritory() ?? false;
     }
 
     /**

@@ -43,21 +43,20 @@ it('places a spread of orders against every seeded tenant, placed and cancelled 
         ->and(Order::query()->where('status', OrderStatus::Cancelled)->whereNull('cancelled_at')->exists())->toBeFalse();
 });
 
-it('splits a seeded order into CGST and SGST for an intra-state tenant, and one IGST line for an inter-state one', function (): void {
-    $intraState = Tenant::query()->where('slug', 'spice')->sole();
-    $interState = Tenant::query()->where('slug', 'sunrise')->sole();
+it('splits every seeded order into equal halves, and names the state\'s half where it sits', function (): void {
+    $state = Tenant::query()->where('slug', 'spice')->sole();
+    $unionTerritory = Tenant::query()->where('slug', 'seaview')->sole();
 
-    $intraStateOrder = Order::query()->where('tenant_id', $intraState->getKey())->where('tax', '>', 0)->firstOrFail();
-    $interStateOrder = Order::query()->where('tenant_id', $interState->getKey())->where('tax', '>', 0)->firstOrFail();
+    $stateOrder = Order::query()->where('tenant_id', $state->getKey())->where('tax', '>', 0)->firstOrFail();
+    $unionTerritoryOrder = Order::query()->where('tenant_id', $unionTerritory->getKey())->where('tax', '>', 0)->firstOrFail();
 
-    expect($intraStateOrder->cgst)->toBeGreaterThan(0)
-        ->and($intraStateOrder->sgst)->toBeGreaterThan(0)
-        ->and($intraStateOrder->igst)->toBe(0)
-        ->and($intraStateOrder->cgst + $intraStateOrder->sgst)->toBe($intraStateOrder->tax)
-        ->and($interStateOrder->igst)->toBeGreaterThan(0)
-        ->and($interStateOrder->cgst)->toBe(0)
-        ->and($interStateOrder->sgst)->toBe(0)
-        ->and($interStateOrder->igst)->toBe($interStateOrder->tax);
+    expect($stateOrder->cgst)->toBeGreaterThan(0)
+        ->and($stateOrder->sgst)->toBeGreaterThan(0)
+        ->and($stateOrder->cgst + $stateOrder->sgst)->toBe($stateOrder->tax)
+        // Puducherry: the same money, invoiced as UTGST.
+        ->and($stateOrder->is_union_territory)->toBeFalse()
+        ->and($unionTerritoryOrder->is_union_territory)->toBeTrue()
+        ->and($unionTerritoryOrder->cgst + $unionTerritoryOrder->sgst)->toBe($unionTerritoryOrder->tax);
 });
 
 it('copies an item\'s HSN or SAC code onto the order line that ordered it', function (): void {

@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             AdminSeeder::class,
+            // Before the tenants, so a seeded menu could reference a code and
+            // so the first tenant to open the panel already has the catalogue.
+            TaxCodeSeeder::class,
             TenantSeeder::class,
             OrderSeeder::class,
         ]);

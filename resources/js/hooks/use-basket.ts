@@ -57,7 +57,7 @@ export function basketStorageKey(tenantSlug: string, menuId: number): string {
  * Nothing is ordered through it yet: it is a list to show a member of staff,
  * priced by the server (App\Actions\Baskets\PriceBasket). It survives a reload and
  * follows another tab of the same app. Read through useSyncExternalStore, like
- * the appearance, so the first render agrees with a page painted without it.
+ * the appearance, so every render sees the same list rather than a new array.
  */
 export function useBasket(storageKey: string): Basket {
     const lines = useSyncExternalStore(

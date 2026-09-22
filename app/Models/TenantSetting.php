@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\Currency;
-use App\Enums\GstTreatment;
 use Carbon\CarbonImmutable;
 use Database\Factories\TenantSettingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,10 +16,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * When its doors are open is not here — that is a week of `tenant_opening_hours`
  * rows — and what is added on top of a bill lives in charges.
  *
- * GST is levied in halves on an intra-state supply, CGST to the centre and SGST
- * to the state, so both are stored and the rate anything is taxed at is the two
- * added up. `tax_overrides_item_rates` makes that rate the rate for every item,
- * whatever an item's own says.
+ * GST is levied in halves, CGST to the centre and SGST to the state, so both
+ * are stored and the rate anything is taxed at is the two added up. That rate
+ * is only this tenant's default: an item with a `tax_rate` of its own is taxed
+ * at it, halved the same way, unless `tax_overrides_item_rates` says the
+ * tenant's rate beats an item's.
+ *
+ * `is_union_territory` changes one word on a bill — the state's half reads
+ * UTGST rather than SGST — and no money at all.
  *
  * @property int $id
  * @property int $tenant_id
@@ -30,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $landline_phone
  * @property Currency $currency
  * @property string|null $gstin
- * @property GstTreatment $gst_treatment
+ * @property bool $is_union_territory
  * @property int $cgst_rate
  * @property int $sgst_rate
  * @property bool $tax_overrides_item_rates
@@ -45,7 +48,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'landline_phone',
     'currency',
     'gstin',
-    'gst_treatment',
+    'is_union_territory',
     'cgst_rate',
     'sgst_rate',
     'tax_overrides_item_rates',
@@ -80,7 +83,7 @@ class TenantSetting extends Model
     #[\Override]
     protected $attributes = [
         'currency' => Currency::IndianRupee->value,
-        'gst_treatment' => GstTreatment::IntraState->value,
+        'is_union_territory' => false,
         'cgst_rate' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
         'sgst_rate' => self::DEFAULT_TAX_RATE_BASIS_POINTS / 2,
         'tax_overrides_item_rates' => false,
@@ -104,11 +107,11 @@ class TenantSetting extends Model
     }
 
     /**
-     * How this tenant's GST is levied, as the tenant stated it.
+     * Whether the state's half of a bill is called UTGST rather than SGST.
      */
-    public function gstTreatment(): GstTreatment
+    public function isInUnionTerritory(): bool
     {
-        return $this->gst_treatment;
+        return $this->is_union_territory;
     }
 
     /**
@@ -126,7 +129,7 @@ class TenantSetting extends Model
     {
         return [
             'currency' => Currency::class,
-            'gst_treatment' => GstTreatment::class,
+            'is_union_territory' => 'boolean',
             'cgst_rate' => 'integer',
             'sgst_rate' => 'integer',
             'tax_overrides_item_rates' => 'boolean',

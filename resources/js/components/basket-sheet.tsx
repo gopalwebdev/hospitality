@@ -66,8 +66,8 @@ interface BasketSheetProps {
  * GST is shown twice over, which is what a bill here does. The **rate and
  * amount on each line**, because one basket can hold a 5% item beside an 18%
  * one and a single figure at the foot would hide that. And the **parts at the
- * foot** — CGST and SGST, or UTGST, or one IGST — because that is how the tax
- * is actually levied and how it has to be shown.
+ * foot** — CGST and SGST, or UTGST where the tenant is in a union territory —
+ * because that is how the tax is actually levied and how it has to be shown.
  *
  * Nothing is ordered from here: a guest shows this to a member of staff.
  */
@@ -276,15 +276,15 @@ function LineRow({
 }
 
 /**
- * The parts of a bill's GST, each on its own line, in the order a bill lists them.
+ * The two parts of a bill's GST, each on its own line, in the order a bill lists them.
  *
- * Only the parts that carry something: an intra-state bill never shows an empty
- * IGST, and a tenant charging no GST shows no rows at all rather than three
- * zeroes. The state's half is called UTGST in a union territory, where the
- * money is identical and only the wording differs.
+ * Only the parts that carry something, so a tenant charging no GST shows no
+ * rows at all rather than two zeroes. The state's half is called UTGST in a
+ * union territory, where the money is identical and only the wording differs.
  */
 function gstRows(
     parts: TaxParts,
+    isUnionTerritory: boolean,
     t: Translator['t'],
 ): { key: string; label: string; amount: number }[] {
     return [
@@ -295,18 +295,10 @@ function gstRows(
         },
         {
             key: 'sgst',
-            label: t(
-                parts.treatment === 'union-territory'
-                    ? 'basket.utgst'
-                    : 'basket.sgst',
-                { rate: formatRate(parts.sgstRate) },
-            ),
+            label: t(isUnionTerritory ? 'basket.utgst' : 'basket.sgst', {
+                rate: formatRate(parts.sgstRate),
+            }),
             amount: parts.sgst,
-        },
-        {
-            key: 'igst',
-            label: t('basket.igst', { rate: formatRate(parts.igstRate) }),
-            amount: parts.igst,
         },
     ].filter((row) => row.amount > 0);
 }
@@ -337,7 +329,7 @@ function Totals({
         );
     }
 
-    const gst = gstRows(priced.taxParts, t);
+    const gst = gstRows(priced.taxParts, priced.isUnionTerritory, t);
 
     return (
         // Nothing is dimmed or blanked while the next answer is fetched. The

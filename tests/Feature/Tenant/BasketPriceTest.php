@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Baskets\PriceBasket;
-use App\Enums\GstTreatment;
 use App\Models\Charge;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
@@ -72,13 +71,10 @@ function seedCurryWithChoices(): array
 function splitOf(int $cgst, int $sgst, int $rate = 500): array
 {
     return [
-        'treatment' => GstTreatment::IntraState->value,
         'cgstRate' => intdiv($rate, 2),
         'cgst' => $cgst,
         'sgstRate' => $rate - intdiv($rate, 2),
         'sgst' => $sgst,
-        'igstRate' => 0,
-        'igst' => 0,
     ];
 }
 
@@ -134,24 +130,27 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
                     'key' => 'combo', 'status' => PriceBasket::OK,
                     'unitPrice' => 59900, 'total' => 59900,
                     'taxableValue' => 59900,
-                    'tax' => 2995,
-                    // An odd total: the centre's half comes from its own rate
-                    // and the state's is the remainder, so the two still add up.
-                    'taxParts' => splitOf(cgst: 1498, sgst: 1497),
+                    'tax' => 2996,
+                    // 2.5% of ₹599.00 is ₹14.975 a side, and each side rounds
+                    // for itself: the tax charged is what the two come to, not
+                    // 5% worked out first and split.
+                    'taxParts' => splitOf(cgst: 1498, sgst: 1498),
                 ],
             ],
             'subtotal' => 137700,
             // 5% of every part: an add-on is taxed at the rate of the item it is
             // added to, so the naan and the cheese pay the curry's 5%. The
             // charges are taxed too — a service charge is part of the supply.
-            'tax' => 2890 + 200 + 800 + 2995 + 689 + 100,
+            'tax' => 2890 + 200 + 800 + 2996 + 688 + 100,
             'taxParts' => splitOf(cgst: 3837, sgst: 3837),
             'pricesIncludeTax' => false,
+            // Wording for the state's half, and nothing else.
+            'isUnionTerritory' => false,
             'charges' => [
                 [
                     'id' => $service->getKey(), 'name' => $service->name, 'amount' => 13770,
-                    'taxableValue' => 13770, 'tax' => 689,
-                    'taxParts' => splitOf(cgst: 344, sgst: 345),
+                    'taxableValue' => 13770, 'tax' => 688,
+                    'taxParts' => splitOf(cgst: 344, sgst: 344),
                 ],
                 [
                     'id' => $packing->getKey(), 'name' => $packing->name, 'amount' => 2000,
@@ -159,7 +158,7 @@ it('prices each line with its choices, taxes the add-ons at the item\'s rate, an
                     'taxParts' => splitOf(cgst: 50, sgst: 50),
                 ],
             ],
-            'total' => 137700 + 6885 + 789 + 13770 + 2000,
+            'total' => 137700 + 6886 + 788 + 13770 + 2000,
             // Nothing here is counted, so nothing can run short.
             'shortages' => [],
         ]);
@@ -370,6 +369,7 @@ it('adds no charge to an empty basket', function (): void {
             'tax' => 0,
             'taxParts' => splitOf(cgst: 0, sgst: 0, rate: 0),
             'pricesIncludeTax' => false,
+            'isUnionTerritory' => false,
             'charges' => [],
             'total' => 0,
             'shortages' => [],

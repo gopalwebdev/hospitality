@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\GstTreatment;
 use App\Enums\OrderStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderFactory;
@@ -25,11 +24,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $location_label
  * @property string|null $note
  * @property int $subtotal
- * @property GstTreatment $gst_treatment
+ * @property bool $is_union_territory
  * @property int $tax
  * @property int $cgst
  * @property int $sgst
- * @property int $igst
  * @property int $charges_total
  * @property int $total
  * @property bool $prices_include_tax
@@ -44,11 +42,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'location_label',
     'note',
     'subtotal',
-    'gst_treatment',
+    'is_union_territory',
     'tax',
     'cgst',
     'sgst',
-    'igst',
     'charges_total',
     'total',
     'prices_include_tax',
@@ -63,10 +60,9 @@ class Order extends Model
     #[\Override]
     protected $attributes = [
         'status' => OrderStatus::Placed->value,
-        'gst_treatment' => GstTreatment::IntraState->value,
+        'is_union_territory' => false,
         'cgst' => 0,
         'sgst' => 0,
-        'igst' => 0,
     ];
 
     /**
@@ -125,11 +121,10 @@ class Order extends Model
             'menu_id' => 'integer',
             'status' => OrderStatus::class,
             'subtotal' => 'integer',
-            'gst_treatment' => GstTreatment::class,
+            'is_union_territory' => 'boolean',
             'tax' => 'integer',
             'cgst' => 'integer',
             'sgst' => 'integer',
-            'igst' => 'integer',
             'charges_total' => 'integer',
             'total' => 'integer',
             'prices_include_tax' => 'boolean',

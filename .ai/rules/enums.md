@@ -48,12 +48,16 @@ Basis points rather than a percentage float, though — 5% is `500`. That keeps 
 
 `::DEFAULT_TAX_RATE_BASIS_POINTS` is **0**, and that is the point: no tax information is hardcoded, so a tenant charges nothing until it says what it charges.
 
-## How GST is levied is a tenant's statement, not a lookup
-`App\Enums\GstTreatment` — `IntraState` (CGST + SGST), `UnionTerritory` (CGST + UTGST), `InterState` (IGST) — is on `tenant_settings.gst_treatment`, chosen on the Settings page, and copied onto every `orders.gst_treatment` when a bill is placed.
+The `tax_codes` catalogue is the same lesson applied: a list of HSN and SAC codes with the rate each usually carries, kept as **rows a panel can edit** rather than as the enum that was reverted here. Picking one copies its rate onto an item and nothing more (`.ai/rules/tax-codes.md`).
 
-`isSplitInHalves()` is the one question anything pricing asks; `stateTaxLabel()` is what the invoice calls the state's half. UTGST rides the SGST columns, because the money is identical and only the wording differs.
+## There is no IGST, and how GST is levied is a boolean, not an enum
+**Every bill is CGST plus the state's half.** The project owner's scope decision: nothing here is sold to another state's consumer. Everything is consumed where it is served, and the place of supply for lodging and for anything eaten or used on the premises is the premises themselves (IGST Act, s. 12(3)), so a guest from Kerala eating in Chennai is still an intra-state supply. Do not add an inter-state case back without asking — it would need its own columns, its own row on every bill and a third branch through `GstSplit`, `PriceBasket`, `PlaceOrder`, the order infolist and the guest basket.
 
-**It is not worked out from where the tenant is.** A `GstStateCode` enum listing all 37 state codes and which union territories have a legislature was written and deleted: that is tax policy baked into the code, and the project owner's instruction is that a tenant states it. A tenant that moves, or whose accountant disagrees, changes a select.
+An `App\Enums\GstTreatment` enum held three cases — `IntraState`, `UnionTerritory`, `InterState` — and **was deleted** when IGST went. With two cases left, what remains is a plain yes-or-no, so it is `tenant_settings.is_union_territory`, a **toggle** on the Settings page, copied onto `orders.is_union_territory` when a bill is placed. That follows the same precedent as `menu_items.is_service_request`, which also replaced an enum built for it first (`.ai/rules/migrations.md`).
+
+`Tenant::isInUnionTerritory()` is what anything asks. It decides **one word and no money**: UTGST rides the SGST columns, so nothing downstream branches on it except a label. Everywhere that label is drawn — the guest basket's foot (`PricedBasket.isUnionTerritory`), `OrderInfolist::taxPartsOf()`, and the Settings page's own rate label — reads it, and a new place that prints the state's half must read it too rather than hardcoding "SGST".
+
+**It is not worked out from where the tenant is.** A `GstStateCode` enum listing all 37 state codes and which union territories have a legislature was written and deleted: that is tax policy baked into the code, and the project owner's instruction is that a tenant states it. A tenant that moves, or whose accountant disagrees, flips a toggle.
 
 ## A tenant's type is data, and decides nothing yet
 `tenants.type` is `App\Enums\TenantType`: required on TenantForm with no default, editable by the product team, shown and filtered on in the tenants table, and CHECK-constrained as `tenants_type_is_known`, which its migration builds from the enum's cases. No copy varies by it — the application says "tenant" to everyone (`.ai/rules/lang.md`), and the enum's cases are the only place a kind of business is named.

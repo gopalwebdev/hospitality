@@ -77,13 +77,13 @@ final readonly class PlaceOrder
                 'location_label' => $locationLabel,
                 'note' => $note,
                 'subtotal' => $priced['subtotal'],
-                // The treatment and the split as the bill was actually priced,
-                // never worked out again: a tenant may change either later.
-                'gst_treatment' => $priced['taxParts']->treatment,
+                // The split and what the state's half is called as the bill was
+                // actually priced, never worked out again: a tenant may change
+                // its rates, or move, after an order has been placed.
+                'is_union_territory' => $priced['isUnionTerritory'],
                 'tax' => $priced['tax'],
                 'cgst' => $priced['taxParts']->cgst,
                 'sgst' => $priced['taxParts']->sgst,
-                'igst' => $priced['taxParts']->igst,
                 'charges_total' => array_sum(array_column($priced['charges'], 'amount')),
                 'total' => $priced['total'],
                 'prices_include_tax' => $priced['pricesIncludeTax'],

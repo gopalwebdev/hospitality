@@ -66,13 +66,11 @@ return [
         'items' => ':count items',
         'empty' => 'Nothing in your basket yet.',
         'subtotal' => 'Subtotal',
-        // GST is levied in halves on an intra-state supply and a bill shows
-        // each on its own. UTGST replaces SGST in a union territory, and an
-        // inter-state supply is one IGST instead of the two.
+        // GST is levied in halves and a bill shows each on its own. UTGST
+        // replaces SGST in a union territory — the same money, one word.
         'cgst' => 'CGST :rate',
         'sgst' => 'SGST :rate',
         'utgst' => 'UTGST :rate',
-        'igst' => 'IGST :rate',
         'gst_included' => 'Includes GST of :amount',
         // Per line, where the rate matters more than the split: a basket can
         // hold a 5% item and an 18% one, and this is where that shows.

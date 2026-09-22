@@ -275,6 +275,23 @@ return [
         'empty_description' => 'A group is a set of choices — a spice level, a bread, extras — attached to as many items as need it.',
     ],
 
+    'tax_codes' => [
+        'label' => 'HSN / SAC code',
+        'plural' => 'HSN / SAC codes',
+        'create' => 'New code',
+        'code' => 'Code',
+        'description' => 'Covers',
+        'tax_rate' => 'GST rate',
+        'source' => 'Source',
+        'source_catalogue' => 'Standard',
+        'source_own' => 'Yours',
+        'empty_heading' => 'No codes yet',
+        'empty_description' => 'Add the HSN and SAC codes you invoice under, and an item can take its GST rate from one.',
+        // On the item form, where picking one fills in the rate and the code.
+        'picker' => 'Fill from a code',
+        'picker_placeholder' => 'Pick a code',
+    ],
+
     'charges' => [
         'label' => 'charge',
         'plural' => 'charges',

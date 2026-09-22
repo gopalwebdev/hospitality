@@ -27,8 +27,6 @@ return new class extends Migration
             $table->integer('cgst')->default(0);
             $table->smallInteger('sgst_rate')->default(0);
             $table->integer('sgst')->default(0);
-            $table->smallInteger('igst_rate')->default(0);
-            $table->integer('igst')->default(0);
             $table->integer('position')->default(0);
             $table->timestamps();
         });
@@ -36,8 +34,8 @@ return new class extends Migration
         DB::statement('ALTER TABLE order_charges
             ADD CONSTRAINT order_charges_amount_not_negative CHECK (amount >= 0 AND taxable_value >= 0),
             ADD CONSTRAINT order_charges_tax_rate_in_range CHECK (tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT order_charges_tax_rates_add_up CHECK (cgst_rate + sgst_rate + igst_rate = tax_rate),
-            ADD CONSTRAINT order_charges_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0 AND igst >= 0),
+            ADD CONSTRAINT order_charges_tax_rates_add_up CHECK (cgst_rate + sgst_rate = tax_rate),
+            ADD CONSTRAINT order_charges_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0),
             ADD CONSTRAINT order_charges_position_not_negative CHECK ("position" >= 0)');
     }
 
