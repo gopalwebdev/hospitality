@@ -243,6 +243,10 @@ return [
         'create' => 'New add-on group',
         'unique' => 'This tenant already has an add-on group with that name.',
         'options' => 'Options',
+        'tax_rate' => 'GST rate',
+        // Blank is the ordinary answer: an add-on is taxed with the item it is
+        // added to. A rate here is for an option that is a separate supply.
+        'tax_rate_placeholder' => "Item's",
         'option' => 'Option',
         'price' => 'Price',
         'free' => 'Free',

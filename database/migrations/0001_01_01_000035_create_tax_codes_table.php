@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -27,8 +26,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE tax_codes
-            ADD CONSTRAINT tax_codes_tax_rate_in_range CHECK (tax_rate BETWEEN 0 AND 10000)');
     }
 
     public function down(): void

@@ -224,10 +224,14 @@ describe('guest basket', () => {
         ).toBeInTheDocument();
 
         expect(amountFor(sheet, 'Subtotal')).toMatch(/389\.00/);
-        // Levied in halves, and shown that way.
-        expect(amountFor(sheet, 'CGST 2.5%')).toMatch(/10\.70/);
-        expect(amountFor(sheet, 'SGST 2.5%')).toMatch(/10\.70/);
+        // The fee states the GST it carries, which is what makes the lines
+        // above add up to the one GST figure below them.
         expect(amountFor(sheet, 'Service Charge')).toMatch(/38\.90/);
+        expect(amountFor(sheet, 'Service Charge')).toMatch(/GST 5% · ₹?1\.94/);
+        // One GST row, added on top because these prices exclude it. No
+        // CGST/UTGST split: a guest reads a basket, not a tax invoice.
+        expect(amountFor(sheet, 'GST')).toMatch(/21\.40/);
+        expect(within(sheet).queryByText(/CGST/)).not.toBeInTheDocument();
         expect(amountFor(sheet, 'Total')).toMatch(/449\.30/);
 
         // Priced against this menu as soon as the basket holds anything,
@@ -284,7 +288,9 @@ describe('guest basket', () => {
         expect(
             within(sheet).getByText(/Includes GST of ₹?14\.72/),
         ).toBeInTheDocument();
-        expect(amountFor(sheet, 'CGST 2.5%')).toMatch(/7\.36/);
+        // Already inside the prices, so it is a footnote and never a row of
+        // the sum, and it is stated once rather than halved as well.
+        expect(within(sheet).queryByText(/CGST/)).not.toBeInTheDocument();
         expect(amountFor(sheet, 'Total')).toMatch(/309\.00/);
 
         fireEvent.click(

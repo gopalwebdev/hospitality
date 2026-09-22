@@ -16,13 +16,9 @@ import {
     type BasketLine,
     MAX_LINE_QUANTITY,
 } from '@/hooks/use-basket';
-import {
-    type PricedBasket,
-    type PricedLine,
-    type TaxParts,
-} from '@/hooks/use-basket-price';
+import { type PricedBasket, type PricedLine } from '@/hooks/use-basket-price';
 import { useMoney } from '@/hooks/use-money';
-import { type Translator, useTranslations } from '@/hooks/use-translations';
+import { useTranslations } from '@/hooks/use-translations';
 import {
     type OrderLimits,
     isWithinLimits,
@@ -63,11 +59,10 @@ interface BasketSheetProps {
  * component only reads it. A line the menu can no longer honour says so in
  * place and is left out of the total until it is changed or removed.
  *
- * GST is shown twice over, which is what a bill here does. The **rate and
- * amount on each line**, because one basket can hold a 5% item beside an 18%
- * one and a single figure at the foot would hide that. And the **parts at the
- * foot** — CGST and SGST, or UTGST where the tenant is in a union territory —
- * because that is how the tax is actually levied and how it has to be shown.
+ * **GST is stated on each line and once in the totals, and the two meet.** A
+ * line carries its own rate and amount because one basket can hold a 5% item
+ * beside an 18% one; a charge states its GST for the same reason; and the foot
+ * carries their sum. The CGST/UTGST split is not drawn here — see Totals.
  *
  * Nothing is ordered from here: a guest shows this to a member of staff.
  */
@@ -276,40 +271,20 @@ function LineRow({
 }
 
 /**
- * The two parts of a bill's GST, each on its own line, in the order a bill lists them.
- *
- * Only the parts that carry something, so a tenant charging no GST shows no
- * rows at all rather than two zeroes. The state's half is called UTGST in a
- * union territory, where the money is identical and only the wording differs.
- */
-function gstRows(
-    parts: TaxParts,
-    isUnionTerritory: boolean,
-    t: Translator['t'],
-): { key: string; label: string; amount: number }[] {
-    return [
-        {
-            key: 'cgst',
-            label: t('basket.cgst', { rate: formatRate(parts.cgstRate) }),
-            amount: parts.cgst,
-        },
-        {
-            key: 'sgst',
-            label: t(isUnionTerritory ? 'basket.utgst' : 'basket.sgst', {
-                rate: formatRate(parts.sgstRate),
-            }),
-            amount: parts.sgst,
-        },
-    ].filter((row) => row.amount > 0);
-}
-
-/**
  * The bill as the server worked it out.
  *
- * GST sits between the subtotal and the total when it is added on top, because
- * that is where it is added. When the prices already carry it, it moves below
- * the total as a note — it is not part of the sum there, and putting it in the
- * running list would read as though it were charged twice.
+ * **GST is named once, and the figures that name it add up.** Where the prices
+ * already carry it, the total is what a guest pays and the tax is one footnote
+ * under it; where it is added on top, it is one row in the running sum. Either
+ * way a charge states its own GST beside the item lines' — the fee's share used
+ * to be invisible, so the line saying "Incl. GST ₹45.62" and the foot saying
+ * "Includes GST of ₹53.24" looked like two unrelated numbers.
+ *
+ * **The CGST/UTGST split is deliberately not drawn here.** It belongs on the
+ * tax invoice the tenant issues and on the order in the panel, both of which
+ * keep it (`.ai/rules/enums.md`). On a phone it meant the same tax was stated
+ * three times over — on the line, as a total, and halved — and the project
+ * owner's word for that was confusing.
  */
 function Totals({
     priced,
@@ -329,7 +304,13 @@ function Totals({
         );
     }
 
-    const gst = gstRows(priced.taxParts, priced.isUnionTerritory, t);
+    const gstNote = (rate: number, amount: number): string =>
+        t(
+            priced.pricesIncludeTax
+                ? 'basket.line_gst_included'
+                : 'basket.line_gst',
+            { rate: formatRate(rate), amount: money(amount) },
+        );
 
     return (
         // Nothing is dimmed or blanked while the next answer is fetched. The
@@ -342,22 +323,29 @@ function Totals({
                     amount={priced.subtotal}
                 />
 
-                {!priced.pricesIncludeTax &&
-                    gst.map((row) => (
-                        <TotalRow
-                            key={row.key}
-                            label={row.label}
-                            amount={row.amount}
-                        />
-                    ))}
-
                 {priced.charges.map((charge) => (
                     <TotalRow
                         key={charge.id}
                         label={charge.name}
                         amount={charge.amount}
+                        // A fee is taxed with the supply, so it says so where
+                        // an item line does. Without it the GST at the foot is
+                        // larger than the lines above and nothing explains why.
+                        note={
+                            charge.tax > 0
+                                ? gstNote(
+                                      wholeRate(charge.taxParts),
+                                      charge.tax,
+                                  )
+                                : null
+                        }
                     />
                 ))}
+
+                {/* Added on top, so it is part of the sum rather than a note. */}
+                {!priced.pricesIncludeTax && priced.tax > 0 && (
+                    <TotalRow label={t('basket.gst')} amount={priced.tax} />
+                )}
 
                 <TotalRow
                     strong
@@ -367,27 +355,9 @@ function Totals({
             </dl>
 
             {priced.pricesIncludeTax && priced.tax > 0 && (
-                <div className="text-muted-foreground mt-1 text-xs">
-                    <p>
-                        {t('basket.gst_included', {
-                            amount: money(priced.tax),
-                        })}
-                    </p>
-
-                    <dl className="mt-0.5 space-y-0.5">
-                        {gst.map((row) => (
-                            <div
-                                key={row.key}
-                                className="flex justify-between gap-3"
-                            >
-                                <dt>{row.label}</dt>
-                                <dd>
-                                    <Money amount={row.amount} />
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                    {t('basket.gst_included', { amount: money(priced.tax) })}
+                </p>
             )}
         </div>
     );
@@ -397,10 +367,13 @@ function TotalRow({
     label,
     amount,
     strong = false,
+    note = null,
 }: {
     label: string;
     amount: number;
     strong?: boolean;
+    /** Small print under the row, such as the GST this line carries. */
+    note?: string | null;
 }) {
     return (
         <div
@@ -409,8 +382,14 @@ function TotalRow({
             }`}
         >
             <dt>{label}</dt>
-            <dd>
+            <dd className="text-right">
                 <Money amount={amount} />
+
+                {note !== null && (
+                    <span className="text-muted-foreground block text-xs tabular-nums">
+                        {note}
+                    </span>
+                )}
             </dd>
         </div>
     );

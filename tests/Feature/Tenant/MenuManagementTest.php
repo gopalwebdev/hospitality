@@ -23,7 +23,6 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
-use Illuminate\Database\QueryException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use LogicException;
@@ -1182,25 +1181,30 @@ it('refuses a consumable item with no diet mark, even around the form', function
         ->toThrow(LogicException::class);
 });
 
-it('refuses a consumable row with no diet mark at the database, whatever writes it', function (): void {
+it('refuses a consumable with no diet mark', function (): void {
     $category = MenuCategory::factory()->create();
 
-    // MenuItemObserver refuses this before it reaches Postgres, so events are
-    // switched off to prove menu_items_diets_match_kind is what actually
-    // guards a write that goes around the model entirely.
-    expect(fn () => MenuItem::withoutEvents(fn (): MenuItem => MenuItem::factory()
+    // MenuItemObserver is the only thing that refuses this now. It used to be
+    // backed by menu_items_diets_match_kind, and that constraint — like every
+    // other CHECK in this schema — was dropped on the project owner's
+    // instruction (`.ai/rules/migrations.md`). A write that switches events off
+    // goes around the rule entirely and Postgres will store it.
+    expect(fn (): MenuItem => MenuItem::factory()
         ->inCategory($category)
-        ->create(['kind' => MenuItemKind::Consumable, 'diets' => null])))
-        ->toThrow(QueryException::class);
+        ->create(['kind' => MenuItemKind::Consumable, 'diets' => null]))
+        ->toThrow(LogicException::class);
 });
 
-it('refuses goods or a service carrying a diet mark at the database, whatever writes it', function (MenuItemKind $kind): void {
+it('refuses goods or a service carrying a diet mark', function (MenuItemKind $kind): void {
     $category = MenuCategory::factory()->create();
 
-    expect(fn () => MenuItem::withoutEvents(fn (): MenuItem => MenuItem::factory()
+    // The observer blanks the marks of a kind that carries none rather than
+    // throwing, which is the same rule read the other way round.
+    $item = MenuItem::factory()
         ->inCategory($category)
-        ->create(['kind' => $kind, 'diets' => [Diet::Vegetarian]])))
-        ->toThrow(QueryException::class);
+        ->create(['kind' => $kind, 'diets' => [Diet::Vegetarian]]);
+
+    expect($item->refresh()->diets)->toBeNull();
 })->with([MenuItemKind::Goods, MenuItemKind::Service]);
 
 it('refiles an item into a sub-category from the items page', function (): void {

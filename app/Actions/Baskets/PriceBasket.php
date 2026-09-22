@@ -227,9 +227,12 @@ class PriceBasket
             $quantities[$choice['optionId']] = ($quantities[$choice['optionId']] ?? 0) + $choice['quantity'];
         }
 
-        // Every part of the line is taxed at the item's rate. An add-on is part of
-        // the item it is added to — a composite supply, taxed at the rate of its
-        // principal supply (CGST Act, s. 8(a)) — so an option has no rate of its own.
+        // Every part of the line is taxed at the item's rate unless an option
+        // states its own. An add-on is normally part of the item it is added to
+        // — a composite supply, taxed at the rate of its principal supply (CGST
+        // Act, s. 8(a)) — and `menu_add_on_options.tax_rate` is null for it.
+        // An option that is really a separate supply, a haircut beside a meal,
+        // carries its own and is taxed at it.
         $rate = $item->taxRate($tenantRate, $tenantOverrides);
         $parts = [['amount' => $item->price, 'rate' => $rate]];
         $picks = [];
@@ -251,7 +254,7 @@ class PriceBasket
             }
 
             $picks[$group->getKey()] = ($picks[$group->getKey()] ?? 0) + $quantity;
-            $parts[] = ['amount' => $option->price * $quantity, 'rate' => $rate];
+            $parts[] = ['amount' => $option->price * $quantity, 'rate' => $option->taxRate($rate)];
         }
 
         foreach ($offered as $group) {
@@ -359,7 +362,7 @@ class PriceBasket
             ->where('tenant_id', $tenant->getKey())
             ->whereKey($ids)
             ->with(['options' => fn ($options) => $options
-                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price', 'max_per_item'])
+                ->select(['id', 'tenant_id', 'menu_add_on_group_id', 'price', 'tax_rate', 'hsn_sac_code', 'max_per_item'])
                 ->available()])
             ->get()
             ->keyBy(fn (MenuAddOnGroup $group): int => $group->getKey());

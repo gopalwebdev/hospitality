@@ -66,11 +66,11 @@ return [
         'items' => ':count items',
         'empty' => 'Nothing in your basket yet.',
         'subtotal' => 'Subtotal',
-        // GST is levied in halves and a bill shows each on its own. UTGST
-        // replaces SGST in a union territory — the same money, one word.
-        'cgst' => 'CGST :rate',
-        'sgst' => 'SGST :rate',
-        'utgst' => 'UTGST :rate',
+        // One GST figure, because a guest reads a basket rather than a tax
+        // invoice. The CGST/UTGST split is on the invoice the tenant issues
+        // and on the order in the panel; three statements of one tax on a
+        // phone was what the project owner called confusing.
+        'gst' => 'GST',
         'gst_included' => 'Includes GST of :amount',
         // Per line, where the rate matters more than the split: a basket can
         // hold a 5% item and an 18% one, and this is where that shows.

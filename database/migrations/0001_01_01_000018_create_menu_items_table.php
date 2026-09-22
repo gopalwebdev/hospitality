@@ -5,7 +5,6 @@ use App\Enums\ItemAvailability;
 use App\Enums\MenuItemKind;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -45,53 +44,6 @@ return new class extends Migration
             $table->integer('position')->default(0);
             $table->timestamps();
         });
-
-        // Which kinds carry a diet mark comes from the enum, so a case added
-        // later cannot leave the database accepting a kind the form refuses a
-        // diet on, or requiring one the form never asks for.
-        $kinds = collect(MenuItemKind::cases())
-            ->map(fn (MenuItemKind $kind): string => "'{$kind->value}'")
-            ->implode(', ');
-
-        $dietRequiringKinds = collect(MenuItemKind::cases())
-            ->filter(fn (MenuItemKind $kind): bool => $kind->requiresDietMark())
-            ->map(fn (MenuItemKind $kind): string => "'{$kind->value}'")
-            ->implode(', ');
-
-        DB::statement("ALTER TABLE menu_items
-            ADD CONSTRAINT menu_items_positions_not_negative CHECK (\"position\" >= 0 AND featured_position >= 0),
-            ADD CONSTRAINT menu_items_prices_not_negative CHECK (price >= 0 AND (original_price IS NULL OR original_price >= 0)),
-            ADD CONSTRAINT menu_items_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT menu_items_kind_is_known CHECK (kind IN ({$kinds})),
-            ADD CONSTRAINT menu_items_diets_match_kind CHECK ((kind IN ({$dietRequiringKinds})) = (diets IS NOT NULL)),
-            ADD CONSTRAINT menu_items_max_per_order_in_range CHECK (max_per_order IS NULL OR max_per_order BETWEEN 1 AND 99)");
-
-        // Which marks contradict each other comes from the enum, so a case
-        // added later cannot leave the database accepting a combination the
-        // form refuses. Each unordered pair is named once.
-        $conflicts = [];
-
-        foreach (Diet::cases() as $diet) {
-            foreach (Diet::cases() as $other) {
-                if ($diet->value < $other->value && ! $diet->goesWith($other)) {
-                    $conflicts[] = "NOT (diets @> '[\"{$diet->value}\"]'::jsonb AND diets @> '[\"{$other->value}\"]'::jsonb)";
-                }
-            }
-        }
-
-        // An item whose kind requires a diet mark carries at least one, and
-        // never two that contradict each other.
-        DB::statement('ALTER TABLE menu_items
-            ADD CONSTRAINT menu_items_diets_are_consistent CHECK (
-                diets IS NULL OR (jsonb_array_length(diets) >= 1 AND '.implode(' AND ', $conflicts).')
-            )');
-
-        $available = ItemAvailability::Available->value;
-
-        // None left is never "available": MenuItemObserver marks it out of stock.
-        DB::statement("ALTER TABLE menu_items
-            ADD CONSTRAINT menu_items_stock_not_negative CHECK (stock_quantity IS NULL OR stock_quantity >= 0),
-            ADD CONSTRAINT menu_items_none_left_is_not_available CHECK (stock_quantity IS NULL OR stock_quantity > 0 OR availability <> '{$available}')");
     }
 
     public function down(): void

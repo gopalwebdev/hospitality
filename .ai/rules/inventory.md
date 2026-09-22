@@ -76,7 +76,7 @@ The reads of placing an order do not grow with its lines (`PlaceOrderTest`); the
 - locks the order, and refuses one that is not placed (`LogicException`)
 - adds back, per row, the sum of that order's `order-placed` movements — never a recomputation from its lines, because a combo's contents or an option may have changed since
 - gives nothing back to a row nobody counts any more
-- sets `status` to cancelled together with `cancelled_at` (`orders_cancelled_at_matches_status`)
+- sets `status` to cancelled together with `cancelled_at` (the observer's job now that the CHECK constraint is gone)
 
 ## A form never writes back a count it did not change
 Filament saves every field a form holds, and the options repeater saves every row. A count written back as the form opened would undo every order placed while it was open. So `App\Filament\Schemas\StockFields` keeps the count the form opened with, `stock_quantity_loaded`, hidden beside the input, and writes an existing row's count only when the two differ — under the lock, through `applyIfChanged()`.

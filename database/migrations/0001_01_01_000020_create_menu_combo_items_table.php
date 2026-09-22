@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,9 +18,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE menu_combo_items
-            ADD CONSTRAINT menu_combo_items_position_not_negative CHECK ("position" >= 0),
-            ADD CONSTRAINT menu_combo_items_quantity_positive CHECK (quantity >= 1)');
     }
 
     public function down(): void

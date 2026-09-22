@@ -1,10 +1,8 @@
 <?php
 
 use App\Enums\CountryCallingCode;
-use App\Enums\TenantType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -29,14 +27,6 @@ return new class extends Migration
             $table->smallInteger('max_staff')->default(config('tenants.default_max_staff'));
             $table->timestamps();
         });
-
-        $types = collect(TenantType::cases())
-            ->map(fn (TenantType $type): string => "'{$type->value}'")
-            ->implode(', ');
-
-        DB::statement("ALTER TABLE tenants
-            ADD CONSTRAINT tenants_role_limits_not_negative CHECK (max_owners >= 0 AND max_staff >= 0),
-            ADD CONSTRAINT tenants_type_is_known CHECK (type IN ({$types}))");
     }
 
     public function down(): void

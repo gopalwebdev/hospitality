@@ -16,8 +16,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * One choice in an add-on group. The price is what one of it adds; zero is a real price.
- * It has no tax rate of its own: an add-on is part of the item it is added to, a composite supply taxed at the item's rate.
  * Its count, when kept, is shared by every item offering its group.
+ *
+ * `tax_rate` and `hsn_sac_code` are **normally null**, and that is the right
+ * answer: an add-on is part of the item it is added to, a composite supply
+ * taxed at the item's rate (CGST Act, s. 8(a)). They exist for the option that
+ * is genuinely a different supply — a haircut offered beside a meal — and
+ * `taxRate()` is what falls back to the item's.
  *
  * @property int $id
  * @property int $tenant_id
@@ -25,6 +30,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read MenuAddOnGroup $group
  * @property string $name
  * @property int $price
+ * @property int|null $tax_rate basis points; null follows the item
+ * @property string|null $hsn_sac_code
  * @property int $max_per_item
  * @property bool $is_default
  * @property bool $is_available
@@ -33,7 +40,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'price', 'max_per_item', 'is_default', 'is_available', 'stock_quantity', 'position'])]
+#[Fillable(['name', 'price', 'tax_rate', 'hsn_sac_code', 'max_per_item', 'is_default', 'is_available', 'stock_quantity', 'position'])]
 #[ObservedBy([MenuAddOnOptionObserver::class])]
 class MenuAddOnOption extends Model
 {
@@ -49,6 +56,8 @@ class MenuAddOnOption extends Model
     #[\Override]
     protected $attributes = [
         'price' => 0,
+        'tax_rate' => null,
+        'hsn_sac_code' => null,
         'max_per_item' => 1,
         'is_default' => false,
         'is_available' => true,
@@ -111,6 +120,18 @@ class MenuAddOnOption extends Model
     }
 
     /**
+     * The rate this option is taxed at: its own where it states one, otherwise the item's.
+     *
+     * Null is the ordinary case and means "part of the item", which is what a
+     * composite supply is. A rate of its own is for an option that is really a
+     * separate supply.
+     */
+    public function taxRate(int $itemRate): int
+    {
+        return $this->tax_rate ?? $itemRate;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -118,6 +139,7 @@ class MenuAddOnOption extends Model
         return [
             'menu_add_on_group_id' => 'integer',
             'price' => 'integer',
+            'tax_rate' => 'integer',
             'max_per_item' => 'integer',
             'is_default' => 'boolean',
             'is_available' => 'boolean',

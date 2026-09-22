@@ -42,8 +42,11 @@ use LogicException;
  * capped at one, because a hidden column that reappeared once the maximum
  * changed was harder to find than a column disabled at one.
  *
- * An option has a price and no tax rate: an add-on is part of the item it is
- * added to, taxed at that item's rate.
+ * An option's **GST rate and HSN/SAC code are normally left blank**, and blank
+ * is the right answer: an add-on is part of the item it is added to, a
+ * composite supply taxed at that item's rate. They are there for the option
+ * that is really a separate supply — a haircut offered beside a meal — and
+ * `MenuAddOnOption::taxRate()` is what falls back to the item's.
  */
 class MenuAddOnGroupForm
 {
@@ -138,6 +141,8 @@ class MenuAddOnGroupForm
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
                         TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
+                        TableColumn::make(__('panel.add_on_groups.tax_rate'))->width('7rem'),
+                        TableColumn::make(__('panel.items.hsn_sac_code'))->width('9rem'),
                         TableColumn::make(__('panel.add_on_groups.max_per_item'))->width('7rem'),
                         TableColumn::make(__('panel.stock.in_stock'))->width('8rem'),
                         TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
@@ -155,6 +160,23 @@ class MenuAddOnGroupForm
                             ->step(0.01)
                             ->prefix('+ '.$currency->symbol())
                             ->placeholder(__('panel.add_on_groups.free')),
+
+                        // Blank is the ordinary answer and means "taxed with the
+                        // item", which is what a composite supply is. It is here
+                        // for an option that is really a separate supply — a
+                        // haircut offered beside a meal.
+                        TextInput::make('tax_rate_percentage')
+                            ->label(__('panel.add_on_groups.tax_rate'))
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.01)
+                            ->suffix('%')
+                            ->placeholder(__('panel.add_on_groups.tax_rate_placeholder')),
+
+                        TextInput::make('hsn_sac_code')
+                            ->label(__('panel.items.hsn_sac_code'))
+                            ->maxLength(8),
 
                         TextInput::make('max_per_item')
                             ->label(__('panel.add_on_groups.max_per_item'))
@@ -385,6 +407,14 @@ class MenuAddOnGroupForm
         // in place, so there is nothing left to unset. See PricingFields::store().
         $data['price'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
+        // Blank stays null, which means "taxed with the item". Converted here
+        // and nowhere else, so the rounding happens once.
+        $data['tax_rate'] = blank($data['tax_rate_percentage'] ?? null)
+            ? null
+            : PricingFields::toBasisPoints($data['tax_rate_percentage']);
+
+        unset($data['tax_rate_percentage']);
+
         if ($isOnePick) {
             $data['max_per_item'] = 1;
         }
@@ -421,6 +451,10 @@ class MenuAddOnGroupForm
         $minorUnits = (int) ($data['price'] ?? 0);
 
         $data['price'] = $minorUnits === 0 ? null : $currency->toMajorUnits($minorUnits);
+
+        $data['tax_rate_percentage'] = blank($data['tax_rate'] ?? null)
+            ? null
+            : PricingFields::toPercentage((int) $data['tax_rate']);
 
         return $data;
     }

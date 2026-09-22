@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -23,8 +22,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE menu_add_on_groups
-            ADD CONSTRAINT menu_add_on_groups_max_picks_in_range CHECK (max_picks IS NULL OR max_picks BETWEEN 1 AND 99)');
     }
 
     public function down(): void

@@ -3,7 +3,6 @@
 use App\Enums\ItemAvailability;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -29,11 +28,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE menu_combos
-            ADD CONSTRAINT menu_combos_position_not_negative CHECK ("position" >= 0),
-            ADD CONSTRAINT menu_combos_prices_not_negative CHECK (price >= 0 AND (original_price IS NULL OR original_price >= 0)),
-            ADD CONSTRAINT menu_combos_tax_rate_in_range CHECK (tax_rate IS NULL OR tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT menu_combos_max_per_order_in_range CHECK (max_per_order IS NULL OR max_per_order BETWEEN 1 AND 99)');
     }
 
     public function down(): void

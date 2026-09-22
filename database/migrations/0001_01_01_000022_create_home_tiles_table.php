@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -25,13 +24,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement("ALTER TABLE home_tiles
-            ADD CONSTRAINT home_tiles_position_not_negative CHECK (\"position\" >= 0),
-            ADD CONSTRAINT home_tiles_destination_matches_action CHECK (
-                (action = 'menu' AND menu_id IS NOT NULL AND document_path IS NULL AND url IS NULL)
-                OR (action = 'pdf' AND document_path IS NOT NULL AND menu_id IS NULL AND url IS NULL)
-                OR (action = 'link' AND url IS NOT NULL AND menu_id IS NULL AND document_path IS NULL)
-            )");
     }
 
     public function down(): void

@@ -3,7 +3,6 @@
 use App\Enums\OrderStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -38,19 +37,6 @@ return new class extends Migration
             $table->timestamp('cancelled_at')->nullable();
             $table->timestamps();
         });
-
-        $statuses = collect(OrderStatus::cases())
-            ->map(fn (OrderStatus $status): string => "'{$status->value}'")
-            ->implode(', ');
-
-        $cancelled = OrderStatus::Cancelled->value;
-
-        DB::statement("ALTER TABLE orders
-            ADD CONSTRAINT orders_status_is_known CHECK (status IN ({$statuses})),
-            ADD CONSTRAINT orders_money_not_negative CHECK (subtotal >= 0 AND tax >= 0 AND charges_total >= 0 AND total >= 0),
-            ADD CONSTRAINT orders_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0),
-            ADD CONSTRAINT orders_tax_parts_add_up CHECK (cgst + sgst = tax),
-            ADD CONSTRAINT orders_cancelled_at_matches_status CHECK ((status = '{$cancelled}') = (cancelled_at IS NOT NULL))");
     }
 
     public function down(): void

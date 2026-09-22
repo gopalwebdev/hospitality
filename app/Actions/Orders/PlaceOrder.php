@@ -113,7 +113,7 @@ final readonly class PlaceOrder
 
         $items = $this->named(MenuItem::query(), $this->idsOf($lines, PriceBasket::ITEM), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
         $combos = $this->named(MenuCombo::query(), $this->idsOf($lines, PriceBasket::COMBO), ['id', 'name', 'tax_rate', 'hsn_sac_code']);
-        $options = $this->named(MenuAddOnOption::query(), $this->optionIdsOf($lines), ['id', 'name', 'price']);
+        $options = $this->named(MenuAddOnOption::query(), $this->optionIdsOf($lines), ['id', 'name', 'price', 'tax_rate', 'hsn_sac_code']);
 
         foreach ($lines as $index => $line) {
             $isCombo = $line['type'] === PriceBasket::COMBO;
@@ -152,6 +152,10 @@ final readonly class PlaceOrder
                     'name' => $option->getTranslations('name'),
                     'quantity' => $quantity,
                     'price' => $option->price,
+                    // What it was actually invoiced under: its own where it
+                    // states one, the item's where it does not.
+                    'tax_rate' => $option->taxRate($orderLine->tax_rate),
+                    'hsn_sac_code' => $option->hsn_sac_code ?? $orderLine->hsn_sac_code,
                 ]);
 
                 $choice->forceFill(['tenant_id' => $order->tenant_id, 'order_line_id' => $orderLine->getKey()])->save();

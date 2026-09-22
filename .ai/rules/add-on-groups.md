@@ -59,9 +59,7 @@ How a guest sees it:
 - **`max_per_item`:** caps how many of one option a single item takes, always — there is no group-wide switch gating it any more. `MenuAddOnGroup::quantityAllowedFor()` is the one place that works out the effective cap: an option's own `max_per_item`, never more than the maximum picks in play (the group's own, or an item's own — see below). `picksOffered()` adds the options up with it. `Guest\MenuController` and `PriceBasket` both go through them.
 
 **Stated three times over:**
-- **CHECK constraints:**
-  - `menu_add_on_groups_max_in_range`: a group's own max null or 1–99
-  - `menu_item_add_on_groups_max_in_range`: an item's own cap on a group null or 1–99
+- **Ranges (a group's own max, and an item's own cap on it: null or 1–99)** are refused by the form and by nothing else. They were CHECK constraints as well until every CHECK in the schema was dropped (`.ai/rules/migrations.md`), so a write that goes around the form can now store anything.
   - `max_per_item BETWEEN 1 AND 99` on options
 - **Form validation:**
   - `MenuAddOnGroupForm`: the maximum is 1–99, or blank; no more options are set as the default than the maximum (this rule sits on the options repeater, so its message reads under the table); an option's Max each is not more than the group's own maximum; a group has at least one option.

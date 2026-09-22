@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\MenuRailType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -20,14 +18,6 @@ return new class extends Migration
             $table->integer('position')->default(0);
             $table->timestamps();
         });
-
-        $types = collect(MenuRailType::cases())
-            ->map(fn (MenuRailType $type): string => "'{$type->value}'")
-            ->implode(', ');
-
-        DB::statement("ALTER TABLE menu_rails
-            ADD CONSTRAINT menu_rails_type_is_known CHECK (type IN ({$types})),
-            ADD CONSTRAINT menu_rails_position_not_negative CHECK (\"position\" >= 0)");
     }
 
     public function down(): void

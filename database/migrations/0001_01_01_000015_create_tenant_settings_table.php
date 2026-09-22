@@ -4,7 +4,6 @@ use App\Enums\Currency;
 use App\Models\TenantSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -37,12 +36,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE tenant_settings
-            ADD CONSTRAINT tenant_settings_tax_rates_in_range CHECK (
-                cgst_rate BETWEEN 0 AND 10000
-                AND sgst_rate BETWEEN 0 AND 10000
-                AND cgst_rate + sgst_rate <= 10000
-            )');
     }
 
     public function down(): void

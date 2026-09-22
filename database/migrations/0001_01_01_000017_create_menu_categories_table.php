@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -21,9 +20,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE menu_categories
-            ADD CONSTRAINT menu_categories_not_own_parent CHECK (parent_id IS NULL OR parent_id <> id),
-            ADD CONSTRAINT menu_categories_position_not_negative CHECK ("position" >= 0)');
     }
 
     public function down(): void

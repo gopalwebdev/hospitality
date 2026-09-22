@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\OrderLineType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -43,23 +41,6 @@ return new class extends Migration
             $table->integer('position')->default(0);
             $table->timestamps();
         });
-
-        $types = collect(OrderLineType::cases())
-            ->map(fn (OrderLineType $type): string => "'{$type->value}'")
-            ->implode(', ');
-
-        $item = OrderLineType::Item->value;
-        $combo = OrderLineType::Combo->value;
-
-        DB::statement("ALTER TABLE order_lines
-            ADD CONSTRAINT order_lines_type_is_known CHECK (type IN ({$types})),
-            ADD CONSTRAINT order_lines_key_matches_type CHECK ((type = '{$item}' AND menu_combo_id IS NULL) OR (type = '{$combo}' AND menu_item_id IS NULL)),
-            ADD CONSTRAINT order_lines_quantity_at_least_one CHECK (quantity >= 1),
-            ADD CONSTRAINT order_lines_money_not_negative CHECK (unit_price >= 0 AND total >= 0 AND taxable_value >= 0),
-            ADD CONSTRAINT order_lines_tax_rate_in_range CHECK (tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT order_lines_tax_rates_add_up CHECK (cgst_rate + sgst_rate = tax_rate),
-            ADD CONSTRAINT order_lines_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0),
-            ADD CONSTRAINT order_lines_position_not_negative CHECK (\"position\" >= 0)");
     }
 
     public function down(): void

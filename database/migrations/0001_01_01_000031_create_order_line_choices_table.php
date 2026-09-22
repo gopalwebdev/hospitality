@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -20,12 +19,15 @@ return new class extends Migration
             $table->integer('quantity');
             // What one of it added, when the order was placed.
             $table->integer('price');
+            // What this choice was actually invoiced under, copied at the time
+            // because an order outlives the option. Both follow the item where
+            // the option states neither, which is the usual case — the line's
+            // own tax_rate is the principal item's.
+            $table->smallInteger('tax_rate')->default(0);
+            $table->string('hsn_sac_code', 8)->nullable();
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE order_line_choices
-            ADD CONSTRAINT order_line_choices_quantity_at_least_one CHECK (quantity >= 1),
-            ADD CONSTRAINT order_line_choices_price_not_negative CHECK (price >= 0)');
     }
 
     public function down(): void

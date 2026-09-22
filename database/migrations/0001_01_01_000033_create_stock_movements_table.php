@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\StockMovementReason;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -30,16 +28,6 @@ return new class extends Migration
             // A movement is never edited, so there is no updated_at.
             $table->timestamp('created_at')->useCurrent();
         });
-
-        $reasons = collect(StockMovementReason::cases())
-            ->map(fn (StockMovementReason $reason): string => "'{$reason->value}'")
-            ->implode(', ');
-
-        DB::statement("ALTER TABLE stock_movements
-            ADD CONSTRAINT stock_movements_reason_is_known CHECK (reason IN ({$reasons})),
-            ADD CONSTRAINT stock_movements_names_one_thing CHECK ((menu_item_id IS NULL) <> (menu_add_on_option_id IS NULL)),
-            ADD CONSTRAINT stock_movements_change_not_zero CHECK (quantity_change <> 0),
-            ADD CONSTRAINT stock_movements_after_not_negative CHECK (quantity_after >= 0)");
     }
 
     public function down(): void

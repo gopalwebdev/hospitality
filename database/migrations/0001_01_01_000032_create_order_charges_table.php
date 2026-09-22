@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -31,12 +30,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE order_charges
-            ADD CONSTRAINT order_charges_amount_not_negative CHECK (amount >= 0 AND taxable_value >= 0),
-            ADD CONSTRAINT order_charges_tax_rate_in_range CHECK (tax_rate BETWEEN 0 AND 10000),
-            ADD CONSTRAINT order_charges_tax_rates_add_up CHECK (cgst_rate + sgst_rate = tax_rate),
-            ADD CONSTRAINT order_charges_tax_parts_not_negative CHECK (cgst >= 0 AND sgst >= 0),
-            ADD CONSTRAINT order_charges_position_not_negative CHECK ("position" >= 0)');
     }
 
     public function down(): void
