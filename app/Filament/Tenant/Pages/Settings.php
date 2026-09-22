@@ -265,35 +265,60 @@ class Settings extends Page
 
     /**
      * One day of the week, as a row of a table that has its headings on the first row alone.
+     *
+     * **`gridContainer()` is what makes it a table at all.** The breakpoints
+     * here are container queries (`@md`), so without it none of them ever
+     * matched: every day fell back to the two-column `default`, which put the
+     * name beside the toggle and wrapped the two times onto a second line. Seven
+     * days became fourteen rows of half-empty grid, which is what the project
+     * owner was looking at when they asked for this to be fixed.
+     *
+     * Twelve columns rather than four, because four equal columns across a
+     * full-width section left the day name floating in a quarter of the page.
+     * The name needs two of them and the times need four each.
      */
     private function dayRow(Weekday $weekday, bool $isFirst): Grid
     {
         $path = "hours.{$weekday->value}";
         $isOpen = fn (Get $get): bool => ! (bool) $get("{$path}.is_closed");
+        $isClosed = fn (Get $get): bool => (bool) $get("{$path}.is_closed");
 
-        return Grid::make(['default' => 2, '@md' => 4])
+        return Grid::make(['default' => 2, '@md' => 12])
+            ->gridContainer()
             ->schema([
                 Text::make($weekday->label())
-                    ->weight(FontWeight::Medium),
+                    ->weight(FontWeight::Medium)
+                    ->columnSpan(['default' => 1, '@md' => 2]),
 
                 Toggle::make("{$path}.is_closed")
                     ->label('Closed')
                     ->hiddenLabel(! $isFirst)
                     ->inline(false)
-                    // Live: the two times below are only asked for on a day that opens.
-                    ->live(),
+                    // Live: the two times beside it are only asked for on a day that opens.
+                    ->live()
+                    ->columnSpan(['default' => 1, '@md' => 2]),
 
                 ClockTimePicker::make("{$path}.opens_at")
                     ->label('Opens')
                     ->hiddenLabel(! $isFirst)
                     ->visible($isOpen)
-                    ->required($isOpen),
+                    ->required($isOpen)
+                    ->columnSpan(['default' => 1, '@md' => 4]),
 
                 ClockTimePicker::make("{$path}.closes_at")
                     ->label('Closes')
                     ->hiddenLabel(! $isFirst)
                     ->visible($isOpen)
-                    ->required($isOpen),
+                    ->required($isOpen)
+                    ->columnSpan(['default' => 1, '@md' => 4]),
+
+                // Standing in for the two pickers rather than leaving two
+                // thirds of the row blank: a closed day used to read as a row
+                // that had failed to render.
+                Text::make('Closed all day')
+                    ->color('gray')
+                    ->visible($isClosed)
+                    ->columnSpan(['default' => 2, '@md' => 8]),
             ]);
     }
 
