@@ -4,11 +4,14 @@ namespace App\Filament\Schemas;
 
 use App\Enums\Currency;
 use App\Enums\ItemAvailability;
+use App\Models\TaxCode;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * The inputs behind a price: what it costs, what it used to, its GST rate, and how many one order may hold.
@@ -64,18 +67,22 @@ final class PricingFields
     }
 
     /**
-     * The GST rate, typed as the percentage an accountant quotes.
+     * The GST rate a line carries, shown but **not typed**.
      *
-     * A number rather than a list of slabs on purpose: India's GST 2.0 reform
-     * of September 2025 restructured the slabs, and the next notification may
-     * do so again — a hardcoded list is one notification from being wrong.
+     * It is filled by `taxCodePicker()` above it and disabled, on the project
+     * owner's instruction: a rate is chosen by naming what is being sold, not
+     * by typing a number from memory. A rate the catalogue does not offer is
+     * added to the catalogue, which is a page a tenant owns
+     * (`.ai/rules/tax-codes.md`).
      *
-     * The placeholder is the tenant's own rate, so leaving it empty visibly
-     * means "whatever settings says" without a sentence explaining it. The bare
-     * number rather than `formatRate()`'s "5%": the field already carries its
-     * own '%' suffix, and a placeholder of "5%" beside it read as "5%%".
+     * `dehydrated()` is not optional here — Filament leaves a disabled field
+     * out of the save by default, which would blank the rate on every edit.
+     *
+     * There is deliberately **no placeholder**. It used to show the tenant's
+     * own rate, so an empty box read "18" and looked filled in; the project
+     * owner asked for it gone.
      */
-    public static function taxRatePercentage(int $tenantRate): TextInput
+    public static function taxRatePercentage(): TextInput
     {
         return TextInput::make('tax_rate_percentage')
             ->label(__('panel.items.tax_rate'))
@@ -84,7 +91,8 @@ final class PricingFields
             ->maxValue(100)
             ->step(0.01)
             ->suffix('%')
-            ->placeholder(self::formattedPercentage($tenantRate));
+            ->disabled()
+            ->dehydrated();
     }
 
     /**
@@ -92,13 +100,102 @@ final class PricingFields
      *
      * One field for both, as an invoice and GSTR-1 have one: HSN numbers goods
      * and SAC numbers services, and this menu carries both — a bottle of water
-     * is goods, a bedsheet change is a service.
+     * is goods, a bedsheet change is a service. Filled and disabled for the
+     * same reason as the rate above.
      */
     public static function hsnSacCode(): TextInput
     {
         return TextInput::make('hsn_sac_code')
             ->label(__('panel.items.hsn_sac_code'))
-            ->maxLength(8);
+            ->maxLength(8)
+            ->disabled()
+            ->dehydrated();
+    }
+
+    /**
+     * The one control that sets a line's GST: pick what is being sold.
+     *
+     * Picking copies the code's rate and number onto the record and lets go —
+     * the two fields below hold what was copied, and correcting the catalogue
+     * later never reprices anything already filled in (`App\Models\TaxCode`).
+     * Clearing it clears both, which is how a line goes back to the tenant's
+     * own rate.
+     */
+    public static function taxCodePicker(): Select
+    {
+        return Select::make('tax_code_id')
+            ->label(__('panel.tax_codes.picker'))
+            ->placeholder(__('panel.tax_codes.picker_placeholder'))
+            ->options(fn (): array => self::taxCodeOptions())
+            ->searchable()
+            ->native(false)
+            // menu_items has no column for it: it only fills the two below.
+            ->dehydrated(false)
+            ->live()
+            ->afterStateUpdated(self::applyTaxCode(...))
+            // An edit opens on the code the record was filled from, worked out
+            // from what it stored rather than from a column nothing keeps.
+            ->formatStateUsing(fn (mixed $state, ?Model $record): ?int => $record instanceof Model
+                ? self::taxCodeIdFor($record->getAttribute('hsn_sac_code'), $record->getAttribute('tax_rate'))
+                : null);
+    }
+
+    /**
+     * Copy a picked code onto the fields below it, or clear them when it is cleared.
+     */
+    public static function applyTaxCode(mixed $state, Set $set): void
+    {
+        $taxCode = blank($state) ? null : TaxCode::query()->find((int) $state);
+
+        $set('tax_rate_percentage', $taxCode instanceof TaxCode ? self::toPercentage($taxCode->tax_rate) : null);
+        $set('hsn_sac_code', $taxCode?->code);
+    }
+
+    /**
+     * The codes this tenant may file something under: the catalogue, and its own.
+     *
+     * @return array<int, string>
+     */
+    public static function taxCodeOptions(): array
+    {
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Tenant) {
+            return [];
+        }
+
+        // once(): Filament asks a select for its options more than once while
+        // it builds and validates one form.
+        return once(fn (): array => TaxCode::query()
+            ->availableTo($tenant)
+            ->orderBy('code')
+            ->get()
+            ->mapWithKeys(fn (TaxCode $taxCode): array => [
+                $taxCode->getKey() => sprintf('%s · %s — %s', $taxCode->code, self::formatRate($taxCode->tax_rate), $taxCode->description),
+            ])
+            ->all());
+    }
+
+    /**
+     * The code a stored number-and-rate pair came from, for a form being filled.
+     */
+    public static function taxCodeIdFor(?string $code, ?int $rate): ?int
+    {
+        if (blank($code) || $rate === null) {
+            return null;
+        }
+
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Tenant) {
+            return null;
+        }
+
+        return TaxCode::query()
+            ->availableTo($tenant)
+            ->where('code', $code)
+            ->where('tax_rate', $rate)
+            ->value('id');
     }
 
     /**
@@ -240,17 +337,5 @@ final class PricingFields
         $tenant = Filament::getTenant();
 
         return $tenant instanceof Tenant ? $tenant->currency() : Currency::IndianRupee;
-    }
-
-    /**
-     * The GST rate the tenant in this panel charges by default.
-     */
-    public static function tenantTaxRate(): int
-    {
-        $tenant = Filament::getTenant();
-
-        return $tenant instanceof Tenant
-            ? $tenant->taxRate()
-            : TenantSetting::DEFAULT_TAX_RATE_BASIS_POINTS;
     }
 }

@@ -8,11 +8,13 @@ use App\Filament\Schemas\StockFields;
 use App\Filament\Schemas\TranslatedFields;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuAddOnOption;
+use App\Models\TaxCode;
 use App\Models\Tenant;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Group;
@@ -141,8 +143,7 @@ class MenuAddOnGroupForm
                     ->table([
                         TableColumn::make(__('panel.add_on_groups.option'))->markAsRequired(),
                         TableColumn::make(__('panel.add_on_groups.price'))->width('9rem'),
-                        TableColumn::make(__('panel.add_on_groups.tax_rate'))->width('7rem'),
-                        TableColumn::make(__('panel.items.hsn_sac_code'))->width('9rem'),
+                        TableColumn::make(__('panel.add_on_groups.tax_code'))->width('16rem'),
                         TableColumn::make(__('panel.add_on_groups.max_per_item'))->width('7rem'),
                         TableColumn::make(__('panel.stock.in_stock'))->width('8rem'),
                         TableColumn::make(__('panel.add_on_groups.is_default'))->width('7rem')->alignment(Alignment::Center),
@@ -161,22 +162,19 @@ class MenuAddOnGroupForm
                             ->prefix('+ '.$currency->symbol())
                             ->placeholder(__('panel.add_on_groups.free')),
 
-                        // Blank is the ordinary answer and means "taxed with the
-                        // item", which is what a composite supply is. It is here
-                        // for an option that is really a separate supply — a
-                        // haircut offered beside a meal.
-                        TextInput::make('tax_rate_percentage')
-                            ->label(__('panel.add_on_groups.tax_rate'))
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->step(0.01)
-                            ->suffix('%')
-                            ->placeholder(__('panel.add_on_groups.tax_rate_placeholder')),
-
-                        TextInput::make('hsn_sac_code')
-                            ->label(__('panel.items.hsn_sac_code'))
-                            ->maxLength(8),
+                        // One column rather than a rate and a code side by
+                        // side: both are copied from whatever is picked here,
+                        // so the two boxes they used to fill were read-only
+                        // repetitions of this label. Blank is the ordinary
+                        // answer and means "taxed with the item", which is what
+                        // a composite supply is; a code is for the option that
+                        // is really a separate supply.
+                        Select::make('tax_code_id')
+                            ->label(__('panel.add_on_groups.tax_code'))
+                            ->placeholder(__('panel.add_on_groups.tax_rate_placeholder'))
+                            ->options(fn (): array => PricingFields::taxCodeOptions())
+                            ->searchable()
+                            ->native(false),
 
                         TextInput::make('max_per_item')
                             ->label(__('panel.add_on_groups.max_per_item'))
@@ -407,13 +405,14 @@ class MenuAddOnGroupForm
         // in place, so there is nothing left to unset. See PricingFields::store().
         $data['price'] = blank($data['price'] ?? null) ? 0 : $currency->toMinorUnits($data['price']);
 
-        // Blank stays null, which means "taxed with the item". Converted here
-        // and nowhere else, so the rounding happens once.
-        $data['tax_rate'] = blank($data['tax_rate_percentage'] ?? null)
-            ? null
-            : PricingFields::toBasisPoints($data['tax_rate_percentage']);
+        // Whatever the picked code carries, copied onto the option and then
+        // let go. Blank stays null, which means "taxed with the item".
+        $taxCode = blank($data['tax_code_id'] ?? null) ? null : TaxCode::query()->find((int) $data['tax_code_id']);
 
-        unset($data['tax_rate_percentage']);
+        $data['tax_rate'] = $taxCode?->tax_rate;
+        $data['hsn_sac_code'] = $taxCode?->code;
+
+        unset($data['tax_code_id']);
 
         if ($isOnePick) {
             $data['max_per_item'] = 1;
@@ -452,9 +451,11 @@ class MenuAddOnGroupForm
 
         $data['price'] = $minorUnits === 0 ? null : $currency->toMajorUnits($minorUnits);
 
-        $data['tax_rate_percentage'] = blank($data['tax_rate'] ?? null)
-            ? null
-            : PricingFields::toPercentage((int) $data['tax_rate']);
+        // Worked out from what the option stored, because nothing keeps the id.
+        $data['tax_code_id'] = PricingFields::taxCodeIdFor(
+            $data['hsn_sac_code'] ?? null,
+            $data['tax_rate'] ?? null,
+        );
 
         return $data;
     }

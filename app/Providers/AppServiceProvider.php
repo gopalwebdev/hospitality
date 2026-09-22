@@ -55,10 +55,39 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureDateTimeDisplay();
+        $this->configureTables();
         $this->configureRequestMemoization();
         $this->configureQueryGuards();
         $this->configureAuthorization();
         $this->configureDevProcesses();
+    }
+
+    /**
+     * How every table in both panels behaves, set once rather than per table.
+     *
+     * All of it is Filament's own settings, on the project owner's instruction:
+     * **do not hand-roll table chrome**, configure what Filament already offers.
+     *
+     * - `hiddenFilterIndicators()` drops the "Active filters" strip above the
+     *   rows. It repeated what the controls beside it already said — the search
+     *   box shows its own term with its own clear button, and the filter button
+     *   carries a count badge — so a search read as a filter and a filter read
+     *   twice. What a page is narrowed to is now read where it is set.
+     * - The two `persist...InSession()` calls keep a search and a set of filters
+     *   across a visit, so opening a record and coming back does not drop what
+     *   was being looked at.
+     *
+     * A table that needs different behaviour still overrides it at its own call
+     * site; this is only the default.
+     */
+    protected function configureTables(): void
+    {
+        Table::configureUsing(static function (Table $table): void {
+            $table
+                ->hiddenFilterIndicators()
+                ->persistFiltersInSession()
+                ->persistSearchInSession();
+        });
     }
 
     /**

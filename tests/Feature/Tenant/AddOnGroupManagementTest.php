@@ -207,11 +207,10 @@ it('opens a group with its answers, and each option as stored, a free one blank'
         ->and($cheeseRow['is_default'])->toBeTrue()
         // Free reads as the placeholder rather than "0".
         ->and($state['options']['record-'.$raita->getKey()]['price'])->toBeNull()
-        // An add-on is normally taxed with its item, so the rate is offered and
-        // left blank — the placeholder reads "Item's". A rate here is for an
-        // option that is really a separate supply.
-        ->and($cheeseRow['tax_rate_percentage'])->toBeNull()
-        ->and($cheeseRow['hsn_sac_code'])->toBeNull();
+        // An add-on is normally taxed with its item, so the one tax control on
+        // the row — the code picker, which carries both the rate and the number
+        // — is offered and left blank. Its placeholder reads "Item's".
+        ->and($cheeseRow['tax_code_id'])->toBeNull();
 });
 
 it('edits a group from one pick to two, writing its options back exactly as they were stored', function (): void {

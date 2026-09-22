@@ -12,7 +12,6 @@ use App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas\MenuAddOnGroupForm;
 use App\Filament\Tenant\Resources\Menus\Schemas\MenuSubCategoryForm;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuItem;
-use App\Models\TaxCode;
 use App\Models\Tenant;
 use Closure;
 use Filament\Facades\Filament;
@@ -25,7 +24,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
@@ -191,10 +189,13 @@ class MenuItemForm
      * MenuItemKind::taxCodeLabel() says which — rather than asking for
      * "HSN / SAC code" whatever is being priced.
      *
-     * The picker above them fills both in from `tax_codes` so nobody types a
-     * rate from memory. It **copies and lets go**: the two fields stay editable
-     * and the item keeps its own `tax_rate`, so correcting a code later never
-     * reprices an item already filled in (`App\Models\TaxCode`).
+     * The picker above them is the **only** way to set either: both fields are
+     * disabled, on the project owner's instruction, because a rate is chosen by
+     * naming what is being sold rather than typed from memory. A rate the
+     * catalogue does not offer is added to the catalogue, which is a page the
+     * tenant owns. Picking **copies and lets go** — the item keeps its own
+     * `tax_rate`, so correcting a code later never reprices an item already
+     * filled in (`App\Models\TaxCode`, `.ai/rules/tax-codes.md`).
      */
     private static function taxSection(): Section
     {
@@ -203,68 +204,13 @@ class MenuItemForm
             ->compact()
             ->columns(2)
             ->schema([
-                Select::make('tax_code_picker')
-                    ->label(__('panel.tax_codes.picker'))
-                    ->placeholder(__('panel.tax_codes.picker_placeholder'))
-                    ->options(fn (): array => self::taxCodeOptions())
-                    ->searchable()
-                    ->native(false)
-                    // Never stored: this field's whole job is to fill the two
-                    // below, and menu_items has no column for it.
-                    ->dehydrated(false)
-                    ->live()
-                    ->afterStateUpdated(self::fillFromTaxCode(...))
+                PricingFields::taxCodePicker()
                     ->columnSpanFull(),
 
-                PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
+                PricingFields::taxRatePercentage(),
                 PricingFields::hsnSacCode()
                     ->label(fn (Get $get): string => self::taxCodeLabel($get)),
             ]);
-    }
-
-    /**
-     * Copy a picked code's rate and number onto the item.
-     */
-    private static function fillFromTaxCode(?string $state, Set $set): void
-    {
-        $taxCode = $state === null || $state === '' ? null : TaxCode::query()->find($state);
-
-        if (! $taxCode instanceof TaxCode) {
-            return;
-        }
-
-        $set('tax_rate_percentage', PricingFields::toPercentage($taxCode->tax_rate));
-        $set('hsn_sac_code', $taxCode->code);
-    }
-
-    /**
-     * The codes this tenant may file an item under: the catalogue, and its own.
-     *
-     * @return array<int, string>
-     */
-    private static function taxCodeOptions(): array
-    {
-        $tenant = Filament::getTenant();
-
-        if (! $tenant instanceof Tenant) {
-            return [];
-        }
-
-        // once(): Filament asks a select for its options more than once while
-        // it builds and validates one form.
-        return once(fn (): array => TaxCode::query()
-            ->availableTo($tenant)
-            ->orderBy('code')
-            ->get()
-            ->mapWithKeys(fn (TaxCode $taxCode): array => [
-                $taxCode->getKey() => sprintf(
-                    '%s · %s — %s',
-                    $taxCode->code,
-                    PricingFields::formatRate($taxCode->tax_rate),
-                    $taxCode->description,
-                ),
-            ])
-            ->all());
     }
 
     /**

@@ -199,8 +199,11 @@ class Settings extends Page
                     ->weight(FontWeight::Medium)
                     ->columnSpanFull(),
 
+                // Live, because the two rates above are only editable while
+                // this is on — see halfRate().
                 Toggle::make('tax_overrides_item_rates')
-                    ->label('Tax every item at this rate')
+                    ->label('Use this one rate for everything, ignoring item codes')
+                    ->live()
                     ->columnSpanFull(),
 
                 Toggle::make('prices_include_tax')
@@ -219,6 +222,16 @@ class Settings extends Page
 
     /**
      * One half of the rate, typed the way an accountant quotes it.
+     *
+     * **Editable only while "use this one rate for everything" is on**, on the
+     * project owner's instruction: with it off, every item and combo takes its
+     * rate from the code picked on it, so a number typed here would not be what
+     * anything on the menu is taxed at.
+     *
+     * It is still `dehydrated()` while disabled, and that matters — the stored
+     * rate is what a **charge** is taxed at either way (`PriceBasket::charges()`),
+     * so dropping it from the save would quietly untax every service charge.
+     * Changing it means turning the toggle on, editing, and turning it back off.
      */
     private function halfRate(string $name, string|Closure $label): TextInput
     {
@@ -230,6 +243,8 @@ class Settings extends Page
             ->maxValue(100)
             ->step(0.01)
             ->suffix('%')
+            ->disabled(fn (Get $get): bool => $get('tax_overrides_item_rates') !== true)
+            ->dehydrated()
             // Live, because the two of them are added up above as they are typed.
             ->live(onBlur: true);
     }

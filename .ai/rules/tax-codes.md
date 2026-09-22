@@ -9,14 +9,18 @@ paths:
 # HSN and SAC codes
 
 ## The list exists so nobody types a GST rate from memory, and it copies rather than binds
-`tax_codes` holds a code, what it covers, and the rate it usually carries. Picking one on the item form **copies** its `tax_rate` and its `code` onto that item and then lets go: `menu_items.tax_rate` and `menu_items.hsn_sac_code` are what a bill actually reads, and both stay editable afterwards.
+`tax_codes` holds a code, what it covers, and the rate it usually carries. Picking one on the item form **copies** its `tax_rate` and its `code` onto that item and then lets go: `menu_items.tax_rate` and `menu_items.hsn_sac_code` are what a bill actually reads, and nothing reads this table again.
 
 That was the project owner's choice over referencing the row, and the consequences are the point:
 - Correcting a code **never reprices** anything already filled in. A slab changing is a panel job, item by item, not a silent repricing of a live menu.
-- An item that needs a different rate is simply edited — there is no override to model.
+- An item that needs a rate the catalogue does not carry gets a new code added to the catalogue. The two fields are disabled, so the code list is the one place a rate is decided and it stays reviewable.
 - Nothing on the pricing path touches this table. `PriceBasket`, `GstSplit` and `PlaceOrder` have never heard of it, and must not learn: a placed order already copies the rate it was invoiced at (`.ai/rules/actions-menus.md`).
 
-The picker is `tax_code_picker` in `MenuItemForm::taxSection()`, `dehydrated(false)` because `menu_items` has no column for it, and its options come from `taxCodeOptions()` wrapped in `once()` — Filament asks a select for its options several times while building and validating one form, and the duplicate-query guard throws otherwise (`.ai/rules/app.md`).
+**The picker is the only way to set either field.** `PricingFields::taxRatePercentage()` and `::hsnSacCode()` are `disabled()`, on the project owner's instruction: a rate is chosen by naming what is being sold, not typed from memory. A rate the catalogue does not offer is added to the catalogue, which is a page the tenant owns. Both carry `dehydrated()` — Filament leaves a disabled field out of the save by default, which would blank the rate on every edit. There is no placeholder on the rate any more; it used to show the tenant's own, so an empty box read "18" and looked filled in.
+
+`PricingFields::taxCodePicker()` is shared by the item form and the combo form, is `dehydrated(false)` because neither table has a column for it, and `formatStateUsing()` reopens an edit on the code the record was filled from by matching its stored `hsn_sac_code` and `tax_rate`. Clearing it clears both fields, which is how a line goes back to the tenant's own rate. Options come from `taxCodeOptions()` wrapped in `once()` — Filament asks a select for its options several times while building and validating one form, and the duplicate-query guard throws otherwise (`.ai/rules/app.md`).
+
+**An add-on option gets one column, not three.** In the options repeater the picker *is* the whole tax control: a rate and a code beside it would have been two read-only boxes repeating the label already on the select, on a row that was eight columns wide. `MenuAddOnGroupForm::storeOption()` resolves the picked code into `tax_rate` and `hsn_sac_code`; `fillOption()` works the id back out of the pair. Blank means "taxed with the item", which is the ordinary answer.
 
 ## A row with no tenant is the shared catalogue
 `tax_codes.tenant_id` is **nullable**, and that is the whole design: null is the catalogue `TaxCodeSeeder` writes, offered to every tenant; a row naming a tenant is that tenant's own addition and nobody else is offered it. `TaxCode::availableTo()` is the one query that puts the two together.

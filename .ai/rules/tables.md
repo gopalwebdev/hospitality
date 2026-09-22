@@ -7,6 +7,16 @@ paths:
 
 # Tables
 
+## Table chrome is Filament's own settings, set once in AppServiceProvider
+Standing instruction from the project owner: **do not hand-roll table chrome.** Where Filament already offers a setting, configure it; do not write a view or a stylesheet to get the same effect.
+
+`AppServiceProvider::configureTables()` holds the defaults every table in both panels starts from, beside the date formats:
+
+- **`hiddenFilterIndicators()`** — the "Active filters" strip above the rows is off. It repeated what the controls beside it already said: the search box shows its own term with its own clear button, and the filter button carries a count badge, so a search read as a filter and a filter read twice over. The project owner asked for it gone.
+- **`persistFiltersInSession()` and `persistSearchInSession()`** — opening a record and coming back keeps what was being looked at.
+
+A table that genuinely needs different behaviour overrides it at its own call site. Adding chrome that Filament has no setting for is a conversation, not a patch.
+
 ## Never group or sort a Filament table on a translated (JSON) column
 Filament's table grouping (`->groups()`/`->defaultGroup()`) orders the query by the group's raw column or relationship attribute unless you override `orderQueryUsing()`. On a translated column that orders whole JSON documents rather than names. While those columns were plain `json` it was worse — Postgres has no ordering operator for `json`, and pages 500'd in production while the SQLite test suite passed. They are `jsonb` now, which sorts without an error and still sorts wrong, so the rule stands; and the suite runs on Postgres, so a page test would catch it.
 

@@ -69,7 +69,11 @@ class MenuComboForm
                     ->schema([
                         PricingFields::price($currency),
                         PricingFields::originalPrice($currency),
-                        PricingFields::taxRatePercentage(PricingFields::tenantTaxRate()),
+                        // The picker is the only way to set the two below it,
+                        // which are disabled for the same reason as an item's.
+                        PricingFields::taxCodePicker()->columnSpanFull(),
+                        PricingFields::taxRatePercentage(),
+                        PricingFields::hsnSacCode(),
                         PricingFields::availability(),
                         PricingFields::maxPerOrder(),
                     ])
