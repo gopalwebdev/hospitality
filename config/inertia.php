@@ -7,12 +7,17 @@ return [
     | Server Side Rendering
     |--------------------------------------------------------------------------
     |
-    | Off: the app is rendered in the browser and nowhere else. Inertia's
-    | Vite plugin pre-renders through the dev server whenever Vite is
-    | running hot, and nothing has ever pre-rendered a deployed page —
-    | there is no bundle under bootstrap/ssr and no inertia:start-ssr
-    | process — so leaving this on meant a page server rendered while it
-    | was being written and client rendered once it shipped.
+    | Off: the app is rendered in the browser and nowhere else. This is the
+    | PHP half of that — it is what stops Inertia\Ssr\HttpGateway sending a
+    | response through an SSR renderer. It has no say over Vite, which does
+    | its own SSR pre-rendering in dev whenever it is left to its defaults;
+    | vite.config.ts's inertia({ ssr: false }) is the other half, and both
+    | are required. See .ai/rules/js.md before touching either on its own.
+    |
+    | Nothing has ever pre-rendered a deployed page — there is no bundle
+    | under bootstrap/ssr and no inertia:start-ssr process — so leaving
+    | this on meant a page server rendered while it was being written and
+    | client rendered once it shipped.
     |
     | See: https://inertiajs.com/server-side-rendering
     |

@@ -47,17 +47,22 @@ Everything a tenant wrote — menu, category, item, add-on group, option, charge
 A chrome string that names the business says "tenant", whatever the tenant's type. The guest app is sent no type at all.
 
 ## The app renders in the browser, and nowhere else
-`config/inertia.php` sets `ssr.enabled` to **false**. No Inertia page is pre-rendered: the server sends props and React paints from them, in development exactly as in production.
+SSR is off **twice over**, and both switches are necessary — this is the one place server cost was deliberately cut, and it stayed half-cut once before.
 
-It was on, and being on was worse than either answer chosen deliberately. Inertia v3's Vite plugin serves SSR from the dev server (`HttpGateway` posts to `/__inertia_ssr` whenever `Vite::isRunningHot()`), while a deployed page has never been pre-rendered — there is no bundle under `bootstrap/ssr`, and `php artisan dev` starts Horizon, Pail and Vite and nothing else (`DevProcessesTest`). So every page was server rendered on the machine it was written on and client rendered once it shipped: the one arrangement where a hydration mismatch, or a render that reaches for `window`, breaks nowhere it would be seen.
+- **`config/inertia.php` sets `ssr.enabled` to `false`.** This is the PHP side: it stops `Inertia\Ssr\HttpGateway` dispatching a response through an SSR renderer. It says nothing to Vite.
+- **`vite.config.ts` passes `inertia({ ssr: false })`.** This is the Vite side, and it is the one that was missing: `@inertiajs/vite`'s own plugin looks for an `resources/js/ssr.tsx`-shaped entry on every dev boot regardless of the Laravel config, and — finding none, since there is none — still opened the `/__inertia_ssr` dev endpoint and warmed an SSR module graph on every `npm run dev`, real work for a server nothing ever asked for. `ssr: false` is read in the plugin's own `configResolved` hook and short-circuits `configureServer` before any of that runs.
+
+Set only the first one, a dev boot still prints "Inertia SSR dev endpoint" and "Warming up Inertia SSR module graph" — which is exactly what shipped, and exactly what alerted the project owner that this was still costing something. Both have to be off together.
+
+No Inertia page is pre-rendered either way: the server sends props and React paints from them, in development exactly as in production. It was on, and being on was worse than either answer chosen deliberately: a deployed page has never been pre-rendered — there is no bundle under `bootstrap/ssr`, and `php artisan dev` starts Horizon, Pail and Vite and nothing else (`DevProcessesTest`) — so every page was server rendered on the machine it was written on and client rendered once it shipped. That is the one arrangement where a hydration mismatch, or a render that reaches for `window`, breaks nowhere it would be seen.
 
 What follows from it:
 - **The boot loader is the first paint**, on every load rather than only a deployed one. `#app` is empty until React mounts, which is what the section below is about.
 - **`getServerSnapshot` is dead.** The third argument to `useSyncExternalStore` in `hooks/use-basket.ts` and `hooks/use-appearance.tsx` is never called; nothing may be built on it.
 - **The theme is still painted by the server** — `resources/views/partials/theme.blade.php` reads the `appearance` cookie before any JavaScript runs. That is Blade, not SSR, and it is untouched by this (`.ai/rules/views.md`).
-- Turning it back on is not a flag: it means building the bundle, running `inertia:start-ssr` under the process manager, and re-reading every browser API touched during a first render.
+- Turning it back on is not a flag: it means an `resources/js/ssr.tsx` entry, `inertia({ ssr: false })` coming out of `vite.config.ts`, building the bundle, running `inertia:start-ssr` under the process manager, and re-reading every browser API touched during a first render.
 
-The Filament panels are a different stack. Livewire renders its HTML on the server by definition, so a panel has no client-rendered mode to choose; `->spa(hasPrefetching: true)` is as far toward the browser as they go (`.ai/rules/filament.md`).
+The Filament panels are a different stack and were never part of this. Livewire renders its HTML on the server by definition, so a panel has no client-rendered mode to choose; `->spa(hasPrefetching: true)` is as far toward the browser as they go (`.ai/rules/filament.md`). "CSR only" as a standing instruction is about the Inertia guest app specifically — Filament has no SSR toggle to turn off.
 
 ## Nothing waits on a blank screen
 Two layers, and both are needed because they cover different gaps:

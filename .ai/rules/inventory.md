@@ -64,7 +64,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 
 **An order is a copy.**
 - `orders` keeps its totals as priced, and its GST as levied: `is_union_territory` (what the state's half was called), `tax`, and the `cgst` / `sgst` the two of which add up to it.
-- `order_lines` and `order_charges` each keep their own `taxable_value`, `tax_rate` and split, and a line keeps the item's `hsn_sac_code` — a tax invoice names a code per line, and the item may be recoded or deleted later. See `.ai/rules/actions-menus.md`.
+- `order_lines` and `order_charges` each keep their own `taxable_value`, `tax_rate` and split, and each keeps a copy of its `hsn_sac_code` — an item's, a combo's or a charge's own where it states one — because a tax invoice names a code per line and the source may be recoded or deleted later. See `.ai/rules/actions-menus.md`.
 - `order_lines`, `order_line_choices` and `order_charges` keep names as `jsonb` in every language and money as it was then.
 - Their keys to the menu are `nullOnDelete`, so deleting or renaming an item never rewrites an order.
 - PlaceOrder sets `tenant_id` on every order row itself; no observer does, because nothing else writes them.

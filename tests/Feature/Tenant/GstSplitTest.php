@@ -207,6 +207,60 @@ it('taxes a service charge with the supply rather than after it', function (): v
         ->and($order->total)->toBe(10000 + 550 + 1000);
 });
 
+it('taxes a charge at its own code\'s rate, distinct from the tenant\'s, and copies its HSN or SAC', function (): void {
+    // The tenant's default is 5%; this charge states 18% of its own and a
+    // code, exactly as an item can — a service charge filed under its own SAC
+    // rather than the tenant's blended default.
+    ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(rate: 500, price: 10000);
+
+    Charge::factory()
+        ->ofTenant($tenant)
+        ->fixedAmount(5000)
+        ->taxedAt(1800)
+        ->onMenus($menu)
+        ->create(['hsn_sac_code' => '996331']);
+
+    $order = orderOneOf($tenant, $menu, $item);
+    $charge = OrderCharge::query()->where('order_id', $order->getKey())->sole();
+    $line = OrderLine::query()->where('order_id', $order->getKey())->sole();
+
+    // 18% of ₹50.00, not the tenant's 5% — and the item still carries its
+    // own 5%, unaffected by the charge stating a rate of its own.
+    expect($charge->tax_rate)->toBe(1800)
+        ->and($charge->cgst_rate)->toBe(900)
+        ->and($charge->sgst_rate)->toBe(900)
+        ->and($charge->cgst)->toBe(450)
+        ->and($charge->sgst)->toBe(450)
+        ->and($charge->hsn_sac_code)->toBe('996331')
+        ->and($line->tax_rate)->toBe(500);
+});
+
+it('never lets "use this one rate for every item" reach a charge', function (): void {
+    // The item states 18% of its own; the tenant's default is 5%.
+    ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(
+        rate: 500,
+        price: 10000,
+        itemRate: 1800,
+    );
+
+    // On the project owner's instruction: this toggle only ever reaches
+    // MenuItem/MenuCombo::taxRate(). A charge is its own supply, and one with
+    // no code of its own keeps following the tenant's rate whatever this says.
+    $tenant->settings->update(['tax_overrides_item_rates' => true]);
+
+    Charge::factory()->ofTenant($tenant)->fixedAmount(5000)->onMenus($menu)->create();
+
+    $order = orderOneOf($tenant, $menu, $item);
+    $line = OrderLine::query()->where('order_id', $order->getKey())->sole();
+    $charge = OrderCharge::query()->where('order_id', $order->getKey())->sole();
+
+    // The toggle reached the item — its own 18% was set aside for the
+    // tenant's 5% — and the charge reads the same 5% it always would have:
+    // nothing about it changed.
+    expect($line->tax_rate)->toBe(500)
+        ->and($charge->tax_rate)->toBe(500);
+});
+
 it('takes the tax out of a price that already carries it', function (): void {
     // ₹105.00 including 5% holds ₹5.00 of GST and ₹100.00 of value.
     ['tenant' => $tenant, 'menu' => $menu, 'item' => $item] = taxedTenantWithItem(

@@ -49,7 +49,7 @@ The invariant that an item leaving a menu stops being featured lives in `MenuIte
 GST is worked out part by part and rounded once per part per line:
 - **Items:** every part of an item's line is taxed at the item's rate, its options included. An add-on is part of the item it is added to, a composite supply taxed at the rate of its principal supply (CGST Act, s. 8(a)).
 - **Combos:** taxed at their own rate.
-- **Charges are taxed too**, at the tenant's own rate — a service charge is consideration for the same supply, not something added after tax. The tenant's rate rather than an item's, because a bill spanning several slabs has no one principal supply to follow.
+- **Charges are taxed too**, at their own code's rate where one is picked (`Charge::taxRate()`) or the tenant's own where it is not — a service charge is consideration for the same supply, not something added after tax. Never an item's rate: a bill spanning several slabs has no one principal supply to follow, and a charge is its own supply besides. `tenant_settings.tax_overrides_item_rates` has no say here either way — it only ever reaches `MenuItem`/`MenuCombo::taxRate()` (`.ai/rules/charges.md`).
 
 **Every amount carries its split.** `App\Actions\Baskets\GstSplit` is where the halves are worked out, once, and it is the only place that arithmetic lives: the rate halves in basis points (`intdiv`, remainder to the state) so the two always add to the rate, and **each half's amount is worked out from its own rate**. The tax charged is what the two come to, not a figure worked out at the whole rate and then divided.
 

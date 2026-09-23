@@ -6,6 +6,7 @@ use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\Charges\Pages\ListCharges;
 use App\Models\Charge;
 use App\Models\Menu;
+use App\Models\TaxCode;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -85,6 +86,53 @@ it('types a fixed amount as money and stores it in minor units', function (): vo
         ->and($charge->rate)->toBeNull()
         ->and($charge->amountOn(50000))->toBe(2050)
         ->and($charge->amountOn(0))->toBe(2050);
+});
+
+it('fills a charge\'s tax rate and code from a picked tax code, and clears both when it is cleared', function (): void {
+    $tenant = Tenant::factory()->create();
+    Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $taxCode = TaxCode::factory()->ofTenant($tenant)->taxedAt(1800)->create(['code' => '996331']);
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    // fillForm() (which callAction() uses) skips reactive hooks, so a test
+    // writes what PricingFields::applyTaxCode() would have — a picked code,
+    // and the rate and number it copies — rather than triggering the picker.
+    Livewire::test(ListCharges::class)
+        ->callAction('create', [
+            'name' => [Locale::English->value => 'Service Charge'],
+            'calculation' => ChargeCalculation::Percentage->value,
+            'rate_percentage' => '10',
+            'tax_code_id' => $taxCode->getKey(),
+            'tax_rate_percentage' => '18',
+            'hsn_sac_code' => '996331',
+            'is_active' => true,
+        ])
+        ->assertHasNoActionErrors();
+
+    $charge = chargeNamed('Service Charge');
+
+    // A charge is its own supply, so its own code — distinct from `rate`,
+    // which is what this charge itself adds to a bill.
+    expect($charge->tax_rate)->toBe(1800)
+        ->and($charge->hsn_sac_code)->toBe('996331');
+
+    // Clearing the picker clears both, which is how a charge goes back to
+    // following the tenant's own rate (Charge::taxRate()).
+    Livewire::test(ListCharges::class)
+        ->callAction(TestAction::make('edit')->table($charge), [
+            'name' => $charge->getTranslations('name'),
+            'calculation' => ChargeCalculation::Percentage->value,
+            'rate_percentage' => '10',
+            'tax_code_id' => null,
+            'tax_rate_percentage' => null,
+            'hsn_sac_code' => null,
+            'is_active' => true,
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($charge->refresh()->tax_rate)->toBeNull()
+        ->and($charge->hsn_sac_code)->toBeNull();
 });
 
 it('limits a charge to the menus chosen for it', function (): void {

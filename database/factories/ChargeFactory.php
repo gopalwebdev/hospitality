@@ -57,6 +57,16 @@ class ChargeFactory extends Factory
     }
 
     /**
+     * Taxed at its own $basisPoints, rather than following the tenant's rate.
+     */
+    public function taxedAt(int $basisPoints): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'tax_rate' => $basisPoints,
+        ]);
+    }
+
+    /**
      * A charge belonging to an existing tenant.
      */
     public function ofTenant(Tenant $tenant): static

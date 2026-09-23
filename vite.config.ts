@@ -90,7 +90,15 @@ export default defineConfig({
                 }),
             ],
         }),
-        inertia(),
+        // ssr: false at the plugin's own level — config/inertia.php's
+        // ssr.enabled only tells the PHP HttpGateway not to dispatch to an
+        // SSR renderer for the response it builds; it says nothing to Vite.
+        // Left at the plugin's default, @inertiajs/vite looks for an
+        // resources/js/ssr.tsx-shaped entry on every dev boot and, finding
+        // none, still opens the /__inertia_ssr dev endpoint and warms an SSR
+        // module graph that this app never uses — real work, on every
+        // `npm run dev`, for a server nothing ever asks. See .ai/rules/js.md.
+        inertia({ ssr: false }),
         react(),
         babel({
             presets: [reactCompilerPreset()],

@@ -94,6 +94,22 @@ class ChargeForm
                             ->required(fn (Get $get): bool => self::calculation($get) === ChargeCalculation::FixedAmount),
                     ]),
 
+                // A charge is its own supply, never an item's: the picker and
+                // the two fields it fills are exactly MenuItemForm's, and
+                // blank still means "the tenant's own rate" (Charge::taxRate()).
+                // tenant_settings.tax_overrides_item_rates has no say here
+                // either way — it only ever reaches an item or a combo.
+                Section::make(__('panel.charges.tax_section'))
+                    ->icon(Heroicon::OutlinedReceiptPercent)
+                    ->schema([
+                        PricingFields::taxCodePicker()
+                            ->columnSpanFull(),
+
+                        PricingFields::taxRatePercentage(),
+                        PricingFields::hsnSacCode(),
+                    ])
+                    ->columns(2),
+
                 Section::make(__('panel.charges.where_section'))
                     ->icon(Heroicon::OutlinedBookOpen)
                     ->schema([
@@ -170,11 +186,18 @@ class ChargeForm
             ? null
             : PricingFields::currency()->toMinorUnits($data['amount']);
 
-        // `amount` is typed in rupees and stored in paise under the same
-        // name, so it was converted in place above; only `rate_percentage`,
-        // which has no column, is dropped. Unsetting `amount` here would
-        // throw the converted value away.
-        unset($data['rate_percentage']);
+        // Whatever the picker filled, or null — which is "the tenant's own
+        // rate" (Charge::taxRate()). Not `rate`: that is what this charge
+        // itself adds to a bill, a different number from what it is taxed at.
+        $data['tax_rate'] = blank($data['tax_rate_percentage'] ?? null)
+            ? null
+            : PricingFields::toBasisPoints($data['tax_rate_percentage']);
+
+        // `amount` and `hsn_sac_code` are typed and stored under the same
+        // name, so they were converted (or left alone) in place above; only
+        // the two percentage fields, which have no column of their own, are
+        // dropped. Unsetting `amount` here would throw the converted value away.
+        unset($data['rate_percentage'], $data['tax_rate_percentage']);
 
         return $data;
     }
@@ -194,6 +217,10 @@ class ChargeForm
         $data['amount'] = blank($data['amount'] ?? null)
             ? null
             : PricingFields::currency()->toMajorUnits((int) $data['amount']);
+
+        $data['tax_rate_percentage'] = blank($data['tax_rate'] ?? null)
+            ? null
+            : PricingFields::toPercentage((int) $data['tax_rate']);
 
         return $data;
     }

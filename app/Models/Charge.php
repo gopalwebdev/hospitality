@@ -19,12 +19,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * Something added to a guest's bill beyond what they order: a service charge, a packing charge,
  * a room-service fee. A share of the bill or a fixed amount, on the menus attached to it.
  *
+ * `tax_rate` and `hsn_sac_code` are **normally null**, meaning "the tenant's own
+ * rate" — a charge is its own supply, taxed with the order rather than folded
+ * into any one item's rate, and never touched by `tenant_settings.tax_overrides_item_rates`,
+ * which only ever reaches `MenuItem`/`MenuCombo::taxRate()`. They are here for
+ * the tenant that wants to state a charge's own code — a service charge filed
+ * under its own SAC rather than the tenant's blended default. See `.ai/rules/tax-codes.md`.
+ *
  * @property int $id
  * @property int $tenant_id
  * @property string $name
  * @property ChargeCalculation $calculation
  * @property int|null $rate
  * @property int|null $amount
+ * @property int|null $tax_rate basis points; null follows the tenant's own rate
+ * @property string|null $hsn_sac_code
  * @property bool $is_active
  * @property int $position
  * @property CarbonImmutable|null $created_at
@@ -35,6 +44,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
     'calculation',
     'rate',
     'amount',
+    'tax_rate',
+    'hsn_sac_code',
     'is_active',
     'position',
 ])]
@@ -91,6 +102,14 @@ class Charge extends Model
     }
 
     /**
+     * The rate this charge is taxed at: its own where it states one, otherwise the tenant's.
+     */
+    public function taxRate(int $tenantRate): int
+    {
+        return $this->tax_rate ?? $tenantRate;
+    }
+
+    /**
      * @param  Builder<$this>  $query
      */
     public function scopeActive(Builder $query): void
@@ -125,6 +144,7 @@ class Charge extends Model
             'calculation' => ChargeCalculation::class,
             'rate' => 'integer',
             'amount' => 'integer',
+            'tax_rate' => 'integer',
             'is_active' => 'boolean',
             'position' => 'integer',
         ];

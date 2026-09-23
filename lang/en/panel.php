@@ -305,6 +305,7 @@ return [
         'rate' => 'Rate',
         'amount' => 'Amount',
         'adds' => 'Adds',
+        'tax_section' => 'Tax',
         'where_section' => 'Where it applies',
         'menus' => 'Menus',
         'menus_invalid' => 'Pick only this tenant\'s menus.',

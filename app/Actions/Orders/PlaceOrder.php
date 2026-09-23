@@ -174,16 +174,18 @@ final readonly class PlaceOrder
             return;
         }
 
-        $names = $this->named(Charge::query(), array_column($charges, 'id'), ['id', 'name']);
+        $named = $this->named(Charge::query(), array_column($charges, 'id'), ['id', 'name', 'hsn_sac_code']);
 
         foreach ($charges as $position => $charge) {
             $orderCharge = new OrderCharge([
                 'charge_id' => $charge['id'],
-                'name' => $names->get($charge['id'])?->getTranslations('name') ?? [Locale::default()->value => $charge['name']],
+                'name' => $named->get($charge['id'])?->getTranslations('name') ?? [Locale::default()->value => $charge['name']],
                 'amount' => $charge['amount'],
                 'tax_rate' => $charge['taxParts']->rate(),
                 'taxable_value' => $charge['taxableValue'],
                 ...$charge['taxParts']->columns(),
+                // Copied, because the charge may be recoded or deleted later.
+                'hsn_sac_code' => $named->get($charge['id'])?->hsn_sac_code,
                 'position' => $position,
             ]);
 

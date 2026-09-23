@@ -403,7 +403,7 @@ class PriceBasket
         }
 
         return array_values(Charge::query()
-            ->select(['id', 'name', 'calculation', 'rate', 'amount'])
+            ->select(['id', 'name', 'calculation', 'rate', 'amount', 'tax_rate'])
             ->where('tenant_id', $tenant->getKey())
             ->active()
             ->forMenu($menu->getKey())
@@ -413,11 +413,12 @@ class PriceBasket
                 $amount = $charge->amountOn($subtotal);
 
                 // A service charge is consideration for the same supply, so it
-                // is taxed rather than added after tax. At the tenant's own
-                // rate: a bill spanning several slabs has no one principal
-                // supply to follow, and the tenant's rate is what it charges
-                // for serving. An item's own rate is for the item.
-                $tax = GstSplit::on($amount, $tenantRate, $pricesIncludeTax);
+                // is taxed rather than added after tax. At its own code's rate
+                // where it has one, the tenant's own where it does not — never
+                // an item's: a bill spanning several slabs has no one
+                // principal supply to follow, and tax_overrides_item_rates has
+                // no say here either way (Charge::taxRate()).
+                $tax = GstSplit::on($amount, $charge->taxRate($tenantRate), $pricesIncludeTax);
 
                 return [
                     'id' => $charge->getKey(),

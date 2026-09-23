@@ -18,7 +18,8 @@ return new class extends Migration
             // What it added to this bill, worked out when the order was placed.
             $table->integer('amount');
             // A charge is part of the value of the supply and is taxed with it,
-            // at the tenant's own rate. Shaped exactly as a line's tax is, so an
+            // at its own code's rate or the tenant's own where it named none
+            // (Charge::taxRate()). Shaped exactly as a line's tax is, so an
             // invoice prints a charge and an item the same way.
             $table->smallInteger('tax_rate')->default(0);
             $table->integer('taxable_value')->default(0);
@@ -26,6 +27,9 @@ return new class extends Migration
             $table->integer('cgst')->default(0);
             $table->smallInteger('sgst_rate')->default(0);
             $table->integer('sgst')->default(0);
+            // Copied from the charge, because the charge may be recoded or
+            // deleted later and an invoice names a code per line.
+            $table->string('hsn_sac_code', 8)->nullable();
             $table->integer('position')->default(0);
             $table->timestamps();
         });

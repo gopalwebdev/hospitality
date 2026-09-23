@@ -200,9 +200,11 @@ class Settings extends Page
                     ->columnSpanFull(),
 
                 // Live, because the two rates above are only editable while
-                // this is on — see halfRate().
+                // this is on — see halfRate(). Items and combos only: a
+                // charge is never governed by this toggle either way — see
+                // the note on halfRate() below.
                 Toggle::make('tax_overrides_item_rates')
-                    ->label('Use this one rate for everything, ignoring item codes')
+                    ->label('Use this one rate for every item, ignoring item codes')
                     ->live()
                     ->columnSpanFull(),
 
@@ -223,15 +225,19 @@ class Settings extends Page
     /**
      * One half of the rate, typed the way an accountant quotes it.
      *
-     * **Editable only while "use this one rate for everything" is on**, on the
+     * **Editable only while "use this one rate for every item" is on**, on the
      * project owner's instruction: with it off, every item and combo takes its
      * rate from the code picked on it, so a number typed here would not be what
      * anything on the menu is taxed at.
      *
-     * It is still `dehydrated()` while disabled, and that matters — the stored
-     * rate is what a **charge** is taxed at either way (`PriceBasket::charges()`),
-     * so dropping it from the save would quietly untax every service charge.
-     * Changing it means turning the toggle on, editing, and turning it back off.
+     * It is still `dehydrated()` while disabled, and that matters for a reason
+     * that has nothing to do with items: this is also every **charge's**
+     * fallback rate, whatever the toggle says (`Charge::taxRate()`,
+     * `PriceBasket::charges()`) — a charge with no code of its own is taxed at
+     * it, and one with a code of its own ignores it completely. Dropping this
+     * field from the save while disabled would quietly untax every charge
+     * that has never been given its own code. Changing it means turning the
+     * toggle on, editing, and turning it back off.
      */
     private function halfRate(string $name, string|Closure $label): TextInput
     {

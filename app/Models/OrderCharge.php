@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $cgst
  * @property int $sgst_rate
  * @property int $sgst
+ * @property string|null $hsn_sac_code
  * @property int $position
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -38,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'cgst',
     'sgst_rate',
     'sgst',
+    'hsn_sac_code',
     'position',
 ])]
 class OrderCharge extends Model
