@@ -116,6 +116,13 @@ What is added to a bill beyond the price — a service charge, a packing charge,
 
 The guest menu lists only the charges its own menu carries, and adds them to the basket a guest keeps on their phone through `App\Actions\Baskets\PriceBasket` and `Charge::amountOn()`. Nothing is ordered yet: the basket is shown to a member of staff (`.ai/rules/js.md`). See `.ai/rules/models.md` for the pairing rules.
 
+## Where an order goes, and how it is paid for
+Two modules added together, because an order needs both: `locations` says where it goes and `payments` says what was taken for it.
+
+**Locations** are one generic module — `App\Enums\LocationKind` is `Room`, `Table`, `Area` or `Zone` — rather than separate Rooms and Tables, because this is one product for hotels, restaurants and hospitals. A hotel lists rooms, a restaurant tables, both list a few delivery points like a pool, and a zone groups them a floor or a terrace at a time without ever being a destination itself. A tenant's `type` decides which kinds it is offered and nothing else. `orders.location_id` names one and `orders.location_name` keeps a copy, so renaming or deleting a location never rewrites an order. Assigning a guest to a room or table is a **later** feature. See `.ai/rules/locations.md`.
+
+**Payments** are what staff actually took — cash, UPI, a card — with an optional transaction number and the specific machine or QR code it went through. A payment is one transaction and settles as many orders as it cleared, through `order_payments` carrying an allocated amount: one swipe clears a whole stay at checkout, and one bill splits across two methods. There is **no payment gateway**; staff record money that has already changed hands. A payment is voided, never deleted, and `orders.settlement` (`PayNow` / `AddToBill`) records the guest's intent rather than the truth about the money. See `.ai/rules/payments.md`.
+
 ## Two languages a tenant writes in; the application itself is English
 `App\Enums\Locale` has one case per language a tenant may write its menu in — English and Tamil for now — and is the single source of truth: the cookie middleware validates against it, the toggle is built from it, and every translated column stores one key per case. English is the default, the fallback, and the only language an admin form requires.
 

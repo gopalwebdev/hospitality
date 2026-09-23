@@ -8,10 +8,12 @@ use App\Actions\Inventory\StockDemand;
 use App\Enums\Locale;
 use App\Enums\OrderLineType;
 use App\Enums\OrderRefusal;
+use App\Enums\OrderSettlement;
 use App\Enums\StockMovementReason;
 use App\Exceptions\InsufficientStock;
 use App\Exceptions\OrderRefused;
 use App\Models\Charge;
+use App\Models\Location;
 use App\Models\Menu;
 use App\Models\MenuAddOnOption;
 use App\Models\MenuCombo;
@@ -58,8 +60,15 @@ final readonly class PlaceOrder
      * @throws OrderRefused when ordering is off, the menu is not being served, or a line no longer stands
      * @throws InsufficientStock when a counted item or option has fewer left than the basket asks for
      */
-    public function __invoke(Tenant $tenant, Menu $menu, array $lines, ?string $locationLabel = null, ?string $note = null): Order
-    {
+    public function __invoke(
+        Tenant $tenant,
+        Menu $menu,
+        array $lines,
+        ?Location $location = null,
+        OrderSettlement $settlement = OrderSettlement::AddToBill,
+        ?string $locationLabel = null,
+        ?string $note = null,
+    ): Order {
         throw_unless($tenant->isOpenAt(), OrderRefused::class, OrderRefusal::StoreClosed);
 
         throw_unless($menu->isBeingServedAt(), OrderRefused::class, OrderRefusal::NotBeingServed);
@@ -72,9 +81,20 @@ final readonly class PlaceOrder
             }
         }
 
-        return DB::transaction(function () use ($tenant, $menu, $lines, $locationLabel, $note, $priced): Order {
+        // A picked location wins over typed free text — copied in every
+        // language it has, so an order is a copy just as its lines are.
+        // Free text is stored under the default locale only, the same shape
+        // copyCharges() already uses for a charge with no row to copy from.
+        $locationName = match (true) {
+            $location instanceof Location => $location->getTranslations('name'),
+            is_string($locationLabel) && $locationLabel !== '' => [Locale::default()->value => $locationLabel],
+            default => null,
+        };
+
+        return DB::transaction(function () use ($tenant, $menu, $lines, $location, $settlement, $locationName, $note, $priced): Order {
             $order = new Order([
-                'location_label' => $locationLabel,
+                'location_name' => $locationName,
+                'settlement' => $settlement,
                 'note' => $note,
                 'subtotal' => $priced['subtotal'],
                 // The split and what the state's half is called as the bill was
@@ -89,7 +109,11 @@ final readonly class PlaceOrder
                 'prices_include_tax' => $priced['pricesIncludeTax'],
             ]);
 
-            $order->forceFill(['tenant_id' => $tenant->getKey(), 'menu_id' => $menu->getKey()])->save();
+            $order->forceFill([
+                'tenant_id' => $tenant->getKey(),
+                'menu_id' => $menu->getKey(),
+                'location_id' => $location?->getKey(),
+            ])->save();
 
             ($this->applyStockChanges)(($this->stockDemand)($lines), StockMovementReason::OrderPlaced, $order);
 

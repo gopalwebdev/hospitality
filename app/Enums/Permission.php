@@ -19,6 +19,16 @@ enum Permission: string
     case OrderViewOwn = 'order.view-own';
     case OrderViewAny = 'order.view-any';
     case OrderManage = 'order.manage';
+
+    /** Read what has been paid on an order, by what method, and by whom. */
+    case PaymentView = 'payment.view';
+
+    /** Record a payment against one or more orders. */
+    case PaymentRecord = 'payment.record';
+
+    /** Reverse a payment already recorded. Kept separate from recording one: reversing money is an owner's call. */
+    case PaymentVoid = 'payment.void';
+
     case UserManage = 'user.manage';
 
     /** See the tiles a guest lands on. Everyone who reads a menu holds this. */
@@ -29,6 +39,9 @@ enum Permission: string
 
     /** Change one tenant's own configuration. */
     case SettingsManage = 'settings.manage';
+
+    /** Manage a tenant's rooms, tables and delivery points. */
+    case LocationManage = 'location.manage';
 
     /** Product-team-level: create, suspend, and delete tenants. */
     case TenantManage = 'tenant.manage';

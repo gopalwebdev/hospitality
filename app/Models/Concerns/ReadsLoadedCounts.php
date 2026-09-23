@@ -12,16 +12,26 @@ namespace App\Models\Concerns;
 trait ReadsLoadedCounts
 {
     /**
-     * A withCount() value already loaded, or null when it was not.
+     * A withCount() or withSum() value already loaded, or null when it was not.
      *
      * Read straight out of the attribute array rather than through __get:
      * under Model::shouldBeStrict() touching an attribute that was never
      * selected throws, and "not loaded" is the ordinary case here, not a bug.
+     *
+     * A withSum() with nothing to sum comes back as SQL NULL, which is a
+     * loaded answer of zero — not "not loaded" — so the two are told apart by
+     * whether the key exists at all, never by whether its value is null.
+     * Conflating them sent every row with nothing to sum back to a fresh
+     * query, silently reintroducing the N+1 the loaded value existed to avoid.
      */
     protected function loadedCount(string $key): ?int
     {
-        $value = $this->getAttributes()[$key] ?? null;
+        $attributes = $this->getAttributes();
 
-        return $value === null ? null : (int) $value;
+        if (! array_key_exists($key, $attributes)) {
+            return null;
+        }
+
+        return $attributes[$key] === null ? 0 : (int) $attributes[$key];
     }
 }

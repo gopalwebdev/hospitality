@@ -64,6 +64,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 
 **An order is a copy.**
 - `orders` keeps its totals as priced, and its GST as levied: `is_union_territory` (what the state's half was called), `tax`, and the `cgst` / `sgst` the two of which add up to it.
+- `orders.location_name` is a translated `jsonb` copy of where it went, beside a `nullOnDelete` `location_id`, so renaming or deleting Room 204 never rewrites an order delivered there. A guest who typed free text instead of picking stores it under the default locale. See `.ai/rules/locations.md`.
 - `order_lines` and `order_charges` each keep their own `taxable_value`, `tax_rate` and split, and each keeps a copy of its `hsn_sac_code` — an item's, a combo's or a charge's own where it states one — because a tax invoice names a code per line and the source may be recoded or deleted later. See `.ai/rules/actions-menus.md`.
 - `order_lines`, `order_line_choices` and `order_charges` keep names as `jsonb` in every language and money as it was then.
 - Their keys to the menu are `nullOnDelete`, so deleting or renaming an item never rewrites an order.
@@ -74,6 +75,7 @@ The reads of placing an order do not grow with its lines (`PlaceOrderTest`); the
 ## Cancelling reverses the order's own movements
 `CancelOrder`:
 - locks the order, and refuses one that is not placed (`LogicException`)
+- **refuses one a live payment still stands against**, naming it: staff void the payment first, which stops stock coming back while money sits recorded against an order that no longer exists (`.ai/rules/payments.md`)
 - adds back, per row, the sum of that order's `order-placed` movements — never a recomputation from its lines, because a combo's contents or an option may have changed since
 - gives nothing back to a row nobody counts any more
 - sets `status` to cancelled together with `cancelled_at` (the observer's job now that the CHECK constraint is gone)
@@ -98,13 +100,20 @@ Filament saves every field a form holds, and the options repeater saves every ro
 - **Orders** (`OrderResource`, top of the navigation): the list, one order's page, and **Cancel order** (`OrderPolicy::cancel()`, which is `order.manage`). Nothing is created, edited or deleted: `OrderPolicy` answers false.
 
 ## Not built yet
-- The guest app placing orders and reading `shortages`.
-- Order statuses between placed and cancelled, order numbers, and payments.
+- The guest app placing orders and reading `shortages`. The API takes `locationId` and `settlement`; nothing on the phone sends them yet.
+- Order statuses between placed and cancelled, and order numbers.
+- Assigning a guest to a room or table (`.ai/rules/locations.md`).
 - Low-stock alerts and a daily reset of counts.
 - **Idempotency.** A phone retrying the POST would place a second order. This has to be solved before the app places orders.
+
+**Payments are built** — see `.ai/rules/payments.md`. `payments` and `order_payments` record what staff actually took and which orders it cleared, and `orders.settlement` carries the guest's intent to pay now or add it to the bill.
 
 Tests:
 - `tests/Feature/Tenant/PlaceOrderTest.php`
 - `tests/Feature/Tenant/StockManagementTest.php`
 - `tests/Feature/Tenant/OrderManagementTest.php`
 - `tests/Feature/Tenant/BasketPriceTest.php`
+- `tests/Feature/Tenant/PaymentTest.php`
+- `tests/Feature/Tenant/CheckoutTest.php`
+- `tests/Feature/Tenant/LocationManagementTest.php`
+- `tests/Feature/Tenant/PaymentDeviceManagementTest.php`

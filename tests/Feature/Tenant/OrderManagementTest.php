@@ -57,7 +57,7 @@ function placedOrderOf(MenuItem $item, int $quantity): Order
         Tenant::query()->findOrFail($item->tenant_id),
         Menu::query()->withoutGlobalScopes()->findOrFail($category->menu_id),
         [['key' => 'item-'.$item->getKey(), 'type' => PriceBasket::ITEM, 'id' => $item->getKey(), 'quantity' => $quantity, 'choices' => []]],
-        'Room 204',
+        locationLabel: 'Room 204',
     );
 }
 
@@ -116,6 +116,27 @@ it('cancels an order from the list, putting back what it took', function (): voi
     expect($order->refresh()->status)->toBe(OrderStatus::Cancelled)
         ->and($item->refresh()->stock_quantity)->toBe(2)
         ->and($item->availability)->toBe(ItemAvailability::Available);
+});
+
+it('cancels an order from its own page, which loads its payments too', function (): void {
+    $tenant = Tenant::factory()->create();
+    $item = orderableItemFor($tenant, stock: 2);
+    $order = placedOrderOf($item, 2);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    // From ViewOrder rather than the list, deliberately. That page's
+    // route-binding query eager-loads paymentAllocations.payment.paymentDevice
+    // and an amount_paid sum, and Eloquent's refresh() reloads neither a
+    // nested dot-path relation nor an aggregate — so redrawing the infolist
+    // after the action used to lazy-load under strict mode. The list path
+    // never caught it because its query loads none of that.
+    Livewire::test(ViewOrder::class, ['record' => $order->getKey()])
+        ->callAction(TestAction::make('cancel'))
+        ->assertHasNoActionErrors();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled)
+        ->and($item->refresh()->stock_quantity)->toBe(2);
 });
 
 it('offers no cancel on an order already cancelled', function (): void {

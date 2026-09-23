@@ -59,19 +59,34 @@ An `App\Enums\GstTreatment` enum held three cases — `IntraState`, `UnionTerrit
 
 **It is not worked out from where the tenant is.** A `GstStateCode` enum listing all 37 state codes and which union territories have a legislature was written and deleted: that is tax policy baked into the code, and the project owner's instruction is that a tenant states it. A tenant that moves, or whose accountant disagrees, flips a toggle.
 
-## A tenant's type is data, and decides nothing yet
-`tenants.type` is `App\Enums\TenantType`: required on TenantForm with no default, editable by the product team, shown and filtered on in the tenants table, and CHECK-constrained as `tenants_type_is_known`, which its migration builds from the enum's cases. No copy varies by it — the application says "tenant" to everyone (`.ai/rules/lang.md`), and the enum's cases are the only place a kind of business is named.
+## A tenant's type decides exactly one thing: which kinds of location it is offered
+**This replaces the rule that said the type decides nothing.** `tenants.type` is `App\Enums\TenantType`: required on TenantForm with no default, editable by the product team, shown and filtered on in the tenants table. No *copy* varies by it — the application still says "tenant" to everyone (`.ai/rules/lang.md`), and the enum's cases are still the only place a kind of business is named.
 
-When a feature first differs by type, put the difference on the enum as a method per question (like `HomeRowLayout`), never string comparisons at the call site — and revisit whether the type may still be edited once data depends on it.
+What it now decides, and nothing more:
+
+- **`locationKinds()`** — what `LocationForm` offers. Hotel and Hospital get `[Room, Area, Zone]`, Restaurant gets `[Table, Area, Zone]`, so a hotel is never invited to file something as a Table.
+- **`defaultLocationKind()`** — which of those the form preselects, and which the seeder starts a tenant with.
+
+This followed the rule's own advice: the difference is **a method per question on the enum**, never a string comparison at a call site (the `HomeRowLayout` shape). Do the same for the next one.
+
+**The type stays editable, and changing it rewrites nothing.** That was the open question this rule used to flag, and the answer is that an existing `locations` row keeps its `kind` whatever the tenant later becomes; `LocationForm` adds the record's own kind to the option list so a row created under the old type can still be opened. Nothing migrates and nothing is silently re-filed. Keep any future type-dependent feature to the same standard — a type is a starting point, not something data is rewritten to match. See `.ai/rules/locations.md`.
 
 ## A menu block's type says what it is, and whether every menu has one
 `App\Enums\MenuRailType` (`Featured`, `Combos`) is the `type` of a `menu_rails` row. It replaced a `MenuRail` enum of the same two cases whose job was naming a `position` column on `menus` for each. `isOnEveryMenu()` is the one question that changes how a type is read: true means exactly one per menu with no row until it is placed (`Menu::readingOrder()` fills it in at 0), false — for a kind a menu may hold several of, such as a banner — means only its rows exist. `label()` is what the panel calls it. Adding a case is covered in `.ai/rules/menus.md`; `menu_rails_type_is_known` is rebuilt from the cases by `migrate:fresh`.
 
-## Orders and stock carry four small enums
+## Orders, stock, locations and money carry ten small enums
 - **`OrderStatus`:** `Placed`, `Cancelled`. The steps staff move an order through arrive with the screens that move it; `orders_status_is_known` is built from the cases.
 - **`OrderLineType`:** `Item`, `Combo` — the same words as `PriceBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
 - **`StockMovementReason`:** `Restock`, `Count`, `OrderPlaced`, `OrderCancelled`, with `label()` and `color()` for the history table.
 - **`OrderRefusal`:** why an order was refused, sent to the guest app as `reason` with `message()` from `lang/en/guest.php`. `InsufficientStock` is a case here too, so a refusal always answers with the same field. `StoreClosed` replaced `NotAcceptingOrders` when the switch it named became weekly opening hours.
+- **`LocationKind`:** `Room`, `Table`, `Area`, `Zone`, carrying the two questions that keep a zone out of an order — `isDeliverable()` and `canHoldChildren()`, with `deliverableValues()` for queries (`.ai/rules/locations.md`).
+- **`OrderSettlement`:** `PayNow`, `AddToBill` — the guest's **intent**, never the truth about the money.
+- **`PaymentMethod`:** `Cash`, `Upi`, `CreditCard`, `DebitCard`, carrying `deviceKind()` and `takesReference()` — the single place it is said which device a method may name and whether it carries a transaction number.
+- **`PaymentDeviceKind`:** `CardMachine`, `QrCode`.
+- **`PaymentState`:** `Unpaid`, `PartlyPaid`, `Paid`. **No column** — worked out from what an order has been paid against its total, so it cannot disagree with the money.
+- **`PaymentRefusal`:** why a payment was refused, carried by `PaymentRefused` and rendered 422, the `OrderRefusal` shape.
+
+See `.ai/rules/payments.md`.
 
 ## A weekday is an enum, and hours repeat weekly
 `App\Enums\Weekday` (Monday…Sunday) is the `weekday` of a `tenant_opening_hours` row. `week()` is the week in the order it is read and worked, Monday first, and is what the Settings page and the seeder iterate; `on(CarbonImmutable)` names the day a moment falls on, and `previous()` exists for a window that runs past midnight. `tenant_opening_hours_weekday_is_known` is built from its cases.

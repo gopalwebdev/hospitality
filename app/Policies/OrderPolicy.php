@@ -57,4 +57,12 @@ class OrderPolicy
     {
         return $user->can(Permission::OrderManage->value);
     }
+
+    /**
+     * Record a payment against this order.
+     */
+    public function recordPayment(User $user, Order $order): bool
+    {
+        return $user->can(Permission::PaymentRecord->value);
+    }
 }

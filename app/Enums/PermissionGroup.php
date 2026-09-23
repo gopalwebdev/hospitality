@@ -100,9 +100,9 @@ enum PermissionGroup: string
     {
         return match ($this) {
             self::Menu => ['menu'],
-            self::Orders => ['order'],
+            self::Orders => ['order', 'payment'],
             self::People => ['user'],
-            self::Tenant => ['settings', 'storefront'],
+            self::Tenant => ['settings', 'storefront', 'location'],
             self::ProductTeam => ['tenant', 'role', 'permission'],
             self::Other => [],
         };

@@ -45,6 +45,11 @@ enum Role: string
                 Permission::StorefrontView,
                 Permission::OrderViewAny,
                 Permission::OrderManage,
+                // Not PaymentVoid: reversing money already taken is an
+                // owner's call, so Owner holds it only through the
+                // everyPermissionExcept() default above.
+                Permission::PaymentView,
+                Permission::PaymentRecord,
             ],
 
             // A guest reads the menu and orders for themselves. view-own

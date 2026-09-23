@@ -3,12 +3,15 @@
 namespace App\Filament\Tenant\Resources\Orders\Schemas;
 
 use App\Enums\Currency;
+use App\Enums\OrderSettlement;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Filament\Schemas\PricingFields;
 use App\Models\Order;
 use App\Models\OrderCharge;
 use App\Models\OrderLine;
 use App\Models\OrderLineChoice;
+use App\Models\OrderPayment;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
@@ -22,8 +25,10 @@ use Filament\Support\Icons\Heroicon;
  * One order as it was placed: where it goes, what was in it, and what it came to.
  *
  * Every name and amount here is the copy the order kept, so an item renamed or
- * repriced since still reads as the guest ordered it. The lines, their choices
- * and the charges arrive loaded with the record (OrderResource).
+ * repriced since still reads as the guest ordered it. The lines, their choices,
+ * the charges and the payments that settled it arrive loaded with the record
+ * (OrderResource). Read-only throughout: voiding a payment lives on the
+ * Payments page, in one place.
  */
 class OrderInfolist
 {
@@ -50,13 +55,19 @@ class OrderInfolist
                             ->label(__('panel.orders.placed_at'))
                             ->dateTime(),
 
-                        TextEntry::make('location_label')
+                        TextEntry::make('location_name')
                             ->label(__('panel.orders.location'))
                             ->placeholder('—'),
 
                         TextEntry::make('menu.name')
                             ->label(__('panel.categories.menu'))
                             ->placeholder('—'),
+
+                        TextEntry::make('settlement')
+                            ->label(__('panel.orders.settlement'))
+                            ->badge()
+                            ->formatStateUsing(fn (OrderSettlement $state): string => $state->label())
+                            ->color(fn (OrderSettlement $state): string => $state->color()),
 
                         TextEntry::make('cancelled_at')
                             ->label(__('panel.orders.cancelled_at'))
@@ -130,6 +141,57 @@ class OrderInfolist
 
                         TextEntry::make('total')
                             ->label(__('panel.orders.total'))
+                            ->formatStateUsing($money)
+                            ->weight(FontWeight::Bold),
+                    ]),
+
+                Section::make(__('panel.orders.payments_section'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->compact()
+                    ->schema([
+                        RepeatableEntry::make('paymentAllocations')
+                            ->hiddenLabel()
+                            ->placeholder(__('panel.orders.no_payments'))
+                            ->table([
+                                TableColumn::make(__('panel.payments.method')),
+                                TableColumn::make(__('panel.payments.device')),
+                                TableColumn::make(__('panel.payments.reference')),
+                                TableColumn::make(__('panel.payments.amount'))->alignment(Alignment::End),
+                                TableColumn::make(__('panel.payments.recorded_by')),
+                                TableColumn::make(__('panel.payments.paid_at')),
+                                TableColumn::make(__('panel.payments.voided')),
+                            ])
+                            ->schema([
+                                TextEntry::make('payment.method')
+                                    ->badge()
+                                    ->formatStateUsing(fn (PaymentMethod $state): string => $state->label())
+                                    ->color(fn (PaymentMethod $state): string => $state->color()),
+
+                                TextEntry::make('payment.paymentDevice.name')
+                                    ->placeholder('—'),
+
+                                TextEntry::make('payment.reference')
+                                    ->placeholder('—'),
+
+                                TextEntry::make('amount')
+                                    ->formatStateUsing($money),
+
+                                TextEntry::make('payment.recordedBy.name')
+                                    ->placeholder('—'),
+
+                                TextEntry::make('payment.paid_at')
+                                    ->dateTime(),
+
+                                TextEntry::make('voided')
+                                    ->state(fn (OrderPayment $allocation): bool => $allocation->payment->isVoided())
+                                    ->formatStateUsing(fn (bool $state): string => $state ? __('panel.shared.yes') : __('panel.shared.no'))
+                                    ->badge()
+                                    ->color(fn (bool $state): string => $state ? 'danger' : 'success'),
+                            ]),
+
+                        TextEntry::make('amount_outstanding')
+                            ->label(__('panel.orders.outstanding'))
+                            ->state(fn (Order $record): int => $record->amountOutstanding())
                             ->formatStateUsing($money)
                             ->weight(FontWeight::Bold),
                     ]),

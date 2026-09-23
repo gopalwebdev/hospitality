@@ -433,6 +433,10 @@ it('seeds staff who work orders but do not change the menu', function (): void {
         PermissionEnum::StorefrontView->value,
         PermissionEnum::OrderViewAny->value,
         PermissionEnum::OrderManage->value,
+        // Staff read what has been paid and take a payment; reversing one
+        // already taken stays an owner's call (PermissionEnum::PaymentVoid).
+        PermissionEnum::PaymentView->value,
+        PermissionEnum::PaymentRecord->value,
     ])
         ->and($staff->hasPermissionTo(PermissionEnum::MenuManage->value))->toBeFalse()
         // Reading the home screen is not arranging it.

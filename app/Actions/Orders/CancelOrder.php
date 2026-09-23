@@ -11,6 +11,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -21,13 +22,18 @@ use LogicException;
  * from its lines: a combo's contents or an option's count may have changed
  * since, and only the movements say what was actually taken. A row nobody counts
  * any more gets nothing back, and a row deleted since took its movements with it.
+ *
+ * Also refuses an order a live (unvoided) payment still stands against, before
+ * anything is written: staff void the payment first, which is the auditable
+ * order and stops stock coming back while money sits recorded against an order
+ * that no longer exists.
  */
 final readonly class CancelOrder
 {
     public function __construct(private ApplyStockChanges $applyStockChanges) {}
 
     /**
-     * @throws LogicException when the order has already been cancelled
+     * @throws LogicException when the order has already been cancelled, or a live payment still stands against it
      */
     public function __invoke(Order $order, ?User $user = null): void
     {
@@ -40,6 +46,16 @@ final readonly class CancelOrder
                 ->firstOrFail(['id', 'tenant_id', 'status', 'cancelled_at']);
 
             throw_unless($locked->isPlaced(), LogicException::class, 'Only a placed order can be cancelled.');
+
+            $livePaymentId = $locked->paymentAllocations()
+                ->whereHas('payment', fn (Builder $payment): Builder => $payment->live())
+                ->value('payment_id');
+
+            throw_if(
+                $livePaymentId !== null,
+                LogicException::class,
+                sprintf('Payment #%d still stands against this order; void it before cancelling.', $livePaymentId),
+            );
 
             $taken = StockMovement::query()
                 ->where('order_id', $locked->getKey())

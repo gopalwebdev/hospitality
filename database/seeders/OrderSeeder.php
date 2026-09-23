@@ -8,6 +8,8 @@ use App\Actions\Inventory\RecordStockMovement;
 use App\Actions\Inventory\StockChange;
 use App\Actions\Orders\CancelOrder;
 use App\Actions\Orders\PlaceOrder;
+use App\Actions\Payments\RecordPayment;
+use App\Actions\Payments\VoidPayment;
 use App\Enums\Role;
 use App\Enums\StockMovementReason;
 use App\Models\Menu;
@@ -67,6 +69,14 @@ use Illuminate\Support\Facades\Date;
  * the moment it already has any order at all. Re-seeding an existing
  * database is safe; it simply leaves a tenant's orders as they stood.
  *
+ * Every tenant's block also settles some of what it placed, through the same
+ * App\Actions\Payments\RecordPayment and App\Actions\Payments\VoidPayment a
+ * member of staff would use from the panel: at least one order paid in full,
+ * one paid in part and left outstanding, one settled and then voided back to
+ * outstanding, and the rest left owing money entirely — so a fresh install's
+ * Orders and Payments pages both have something to read on every payment
+ * state rather than a wall of Unpaid.
+ *
  * @phpstan-import-type BasketLine from PriceBasket
  */
 class OrderSeeder extends Seeder
@@ -79,6 +89,8 @@ class OrderSeeder extends Seeder
         CancelOrder $cancelOrder,
         ApplyStockChanges $applyStockChanges,
         RecordStockMovement $recordStockMovement,
+        RecordPayment $recordPayment,
+        VoidPayment $voidPayment,
     ): void {
         $now = CarbonImmutable::now();
 

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Guest;
 
 use App\Actions\Orders\PlaceOrder;
+use App\Enums\OrderSettlement;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Guest\PlaceOrderRequest;
+use App\Models\Location;
 use App\Models\Menu;
 use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +33,27 @@ class PlaceOrderController extends Controller
         /** @var list<array{key: string, type: string, id: int, quantity: int, choices?: list<array{optionId: int, quantity: int}>}> $lines */
         $lines = $request->validated('lines');
 
+        $locationId = $request->validated('locationId');
+        $location = null;
+
+        if (is_int($locationId)) {
+            // Resolved against the tenant by hand, exactly like the menu
+            // above: a scoped binding does not cover this because the tenant
+            // comes from the subdomain rather than the path. deliverable()
+            // refuses a Zone outright — nothing is ever ordered to one — so
+            // naming a Zone's id 404s the same as naming one that does not exist.
+            $location = Location::query()->deliverable()->find($locationId, ['id', 'tenant_id', 'is_active', 'name']);
+
+            abort_if($location === null, 404);
+            abort_unless($location->tenant_id === $tenant->getKey(), 404);
+            abort_unless($location->is_active, 404);
+        }
+
+        $settlementValue = $request->validated('settlement');
+        $settlement = is_string($settlementValue) ? OrderSettlement::from($settlementValue) : OrderSettlement::AddToBill;
+
+        // A picked location wins over typed free text; PlaceOrder is where
+        // that precedence is actually decided.
         $locationLabel = $request->validated('locationLabel');
         $note = $request->validated('note');
 
@@ -38,6 +61,8 @@ class PlaceOrderController extends Controller
             $tenant,
             $menu,
             $lines,
+            $location,
+            $settlement,
             is_string($locationLabel) ? $locationLabel : null,
             is_string($note) ? $note : null,
         );

@@ -16,11 +16,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Inventory/**, app/Actions/Orders/**, app/Filament/Tenant/Resources/Orders/**, app/Filament/Schemas/StockFields.php, app/Filament/Tables/StockActions.php, app/Models/Order.php, app/Models/OrderLine.php, app/Models/OrderLineChoice.php, app/Models/OrderCharge.php, app/Models/StockMovement.php | .ai/rules/inventory.md |
 | resources/js/** | .ai/rules/js.md |
 | lang/** | .ai/rules/lang.md |
+| app/Models/Location.php, app/Filament/Tenant/Resources/Locations/**, app/Actions/Locations/**, app/Observers/LocationObserver.php, app/Enums/LocationKind.php | .ai/rules/locations.md |
 | app/Filament/Tenant/Resources/Menus/** | .ai/rules/menus.md |
 | app/Http/Middleware/**, app/Http/Middleware/SetLocale.php | .ai/rules/middleware.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Models/User.php, app/Models/**, app/Models/MenuItem.php, app/Models/HomeTile.php | .ai/rules/models.md |
 | app/Actions/OneTimePasswords/** | .ai/rules/otp.md |
+| app/Models/Payment.php, app/Models/OrderPayment.php, app/Models/PaymentDevice.php, app/Actions/Payments/**, app/Filament/Tenant/Resources/Payments/**, app/Filament/Tenant/Resources/PaymentDevices/**, app/Enums/PaymentMethod.php, app/Enums/PaymentState.php, app/Enums/OrderSettlement.php | .ai/rules/payments.md |
 | app/Policies/** | .ai/rules/policies.md |
 | app/Providers/Filament/*.php, app/Providers/Filament/TenantPanelProvider.php | .ai/rules/providers-filament.md |
 | app/Providers/AppServiceProvider.php | .ai/rules/providers.md |

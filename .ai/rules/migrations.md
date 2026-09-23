@@ -6,7 +6,25 @@ paths:
 # Migrations
 
 ## One migration file per table, edited in place
-Standing instruction from the project owner: every table has exactly **one** migration, `create_<table>_table`, and a change to a table is an edit to that file — never a new `add_`, `alter_` or `rename_` migration. The history was squashed to this shape, `0001_01_01_000000_create_tenants_table.php` through `0001_01_01_000034_create_tenant_opening_hours_table.php`, numbered in foreign key order. When `menu_item_additions` was deleted the tables after it moved down one, so the three add-on tables end at `000028`; orders and stock follow them (`000029` orders, `000030` order_lines, `000031` order_line_choices, `000032` order_charges, `000033` stock_movements), `000034` is tenant_opening_hours, and `000035` is tax_codes. A new table takes the next number (rename the timestamped file `make:migration` writes). Laravel's multi-table stubs (users and sessions, cache and cache_locks, jobs, job_batches and failed_jobs) and Spatie's five permission tables are split one table per file as well.
+Standing instruction from the project owner: every table has exactly **one** migration, `create_<table>_table`, and a change to a table is an edit to that file — never a new `add_`, `alter_` or `rename_` migration. The history was squashed to this shape, `0001_01_01_000000_create_tenants_table.php` onwards, numbered in foreign key order. A new table takes the next number (rename the timestamped file `make:migration` writes). Laravel's multi-table stubs (users and sessions, cache and cache_locks, jobs, job_batches and failed_jobs) and Spatie's five permission tables are split one table per file as well.
+
+The three add-on tables end at `000028`. From there:
+
+| | |
+| --- | --- |
+| `000029` | locations |
+| `000030` | payment_devices |
+| `000031` | orders |
+| `000032` | order_lines |
+| `000033` | order_line_choices |
+| `000034` | order_charges |
+| `000035` | stock_movements |
+| `000036` | tenant_opening_hours |
+| `000037` | tax_codes |
+| `000038` | payments |
+| `000039` | order_payments |
+
+**Renumbering is expected, and it has happened twice.** When `menu_item_additions` was deleted, everything after it moved down one. When `locations` and `payment_devices` arrived they had to be created *before* `orders`, which now carries a foreign key to `locations`, so the seven files from `orders` to `tax_codes` each moved up two. Nothing outside this rule file names a migration by number, which is what makes that safe — keep it that way.
 
 The consequence is deliberate, and "for now": a database is rebuilt with `php artisan migrate:fresh --seed` after a schema change rather than migrated forward. Revisit this before anything runs with data worth keeping, because at that point a change needs a forward migration again.
 

@@ -62,7 +62,7 @@ class OrderResource extends Resource
     }
 
     /**
-     * An opened order arrives with its menu, its lines in order, their choices and its charges, so the page asks for none of them per line.
+     * An opened order arrives with its menu, its lines in order, their choices, its charges, and the payments that settled it with their devices and who recorded them, so the page asks for none of them per line.
      *
      * @return Builder<Order>
      */
@@ -77,7 +77,18 @@ class OrderResource extends Resource
             'lines' => fn ($lines) => $lines->orderBy('position')->orderBy('id'),
             'lines.choices',
             'charges' => fn ($charges) => $charges->orderBy('position')->orderBy('id'),
-        ]);
+            'paymentAllocations' => fn ($allocations) => $allocations->orderByDesc('id'),
+            'paymentAllocations.payment.paymentDevice',
+            'paymentAllocations.payment.recordedBy',
+        ])
+            // Loaded once here rather than read fresh every time the page asks
+            // what is still outstanding — the Record payment action's
+            // visibility, its amount default, and the infolist's own
+            // outstanding line all read this same value. Aliased exactly
+            // amount_paid and constrained to live payments, the same contract
+            // OrdersTable::configure() follows for the list.
+            ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
+                ->whereHas('payment', fn ($payment) => $payment->live())], 'amount');
     }
 
     public static function getPages(): array

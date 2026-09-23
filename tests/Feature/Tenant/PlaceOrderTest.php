@@ -126,7 +126,7 @@ it('places an order, copying what was ordered and taking it from stock', functio
         ->and($order->tenant_id)->toBe($tenant->getKey())
         ->and($order->menu_id)->toBe($menu->getKey())
         ->and($order->status)->toBe(OrderStatus::Placed)
-        ->and([$order->location_label, $order->note])->toBe(['Room 204', 'Less oil'])
+        ->and([$order->location_name, $order->note])->toBe(['Room 204', 'Less oil'])
         ->and([$order->subtotal, $order->tax, $order->charges_total, $order->total])->toBe([73800, 3690, 0, 77490])
         ->and($line->type)->toBe(OrderLineType::Item)
         ->and($line->menu_item_id)->toBe($curry->getKey())

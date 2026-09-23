@@ -10,14 +10,17 @@ use App\Enums\HomeRowLayout;
 use App\Enums\HomeTileAction;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\LocationKind;
 use App\Enums\MenuItemKind;
 use App\Enums\MenuRailType;
+use App\Enums\PaymentDeviceKind;
 use App\Enums\Role;
 use App\Enums\TenantType;
 use App\Enums\Weekday;
 use App\Models\Charge;
 use App\Models\HomeRow;
 use App\Models\HomeTile;
+use App\Models\Location;
 use App\Models\Menu;
 use App\Models\MenuAddOnGroup;
 use App\Models\MenuAddOnOption;
@@ -27,6 +30,7 @@ use App\Models\MenuComboItem;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
 use App\Models\MenuRail;
+use App\Models\PaymentDevice;
 use App\Models\Tenant;
 use App\Models\User;
 use Closure;
@@ -1178,6 +1182,10 @@ class TenantSeeder extends Seeder
             $this->seedAddOnGroups($tenant);
 
             $this->seedCharges($tenant, self::CHARGES[$definition['slug']], $menus);
+
+            $this->seedLocations($tenant, $definition['type']);
+
+            $this->seedPaymentDevices($tenant);
         }
     }
 
@@ -1293,6 +1301,80 @@ class TenantSeeder extends Seeder
                 array_filter($limitedTo, static fn (string $card): bool => isset($menus[$card])),
             )));
         }
+    }
+
+    /**
+     * A handful of locations for this tenant, keyed off what kind of business
+     * it is — TenantType::defaultLocationKind() reads only here, to pick
+     * sensible starting data; the type stays freely editable afterwards — plus
+     * a couple of delivery points every tenant gets regardless of kind.
+     * Matched on the English name, like everything else here, so re-seeding
+     * tops nothing up twice.
+     */
+    private function seedLocations(Tenant $tenant, TenantType $type): void
+    {
+        $kind = $type->defaultLocationKind();
+
+        [$zoneName, $primary] = match ($kind) {
+            LocationKind::Room => ['Floor 1', ['Room 101', 'Room 102', 'Room 103', 'Room 104', 'Room 105']],
+            LocationKind::Table => ['Terrace', ['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5']],
+            // A kind nothing starts with: Area is seeded below for every
+            // tenant, and a Zone is a grouping rather than a destination.
+            LocationKind::Area, LocationKind::Zone => [null, []],
+        };
+
+        // The primary locations sit under one zone, so a seeded tenant
+        // demonstrates the two levels rather than a flat list — a floor of
+        // rooms, a terrace of tables. LocationObserver refuses a third.
+        $zone = $zoneName === null ? null : $this->firstOrCreateByEnglishName(
+            Location::query()->where('tenant_id', $tenant->getKey()),
+            ['en' => $zoneName],
+            fn (): Location => new Location(['kind' => LocationKind::Zone, 'position' => 0]),
+            ['tenant_id' => $tenant->getKey()],
+        );
+
+        foreach ($primary as $position => $name) {
+            $this->firstOrCreateByEnglishName(
+                Location::query()->where('tenant_id', $tenant->getKey()),
+                ['en' => $name],
+                fn (): Location => new Location([
+                    'kind' => $kind,
+                    'parent_id' => $zone?->getKey(),
+                    'position' => $position,
+                ]),
+                ['tenant_id' => $tenant->getKey()],
+            );
+        }
+
+        $areas = ['Poolside', 'Entrance'];
+
+        foreach ($areas as $position => $name) {
+            $this->firstOrCreateByEnglishName(
+                Location::query()->where('tenant_id', $tenant->getKey()),
+                ['en' => $name],
+                fn (): Location => new Location(['kind' => LocationKind::Area, 'position' => count($primary) + $position]),
+                ['tenant_id' => $tenant->getKey()],
+            );
+        }
+    }
+
+    /**
+     * Two payment devices for every tenant to record against: one card
+     * machine, one QR code. name is a plain string, not translated
+     * (.ai/rules/models.md), so this is matched on kind rather than going
+     * through firstOrCreateByEnglishName.
+     */
+    private function seedPaymentDevices(Tenant $tenant): void
+    {
+        PaymentDevice::query()->firstOrCreate(
+            ['tenant_id' => $tenant->getKey(), 'kind' => PaymentDeviceKind::CardMachine->value],
+            ['name' => 'Counter Card Machine', 'is_active' => true, 'position' => 0],
+        );
+
+        PaymentDevice::query()->firstOrCreate(
+            ['tenant_id' => $tenant->getKey(), 'kind' => PaymentDeviceKind::QrCode->value],
+            ['name' => 'Reception QR Code', 'is_active' => true, 'position' => 1],
+        );
     }
 
     /**
@@ -1672,7 +1754,7 @@ class TenantSeeder extends Seeder
     /**
      * Find a record by the English half of a translated column, or make it.
      *
-     * @template TModel of Menu|MenuCategory|MenuItem|MenuAddOnGroup|MenuAddOnOption|MenuCombo|HomeTile|Charge
+     * @template TModel of Menu|MenuCategory|MenuItem|MenuAddOnGroup|MenuAddOnOption|MenuCombo|HomeTile|Charge|Location
      *
      * @param  Builder<TModel>  $query  already narrowed to the right parent
      * @param  array<string, string>  $translations  the name in every language
