@@ -39,9 +39,13 @@ class ListLocations extends ListRecords
     }
 
     /**
-     * All, then one tab per kind, built by iterating the cases so a kind
-     * added to the enum later cannot leave a tab behind — the
-     * ListMenuItems::getTabs() shape.
+     * All, then one tab per kind **this tenant may actually have**.
+     *
+     * Built from TenantType::locationKinds() rather than every case of the
+     * enum, so a hotel does not read a permanently empty "Table 0" tab and a
+     * restaurant does not read "Room 0" — which is exactly what iterating the
+     * cases produced. A kind added to the enum still cannot leave a tab
+     * behind, because the list it iterates is the enum's own answer.
      *
      * @return array<string, Tab>
      */
@@ -54,7 +58,7 @@ class ListLocations extends ListRecords
                 ->deferBadge(),
         ];
 
-        foreach (LocationKind::cases() as $kind) {
+        foreach ($this->tenant()->type->locationKinds() as $kind) {
             $tabs[$kind->value] = Tab::make($kind->label())
                 ->icon($kind->icon())
                 ->badge(fn (): int => $this->counts()[$kind->value] ?? 0)

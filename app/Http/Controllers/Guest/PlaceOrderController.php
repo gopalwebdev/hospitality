@@ -39,10 +39,8 @@ class PlaceOrderController extends Controller
         if (is_int($locationId)) {
             // Resolved against the tenant by hand, exactly like the menu
             // above: a scoped binding does not cover this because the tenant
-            // comes from the subdomain rather than the path. deliverable()
-            // refuses a Zone outright — nothing is ever ordered to one — so
-            // naming a Zone's id 404s the same as naming one that does not exist.
-            $location = Location::query()->deliverable()->find($locationId, ['id', 'tenant_id', 'is_active', 'name']);
+            // comes from the subdomain rather than the path.
+            $location = Location::query()->find($locationId, ['id', 'tenant_id', 'is_active', 'name']);
 
             abort_if($location === null, 404);
             abort_unless($location->tenant_id === $tenant->getKey(), 404);

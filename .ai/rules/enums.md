@@ -64,7 +64,7 @@ An `App\Enums\GstTreatment` enum held three cases — `IntraState`, `UnionTerrit
 
 What it now decides, and nothing more:
 
-- **`locationKinds()`** — what `LocationForm` offers. Hotel and Hospital get `[Room, Area, Zone]`, Restaurant gets `[Table, Area, Zone]`, so a hotel is never invited to file something as a Table.
+- **`locationKinds()`** — what `LocationForm` offers **and which tabs the locations list draws**. Hotel and Hospital get `[Room, Area]`, Restaurant gets `[Table, Area]`, so a hotel is never invited to file something as a Table and never reads an empty "Table 0" tab.
 - **`defaultLocationKind()`** — which of those the form preselects, and which the seeder starts a tenant with.
 
 This followed the rule's own advice: the difference is **a method per question on the enum**, never a string comparison at a call site (the `HomeRowLayout` shape). Do the same for the next one.
@@ -79,7 +79,7 @@ This followed the rule's own advice: the difference is **a method per question o
 - **`OrderLineType`:** `Item`, `Combo` — the same words as `PriceBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
 - **`StockMovementReason`:** `Restock`, `Count`, `OrderPlaced`, `OrderCancelled`, with `label()` and `color()` for the history table.
 - **`OrderRefusal`:** why an order was refused, sent to the guest app as `reason` with `message()` from `lang/en/guest.php`. `InsufficientStock` is a case here too, so a refusal always answers with the same field. `StoreClosed` replaced `NotAcceptingOrders` when the switch it named became weekly opening hours.
-- **`LocationKind`:** `Room`, `Table`, `Area`, `Zone`, carrying the two questions that keep a zone out of an order — `isDeliverable()` and `canHoldChildren()`, with `deliverableValues()` for queries (`.ai/rules/locations.md`).
+- **`LocationKind`:** `Room`, `Table`, `Area`. Every case is somewhere an order can go; which of them a tenant is offered is `TenantType::locationKinds()` (`.ai/rules/locations.md`).
 - **`OrderSettlement`:** `PayNow`, `AddToBill` — the guest's **intent**, never the truth about the money.
 - **`PaymentMethod`:** `Cash`, `Upi`, `CreditCard`, `DebitCard`, carrying `deviceKind()` and `takesReference()` — the single place it is said which device a method may name and whether it carries a transaction number.
 - **`PaymentDeviceKind`:** `CardMachine`, `QrCode`.

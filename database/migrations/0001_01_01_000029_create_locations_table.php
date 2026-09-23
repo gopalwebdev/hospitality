@@ -11,12 +11,8 @@ return new class extends Migration
         Schema::create('locations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            // App\Enums\LocationKind: a room, a table, a delivery point like a pool or an
-            // entrance, or a zone grouping other locations ("Floor 2").
+            // App\Enums\LocationKind: a room, a table, or a delivery point like a pool.
             $table->string('kind', 32);
-            // A zone this location sits under; null is top level. Two levels, no more —
-            // LocationObserver is the only guard, every CHECK constraint having been dropped.
-            $table->foreignId('parent_id')->nullable()->constrained('locations')->cascadeOnDelete();
             // Guest-facing: "Room 204", "Table 5", "Poolside". Copied onto orders.location_name
             // when picked, so renaming or deleting a location never rewrites an order.
             $table->jsonb('name');

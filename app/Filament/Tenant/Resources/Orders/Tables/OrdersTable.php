@@ -292,8 +292,8 @@ class OrdersTable
     /**
      * This tenant's locations, for the filter dropdown.
      *
-     * deliverable(): a Zone is never picked on an order, so no order can
-     * ever be filtered by one — offering it would be a dead option.
+     * Not narrowed to the active ones: this filters orders already placed,
+     * and one may name a location switched off since.
      *
      * once(): Filament asks a filter for its options more than once while it
      * builds the table.
@@ -306,7 +306,7 @@ class OrdersTable
 
         return once(fn (): array => Location::query()
             ->where('tenant_id', $tenantId)
-            ->deliverable()
+
             ->inReadingOrder()
             ->get()
             ->mapWithKeys(fn (Location $location): array => [$location->getKey() => $location->name])

@@ -73,34 +73,6 @@ class LocationFactory extends Factory
     }
 
     /**
-     * A grouping rather than a destination: a floor, a terrace, a wing.
-     *
-     * Nothing is ever ordered to one (LocationKind::isDeliverable()), and it
-     * is the only kind that may hold other locations under it.
-     */
-    public function zone(): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'kind' => LocationKind::Zone,
-            'name' => [Locale::English->value => fake()->randomElement(['Floor 1', 'Floor 2', 'Terrace', 'North wing'])],
-        ]);
-    }
-
-    /**
-     * Sitting under a zone, on that zone's own tenant.
-     *
-     * Two levels is the whole of the depth — LocationObserver refuses a third
-     * — so the parent handed here must itself be top level.
-     */
-    public function withParent(Location $zone): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'tenant_id' => $zone->tenant_id,
-            'parent_id' => $zone->getKey(),
-        ]);
-    }
-
-    /**
      * Switched off: kept, and offered to no guest.
      */
     public function inactive(): static

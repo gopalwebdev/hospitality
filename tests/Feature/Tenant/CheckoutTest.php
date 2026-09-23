@@ -122,17 +122,3 @@ it('offers no settling on a location that owes nothing', function (): void {
     Livewire::test(ListLocations::class)
         ->assertActionHidden(TestAction::make('settle')->table($room));
 });
-
-it('offers no settling on a zone, which is never ordered to', function (): void {
-    $tenant = Tenant::factory()->create();
-    $zone = Location::factory()->ofTenant($tenant)->zone()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->withParent($zone)->create();
-    orderAtLocation($tenant, $room, 90000);
-
-    enterTenantPanel($tenant, RoleEnum::Owner);
-
-    // The room under it owes money; the floor itself never does.
-    Livewire::test(ListLocations::class)
-        ->assertActionVisible(TestAction::make('settle')->table($room))
-        ->assertActionHidden(TestAction::make('settle')->table($zone));
-});

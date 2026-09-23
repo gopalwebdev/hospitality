@@ -1315,38 +1315,31 @@ class TenantSeeder extends Seeder
     {
         $kind = $type->defaultLocationKind();
 
-        [$zoneName, $primary] = match ($kind) {
-            LocationKind::Room => ['Floor 1', ['Room 101', 'Room 102', 'Room 103', 'Room 104', 'Room 105']],
-            LocationKind::Table => ['Terrace', ['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5']],
-            // A kind nothing starts with: Area is seeded below for every
-            // tenant, and a Zone is a grouping rather than a destination.
-            LocationKind::Area, LocationKind::Zone => [null, []],
+        $primary = match ($kind) {
+            LocationKind::Room => ['Room 101', 'Room 102', 'Room 103', 'Room 104', 'Room 105'],
+            LocationKind::Table => ['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5'],
+            // Nothing starts as an Area: they are seeded below, for every
+            // tenant, whatever kind of business it is.
+            LocationKind::Area => [],
         };
-
-        // The primary locations sit under one zone, so a seeded tenant
-        // demonstrates the two levels rather than a flat list — a floor of
-        // rooms, a terrace of tables. LocationObserver refuses a third.
-        $zone = $zoneName === null ? null : $this->firstOrCreateByEnglishName(
-            Location::query()->where('tenant_id', $tenant->getKey()),
-            ['en' => $zoneName],
-            fn (): Location => new Location(['kind' => LocationKind::Zone, 'position' => 0]),
-            ['tenant_id' => $tenant->getKey()],
-        );
 
         foreach ($primary as $position => $name) {
             $this->firstOrCreateByEnglishName(
                 Location::query()->where('tenant_id', $tenant->getKey()),
                 ['en' => $name],
-                fn (): Location => new Location([
-                    'kind' => $kind,
-                    'parent_id' => $zone?->getKey(),
-                    'position' => $position,
-                ]),
+                fn (): Location => new Location(['kind' => $kind, 'position' => $position]),
                 ['tenant_id' => $tenant->getKey()],
             );
         }
 
-        $areas = ['Poolside', 'Entrance'];
+        // Somewhere other than a room or a table that a guest can still order
+        // to. What reads sensibly depends on the business — a hospital has no
+        // poolside — so the starting pair follows the type, like the kind above.
+        $areas = match ($type) {
+            TenantType::Hotel => ['Poolside', 'Reception'],
+            TenantType::Restaurant => ['Terrace', 'Entrance'],
+            TenantType::Hospital => ['Waiting room', 'Reception'],
+        };
 
         foreach ($areas as $position => $name) {
             $this->firstOrCreateByEnglishName(

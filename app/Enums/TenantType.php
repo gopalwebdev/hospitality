@@ -58,8 +58,8 @@ enum TenantType: string
     public function locationKinds(): array
     {
         return match ($this) {
-            self::Hotel, self::Hospital => [LocationKind::Room, LocationKind::Area, LocationKind::Zone],
-            self::Restaurant => [LocationKind::Table, LocationKind::Area, LocationKind::Zone],
+            self::Hotel, self::Hospital => [LocationKind::Room, LocationKind::Area],
+            self::Restaurant => [LocationKind::Table, LocationKind::Area],
         };
     }
 

@@ -20,8 +20,8 @@ beforeEach(function (): void {
 |--------------------------------------------------------------------------
 |
 | Where an order goes. One generic module rather than separate Rooms and
-| Tables: a hotel wants rooms, a restaurant wants tables, both want a few
-| delivery points like a pool, and a zone groups them a floor at a time.
+| Tables: a hotel wants rooms, a restaurant wants tables, and both want a few
+| delivery points like a pool or an entrance. A flat list, deliberately.
 |
 */
 
@@ -55,8 +55,7 @@ it('creates a location on the tenant in the panel', function (): void {
     expect($location->tenant_id)->toBe($tenant->getKey())
         ->and($location->kind)->toBe(LocationKind::Room)
         ->and($location->code)->toBe('204')
-        ->and($location->capacity)->toBe(2)
-        ->and($location->parent_id)->toBeNull();
+        ->and($location->capacity)->toBe(2);
 });
 
 it('offers a hotel rooms and never tables, and a restaurant the other way about', function (): void {
@@ -64,10 +63,10 @@ it('offers a hotel rooms and never tables, and a restaurant the other way about'
     $restaurant = Tenant::factory()->create(['type' => TenantType::Restaurant]);
 
     // The kinds a tenant is offered follow its type, so a hotel is never
-    // invited to file something as a table. Every tenant still gets Area and
-    // Zone, because a pool and a floor make sense for both.
-    expect($hotel->type->locationKinds())->toBe([LocationKind::Room, LocationKind::Area, LocationKind::Zone])
-        ->and($restaurant->type->locationKinds())->toBe([LocationKind::Table, LocationKind::Area, LocationKind::Zone])
+    // invited to file something as a table. Both still get Area: a pool, an
+    // entrance and a waiting room make sense whatever the business is.
+    expect($hotel->type->locationKinds())->toBe([LocationKind::Room, LocationKind::Area])
+        ->and($restaurant->type->locationKinds())->toBe([LocationKind::Table, LocationKind::Area])
         ->and($hotel->type->defaultLocationKind())->toBe(LocationKind::Room)
         ->and($restaurant->type->defaultLocationKind())->toBe(LocationKind::Table);
 
@@ -90,67 +89,15 @@ it('keeps an existing location on its own kind when its tenant type changes', fu
     expect($room->fresh()?->kind)->toBe(LocationKind::Room);
 });
 
-it('nests a location under a zone and refuses a third level', function (): void {
-    $tenant = Tenant::factory()->create();
-    $zone = Location::factory()->ofTenant($tenant)->zone()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->withParent($zone)->create();
+it('shows a hotel no Table tab, and a restaurant no Room tab', function (): void {
+    $hotel = Tenant::factory()->create(['type' => TenantType::Hotel]);
+    enterTenantPanel($hotel, RoleEnum::Owner);
 
-    expect($room->parent_id)->toBe($zone->getKey())
-        ->and($zone->children()->pluck('id')->all())->toBe([$room->getKey()]);
+    // The tabs follow the tenant's type too, not every case of the enum —
+    // a hotel reading a permanently empty "Table 0" tab is noise.
+    $tabs = array_keys(Livewire::test(ListLocations::class)->instance()->getTabs());
 
-    // Two levels is the whole of the depth, exactly as a menu's categories are.
-    expect(fn () => Location::factory()->ofTenant($tenant)->room()->create(['parent_id' => $room->getKey()]))
-        ->toThrow(LogicException::class);
-});
-
-it('refuses a parent that is not a zone, a zone with a parent, and a row as its own parent', function (): void {
-    $tenant = Tenant::factory()->create();
-    $zone = Location::factory()->ofTenant($tenant)->zone()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->create();
-
-    // Only a zone groups others: a room under a room says nothing useful.
-    expect(fn () => Location::factory()->ofTenant($tenant)->room()->create(['parent_id' => $room->getKey()]))
-        ->toThrow(LogicException::class);
-
-    // A zone is the top level by definition.
-    $second = Location::factory()->ofTenant($tenant)->zone()->create();
-
-    expect(fn () => $second->update(['parent_id' => $zone->getKey()]))
-        ->toThrow(LogicException::class);
-
-    expect(fn () => $room->update(['parent_id' => $room->getKey()]))
-        ->toThrow(LogicException::class);
-});
-
-it('refuses a parent belonging to another tenant', function (): void {
-    $tenant = Tenant::factory()->create();
-    $otherZone = Location::factory()->zone()->create();
-
-    // The schema has no composite key to say this, so InheritParentTenant does.
-    expect(fn () => Location::factory()->ofTenant($tenant)->room()->create(['parent_id' => $otherZone->getKey()]))
-        ->toThrow(LogicException::class);
-});
-
-it('leaves a zone out of the places an order may be sent to', function (): void {
-    $tenant = Tenant::factory()->create();
-    $zone = Location::factory()->ofTenant($tenant)->zone()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->withParent($zone)->create();
-    $area = Location::factory()->ofTenant($tenant)->area()->create();
-
-    $deliverable = Location::query()
-        ->withoutGlobalScopes()
-        ->where('tenant_id', $tenant->getKey())
-        ->deliverable()
-        ->pluck('id')
-        ->all();
-
-    // Nothing is ever delivered "to Floor 2".
-    expect($deliverable)->toContain($room->getKey())
-        ->and($deliverable)->toContain($area->getKey())
-        ->and($deliverable)->not->toContain($zone->getKey())
-        ->and(LocationKind::Zone->isDeliverable())->toBeFalse()
-        ->and(LocationKind::Zone->canHoldChildren())->toBeTrue()
-        ->and(LocationKind::Room->canHoldChildren())->toBeFalse();
+    expect($tabs)->toBe(['all', LocationKind::Room->value, LocationKind::Area->value]);
 });
 
 it('creates a whole range of locations at once', function (): void {

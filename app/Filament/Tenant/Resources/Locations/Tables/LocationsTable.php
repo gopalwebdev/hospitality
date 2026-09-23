@@ -57,10 +57,6 @@ class LocationsTable
                     ->formatStateUsing(fn (LocationKind $state): string => $state->label())
                     ->color(fn (LocationKind $state): string => $state->color()),
 
-                TextColumn::make('parent.name')
-                    ->label(__('panel.locations.parent'))
-                    ->placeholder('—'),
-
                 TextColumn::make('code')
                     ->label(__('panel.locations.code'))
                     ->placeholder('—'),
@@ -109,9 +105,6 @@ class LocationsTable
             ->reorderable('position')
             ->reorderRecordsTriggerAction(Reordering::trigger())
             ->defaultSort('position')
-            // The zone column reads $record->parent->name; without this it
-            // would lazy-load one query per row under strict mode.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('parent'))
             ->emptyStateHeading(__('panel.locations.empty_heading'))
             ->emptyStateDescription(__('panel.locations.empty_description'))
             ->emptyStateIcon(Heroicon::OutlinedMapPin);
@@ -137,11 +130,7 @@ class LocationsTable
             ->icon(Heroicon::OutlinedBanknotes)
             ->color('success')
             ->authorize(fn (): bool => (bool) Auth::user()?->can(Permission::PaymentRecord->value))
-            // A zone is never picked on an order (LocationKind::isDeliverable()),
-            // so nothing is ever outstanding against one — checked directly
-            // rather than left to outstandingOrders() coming back empty, so a
-            // zone with many children costs no query at all here.
-            ->visible(fn (Location $record): bool => $record->kind->isDeliverable() && self::outstandingOrders($record)->isNotEmpty())
+            ->visible(fn (Location $record): bool => self::outstandingOrders($record)->isNotEmpty())
             ->modalHeading(fn (Location $record): string => (string) __('panel.locations.settle_heading', ['name' => $record->name]))
             ->schema(fn (Location $record): array => [
                 Select::make('orders')
