@@ -3,7 +3,7 @@ paths:
   - app/Filament/Tenant/Resources/Orders/Pages/ListOrders.php
   - app/Filament/Tenant/Pages/TakeOrder.php
   - app/Actions/Orders/ReadFloor.php
-  - app/Actions/Orders/AcceptOrder.php
+  - app/Actions/Orders/AdvanceOrder.php
   - app/Actions/Orders/ReviseOrder.php
   - app/Actions/Orders/ReadLocationActivity.php
   - app/Actions/Menus/ReadOrderableMenu.php
@@ -26,11 +26,15 @@ Every active location is a card: its kind, its code, whether anything is open th
 Two things the property must keep: it is `$layoutMode` and **not `$layout`**, because `Filament\Pages\Page` already declares a static `$layout` and a non-static property of that name is a fatal error; and the summary strip is drawn only while something is open, since three zeroes over a quiet floor is the same noise as the badge below.
 
 - **Live by polling, never by push.** `wire:poll` on the grid, 10s, one grouped query per tick (`ReadLocationActivity`) however many cards are drawn. There is no Reverb or Echo in this project and none was added for it; do not reach for websockets here without a fresh reason.
-- **Nothing is stored.** `App\Enums\LocationActivity` (`Clear`, `JustOrdered`, `Running`) is derived on every read. "Open" is a *placed* order that still owes money — the same pair `LocationsTable::settleAction()` offers orders on. A cancelled order is not activity; a settled one is finished business. `.ai/rules/locations.md` forbids a `locations.status` column and this is what honours it.
+- **Nothing is stored.** `App\Enums\LocationActivity` (`Ready`, `Pending`, `Preparing`, `Clear`) is derived on every read, and a card headlines with the loudest of whatever is there. "Open" here means an order still **underway** — pending, being made or ready — never one that owes money: a served order leaves the floor unpaid, and a cancelled one was never work at all. `.ai/rules/locations.md` forbids a `locations.status` column and this is what honours it.
 - **`ReadFloor` is the one place the cards are built and ordered**, and both the floor layout and the counter's picker call it, so a room reads and sorts the same on both. The order is the project owner's: **anything owing first, newest order at the top** (which puts a just-landed order top without a second rule for it), then everywhere quiet, in the tenant's own reading order among themselves — PHP's sort is stable, so a quiet floor does not shuffle on every poll. Filtering is left to the page asking, over the list already in memory.
 - **A quiet card says one thing.** It carried a "Clear" badge and a ₹0.00 and the project owner had both removed: a badge on every card says nothing, and a total of nothing is not a total. `location-card.blade.php` draws the badge and the amount only once something is open.
 - **`Order::amountPaidExpression()`** is the one copy of the correlated "what has this order been paid" SQL. `scopeUnsettled()`, `scopeSettled()` and the board's sum all read it. Do not type it out a fourth time.
 - **Settle is reused, not rewritten.** The board calls `LocationsTable::settleAction()` and hands it the card's location through `->record(fn (array $arguments) => ...)` off the already-loaded collection. Its `visible()` is overridden because the table's own runs a query per row, which on a board of fifty rooms would be fifty queries every poll.
+
+**The floor is about work, not money.** The project owner's instruction: a card says how many orders are pending, being made and ready to carry over — and nothing about what the room owes. The ₹ figures, the Outstanding tile and the Settle button all came off it; a bill is the **list** layout's business and the Locations page's Settle (`.ai/rules/payments.md`). `ReadLocationActivity` sums no amount, and a **served** order leaves the floor even though it may still be unpaid. A quiet card says "Nothing open" and nothing else — no badge, no total of nothing.
+
+**One button moves an order along.** `OrdersTable::advanceAction()` reads its label, its icon and whether it exists at all from `OrderStatus`, so Accept → Mark ready → Hand over is one control rather than three, on a row and in the counter's side column alike. Only the first step confirms, because only the first decides something that cannot be undone. `AdvanceOrder` is its single action.
 
 **An order is changed, not retyped, until it is accepted.** The project owner's rule: a guest rings back to add a coffee, and until somebody picks the order up staff should be able to change it. The **Change** row action links to the counter with `?order=`, which opens with that order already in its basket and saves through `ReviseOrder`; **Accept** is what closes the window. Both disappear the moment they no longer apply — `Order::canBeChanged()` is status *and* no live payment, and it is what the button's `visible()` reads. See `.ai/rules/inventory.md` for what revising does to stock.
 
@@ -57,5 +61,12 @@ Two things the property must keep: it is `$layoutMode` and **not `$layout`**, be
 **Styling.** Everything else is a `<style>` block plus Filament's own Blade components (`x-filament::section`, `badge`, `button`, `icon-button`, `link`, `input.wrapper`, `tabs`, `empty-state`) — a panel is served Filament's compiled CSS and no general Tailwind utilities (`.ai/rules/filament.md`), so layout is written by hand and anything with a theme is borrowed. Colours are Filament's palette variables through `color-mix`, the way the menu arrangement page does it, so they read correctly in both themes; `:is(.dark)` is the dark selector, which is what Filament puts on `<html>`.
 
 **An order is read in a modal, and there is no order page.** `OrdersTable::viewAction()` is the one definition of it — a wide, read-only `ViewAction` rendering `OrderInfolist` — used from a list row and from the counter's "already running here" list. `ViewOrder` was deleted with it, and so was the route-binding query that eager-loaded the record: `mountUsing()` calls `OrderResource::loadForView()` instead, which **`loadMissing`s** rather than `load`s, because the list already eager-loads each row's menu and loading it twice is the duplicate the query guard throws on. Anything that hands an order to that modal must have selected the whole row — `TakeOrder::openOrdersHere()` deliberately selects no column list for exactly that reason.
+
+**Every place carries its kind's icon** — `LocationKind::icon()` on the floor's cards, the counter's picker and location strip, and the Locations table's badge — and every order carries its status's (`OrderStatus::icon()`), on the list, in the modal and in the counter's side column. A room should read as a room wherever it is drawn.
+
+## Not built yet
+- **Parcel and takeaway orders.** Deferred by the project owner. An order goes to a `location` or to typed free text, and neither says "collected at the counter" or "sent out". When it arrives it is likely a kind of *order*, not a kind of location.
+- **Who is in the room.** A guest checked into a room or seated at a table, so a card can say who is there. Deferred too, and `.ai/rules/locations.md` still holds: `locations` carries nothing about occupancy, and when it comes it is a table of its own anchored on `locations.id` — never a `status` or an `occupied_by` column.
+- **Steps past served**, and a kitchen screen of its own.
 
 Tests: `tests/Feature/Tenant/TakeOrderTest.php`, `tests/Feature/Tenant/OrderFloorTest.php`, `tests/Feature/Tenant/OrderChangeTest.php`, `tests/Feature/Tenant/OrderManagementTest.php`.

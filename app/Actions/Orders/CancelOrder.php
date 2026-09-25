@@ -45,7 +45,11 @@ final readonly class CancelOrder
                 ->lockForUpdate()
                 ->firstOrFail(['id', 'tenant_id', 'status', 'cancelled_at']);
 
-            throw_unless($locked->isLive(), LogicException::class, 'This order has already been cancelled.');
+            // Underway rather than merely live: once an order has been served
+            // the guest has it, so there is nothing to call off and nothing to
+            // put back. A served order that has to be given back is a refund,
+            // which is a payment matter (`.ai/rules/payments.md`).
+            throw_unless($locked->isUnderway(), LogicException::class, 'Only an order still being worked can be cancelled.');
 
             $livePaymentId = $locked->paymentAllocations()
                 ->whereHas('payment', fn (Builder $payment): Builder => $payment->live())

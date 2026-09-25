@@ -77,7 +77,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 The reads of placing an order do not grow with its lines (`PlaceOrderTest`); the writes do, one per line and choice.
 
 ## Changing an order before the kitchen has it
-`App\Actions\Orders\ReviseOrder` replaces what is on a placed order — its lines, its charges, its totals — **keeping its number**. `App\Actions\Orders\AcceptOrder` is what closes that window: once an order is `OrderStatus::Accepted` somebody is cooking to its lines and it refuses.
+`App\Actions\Orders\ReviseOrder` replaces what is on a placed order — its lines, its charges, its totals — **keeping its number**. `App\Actions\Orders\AdvanceOrder` is what closes that window: the first step it takes is Placed → Accepted, and from there somebody is cooking to those lines, so ReviseOrder refuses.
 
 - Refused, under the lock, unless it is still open to changes **and** no live payment stands against it — changing a total under money already recorded would leave the two disagreeing, the same rule and the same reason as cancelling's.
 - Priced first by the same `PriceBasket`, and refused whole if a line no longer stands.
@@ -87,7 +87,7 @@ The reads of placing an order do not grow with its lines (`PlaceOrderTest`); the
 
 ## Cancelling reverses the order's own movements
 `CancelOrder`:
-- locks the order, and refuses one already cancelled (`LogicException`); an **accepted** order is still cancellable, because accepting is not finishing
+- locks the order, and refuses one that is not still **underway** (`LogicException`): an accepted or ready order is cancellable, because neither is finished, but a **served** one is not — the guest has it, so there is nothing to call off and giving it back is a refund
 - **refuses one a live payment still stands against**, naming it: staff void the payment first, which stops stock coming back while money sits recorded against an order that no longer exists (`.ai/rules/payments.md`)
 - adds back, per row, the sum of that order's `order-placed` movements — never a recomputation from its lines, because a combo's contents or an option may have changed since
 - gives nothing back to a row nobody counts any more

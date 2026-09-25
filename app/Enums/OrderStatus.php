@@ -3,55 +3,67 @@
 namespace App\Enums;
 
 /**
- * Where an order stands.
+ * Where an order stands, from taken to handed over.
  *
- * Three cases, and the line that matters runs between the first two: a **placed**
- * order is one nobody has picked up yet, so staff may still change it — the guest
- * rang back to add a coffee. **Accepting** it is the kitchen saying it is being
- * made, and from that moment its lines are fixed, because stock has been taken
- * against them and somebody is cooking to them. The project owner's rule:
- * "if the order is not accepted I should be able to modify it; once accepted I
- * cannot."
+ * Four steps in one line, and every screen that moves an order moves it one
+ * step along it — `next()` is the whole flow, so there is no second place that
+ * knows what follows what:
  *
- * Both of the first two are **live** — still owed for, still on the floor, still
- * cancellable. Only cancelling ends an order, and CancelOrder is what puts back
- * whatever it was holding.
+ * **Placed** — taken, nobody has picked it up. The only state its lines may
+ * still be changed in (`isOpenToChanges()`, ReviseOrder), because nothing has
+ * been made to them yet.
+ * **Accepted** — the kitchen has it and is making it.
+ * **Ready** — made, waiting to be carried to the room or collected.
+ * **Served** — handed over. The work is done; whether it has been *paid* for is
+ * a different question entirely (`payments`, `Order::amountOutstanding()`).
  *
- * The later steps a kitchen moves an order through — preparing, ready, served —
- * are still not here. They arrive with the screens that move it, and nothing in
- * this application needs them to decide anything yet.
+ * **Cancelled** is off to the side rather than at the end: an order may be
+ * called off while it is still underway, and CancelOrder puts back whatever it
+ * was holding. Once it has been served there is nothing to call off — the guest
+ * has it — so cancelling is refused and a refund is a payment matter.
+ *
+ * Two questions the rest of the application asks, and they are not the same one:
+ * - `isUnderway()` — is there still work to do? This is what the **floor** draws.
+ *   A served order leaves the floor even though it has not been paid for.
+ * - `isLive()` — does this order still count at all? This is what **money** asks.
+ *   A served order still owes what it owes; only cancelling ends that.
  */
 enum OrderStatus: string
 {
-    /** Taken, not yet picked up. The only state its lines may still be changed in. */
     case Placed = 'placed';
 
-    /** The kitchen has it. Its lines are fixed from here on. */
     case Accepted = 'accepted';
 
-    /** Called off. CancelOrder has put back whatever it was holding. */
+    case Ready = 'ready';
+
+    case Served = 'served';
+
     case Cancelled = 'cancelled';
 
     public function label(): string
     {
         return match ($this) {
-            self::Placed => 'Placed',
-            self::Accepted => 'Accepted',
+            self::Placed => 'Pending',
+            self::Accepted => 'Preparing',
+            self::Ready => 'Ready',
+            self::Served => 'Served',
             self::Cancelled => 'Cancelled',
         };
     }
 
     /**
-     * The colour of the badge shown beside it in the panel.
+     * The colour of the badge shown beside it.
      *
-     * Placed is amber rather than green: it is the one that wants somebody to
-     * do something. Accepted is the settled, in-hand state.
+     * Ready is the loudest on purpose: it is the one with a guest waiting and
+     * the work already done, so it is what a floor should catch the eye with.
      */
     public function color(): string
     {
         return match ($this) {
             self::Placed => 'warning',
-            self::Accepted => 'success',
+            self::Accepted => 'info',
+            self::Ready => 'success',
+            self::Served => 'gray',
             self::Cancelled => 'gray',
         };
     }
@@ -60,17 +72,68 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Placed => 'heroicon-o-clock',
-            self::Accepted => 'heroicon-o-check-circle',
+            self::Accepted => 'heroicon-o-fire',
+            self::Ready => 'heroicon-o-bell-alert',
+            self::Served => 'heroicon-o-check-circle',
             self::Cancelled => 'heroicon-o-x-circle',
         };
     }
 
     /**
-     * Whether an order in this state is still owed for and still on the floor.
+     * The one step that follows this one, or null where the line ends.
      *
-     * Everything that means "this order still counts" asks this rather than
-     * naming Placed: an accepted order still owes money, still shows at its
-     * room, still takes a payment and can still be called off.
+     * The single source of truth for the flow. AdvanceOrder moves an order to
+     * whatever this returns, and every button that offers to move one reads
+     * its label from advanceLabel() rather than naming a status itself.
+     */
+    public function next(): ?self
+    {
+        return match ($this) {
+            self::Placed => self::Accepted,
+            self::Accepted => self::Ready,
+            self::Ready => self::Served,
+            self::Served, self::Cancelled => null,
+        };
+    }
+
+    /**
+     * What the button that takes this order one step further says.
+     */
+    public function advanceLabel(): ?string
+    {
+        return match ($this) {
+            self::Placed => 'Accept',
+            self::Accepted => 'Mark ready',
+            self::Ready => 'Hand over',
+            self::Served, self::Cancelled => null,
+        };
+    }
+
+    public function advanceIcon(): ?string
+    {
+        return $this->next()?->icon();
+    }
+
+    /**
+     * Whether there is still work to do on this order — what the floor draws.
+     *
+     * A served order is finished business however much of it is still unpaid,
+     * and a cancelled one never has to be worked at all.
+     */
+    public function isUnderway(): bool
+    {
+        return match ($this) {
+            self::Placed, self::Accepted, self::Ready => true,
+            self::Served, self::Cancelled => false,
+        };
+    }
+
+    /**
+     * Whether this order still counts — what money asks.
+     *
+     * Everything that used to ask isPlaced() and meant "this one still stands"
+     * asks this: it still owes what it owes, still takes a payment, and still
+     * belongs on a bill.
      */
     public function isLive(): bool
     {
@@ -86,16 +149,23 @@ enum OrderStatus: string
     }
 
     /**
-     * The states an order that still counts is in, for a whereIn.
+     * The statuses with work still to do, for a whereIn.
+     *
+     * @return list<string>
+     */
+    public static function underwayValues(): array
+    {
+        return self::valuesWhere(static fn (self $status): bool => $status->isUnderway());
+    }
+
+    /**
+     * The statuses that still count, for a whereIn.
      *
      * @return list<string>
      */
     public static function liveValues(): array
     {
-        return array_values(array_map(
-            static fn (self $status): string => $status->value,
-            array_filter(self::cases(), static fn (self $status): bool => $status->isLive()),
-        ));
+        return self::valuesWhere(static fn (self $status): bool => $status->isLive());
     }
 
     /**
@@ -114,5 +184,17 @@ enum OrderStatus: string
             },
             [],
         );
+    }
+
+    /**
+     * @param  callable(self): bool  $matches
+     * @return list<string>
+     */
+    private static function valuesWhere(callable $matches): array
+    {
+        return array_values(array_map(
+            static fn (self $status): string => $status->value,
+            array_filter(self::cases(), $matches),
+        ));
     }
 }

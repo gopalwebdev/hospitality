@@ -441,18 +441,17 @@ class TakeOrder extends Page
     }
 
     /**
-     * Pick one of the orders already running here up, without leaving the counter.
+     * Move one of the orders running here one step along, without leaving the counter.
      *
      * The orders page's own action, handed the order through the arguments it
-     * was invoked with. Staff standing at the room can see that #13 is still
-     * waiting and accept it there rather than going to find it in a list.
+     * was invoked with. Staff standing at the room can see that #13 is ready
+     * and hand it over there rather than going to find it in a list.
      */
-    public function acceptOrderAction(): Action
+    public function advanceOrderAction(): Action
     {
-        return OrdersTable::acceptAction()
+        return OrdersTable::advanceAction()
             ->iconButton()
             ->size(Size::Small)
-            ->tooltip(__('panel.orders.accept'))
             ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments))
             ->after(fn () => $this->openOrdersHere = null);
     }

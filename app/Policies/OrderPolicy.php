@@ -66,9 +66,9 @@ class OrderPolicy
     }
 
     /**
-     * Pick an order up: the kitchen has it, and its lines are fixed from here.
+     * Move an order one step along the flow: accepted, ready, served.
      */
-    public function accept(User $user, Order $order): bool
+    public function advance(User $user, Order $order): bool
     {
         return $user->can(Permission::OrderManage->value);
     }

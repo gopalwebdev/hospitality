@@ -65,6 +65,14 @@ the top, and everywhere quiet last.
         line-height: 1.2;
     }
 
+    .floor-stat-value--ready { color: var(--success-600); }
+    .floor-stat-value--pending { color: var(--warning-600); }
+    .floor-stat-value--preparing { color: var(--info-600); }
+
+    :is(.dark) .floor-stat-value--ready { color: var(--success-400); }
+    :is(.dark) .floor-stat-value--pending { color: var(--warning-400); }
+    :is(.dark) .floor-stat-value--preparing { color: var(--info-400); }
+
     .floor-live {
         display: inline-flex;
         align-items: center;
@@ -91,7 +99,6 @@ the top, and everywhere quiet last.
 
 @php
     $summary = $this->summary();
-    $currency = $this->currency();
     $cards = $this->cards();
 @endphp
 
@@ -114,26 +121,33 @@ the top, and everywhere quiet last.
     </x-filament::section>
 @else
     {{--
-        What the whole floor owes, above the cards, so nobody adds them up by
-        eye — and only while there is something to add up. Three zeroes over a
-        quiet floor is the same noise as the "Clear" badge the project owner
-        had taken off the cards.
+        What is waiting across the whole floor, above the cards, so nobody has
+        to count them up by eye — and only while there is something to count.
+        Three zeroes over a quiet floor is the same noise as the "Clear" badge
+        the project owner had taken off the cards.
+
+        No money here either: a bill is the list layout's business.
     --}}
-    @if ($summary['openOrders'] > 0)
+    @if ($summary['ready'] + $summary['pending'] + $summary['preparing'] > 0)
     <div class="floor-summary">
+        <x-filament::section compact>
+            <div class="lc-muted">{{ __('panel.board.ready') }}</div>
+            <div class="floor-stat-value floor-stat-value--ready">{{ $summary['ready'] }}</div>
+        </x-filament::section>
+
+        <x-filament::section compact>
+            <div class="lc-muted">{{ __('panel.board.pending') }}</div>
+            <div class="floor-stat-value floor-stat-value--pending">{{ $summary['pending'] }}</div>
+        </x-filament::section>
+
+        <x-filament::section compact>
+            <div class="lc-muted">{{ __('panel.board.preparing') }}</div>
+            <div class="floor-stat-value floor-stat-value--preparing">{{ $summary['preparing'] }}</div>
+        </x-filament::section>
+
         <x-filament::section compact>
             <div class="lc-muted">{{ __('panel.board.active_locations') }}</div>
             <div class="floor-stat-value">{{ $summary['locations'] }}</div>
-        </x-filament::section>
-
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.board.open_orders') }}</div>
-            <div class="floor-stat-value">{{ $summary['openOrders'] }}</div>
-        </x-filament::section>
-
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.orders.outstanding') }}</div>
-            <div class="floor-stat-value">{{ $currency->format($summary['outstanding']) }}</div>
         </x-filament::section>
     </div>
     @endif
@@ -199,7 +213,6 @@ the top, and everywhere quiet last.
                 @include('filament.tenant.partials.location-card', [
                     'location' => $location,
                     'activity' => $card['activity'],
-                    'currency' => $currency,
                 ])
 
                 <div class="floor-actions">
@@ -213,9 +226,7 @@ the top, and everywhere quiet last.
                     </x-filament::button>
 
 
-                    {{ ($this->settleAction)(['location' => $location->getKey()]) }}
-
-                    @if ($card['activity']['openOrders'] > 0)
+                    @if ($card['activity']['orders'] > 0)
                         {{-- A card is the question; the list is the answer, so the filter is set on the way across. --}}
                         <x-filament::icon-button
                             size="sm"

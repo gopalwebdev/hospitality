@@ -3,13 +3,9 @@
 namespace App\Filament\Tenant\Resources\Orders\Pages;
 
 use App\Actions\Orders\ReadFloor;
-use App\Actions\Orders\ReadLocationActivity;
-use App\Enums\Currency;
 use App\Enums\LocationKind;
-use App\Filament\Schemas\PricingFields;
 use App\Filament\Tenant\Pages\TakeOrder;
 use App\Filament\Tenant\Resources\Locations\LocationResource;
-use App\Filament\Tenant\Resources\Locations\Tables\LocationsTable;
 use App\Filament\Tenant\Resources\Orders\OrderResource;
 use App\Models\Location;
 use App\Models\Tenant;
@@ -19,7 +15,6 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
 use LogicException;
@@ -165,19 +160,28 @@ class ListOrders extends ListRecords
     }
 
     /**
-     * The whole floor in one line: how many locations have something open, how
-     * many orders that is, and what they owe.
+     * The whole floor in one line: how much is waiting, being made and ready.
      *
-     * @return array{locations: int, openOrders: int, outstanding: int}
+     * **No money**, on the project owner's instruction — a bill is the list
+     * layout's business and the Locations page's Settle. What this answers is
+     * what a shift lead wants at a glance: is anything going cold?
+     *
+     * @return array{pending: int, preparing: int, ready: int, locations: int}
      */
     public function summary(): array
     {
         $open = array_filter($this->floor(), static fn (array $card): bool => $card['activity']['state']->isOpen());
 
+        $sum = static fn (string $key): int => array_sum(array_map(
+            static fn (array $card): int => $card['activity'][$key],
+            $open,
+        ));
+
         return [
+            'pending' => $sum('pending'),
+            'preparing' => $sum('preparing'),
+            'ready' => $sum('ready'),
             'locations' => count($open),
-            'openOrders' => array_sum(array_map(static fn (array $card): int => $card['activity']['openOrders'], $open)),
-            'outstanding' => array_sum(array_map(static fn (array $card): int => $card['activity']['outstanding'], $open)),
         ];
     }
 
@@ -191,11 +195,6 @@ class ListOrders extends ListRecords
     public function kinds(): array
     {
         return $this->tenant()->type->locationKinds();
-    }
-
-    public function currency(): Currency
-    {
-        return PricingFields::currency();
     }
 
     public function hasAnyLocation(): bool
@@ -233,24 +232,6 @@ class ListOrders extends ListRecords
     }
 
     /**
-     * Check a location out without leaving the floor.
-     *
-     * The Locations page's own action, handed the card's location through the
-     * arguments it was invoked with rather than a row — one definition of what
-     * settling asks for and does, in both places. Its visibility is overridden
-     * because the table's own runs a query per row to find out whether anything
-     * is outstanding, and the floor already knows: a card per room would
-     * otherwise be a query per room on every poll.
-     */
-    public function settleAction(): Action
-    {
-        return LocationsTable::settleAction()
-            ->size(Size::Small)
-            ->record(fn (array $arguments): ?Location => $this->locationFrom($arguments))
-            ->visible(fn (array $arguments): bool => $this->activityFor($arguments)['outstanding'] > 0);
-    }
-
-    /**
      * The floor, read once per request however many times the view asks.
      *
      * @return list<array{location: Location, activity: array<string, mixed>}>
@@ -258,39 +239,6 @@ class ListOrders extends ListRecords
     private function floor(): array
     {
         return $this->floor ??= app(ReadFloor::class)($this->tenant());
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     */
-    private function locationFrom(array $arguments): ?Location
-    {
-        $id = (int) ($arguments['location'] ?? 0);
-
-        foreach ($this->floor() as $card) {
-            if ($card['location']->getKey() === $id) {
-                return $card['location'];
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     * @return array<string, mixed>
-     */
-    private function activityFor(array $arguments): array
-    {
-        $id = (int) ($arguments['location'] ?? 0);
-
-        foreach ($this->floor() as $card) {
-            if ($card['location']->getKey() === $id) {
-                return $card['activity'];
-            }
-        }
-
-        return ReadLocationActivity::clear();
     }
 
     /**

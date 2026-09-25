@@ -2,7 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Orders\Tables;
 
-use App\Actions\Orders\AcceptOrder;
+use App\Actions\Orders\AdvanceOrder;
 use App\Actions\Orders\CancelOrder;
 use App\Actions\Payments\RecordPayment;
 use App\Enums\OrderSettlement;
@@ -83,6 +83,7 @@ class OrdersTable
                 TextColumn::make('status')
                     ->label(__('panel.orders.status'))
                     ->badge()
+                    ->icon(fn (OrderStatus $state): string => $state->icon())
                     ->formatStateUsing(fn (OrderStatus $state): string => $state->label())
                     ->color(fn (OrderStatus $state): string => $state->color()),
 
@@ -124,9 +125,8 @@ class OrdersTable
                     ->iconButton()
                     ->tooltip(__('panel.orders.view')),
 
-                self::acceptAction()
-                    ->iconButton()
-                    ->tooltip(__('panel.orders.accept')),
+                self::advanceAction()
+                    ->iconButton(),
 
                 self::changeAction()
                     ->iconButton()
@@ -180,29 +180,40 @@ class OrdersTable
     }
 
     /**
-     * Pick an order up: the kitchen has it now.
+     * Move an order one step along: Accept, then Mark ready, then Hand over.
      *
-     * Offered only while it is still waiting, and it is the one thing that
-     * takes an order out of reach of Change — which is the point of it.
+     * One button rather than one per step, and it reads its label, its icon and
+     * whether it is there at all from `OrderStatus` — so the flow is written
+     * down once (`OrderStatus::next()`) and a step added between two others
+     * needs nothing changed here.
+     *
+     * Only the first step asks for confirmation, because only the first step
+     * decides something that cannot be undone: accepting is what takes an
+     * order out of reach of Change.
      */
-    public static function acceptAction(): Action
+    public static function advanceAction(): Action
     {
-        return Action::make('accept')
-            ->label(__('panel.orders.accept'))
-            ->icon(Heroicon::OutlinedCheckCircle)
+        return Action::make('advance')
+            ->label(fn (Order $record): string => (string) ($record->status->advanceLabel() ?? __('panel.orders.advance')))
+            ->tooltip(fn (Order $record): ?string => $record->status->advanceLabel())
+            ->icon(fn (Order $record): string => $record->status->advanceIcon() ?? 'heroicon-o-arrow-right')
             ->color('success')
-            ->authorize('accept')
-            ->visible(fn (Order $record): bool => $record->isPlaced())
-            ->requiresConfirmation()
+            ->authorize('advance')
+            ->visible(fn (Order $record): bool => $record->status->next() !== null)
+            ->requiresConfirmation(fn (Order $record): bool => $record->isPlaced())
             ->modalHeading(fn (Order $record): string => (string) __('panel.orders.accept_heading', ['number' => $record->getKey()]))
             ->modalDescription(__('panel.orders.accept_warning'))
             ->modalSubmitActionLabel(__('panel.orders.accept'))
             ->action(function (Order $record): void {
-                app(AcceptOrder::class)($record);
+                $now = app(AdvanceOrder::class)($record);
 
                 self::reloadPayments($record);
-            })
-            ->successNotificationTitle(__('panel.orders.accepted'));
+
+                Notification::make()
+                    ->title(__('panel.orders.advanced', ['status' => $now->label()]))
+                    ->success()
+                    ->send();
+            });
     }
 
     /**
@@ -236,7 +247,9 @@ class OrdersTable
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
             ->authorize('cancel')
-            ->visible(fn (Order $record): bool => $record->isLive())
+            // Underway, not merely live: once it has been served the guest has
+            // it, so there is nothing to call off — CancelOrder refuses too.
+            ->visible(fn (Order $record): bool => $record->isUnderway())
             ->requiresConfirmation()
             ->modalHeading(fn (Order $record): string => (string) __('panel.orders.cancel_heading', ['number' => $record->getKey()]))
             ->modalDescription(__('panel.orders.cancel_warning'))

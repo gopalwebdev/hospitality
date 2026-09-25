@@ -2,6 +2,7 @@
 
 namespace App\Actions\Orders;
 
+use App\Enums\LocationActivity;
 use App\Models\Location;
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -16,12 +17,14 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  * re-render often.
  *
  * The order is the point, and it is the project owner's: a room with nothing
- * open is not what staff are looking for, so it goes last. Above it, the rooms
- * with orders still owing, **newest order first** — which puts whatever just
- * landed at the top without a second rule for it, since that is exactly what
- * LocationActivity::JustOrdered means. Locations with nothing open keep their
- * own reading order among themselves (PHP's sort is stable), so a quiet floor
- * still reads Room 101, 102, 103 rather than shuffling on every poll.
+ * being worked is not what staff are looking for, so it goes last. Above it,
+ * **the loudest first** — a room with something ready before one with an order
+ * nobody has picked up, before one already in hand — which is
+ * LocationActivity's own declared order and nothing this class decides for
+ * itself. Rooms in the same state are read newest order first. Locations with
+ * nothing underway keep the tenant's own order among themselves (PHP's sort is
+ * stable), so a quiet floor reads Room 101, 102, 103 rather than shuffling on
+ * every poll.
  *
  * Filtering — by kind, by a search, to only what is open — is left to the page
  * asking, over the list this returns. It is already in memory, and the two
@@ -49,17 +52,22 @@ final readonly class ReadFloor
             ])
             ->all();
 
-        usort($cards, function (array $first, array $second): int {
-            $firstIsOpen = $first['activity']['state']->isOpen();
-            $secondIsOpen = $second['activity']['state']->isOpen();
+        $urgency = array_flip(array_map(
+            static fn (LocationActivity $state): string => $state->value,
+            LocationActivity::cases(),
+        ));
 
-            if ($firstIsOpen !== $secondIsOpen) {
-                return $firstIsOpen ? -1 : 1;
+        usort($cards, function (array $first, array $second) use ($urgency): int {
+            $firstRank = $urgency[$first['activity']['state']->value];
+            $secondRank = $urgency[$second['activity']['state']->value];
+
+            if ($firstRank !== $secondRank) {
+                return $firstRank <=> $secondRank;
             }
 
-            // Nothing open on either: leave them in the tenant's own order.
-            // PHP's sort is stable, so returning 0 really does keep it.
-            return $firstIsOpen
+            // Nothing underway on either: leave them in the tenant's own
+            // order. PHP's sort is stable, so returning 0 really does keep it.
+            return $first['activity']['state']->isOpen()
                 ? $second['activity']['lastOrderedAt'] <=> $first['activity']['lastOrderedAt']
                 : 0;
         });

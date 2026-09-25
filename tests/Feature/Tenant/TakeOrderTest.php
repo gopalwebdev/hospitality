@@ -382,7 +382,10 @@ it('shows what is already running at a location once it is picked', function ():
         ->assertSee('Room 204')
         ->assertSee('Already running here')
         ->assertSee('#'.$running->getKey())
-        ->assertSee('₹260.00 owing')
+        // Its state, and what it still owes — the counter is where a bill is
+        // being built, so money belongs here even though the floor has none.
+        ->assertSee('Pending')
+        ->assertSee('₹260.00')
         // And the card is now on screen to order from.
         ->assertSee('Masala Dosa');
 });

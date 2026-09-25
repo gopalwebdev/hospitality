@@ -5,43 +5,67 @@ namespace App\Enums;
 /**
  * What is happening at one location right now, worked out from its orders.
  *
- * Never stored. `.ai/rules/locations.md` settled that `locations` carries
- * nothing about occupancy — that is a fact about the orders placed there, not
- * about the room — so this is derived on every read of the orders page's floor and
- * there is no column behind it.
+ * **This is about work, not money.** The project owner's instruction for the
+ * floor: what staff need at a glance is how many orders are waiting, how many
+ * are being made and how many are ready to be carried over — not what the room
+ * owes. A bill is the list layout's business and the Locations page's Settle.
+ * So an order that has been served leaves the floor even though it has not
+ * been paid for, and nothing here sums an amount.
  *
- * "Open" means a placed order that still owes money: a cancelled one is not
- * activity, and one already settled is finished business.
+ * Never stored. `.ai/rules/locations.md` settled that `locations` carries
+ * nothing about occupancy, and that still holds: this is derived on every read
+ * and there is no column behind it.
+ *
+ * The order of the cases is the order of urgency, and `mostUrgent()` is what a
+ * card headlines with when a room has several things going on at once:
+ * **Ready** first, because the food is made and a guest is waiting for somebody
+ * to walk it over; then **Pending**, which nobody has even picked up; then
+ * **Preparing**, which is already in hand.
  */
 enum LocationActivity: string
 {
-    /** Nothing placed here is still owing. */
+    /** Made and waiting to be taken over. */
+    case Ready = 'ready';
+
+    /** Taken, and nobody has picked it up yet. */
+    case Pending = 'pending';
+
+    /** The kitchen has it. */
+    case Preparing = 'preparing';
+
+    /** Nothing here needs working. */
     case Clear = 'clear';
-
-    /** Its newest open order landed within ReadLocationActivity::NEW_ORDER_MINUTES. */
-    case JustOrdered = 'just-ordered';
-
-    /** Open orders, none of them new: a bill is running here. */
-    case Running = 'running';
 
     public function label(): string
     {
         return match ($this) {
+            self::Ready => 'Ready',
+            self::Pending => 'Pending',
+            self::Preparing => 'Preparing',
             self::Clear => 'Clear',
-            self::JustOrdered => 'New order',
-            self::Running => 'Open bill',
         };
     }
 
     /**
-     * The colour of the badge and the card's edge on a location card.
+     * The colour of the badge and the card's edge.
      */
     public function color(): string
     {
         return match ($this) {
+            self::Ready => 'success',
+            self::Pending => 'warning',
+            self::Preparing => 'info',
             self::Clear => 'gray',
-            self::JustOrdered => 'warning',
-            self::Running => 'info',
+        };
+    }
+
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Ready => 'heroicon-o-bell-alert',
+            self::Pending => 'heroicon-o-clock',
+            self::Preparing => 'heroicon-o-fire',
+            self::Clear => 'heroicon-o-check',
         };
     }
 
@@ -51,6 +75,23 @@ enum LocationActivity: string
     public function isOpen(): bool
     {
         return $this !== self::Clear;
+    }
+
+    /**
+     * The loudest of several, which is what a card headlines with.
+     *
+     * Read off the order the cases are declared in, so changing the urgency of
+     * the floor is changing that order and nothing else.
+     */
+    public static function mostUrgent(self ...$states): self
+    {
+        foreach (self::cases() as $case) {
+            if (in_array($case, $states, strict: true)) {
+                return $case;
+            }
+        }
+
+        return self::Clear;
     }
 
     /**

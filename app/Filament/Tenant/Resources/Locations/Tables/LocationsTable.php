@@ -53,6 +53,9 @@ class LocationsTable
                 TextColumn::make('kind')
                     ->label(__('panel.locations.kind'))
                     ->badge()
+                    // The same icon the floor's cards carry, so a room reads
+                    // as a room wherever it is drawn.
+                    ->icon(fn (LocationKind $state): Heroicon => $state->icon())
                     ->formatStateUsing(fn (LocationKind $state): string => $state->label())
                     ->color(fn (LocationKind $state): string => $state->color()),
 

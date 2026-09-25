@@ -543,13 +543,18 @@
                     <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
                         <div class="to-here">
                             <div style="min-width: 0;">
-                                <div class="lc-name">{{ $here?->name ?? __('panel.take_order.elsewhere') }}</div>
+                                <div class="lc-name">
+                                    @if ($here !== null)
+                                        <x-filament::icon :icon="$here->kind->icon()" class="lc-kind-icon" />
+                                    @endif
+                                    <span>{{ $here?->name ?? __('panel.take_order.elsewhere') }}</span>
+                                </div>
 
                                 @if ($here !== null)
                                     <div class="lc-muted">
                                         {{ $here->kind->label() }}@if (filled($here->code)) · {{ $here->code }}@endif
-                                        @if ($activityHere['outstanding'] > 0)
-                                            · {{ __('panel.take_order.owing', ['amount' => $currency->format($activityHere['outstanding'])]) }}
+                                        @if ($activityHere['state']->isOpen())
+                                            · {{ trans_choice('panel.board.orders_open', $activityHere['orders'], ['count' => $activityHere['orders']]) }}
                                         @endif
                                     </div>
                                 @endif
@@ -579,14 +584,14 @@
                                         </span>
 
                                         <span class="to-open-order-actions">
-                                            <x-filament::badge :color="$open->status->color()" size="xs">
+                                            <x-filament::badge :color="$open->status->color()" :icon="$open->status->icon()" size="xs">
                                                 {{ $open->status->label() }}
                                             </x-filament::badge>
 
                                             <span class="to-line-total">{{ $currency->format($open->amountOutstanding()) }}</span>
 
                                             {{-- Icon buttons: staff at the room work it here rather than going to find it in a list. --}}
-                                            {{ ($this->acceptOrderAction)(['order' => $open->getKey()]) }}
+                                            {{ ($this->advanceOrderAction)(['order' => $open->getKey()]) }}
                                             {{ ($this->changeOrderAction)(['order' => $open->getKey()]) }}
                                         </span>
                                     </div>

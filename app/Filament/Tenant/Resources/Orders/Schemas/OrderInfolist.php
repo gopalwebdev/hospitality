@@ -48,6 +48,7 @@ class OrderInfolist
                         TextEntry::make('status')
                             ->label(__('panel.orders.status'))
                             ->badge()
+                            ->icon(fn (OrderStatus $state): string => $state->icon())
                             ->formatStateUsing(fn (OrderStatus $state): string => $state->label())
                             ->color(fn (OrderStatus $state): string => $state->color()),
 

@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Baskets\PriceBasket;
-use App\Actions\Orders\AcceptOrder;
+use App\Actions\Orders\AdvanceOrder;
 use App\Actions\Orders\CancelOrder;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\ReviseOrder;
@@ -76,16 +76,18 @@ function basketOf(MenuItem $item, int $quantity): array
     ]];
 }
 
-it('accepts a placed order and refuses to accept it twice', function (): void {
+it('moves an order one step at a time, and stops once it has been served', function (): void {
     [$tenant, $menu, $item] = orderableSetup();
     $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1));
 
-    app(AcceptOrder::class)($order);
+    expect(app(AdvanceOrder::class)($order))->toBe(OrderStatus::Accepted)
+        ->and(app(AdvanceOrder::class)($order->refresh()))->toBe(OrderStatus::Ready)
+        ->and(app(AdvanceOrder::class)($order->refresh()))->toBe(OrderStatus::Served)
+        ->and($order->refresh()->status)->toBe(OrderStatus::Served);
 
-    expect($order->refresh()->status)->toBe(OrderStatus::Accepted);
-
-    app(AcceptOrder::class)($order);
-})->throws(LogicException::class);
+    // The line ends there: a served order has nowhere further to go.
+    app(AdvanceOrder::class)($order->refresh());
+})->throws(LogicException::class, 'cannot be moved any further');
 
 it('changes a placed order, re-pricing it and squaring the stock', function (): void {
     [$tenant, $menu, $item] = orderableSetup(stock: 20);
@@ -140,7 +142,7 @@ it('refuses to change an order the kitchen has accepted', function (): void {
     [$tenant, $menu, $item] = orderableSetup();
     $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1));
 
-    app(AcceptOrder::class)($order);
+    app(AdvanceOrder::class)($order);
 
     app(ReviseOrder::class)($tenant, $order->refresh(), $menu, basketOf($item, 3));
 })->throws(LogicException::class, 'picked up already');
@@ -175,21 +177,36 @@ it('leaves an order untouched when the change asks for more than is left', funct
 |--------------------------------------------------------------------------
 */
 
-it('offers Accept and Change on a placed order, and neither once accepted', function (): void {
+it('offers one button that moves an order along, and takes Change away once it does', function (): void {
     [$tenant, $menu, $item] = orderableSetup();
     $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1));
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     Livewire::test(ListOrders::class)
-        ->assertActionVisible(TestAction::make('accept')->table($order))
+        ->assertActionVisible(TestAction::make('advance')->table($order))
         ->assertActionVisible(TestAction::make('change')->table($order))
-        ->callAction(TestAction::make('accept')->table($order))
+        ->callAction(TestAction::make('advance')->table($order))
         ->assertHasNoActionErrors()
-        ->assertActionHidden(TestAction::make('accept')->table($order))
+        // Still one step further to go, but no longer changeable.
+        ->assertActionVisible(TestAction::make('advance')->table($order))
         ->assertActionHidden(TestAction::make('change')->table($order));
 
     expect($order->refresh()->status)->toBe(OrderStatus::Accepted);
+});
+
+it('offers nothing further on an order already served', function (): void {
+    [$tenant, $menu, $item] = orderableSetup();
+    $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1));
+    $order->update(['status' => OrderStatus::Served]);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    Livewire::test(ListOrders::class)
+        ->assertActionHidden(TestAction::make('advance')->table($order))
+        ->assertActionHidden(TestAction::make('change')->table($order))
+        // Nothing to call off either: the guest has it.
+        ->assertActionHidden(TestAction::make('cancel')->table($order));
 });
 
 it('withholds Change from an order a payment already stands against', function (): void {
@@ -202,8 +219,8 @@ it('withholds Change from an order a payment already stands against', function (
 
     Livewire::test(ListOrders::class)
         ->assertActionHidden(TestAction::make('change')->table($order))
-        // Still acceptable, and still cancellable: only changing it is out.
-        ->assertActionVisible(TestAction::make('accept')->table($order));
+        // Still movable along, and still cancellable: only changing it is out.
+        ->assertActionVisible(TestAction::make('advance')->table($order));
 });
 
 it('opens the counter with the order already in its basket, and saves the change', function (): void {
@@ -233,7 +250,7 @@ it('treats a link to an order it may no longer change as a new order', function 
     [$tenant, $menu, $item] = orderableSetup();
     $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1));
 
-    app(AcceptOrder::class)($order);
+    app(AdvanceOrder::class)($order);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
@@ -243,7 +260,7 @@ it('treats a link to an order it may no longer change as a new order', function 
         ->and($page->get('lines'))->toBe([]);
 });
 
-it('accepts one of the orders running at a room from the counter itself', function (): void {
+it('moves one of the orders running at a room along from the counter itself', function (): void {
     [$tenant, $menu, $item] = orderableSetup();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
     $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1), $room);
@@ -253,7 +270,7 @@ it('accepts one of the orders running at a room from the counter itself', functi
     Livewire::withQueryParams(['location' => $room->getKey()])
         ->test(TakeOrder::class)
         ->assertSee('Already running here')
-        ->callAction(TestAction::make('acceptOrderAction')->arguments(['order' => $order->getKey()]))
+        ->callAction(TestAction::make('advanceOrderAction')->arguments(['order' => $order->getKey()]))
         ->assertHasNoActionErrors();
 
     expect($order->refresh()->status)->toBe(OrderStatus::Accepted);

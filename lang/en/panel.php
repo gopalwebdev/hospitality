@@ -234,10 +234,14 @@ return [
         'layout_list' => 'List',
         'layout_floor' => 'Floor',
         'show_orders_here' => 'Show its orders',
+        // One button walks an order along its flow, wording itself from
+        // App\Enums\OrderStatus. Only the first step confirms, because only
+        // the first takes the order out of reach of Change.
+        'advance' => 'Move along',
+        'advanced' => 'Order is now :status',
         'accept' => 'Accept',
         'accept_heading' => 'Accept order #:number?',
         'accept_warning' => 'The kitchen has it from here, and what is on it can no longer be changed.',
-        'accepted' => 'Order accepted',
         'change' => 'Change order',
         'cancel' => 'Cancel order',
         'cancel_heading' => 'Cancel order #:number?',
@@ -275,8 +279,15 @@ return [
         'search' => 'Find a room, table or code',
         'only_open' => 'Only open',
         'live' => 'Live · every :seconds',
-        'active_locations' => 'Locations open',
-        'open_orders' => 'Orders open',
+        // The floor counts work, never money: what a room owes is the list
+        // layout's business and the Locations page's Settle.
+        'active_locations' => 'Places busy',
+        'ready' => 'Ready',
+        'pending' => 'Pending',
+        'preparing' => 'Preparing',
+        'n_ready' => ':count ready',
+        'n_pending' => ':count pending',
+        'n_preparing' => ':count preparing',
         'nothing_open' => 'Nothing open',
         'orders_open' => '{1} 1 order|[2,*] :count orders',
         'capacity' => '{1} 1 seat|[2,*] :count seats',
@@ -300,7 +311,6 @@ return [
         'elsewhere' => 'Somewhere else',
         'change_location' => 'Change',
         'already_here' => 'Already running here',
-        'owing' => ':amount owing',
         'search' => 'Find an item',
         'add' => 'Add',
         'customise' => 'Choose',

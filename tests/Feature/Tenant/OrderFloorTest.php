@@ -2,10 +2,8 @@
 
 use App\Actions\Orders\ReadFloor;
 use App\Actions\Orders\ReadLocationActivity;
-use App\Actions\Payments\RecordPayment;
 use App\Enums\LocationActivity;
 use App\Enums\OrderStatus;
-use App\Enums\PaymentMethod;
 use App\Enums\Role as RoleEnum;
 use App\Enums\TenantType;
 use App\Filament\Tenant\Resources\Orders\Pages\ListOrders;
@@ -13,7 +11,6 @@ use App\Models\Location;
 use App\Models\Order;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Date;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -27,11 +24,14 @@ beforeEach(function (): void {
 | The orders page, read as the floor
 |--------------------------------------------------------------------------
 |
-| Every room, table and delivery point at once, with what is open at each —
-| one of the two ways ListOrders is read. The figures are derived from orders
-| on every read, since locations carry nothing about occupancy, so these tests
-| are mostly about what "open" means (a placed order that still owes money)
-| and about the order the cards come back in.
+| Every room, table and delivery point at once, with what is being worked at
+| each — one of the two ways ListOrders is read. **It is about work, not
+| money**, on the project owner's instruction: what a card says is how many
+| orders are pending, being made and ready to carry over, and what a room owes
+| belongs to the list layout and to the Locations page's Settle.
+|
+| So these tests are mostly about what "underway" means, and about the order
+| the cards come back in.
 |
 */
 
@@ -44,31 +44,32 @@ function floorOf(): Testable
 }
 
 /**
- * A placed order at a location, owing exactly this much.
+ * An order at a location, in whatever state it is being worked.
  */
-function boardOrderAt(Tenant $tenant, ?Location $location, int $total): Order
+function floorOrderAt(Tenant $tenant, ?Location $location, OrderStatus $status = OrderStatus::Placed): Order
 {
     return Order::factory()->create([
         'tenant_id' => $tenant->getKey(),
         'location_id' => $location?->getKey(),
-        'status' => OrderStatus::Placed,
-        'subtotal' => $total,
+        'status' => $status,
+        'subtotal' => 10000,
         'tax' => 0,
         'cgst' => 0,
         'sgst' => 0,
         'charges_total' => 0,
-        'total' => $total,
+        'total' => 10000,
     ]);
 }
 
-it('reads what is open at each location in one query', function (): void {
+it('counts what is being worked at each location in one query', function (): void {
     $tenant = Tenant::factory()->create();
     $room = Location::factory()->ofTenant($tenant)->room()->create();
     $other = Location::factory()->ofTenant($tenant)->room()->create();
 
-    boardOrderAt($tenant, $room, 50000);
-    boardOrderAt($tenant, $room, 30000);
-    boardOrderAt($tenant, $other, 20000);
+    floorOrderAt($tenant, $room, OrderStatus::Placed);
+    floorOrderAt($tenant, $room, OrderStatus::Placed);
+    floorOrderAt($tenant, $room, OrderStatus::Ready);
+    floorOrderAt($tenant, $other, OrderStatus::Accepted);
 
     $queries = 0;
     DB::listen(function () use (&$queries): void {
@@ -78,59 +79,113 @@ it('reads what is open at each location in one query', function (): void {
     $activity = app(ReadLocationActivity::class)($tenant);
 
     expect($queries)->toBe(1)
-        ->and($activity[$room->getKey()]['openOrders'])->toBe(2)
-        ->and($activity[$room->getKey()]['outstanding'])->toBe(80000)
-        ->and($activity[$other->getKey()]['outstanding'])->toBe(20000);
+        ->and($activity[$room->getKey()]['pending'])->toBe(2)
+        ->and($activity[$room->getKey()]['ready'])->toBe(1)
+        ->and($activity[$room->getKey()]['preparing'])->toBe(0)
+        ->and($activity[$room->getKey()]['orders'])->toBe(3)
+        ->and($activity[$other->getKey()]['preparing'])->toBe(1);
 });
 
-it('leaves out a cancelled order and one already settled', function (): void {
+it('headlines a location with the loudest thing happening there', function (): void {
+    $tenant = Tenant::factory()->create();
+    $ready = Location::factory()->ofTenant($tenant)->room()->create();
+    $pending = Location::factory()->ofTenant($tenant)->room()->create();
+    $preparing = Location::factory()->ofTenant($tenant)->room()->create();
+
+    // Ready beats pending even with more of the latter: the food is made and
+    // somebody is waiting for it to be carried over.
+    floorOrderAt($tenant, $ready, OrderStatus::Ready);
+    floorOrderAt($tenant, $ready, OrderStatus::Placed);
+    floorOrderAt($tenant, $ready, OrderStatus::Placed);
+
+    floorOrderAt($tenant, $pending, OrderStatus::Placed);
+    floorOrderAt($tenant, $pending, OrderStatus::Accepted);
+
+    floorOrderAt($tenant, $preparing, OrderStatus::Accepted);
+
+    $activity = app(ReadLocationActivity::class)($tenant);
+
+    expect($activity[$ready->getKey()]['state'])->toBe(LocationActivity::Ready)
+        ->and($activity[$pending->getKey()]['state'])->toBe(LocationActivity::Pending)
+        ->and($activity[$preparing->getKey()]['state'])->toBe(LocationActivity::Preparing);
+});
+
+it('leaves out an order that has been served or cancelled', function (): void {
     $tenant = Tenant::factory()->create();
     $room = Location::factory()->ofTenant($tenant)->room()->create();
 
-    $cancelled = boardOrderAt($tenant, $room, 50000);
-    $cancelled->update(['status' => OrderStatus::Cancelled, 'cancelled_at' => Date::now()]);
+    floorOrderAt($tenant, $room, OrderStatus::Served);
+    floorOrderAt($tenant, $room, OrderStatus::Cancelled);
 
-    $settled = boardOrderAt($tenant, $room, 30000);
-    app(RecordPayment::class)($tenant, PaymentMethod::Cash, 30000, [$settled->getKey() => 30000]);
-
+    // Served is finished work however much of it is still unpaid, and that is
+    // the whole point of the floor being about work rather than money.
     expect(app(ReadLocationActivity::class)($tenant))->toBe([]);
 });
 
-it('counts a part-paid order as open, for what is left of it', function (): void {
+it('sorts the busiest first, by how loud they are, and the quiet ones last', function (): void {
     $tenant = Tenant::factory()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->create();
+    $quiet = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101', 'position' => 1]);
+    $preparing = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 102', 'position' => 2]);
+    $pending = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 103', 'position' => 3]);
+    $ready = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 104', 'position' => 4]);
 
-    $order = boardOrderAt($tenant, $room, 50000);
-    app(RecordPayment::class)($tenant, PaymentMethod::Cash, 20000, [$order->getKey() => 20000]);
+    floorOrderAt($tenant, $preparing, OrderStatus::Accepted);
+    floorOrderAt($tenant, $pending, OrderStatus::Placed);
+    floorOrderAt($tenant, $ready, OrderStatus::Ready);
 
-    $activity = app(ReadLocationActivity::class)($tenant);
+    $order = array_map(
+        static fn (array $card): string => $card['location']->name,
+        app(ReadFloor::class)($tenant),
+    );
 
-    expect($activity[$room->getKey()]['openOrders'])->toBe(1)
-        ->and($activity[$room->getKey()]['outstanding'])->toBe(30000);
+    expect($order)->toBe(['Room 104', 'Room 103', 'Room 102', 'Room 101'])
+        ->and($quiet->refresh()->position)->toBe(1);
 });
 
-it('reads as just ordered while the newest order is fresh, and running once it is not', function (): void {
+it('reads two locations in the same state newest order first', function (): void {
     $tenant = Tenant::factory()->create();
-    $fresh = Location::factory()->ofTenant($tenant)->room()->create();
-    $older = Location::factory()->ofTenant($tenant)->room()->create();
+    $older = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101', 'position' => 1]);
+    $newer = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 102', 'position' => 2]);
 
-    boardOrderAt($tenant, $fresh, 10000);
+    floorOrderAt($tenant, $older)->forceFill(['created_at' => Date::now()->subHours(2)])->save();
+    floorOrderAt($tenant, $newer);
 
-    $stale = boardOrderAt($tenant, $older, 10000);
-    $stale->forceFill(['created_at' => Date::now()->subMinutes(ReadLocationActivity::NEW_ORDER_MINUTES + 5)])->save();
+    $order = array_map(
+        static fn (array $card): string => $card['location']->name,
+        app(ReadFloor::class)($tenant),
+    );
 
-    $activity = app(ReadLocationActivity::class)($tenant);
-
-    expect($activity[$fresh->getKey()]['state'])->toBe(LocationActivity::JustOrdered)
-        ->and($activity[$older->getKey()]['state'])->toBe(LocationActivity::Running);
+    expect($order)->toBe(['Room 102', 'Room 101']);
 });
 
-it('draws a card per location with what is open at it, and the floor summed above them', function (): void {
+it("keeps the quiet locations in the tenant's own order among themselves", function (): void {
+    $tenant = Tenant::factory()->create();
+
+    foreach (['Room 101', 'Room 102', 'Room 103'] as $index => $name) {
+        Location::factory()->ofTenant($tenant)->room()->create(['name' => $name, 'position' => $index]);
+    }
+
+    $order = array_map(
+        static fn (array $card): string => $card['location']->name,
+        app(ReadFloor::class)($tenant),
+    );
+
+    expect($order)->toBe(['Room 101', 'Room 102', 'Room 103']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| What a card draws
+|--------------------------------------------------------------------------
+*/
+
+it('draws a card per location with what is waiting at it', function (): void {
     $tenant = Tenant::factory()->create();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
     Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 310']);
 
-    boardOrderAt($tenant, $room, 124000);
+    floorOrderAt($tenant, $room, OrderStatus::Ready);
+    floorOrderAt($tenant, $room, OrderStatus::Placed);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
@@ -138,34 +193,60 @@ it('draws a card per location with what is open at it, and the floor summed abov
         ->assertOk()
         ->assertSee('Room 204')
         ->assertSee('Room 310')
-        ->assertSee('₹1,240.00')
-        ->assertSee('New order')
+        ->assertSee('1 ready')
+        ->assertSee('1 pending')
         ->assertSee('Nothing open');
 });
 
-it('shows nobody else\'s locations, and nobody else\'s orders against its own', function (): void {
+it('shows no money anywhere on the floor', function (): void {
+    $tenant = Tenant::factory()->create();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+
+    floorOrderAt($tenant, $room);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    // Not the amount, and not the action that takes it: this view is about
+    // where the work is (`.ai/rules/order-taking.md`).
+    floorOf()
+        ->assertDontSee('₹')
+        ->assertActionDoesNotExist('settleAction');
+});
+
+it("says nothing more than 'nothing open' on a quiet card", function (): void {
+    $tenant = Tenant::factory()->create();
+    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101']);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    floorOf()
+        ->assertSee('Room 101')
+        ->assertSee('Nothing open')
+        ->assertDontSee('Clear');
+});
+
+it("shows nobody else's locations, and nobody else's orders against its own", function (): void {
     $tenant = Tenant::factory()->create();
     $theirs = Tenant::factory()->create();
 
     Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Ours 1']);
-    Location::factory()->ofTenant($theirs)->room()->create(['name' => 'Theirs 1']);
+    $theirRoom = Location::factory()->ofTenant($theirs)->room()->create(['name' => 'Theirs 1']);
 
-    boardOrderAt($theirs, null, 90000);
+    floorOrderAt($theirs, $theirRoom);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     floorOf()
         ->assertSee('Ours 1')
-        ->assertDontSee('Theirs 1')
-        ->assertDontSee('₹900.00');
+        ->assertDontSee('Theirs 1');
 });
 
 it('narrows the floor by kind, by search and to what is open', function (): void {
     $tenant = Tenant::factory()->create(['type' => TenantType::Hotel]);
-    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204', 'code' => '204']);
+    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204', 'code' => '204']);
     $pool = Location::factory()->ofTenant($tenant)->area()->create(['name' => 'Poolside']);
 
-    boardOrderAt($tenant, $pool, 10000);
+    floorOrderAt($tenant, $pool);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
@@ -191,95 +272,6 @@ it('leaves a switched-off location off the floor', function (): void {
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     floorOf()->assertDontSee('Room 999');
-});
-
-it('settles a location from its own card', function (): void {
-    $tenant = Tenant::factory()->create();
-    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
-    $order = boardOrderAt($tenant, $room, 40000);
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    floorOf()
-        ->callAction(
-            TestAction::make('settleAction')->arguments(['location' => $room->getKey()]),
-            ['orders' => [$order->getKey()], 'method' => PaymentMethod::Cash->value, 'amount' => 400],
-        )
-        ->assertHasNoActionErrors();
-
-    expect($order->refresh()->amountOutstanding())->toBe(0);
-});
-
-it('sends a tenant with no locations to set some up', function (): void {
-    $tenant = Tenant::factory()->create();
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    floorOf()
-        ->assertOk()
-        ->assertSee('No locations yet')
-        ->assertSee('New location');
-});
-
-/*
-|--------------------------------------------------------------------------
-| The order the cards come back in, and what a quiet one says
-|--------------------------------------------------------------------------
-|
-| The project owner's instruction: a room with nothing open is not what staff
-| are looking for, so it goes last — and it says so once, rather than carrying
-| a badge and a total of nothing.
-|
-*/
-
-it('puts the locations with something owing first, newest order at the top', function (): void {
-    $tenant = Tenant::factory()->create();
-    $quiet = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101', 'position' => 1]);
-    $older = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 102', 'position' => 2]);
-    $newest = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 103', 'position' => 3]);
-
-    $stale = boardOrderAt($tenant, $older, 10000);
-    $stale->forceFill(['created_at' => Date::now()->subHours(2)])->save();
-
-    boardOrderAt($tenant, $newest, 20000);
-
-    $order = array_map(
-        static fn (array $card): string => $card['location']->name,
-        app(ReadFloor::class)($tenant),
-    );
-
-    // The two with something owing, newest first — then the quiet one.
-    expect($order)->toBe(['Room 103', 'Room 102', 'Room 101'])
-        ->and($quiet->refresh()->position)->toBe(1);
-});
-
-it('keeps the quiet locations in the tenant\'s own order among themselves', function (): void {
-    $tenant = Tenant::factory()->create();
-
-    foreach (['Room 101', 'Room 102', 'Room 103'] as $index => $name) {
-        Location::factory()->ofTenant($tenant)->room()->create(['name' => $name, 'position' => $index]);
-    }
-
-    $order = array_map(
-        static fn (array $card): string => $card['location']->name,
-        app(ReadFloor::class)($tenant),
-    );
-
-    expect($order)->toBe(['Room 101', 'Room 102', 'Room 103']);
-});
-
-it('says nothing more than "nothing open" on a quiet card', function (): void {
-    $tenant = Tenant::factory()->create();
-    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101']);
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    // No "Clear" badge, and no total of nothing beside it.
-    floorOf()
-        ->assertSee('Room 101')
-        ->assertSee('Nothing open')
-        ->assertDontSee('Clear')
-        ->assertDontSee('₹0.00');
 });
 
 /*
@@ -310,7 +302,7 @@ it('opens as the list and switches to the floor and back', function (): void {
 it('crosses from a card to the list with that location already filtered', function (): void {
     $tenant = Tenant::factory()->create();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
-    boardOrderAt($tenant, $room, 40000);
+    floorOrderAt($tenant, $room);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
@@ -318,4 +310,15 @@ it('crosses from a card to the list with that location already filtered', functi
 
     expect($page->instance()->isFloor())->toBeFalse()
         ->and($page->get('tableFilters')['location_id']['value'])->toBe((string) $room->getKey());
+});
+
+it('sends a tenant with no locations to set some up', function (): void {
+    $tenant = Tenant::factory()->create();
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    floorOf()
+        ->assertOk()
+        ->assertSee('No locations yet')
+        ->assertSee('New location');
 });

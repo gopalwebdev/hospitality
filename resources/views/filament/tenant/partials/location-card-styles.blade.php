@@ -38,21 +38,13 @@
         background-color: var(--gray-400);
     }
 
-    .lc--just-ordered::before {
-        background-color: var(--warning-500);
-    }
+    .lc--ready::before { background-color: var(--success-500); }
+    .lc--pending::before { background-color: var(--warning-500); }
+    .lc--preparing::before { background-color: var(--info-500); }
 
-    .lc--running::before {
-        background-color: var(--info-500);
-    }
-
-    .lc--just-ordered {
-        background-color: color-mix(in oklab, var(--warning-500) 6%, transparent);
-    }
-
-    .lc--running {
-        background-color: color-mix(in oklab, var(--info-500) 5%, transparent);
-    }
+    .lc--ready { background-color: color-mix(in oklab, var(--success-500) 7%, transparent); }
+    .lc--pending { background-color: color-mix(in oklab, var(--warning-500) 6%, transparent); }
+    .lc--preparing { background-color: color-mix(in oklab, var(--info-500) 5%, transparent); }
 
     .lc-head {
         display: flex;
@@ -85,9 +77,56 @@
         margin-top: 0.75rem;
     }
 
-    .lc-owing {
-        font-size: 1.125rem;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
+    .lc-name {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
     }
+
+    .lc-kind-icon {
+        width: 1rem;
+        height: 1rem;
+        flex: none;
+        color: var(--gray-500);
+    }
+
+    :is(.dark) .lc-kind-icon {
+        color: var(--gray-400);
+    }
+
+    /* How much is waiting, step by step, rather than one figure. */
+    .lc-counts {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        flex-wrap: wrap;
+    }
+
+    .lc-count {
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.5;
+        padding: 0.0625rem 0.4375rem;
+        border-radius: 9999px;
+        white-space: nowrap;
+    }
+
+    .lc-count--ready {
+        color: var(--success-600);
+        background-color: color-mix(in oklab, var(--success-500) 16%, transparent);
+    }
+
+    .lc-count--pending {
+        color: var(--warning-600);
+        background-color: color-mix(in oklab, var(--warning-500) 16%, transparent);
+    }
+
+    .lc-count--preparing {
+        color: var(--info-600);
+        background-color: color-mix(in oklab, var(--info-500) 16%, transparent);
+    }
+
+    :is(.dark) .lc-count--ready { color: var(--success-300); }
+    :is(.dark) .lc-count--pending { color: var(--warning-300); }
+    :is(.dark) .lc-count--preparing { color: var(--info-300); }
 </style>

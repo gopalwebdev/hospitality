@@ -171,6 +171,17 @@ class Order extends Model
     }
 
     /**
+     * Whether there is still work to do on it — what the floor draws.
+     *
+     * Not the same question as isLive(): a served order is finished business
+     * however much of it is still unpaid.
+     */
+    public function isUnderway(): bool
+    {
+        return $this->status->isUnderway();
+    }
+
+    /**
      * Whether staff may still change what is on this order.
      *
      * Two conditions, and both are the point: the kitchen has not accepted it
