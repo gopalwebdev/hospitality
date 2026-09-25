@@ -10,10 +10,13 @@ use App\Models\User;
  * Who may read the orders guests place, and who may call one off.
  *
  * Reading is order.view-any and cancelling order.manage, both of which floor
- * staff hold as well as a tenant owner. Nobody creates, edits or deletes an order
- * here: guests place them from a menu (PlaceOrder), and what was ordered is a
- * record rather than a draft. Which tenant's orders are in front of you is not
- * this policy's business; Filament scopes the resource to the panel's tenant.
+ * staff hold as well as a tenant owner. Creating is order.create, which staff
+ * hold because they take orders at the counter and over the phone from the
+ * panel's own Take order page — the same PlaceOrder a guest's phone calls.
+ * Nothing is edited or deleted: what was ordered is a record rather than a
+ * draft, and an order that should not stand is cancelled. Which tenant's
+ * orders are in front of you is not this policy's business; Filament scopes
+ * the resource to the panel's tenant.
  */
 class OrderPolicy
 {
@@ -28,11 +31,15 @@ class OrderPolicy
     }
 
     /**
-     * Orders are placed by guests from a menu, never typed in here.
+     * Take an order on a guest's behalf, from the panel's Take order page.
+     *
+     * This answered false while ordering was the guest app's alone. It is the
+     * one thing a member of staff may now add here; an order still cannot be
+     * edited or deleted once it stands.
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->can(Permission::OrderCreate->value);
     }
 
     public function update(User $user, Order $order): bool

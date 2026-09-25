@@ -74,12 +74,13 @@ This followed the rule's own advice: the difference is **a method per question o
 ## A menu block's type says what it is, and whether every menu has one
 `App\Enums\MenuRailType` (`Featured`, `Combos`) is the `type` of a `menu_rails` row. It replaced a `MenuRail` enum of the same two cases whose job was naming a `position` column on `menus` for each. `isOnEveryMenu()` is the one question that changes how a type is read: true means exactly one per menu with no row until it is placed (`Menu::readingOrder()` fills it in at 0), false — for a kind a menu may hold several of, such as a banner — means only its rows exist. `label()` is what the panel calls it. Adding a case is covered in `.ai/rules/menus.md`; `menu_rails_type_is_known` is rebuilt from the cases by `migrate:fresh`.
 
-## Orders, stock, locations and money carry ten small enums
+## Orders, stock, locations and money carry eleven small enums
 - **`OrderStatus`:** `Placed`, `Cancelled`. The steps staff move an order through arrive with the screens that move it; `orders_status_is_known` is built from the cases.
 - **`OrderLineType`:** `Item`, `Combo` — the same words as `PriceBasket::ITEM` / `COMBO`, and which of `order_lines.menu_item_id` / `menu_combo_id` a line may fill (`order_lines_key_matches_type`).
 - **`StockMovementReason`:** `Restock`, `Count`, `OrderPlaced`, `OrderCancelled`, with `label()` and `color()` for the history table.
 - **`OrderRefusal`:** why an order was refused, sent to the guest app as `reason` with `message()` from `lang/en/guest.php`. `InsufficientStock` is a case here too, so a refusal always answers with the same field. `StoreClosed` replaced `NotAcceptingOrders` when the switch it named became weekly opening hours.
 - **`LocationKind`:** `Room`, `Table`, `Area`. Every case is somewhere an order can go; which of them a tenant is offered is `TenantType::locationKinds()` (`.ai/rules/locations.md`).
+- **`LocationActivity`:** `Clear`, `JustOrdered`, `Running` — what is happening at a location right now. **No column**, the `PaymentState` shape: it is worked out from that location's open orders on every read of the orders page's floor layout, so it cannot disagree with them, and `.ai/rules/locations.md` forbids a `locations.status` to back it. Named for activity rather than status for exactly that reason.
 - **`OrderSettlement`:** `PayNow`, `AddToBill` — the guest's **intent**, never the truth about the money.
 - **`PaymentMethod`:** `Cash`, `Upi`, `CreditCard`, `DebitCard`, carrying `deviceKind()` and `takesReference()` — the single place it is said which device a method may name and whether it carries a transaction number.
 - **`PaymentDeviceKind`:** `CardMachine`, `QrCode`.

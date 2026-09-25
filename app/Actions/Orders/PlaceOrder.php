@@ -56,6 +56,7 @@ final readonly class PlaceOrder
 
     /**
      * @param  list<BasketLine>  $lines
+     * @param  bool  $allowOutsideHours  staff taking an order themselves, past closing or off a menu's service window
      *
      * @throws OrderRefused when ordering is off, the menu is not being served, or a line no longer stands
      * @throws InsufficientStock when a counted item or option has fewer left than the basket asks for
@@ -68,10 +69,20 @@ final readonly class PlaceOrder
         OrderSettlement $settlement = OrderSettlement::AddToBill,
         ?string $locationLabel = null,
         ?string $note = null,
+        bool $allowOutsideHours = false,
     ): Order {
-        throw_unless($tenant->isOpenAt(), OrderRefused::class, OrderRefusal::StoreClosed);
+        // The two windows are a guest-facing rule: a phone should not be able
+        // to order into a closed kitchen. A member of staff standing in that
+        // kitchen is a different question, and the project owner's answer is
+        // that they may — an order taken over the phone at five past closing
+        // is a real order. Only the tenant panel passes this, and it is
+        // deliberately not a setting: every other refusal below still stands,
+        // stock included, so what this waives is the clock and nothing else.
+        if (! $allowOutsideHours) {
+            throw_unless($tenant->isOpenAt(), OrderRefused::class, OrderRefusal::StoreClosed);
 
-        throw_unless($menu->isBeingServedAt(), OrderRefused::class, OrderRefusal::NotBeingServed);
+            throw_unless($menu->isBeingServedAt(), OrderRefused::class, OrderRefusal::NotBeingServed);
+        }
 
         $priced = ($this->priceBasket)($tenant, $menu, $lines);
 

@@ -431,6 +431,9 @@ it('seeds staff who work orders but do not change the menu', function (): void {
     expect($staff->permissions->pluck('name')->all())->toEqualCanonicalizing([
         PermissionEnum::MenuView->value,
         PermissionEnum::StorefrontView->value,
+        // Staff take orders themselves, at the desk and over the phone, from
+        // the tenant panel's Take order page.
+        PermissionEnum::OrderCreate->value,
         PermissionEnum::OrderViewAny->value,
         PermissionEnum::OrderManage->value,
         // Staff read what has been paid and take a payment; reversing one

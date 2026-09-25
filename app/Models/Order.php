@@ -178,6 +178,18 @@ class Order extends Model
     }
 
     /**
+     * Whether a list query's `amount_paid` sum is already on this instance.
+     *
+     * The one honest way to ask, because loadedCount() answers null both for
+     * "not loaded" and for a sum of nothing, and a modal opening an order has
+     * to know which of those it is looking at before it decides to re-read.
+     */
+    public function amountPaidWasLoaded(): bool
+    {
+        return array_key_exists('amount_paid', $this->getAttributes());
+    }
+
+    /**
      * What is still owed: never negative, however an overpayment came about.
      */
     public function amountOutstanding(): int
@@ -201,25 +213,36 @@ class Order extends Model
     }
 
     /**
-     * Orders still owing money: the sum of their live (non-voided) payment
-     * allocations comes to less than the order's own total.
+     * What an order row has been paid, as SQL against `orders`.
      *
      * A correlated subquery over order_payments joined to live payments —
      * the MenuItemsTable::inMenuOrder() precedent for a correlated read in
-     * raw SQL, needed here because a plain whereHas cannot compare a sum
-     * against another column on the same row.
+     * raw SQL, needed because a plain whereHas cannot compare a sum against
+     * another column on the same row. One method rather than the same string
+     * typed out in each place, because a board summing what a whole location
+     * still owes needs the very same expression the two scopes below compare
+     * against, and three copies of it is three chances to diverge.
+     *
+     * @return literal-string
+     */
+    public static function amountPaidExpression(): string
+    {
+        return 'coalesce(('
+            .'select sum(order_payments.amount) from order_payments'
+            .' join payments on payments.id = order_payments.payment_id'
+            .' where order_payments.order_id = orders.id and payments.voided_at is null'
+            .'), 0)';
+    }
+
+    /**
+     * Orders still owing money: the sum of their live (non-voided) payment
+     * allocations comes to less than the order's own total.
      *
      * @param  Builder<$this>  $query
      */
     public function scopeUnsettled(Builder $query): void
     {
-        $query->whereRaw(
-            'coalesce(('
-            .'select sum(order_payments.amount) from order_payments'
-            .' join payments on payments.id = order_payments.payment_id'
-            .' where order_payments.order_id = orders.id and payments.voided_at is null'
-            .'), 0) < orders.total'
-        );
+        $query->whereRaw(self::amountPaidExpression().' < orders.total');
     }
 
     /**
@@ -227,13 +250,7 @@ class Order extends Model
      */
     public function scopeSettled(Builder $query): void
     {
-        $query->whereRaw(
-            'coalesce(('
-            .'select sum(order_payments.amount) from order_payments'
-            .' join payments on payments.id = order_payments.payment_id'
-            .' where order_payments.order_id = orders.id and payments.voided_at is null'
-            .'), 0) >= orders.total'
-        );
+        $query->whereRaw(self::amountPaidExpression().' >= orders.total');
     }
 
     /**

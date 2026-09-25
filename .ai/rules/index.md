@@ -21,6 +21,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Middleware/**, app/Http/Middleware/SetLocale.php | .ai/rules/middleware.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Models/User.php, app/Models/**, app/Models/MenuItem.php, app/Models/HomeTile.php | .ai/rules/models.md |
+| app/Filament/Tenant/Resources/Orders/Pages/ListOrders.php, app/Filament/Tenant/Pages/TakeOrder.php, app/Actions/Orders/ReadFloor.php, app/Actions/Orders/ReadLocationActivity.php, app/Actions/Menus/ReadOrderableMenu.php, app/Enums/LocationActivity.php, resources/views/filament/tenant/resources/orders/pages/**, resources/views/filament/tenant/pages/take-order.blade.php, resources/views/filament/tenant/partials/** | .ai/rules/order-taking.md |
 | app/Actions/OneTimePasswords/** | .ai/rules/otp.md |
 | app/Models/Payment.php, app/Models/OrderPayment.php, app/Models/PaymentDevice.php, app/Actions/Payments/**, app/Filament/Tenant/Resources/Payments/**, app/Filament/Tenant/Resources/PaymentDevices/**, app/Enums/PaymentMethod.php, app/Enums/PaymentState.php, app/Enums/OrderSettlement.php | .ai/rules/payments.md |
 | app/Policies/** | .ai/rules/policies.md |

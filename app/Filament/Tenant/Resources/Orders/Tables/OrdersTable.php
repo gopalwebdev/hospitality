@@ -12,6 +12,8 @@ use App\Exceptions\PaymentRefused;
 use App\Filament\Schemas\PaymentFields;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tenant\Resources\Orders\OrderResource;
+use App\Filament\Tenant\Resources\Orders\Schemas\OrderInfolist;
 use App\Models\Location;
 use App\Models\Order;
 use App\Models\PaymentDevice;
@@ -21,6 +23,8 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -114,9 +118,8 @@ class OrdersTable
                     ->query(self::unsettledQuery(...)),
             ])
             ->recordActions([
-                ViewAction::make()
+                self::viewAction()
                     ->iconButton()
-                    ->icon(Heroicon::OutlinedEye)
                     ->tooltip(__('panel.orders.view')),
 
                 self::recordPaymentAction()
@@ -143,7 +146,31 @@ class OrdersTable
     }
 
     /**
-     * Call a placed order off and put back what it took from stock — from a row, or from the order's own page.
+     * Read one order — in a modal, from anywhere that can name it.
+     *
+     * There is no order page any more: the project owner asked for the whole
+     * record in a modal, and a full page for four short sections was a
+     * navigation away and back for something staff glance at. The modal is wide
+     * because the lines and the payments are tables, and it is read-only —
+     * taking a payment and calling the order off are the buttons beside it.
+     *
+     * mountUsing() is what makes it safe: the list query carries no lines,
+     * choices, charges or payments, so they are loaded onto the record the
+     * moment the modal opens rather than lazily while it renders, which
+     * Model::shouldBeStrict() would refuse.
+     */
+    public static function viewAction(): ViewAction
+    {
+        return ViewAction::make()
+            ->icon(Heroicon::OutlinedEye)
+            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.view_heading', ['number' => $record->getKey()]))
+            ->modalWidth(Width::FiveExtraLarge)
+            ->mountUsing(fn (Order $record) => OrderResource::loadForView($record))
+            ->schema(fn (Schema $schema): Schema => OrderInfolist::configure($schema));
+    }
+
+    /**
+     * Call a placed order off and put back what it took from stock — from a row, or from the modal reading it.
      */
     public static function cancelAction(): Action
     {
@@ -165,7 +192,7 @@ class OrdersTable
                 // The page redraws from this instance; it has to say cancelled.
                 // Deliberately not a plain refresh(): Eloquent's refresh() only
                 // reloads bare top-level relation names, dropping a nested
-                // dot-path eager load and any withSum aggregate. ViewOrder's
+                // dot-path eager load and any withSum aggregate. The view modal's
                 // route-binding query loads paymentAllocations.payment.paymentDevice
                 // and an amount_paid sum, so cancelling from the order's own
                 // page would otherwise reload them bare and the infolist's
@@ -268,11 +295,17 @@ class OrdersTable
 
         $record->setRawAttributes($fresh->getAttributes());
 
-        $record->load([
-            'paymentAllocations' => fn ($allocations) => $allocations->orderByDesc('id'),
-            'paymentAllocations.payment.paymentDevice',
-            'paymentAllocations.payment.recordedBy',
-        ]);
+        // Only the payments: the lines and charges on a record the modal
+        // already loaded have not changed, and a record from the list has
+        // none loaded to keep.
+        $record->load(array_intersect_key(
+            OrderResource::viewRelations(),
+            array_flip([
+                'paymentAllocations',
+                'paymentAllocations.payment.paymentDevice',
+                'paymentAllocations.payment.recordedBy',
+            ]),
+        ));
     }
 
     /**

@@ -3,25 +3,27 @@
 namespace App\Filament\Tenant\Resources\Orders;
 
 use App\Filament\Tenant\Resources\Orders\Pages\ListOrders;
-use App\Filament\Tenant\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Tenant\Resources\Orders\Schemas\OrderInfolist;
 use App\Filament\Tenant\Resources\Orders\Tables\OrdersTable;
 use App\Models\Order;
 use BackedEnum;
+use Closure;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
- * The orders guests have placed, newest first, to read and — when one has to be called off — cancel.
+ * Every order placed, newest first, to read and — when one has to be called off — cancel.
  *
- * Nothing is created or edited here: guests place orders from a menu
- * (App\Actions\Orders\PlaceOrder), and an order is a record of what was
- * ordered, not a draft. Cancelling puts back what it took from stock
- * (CancelOrder). The steps staff move an order through come with the screens
- * that move it. Who may look and who may cancel is OrderPolicy's business.
+ * Nothing is edited or deleted here: an order is a record of what was ordered,
+ * not a draft, so one that should not stand is cancelled and CancelOrder puts
+ * back what it took from stock. Nothing is created here either, but orders are
+ * no longer only a guest's phone: New order links to the panel's own counter
+ * (App\Filament\Tenant\Pages\TakeOrder), which calls the same PlaceOrder the
+ * guest API does. The steps staff move an order through come with the screens
+ * that move it. Who may look, who may take one and who may cancel is
+ * OrderPolicy's business.
  */
 class OrderResource extends Resource
 {
@@ -62,17 +64,52 @@ class OrderResource extends Resource
     }
 
     /**
-     * An opened order arrives with its menu, its lines in order, their choices, its charges, and the payments that settled it with their devices and who recorded them, so the page asks for none of them per line.
+     * Load everything one order's infolist reads, onto the instance it was handed.
      *
-     * @return Builder<Order>
+     * An order is read in a **modal**, on the project owner's instruction, so
+     * there is no view page and no route binding to hang the eager loads on:
+     * whatever opens the modal calls this first. Without it the infolist would
+     * lazy-load its lines, choices, charges and payments while rendering, which
+     * Model::shouldBeStrict() refuses outright (`.ai/rules/app.md`).
+     *
+     * The payment sum is aliased exactly `amount_paid` and constrained to live
+     * payments — the contract Order::amountPaid() reads it back under, and the
+     * same one OrdersTable::configure() follows for the list. The Record
+     * payment action's visibility, its amount default and the infolist's own
+     * outstanding line all read that one value rather than asking again.
      */
-    public static function getRecordRouteBindingEloquentQuery(): Builder
+    public static function loadForView(Order $record): void
     {
-        // Filament's own is a query of the resource's model, which is this one.
-        /** @var Builder<Order> $query */
-        $query = parent::getRecordRouteBindingEloquentQuery();
+        // loadMissing, not load: the list already eager-loads each row's menu
+        // with the same two columns, and loading it again is the duplicate the
+        // query guard throws on (`.ai/rules/app.md`). Everything else the
+        // infolist reads is genuinely absent from a list row and does load.
+        if ($record->amountPaidWasLoaded()) {
+            $record->loadMissing(self::viewRelations());
 
-        return $query->with([
+            return;
+        }
+
+        $fresh = Order::query()
+            ->whereKey($record->getKey())
+            ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
+                ->whereHas('payment', fn ($payment) => $payment->live())], 'amount')
+            ->firstOrFail();
+
+        $record->setRawAttributes($fresh->getAttributes());
+        $record->loadMissing(self::viewRelations());
+    }
+
+    /**
+     * The lines in order, their choices, the charges, and the payments that
+     * settled it with their devices and who recorded them — so the infolist
+     * asks for none of them per row.
+     *
+     * @return array<int|string, Closure|string>
+     */
+    public static function viewRelations(): array
+    {
+        return [
             'menu' => fn ($menu) => $menu->select(['id', 'name']),
             'lines' => fn ($lines) => $lines->orderBy('position')->orderBy('id'),
             'lines.choices',
@@ -80,22 +117,13 @@ class OrderResource extends Resource
             'paymentAllocations' => fn ($allocations) => $allocations->orderByDesc('id'),
             'paymentAllocations.payment.paymentDevice',
             'paymentAllocations.payment.recordedBy',
-        ])
-            // Loaded once here rather than read fresh every time the page asks
-            // what is still outstanding — the Record payment action's
-            // visibility, its amount default, and the infolist's own
-            // outstanding line all read this same value. Aliased exactly
-            // amount_paid and constrained to live payments, the same contract
-            // OrdersTable::configure() follows for the list.
-            ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
-                ->whereHas('payment', fn ($payment) => $payment->live())], 'amount');
+        ];
     }
 
     public static function getPages(): array
     {
         return [
             'index' => ListOrders::route('/'),
-            'view' => ViewOrder::route('/{record}'),
         ];
     }
 }

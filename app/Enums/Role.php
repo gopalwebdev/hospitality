@@ -38,11 +38,13 @@ enum Role: string
             // new product team permission is withheld here the day it is added.
             self::Owner => self::everyPermissionExcept(...Permission::productTeamOnly()),
 
-            // Staff work the floor: they read the menu and move orders along,
-            // but they do not change what is sold or who works here.
+            // Staff work the floor: they read the menu, take orders on a
+            // guest's behalf and move them along, but they do not change what
+            // is sold or who works here.
             self::Staff => [
                 Permission::MenuView,
                 Permission::StorefrontView,
+                Permission::OrderCreate,
                 Permission::OrderViewAny,
                 Permission::OrderManage,
                 // Not PaymentVoid: reversing money already taken is an

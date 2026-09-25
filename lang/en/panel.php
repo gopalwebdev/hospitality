@@ -228,6 +228,12 @@ return [
         'charges' => 'Charges',
         'total' => 'Total',
         'view' => 'Open',
+        'view_heading' => 'Order #:number',
+        // Orders are read two ways on this one page, on the project owner's
+        // instruction: the list of them, and the floor they are on.
+        'layout_list' => 'List',
+        'layout_floor' => 'Floor',
+        'show_orders_here' => 'Show its orders',
         'cancel' => 'Cancel order',
         'cancel_heading' => 'Cancel order #:number?',
         'cancel_warning' => 'Whatever it took from stock is put back. This cannot be undone.',
@@ -255,6 +261,69 @@ return [
         'settle' => 'Settle',
         'settle_orders' => 'Orders',
         'settle_order_option' => 'Order #:number — :amount outstanding',
+    ],
+
+    // The live floor: every room, table and delivery point at once, with what
+    // is open at each. App\Filament\Tenant\Pages\OrderBoard.
+    'board' => [
+        'title' => 'Order board',
+        'search' => 'Find a room, table or code',
+        'only_open' => 'Only open',
+        'live' => 'Live · every :seconds',
+        'active_locations' => 'Locations open',
+        'open_orders' => 'Orders open',
+        'nothing_open' => 'Nothing open',
+        'orders_open' => '{1} 1 order|[2,*] :count orders',
+        'capacity' => '{1} 1 seat|[2,*] :count seats',
+        'take_order' => 'Take order',
+        'none_heading' => 'Nothing matches',
+        'none_description' => 'Clear the search, or switch the filters off.',
+    ],
+
+    // The counter, where staff take an order on a guest's behalf.
+    // App\Filament\Tenant\Pages\TakeOrder.
+    'take_order' => [
+        'title' => 'Take order',
+        'new' => 'New order',
+        'heading_at' => 'Take order · :name',
+        'details' => 'Order',
+        'location_label' => 'Where it goes',
+        // Where it goes is picked from a grid of cards rather than a select:
+        // a tenant with fifty rooms is a fifty-row dropdown, and staff need to
+        // see what is already open at a room before adding to it.
+        'where_heading' => 'Where is this order going?',
+        'elsewhere' => 'Somewhere else',
+        'change_location' => 'Change',
+        'already_here' => 'Already running here',
+        'owing' => ':amount owing',
+        'search' => 'Find an item',
+        'add' => 'Add',
+        'customise' => 'Choose',
+        'how_many' => 'How many :name?',
+        'complimentary' => 'Complimentary',
+        'limit_reached' => 'Limit reached',
+        'in_basket' => ':count in basket',
+        'basket' => 'Basket',
+        'basket_count' => '{1} 1 item|[2,*] :count items',
+        'basket_empty' => 'Tap an item to start the order.',
+        'empty' => 'Empty the basket',
+        'place' => 'Place order · :amount',
+        'placed' => 'Order #:number placed',
+        'refused' => 'Order refused',
+        'short' => 'Not enough left',
+        'shortage' => ':name — :requested asked for, :available left.',
+        'line_unavailable' => 'No longer available',
+        'line_invalid' => 'Choices need changing',
+        // Said rather than enforced: staff may order past closing, and the
+        // banner is how they know they are.
+        'outside_hours' => 'Outside opening hours',
+        'tenant_closed' => 'The tenant is closed right now.',
+        'menu_not_served' => ':name is outside its service window.',
+        'tax_line' => 'GST :rate · :amount',
+        'tax_included_line' => 'Incl. GST :rate · :amount',
+        'tax_included_total' => 'Includes GST of :amount',
+        'nothing_heading' => 'Nothing to order',
+        'nothing_description' => 'Nothing on this menu can be ordered right now. Try another menu, or check what is available.',
     ],
 
     'add_on_groups' => [

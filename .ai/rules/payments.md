@@ -24,7 +24,7 @@ A plain `payments.order_id` was considered and rejected. It turns one card swipe
 `order_payments` is a real entity rather than a bare pivot — it carries an amount — so the table is plural, it has an `OrderPayment` model, and `OrderPaymentObserver` takes its `tenant_id` from its payment through `App\Actions\Tenants\InheritParentTenant`. **`tenant_id` is deliberately not fillable on it**; anything writing an allocation lets the observer do it.
 
 ## A payment is voided, never deleted
-`voided_at`, `voided_by_user_id` and `void_reason`, and `PaymentPolicy` answers `update`, `delete` and `deleteAny` with **false outright** — the `OrderPolicy` shape. This is the "nothing on the menu is hard-deleted to take it off" instinct from `.ai/rules/models.md`, and money deserves it more than a menu item does.
+`voided_at`, `voided_by_user_id` and `void_reason`, and `PaymentPolicy` answers `update`, `delete` and `deleteAny` with **false outright** — the same three `OrderPolicy` refuses. This is the "nothing on the menu is hard-deleted to take it off" instinct from `.ai/rules/models.md`, and money deserves it more than a menu item does.
 
 `VoidPayment` locks the payment, refuses one already voided, and **leaves the allocations in place** — the history is the point. Everything that reads money ignores a voided payment, so the order simply owes again.
 
@@ -73,6 +73,6 @@ It refuses, writing nothing: an empty or non-positive allocation, allocations th
 ## A refresh() drops what a page eager-loaded
 `Order::refresh()` reloads only bare top-level relation names — it drops **nested dot-path eager loads and any `withSum` aggregate**. `OrderResource::getRecordRouteBindingEloquentQuery()` loads `paymentAllocations.payment.paymentDevice` and the `amount_paid` sum, so a plain `refresh()` after a panel action made the infolist's redraw lazy-load and throw under `Model::shouldBeStrict()`.
 
-`OrdersTable::reloadPayments()` is what both Record payment and Cancel call instead. This bit on the **order's own page only** — the list path loads none of that — which is why `OrderManagementTest` cancels from `ViewOrder` as well as from the table.
+`OrdersTable::reloadPayments()` is what both Record payment and Cancel call instead. It reloads the payments alone: an order is read in a **modal** now (`.ai/rules/order-taking.md`), so the lines and charges on a record the modal already loaded have not changed, and a record straight from the list has none loaded to keep.
 
 Tests: `tests/Feature/Tenant/PaymentTest.php`, `CheckoutTest.php`, `PaymentDeviceManagementTest.php`, `OrderManagementTest.php`.
