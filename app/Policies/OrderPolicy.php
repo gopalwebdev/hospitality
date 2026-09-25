@@ -66,6 +66,29 @@ class OrderPolicy
     }
 
     /**
+     * Pick an order up: the kitchen has it, and its lines are fixed from here.
+     */
+    public function accept(User $user, Order $order): bool
+    {
+        return $user->can(Permission::OrderManage->value);
+    }
+
+    /**
+     * Change what is on an order nobody has picked up yet.
+     *
+     * `order.manage` rather than `order.create`, though it ends in the same
+     * basket: creating is bringing a new order into existence, and this is
+     * working one that already exists — the same side of the line as accepting
+     * and cancelling. Whether this particular order may still be changed is
+     * Order::canBeChanged()'s answer and ReviseOrder's to enforce; this only
+     * says who is allowed to try.
+     */
+    public function change(User $user, Order $order): bool
+    {
+        return $user->can(Permission::OrderManage->value);
+    }
+
+    /**
      * Record a payment against this order.
      */
     public function recordPayment(User $user, Order $order): bool

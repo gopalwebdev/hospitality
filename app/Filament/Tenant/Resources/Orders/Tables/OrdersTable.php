@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Orders\Tables;
 
+use App\Actions\Orders\AcceptOrder;
 use App\Actions\Orders\CancelOrder;
 use App\Actions\Payments\RecordPayment;
 use App\Enums\OrderSettlement;
@@ -12,6 +13,7 @@ use App\Exceptions\PaymentRefused;
 use App\Filament\Schemas\PaymentFields;
 use App\Filament\Schemas\PricingFields;
 use App\Filament\Schemas\TranslatedFields;
+use App\Filament\Tenant\Pages\TakeOrder;
 use App\Filament\Tenant\Resources\Orders\OrderResource;
 use App\Filament\Tenant\Resources\Orders\Schemas\OrderInfolist;
 use App\Models\Location;
@@ -122,6 +124,14 @@ class OrdersTable
                     ->iconButton()
                     ->tooltip(__('panel.orders.view')),
 
+                self::acceptAction()
+                    ->iconButton()
+                    ->tooltip(__('panel.orders.accept')),
+
+                self::changeAction()
+                    ->iconButton()
+                    ->tooltip(__('panel.orders.change')),
+
                 self::recordPaymentAction()
                     ->iconButton()
                     ->tooltip(__('panel.orders.record_payment')),
@@ -170,7 +180,54 @@ class OrdersTable
     }
 
     /**
-     * Call a placed order off and put back what it took from stock — from a row, or from the modal reading it.
+     * Pick an order up: the kitchen has it now.
+     *
+     * Offered only while it is still waiting, and it is the one thing that
+     * takes an order out of reach of Change — which is the point of it.
+     */
+    public static function acceptAction(): Action
+    {
+        return Action::make('accept')
+            ->label(__('panel.orders.accept'))
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->color('success')
+            ->authorize('accept')
+            ->visible(fn (Order $record): bool => $record->isPlaced())
+            ->requiresConfirmation()
+            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.accept_heading', ['number' => $record->getKey()]))
+            ->modalDescription(__('panel.orders.accept_warning'))
+            ->modalSubmitActionLabel(__('panel.orders.accept'))
+            ->action(function (Order $record): void {
+                app(AcceptOrder::class)($record);
+
+                self::reloadPayments($record);
+            })
+            ->successNotificationTitle(__('panel.orders.accepted'));
+    }
+
+    /**
+     * Change what is on an order nobody has picked up yet.
+     *
+     * A link to the counter with the order loaded into its basket, rather than
+     * a form: changing an order is re-taking it, priced by the same
+     * PriceBasket, and TakeOrder is where that already happens. It disappears
+     * the moment the order is accepted or a payment is taken against it
+     * (Order::canBeChanged()), which is the whole rule the project owner asked
+     * for made visible.
+     */
+    public static function changeAction(): Action
+    {
+        return Action::make('change')
+            ->label(__('panel.orders.change'))
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->color('warning')
+            ->authorize('change')
+            ->visible(fn (Order $record): bool => $record->canBeChanged())
+            ->url(fn (Order $record): string => TakeOrder::getUrl().'?order='.$record->getKey());
+    }
+
+    /**
+     * Call a live order off and put back what it was holding — from a row, or from the modal reading it.
      */
     public static function cancelAction(): Action
     {
@@ -179,7 +236,7 @@ class OrdersTable
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
             ->authorize('cancel')
-            ->visible(fn (Order $record): bool => $record->isPlaced())
+            ->visible(fn (Order $record): bool => $record->isLive())
             ->requiresConfirmation()
             ->modalHeading(fn (Order $record): string => (string) __('panel.orders.cancel_heading', ['number' => $record->getKey()]))
             ->modalDescription(__('panel.orders.cancel_warning'))
@@ -215,7 +272,7 @@ class OrdersTable
             ->icon(Heroicon::OutlinedBanknotes)
             ->color('success')
             ->authorize('recordPayment')
-            ->visible(fn (Order $record): bool => $record->isPlaced() && $record->amountOutstanding() > 0)
+            ->visible(fn (Order $record): bool => $record->isLive() && $record->amountOutstanding() > 0)
             ->schema(fn (Order $record): array => [
                 PaymentFields::method(),
                 PaymentFields::device(self::tenant()),
@@ -319,7 +376,7 @@ class OrdersTable
      */
     private static function unsettledQuery(Builder $query): Builder
     {
-        return $query->where('status', OrderStatus::Placed->value)->unsettled();
+        return $query->live()->unsettled();
     }
 
     /**

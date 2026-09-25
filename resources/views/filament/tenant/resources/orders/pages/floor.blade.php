@@ -39,15 +39,23 @@ the top, and everywhere quiet last.
         flex-wrap: wrap;
     }
 
+    /* Full width on a phone, then beside the rest of the toolbar. */
     .floor-toolbar-search {
-        flex: 1 1 12rem;
+        flex: 1 1 100%;
         min-width: 0;
     }
 
+    @media (min-width: 48rem) {
+        .floor-toolbar-search {
+            flex: 1 1 14rem;
+        }
+    }
+
+    /* The summary tiles read two-up on a phone rather than one per row. */
     .floor-summary {
         display: grid;
         gap: 0.75rem;
-        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
     }
 
     .floor-stat-value {
@@ -203,6 +211,7 @@ the top, and everywhere quiet last.
                     >
                         {{ __('panel.board.take_order') }}
                     </x-filament::button>
+
 
                     {{ ($this->settleAction)(['location' => $location->getKey()]) }}
 

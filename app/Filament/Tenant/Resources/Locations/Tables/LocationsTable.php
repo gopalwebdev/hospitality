@@ -6,7 +6,6 @@ use App\Actions\Payments\RecordPayment;
 use App\Actions\Payments\SpreadAcrossOrders;
 use App\Enums\Currency;
 use App\Enums\LocationKind;
-use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\Permission;
 use App\Exceptions\PaymentRefused;
@@ -225,7 +224,7 @@ class LocationsTable
     {
         return once(fn (): Collection => Order::query()
             ->where('location_id', $location->getKey())
-            ->where('status', OrderStatus::Placed->value)
+            ->live()
             ->unsettled()
             ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
                 ->whereHas('payment', fn ($payment) => $payment->live())], 'amount')

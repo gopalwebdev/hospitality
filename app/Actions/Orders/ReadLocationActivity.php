@@ -44,7 +44,7 @@ final readonly class ReadLocationActivity
 
         $rows = Order::query()
             ->where('orders.tenant_id', $tenant->getKey())
-            ->where('orders.status', OrderStatus::Placed->value)
+            ->whereIn('orders.status', OrderStatus::liveValues())
             ->whereNotNull('orders.location_id')
             ->unsettled()
             ->groupBy('orders.location_id')

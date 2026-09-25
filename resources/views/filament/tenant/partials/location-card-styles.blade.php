@@ -11,10 +11,17 @@
     included once per card.
 --}}
 <style>
+    /* One card per row on a phone, then as many as fit. */
     .lc-grid {
         display: grid;
         gap: 0.75rem;
-        grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+        grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 30rem) {
+        .lc-grid {
+            grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+        }
     }
 
     .lc {

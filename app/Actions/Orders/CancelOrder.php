@@ -45,7 +45,7 @@ final readonly class CancelOrder
                 ->lockForUpdate()
                 ->firstOrFail(['id', 'tenant_id', 'status', 'cancelled_at']);
 
-            throw_unless($locked->isPlaced(), LogicException::class, 'Only a placed order can be cancelled.');
+            throw_unless($locked->isLive(), LogicException::class, 'This order has already been cancelled.');
 
             $livePaymentId = $locked->paymentAllocations()
                 ->whereHas('payment', fn (Builder $payment): Builder => $payment->live())
@@ -57,9 +57,12 @@ final readonly class CancelOrder
                 sprintf('Payment #%d still stands against this order; void it before cancelling.', $livePaymentId),
             );
 
+            // The **net** of what this order took and handed back, never the
+            // takes alone: an order changed before it was accepted has both,
+            // and giving back every take would put back stock twice over.
             $taken = StockMovement::query()
                 ->where('order_id', $locked->getKey())
-                ->where('reason', StockMovementReason::OrderPlaced->value)
+                ->whereIn('reason', StockMovementReason::heldByOrderValues())
                 ->get(['id', 'menu_item_id', 'menu_add_on_option_id', 'quantity_change']);
 
             $changes = [];

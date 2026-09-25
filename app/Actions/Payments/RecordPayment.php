@@ -70,7 +70,7 @@ final readonly class RecordPayment
 
                 throw_if($order === null || (int) $order->tenant_id !== $tenant->getKey(), PaymentRefused::class, PaymentRefusal::ForeignOrder, $orderId);
 
-                throw_unless($order->isPlaced(), PaymentRefused::class, PaymentRefusal::OrderCancelled, $orderId);
+                throw_unless($order->isLive(), PaymentRefused::class, PaymentRefusal::OrderCancelled, $orderId);
 
                 // Outstanding is worked out from the sums read under the lock
                 // just taken — never a value either side may already have

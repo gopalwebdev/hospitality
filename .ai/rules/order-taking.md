@@ -3,6 +3,8 @@ paths:
   - app/Filament/Tenant/Resources/Orders/Pages/ListOrders.php
   - app/Filament/Tenant/Pages/TakeOrder.php
   - app/Actions/Orders/ReadFloor.php
+  - app/Actions/Orders/AcceptOrder.php
+  - app/Actions/Orders/ReviseOrder.php
   - app/Actions/Orders/ReadLocationActivity.php
   - app/Actions/Menus/ReadOrderableMenu.php
   - app/Enums/LocationActivity.php
@@ -30,10 +32,12 @@ Two things the property must keep: it is `$layoutMode` and **not `$layout`**, be
 - **`Order::amountPaidExpression()`** is the one copy of the correlated "what has this order been paid" SQL. `scopeUnsettled()`, `scopeSettled()` and the board's sum all read it. Do not type it out a fourth time.
 - **Settle is reused, not rewritten.** The board calls `LocationsTable::settleAction()` and hands it the card's location through `->record(fn (array $arguments) => ...)` off the already-loaded collection. Its `visible()` is overridden because the table's own runs a query per row, which on a board of fifty rooms would be fifty queries every poll.
 
+**An order is changed, not retyped, until it is accepted.** The project owner's rule: a guest rings back to add a coffee, and until somebody picks the order up staff should be able to change it. The **Change** row action links to the counter with `?order=`, which opens with that order already in its basket and saves through `ReviseOrder`; **Accept** is what closes the window. Both disappear the moment they no longer apply — `Order::canBeChanged()` is status *and* no live payment, and it is what the button's `visible()` reads. See `.ai/rules/inventory.md` for what revising does to stock.
+
 **The counter** (`TakeOrder`) asks **where first**, then shows the card on one side and the basket on the other. It is **not registered in the navigation** — an order is taken *about* somewhere, so it is reached from a board card (`?location=`, which skips the question) or from the Orders page's New order header action.
 
 - **Where it goes is a grid, never a select.** There was a searchable `location_id` Select on the form and the project owner had it replaced: a tenant with fifty rooms is a fifty-row dropdown, and — the actual point — a dropdown cannot show what is already open at a room before staff add another order to it. The picker is the board's own cards, `chooseLocation()` on each, with a search over name and code and a dashed **Somewhere else** tile for the free-text path. Do not put a location select back on this form.
-- **Once picked, the page says what is already running there**: a strip naming the location with its live state and outstanding, then that location's open orders (`openOrdersHere()`, capped at `OPEN_ORDERS_SHOWN`, each linking to its own page) and a **Change** button back to the grid. The basket survives a change of mind about the table.
+- **Once picked, the side column says what is already running there**: the location with its live state and outstanding, then its open orders (`openOrdersHere()`, capped at `OPEN_ORDERS_SHOWN`, each opening the order modal) and an icon button back to the grid. It was a full-width strip above the card for one revision and the project owner had it moved: context belongs beside the work, not on top of it, and a strip pushed the whole counter down a screen. The basket survives a change of mind about the table.
 - Location lives on the component (`$locationId`, `$isElsewhere`), **not** in the form's `$data`. Only `location_label` stayed a field, visible when Somewhere else was chosen or the tenant has no locations at all — and a tenant with none never sees the question.
 - The menu, the basket and their queries are all behind the question: `ReadOrderableMenu` and `PriceBasket` are not called while the picker is up.
 
@@ -46,8 +50,12 @@ Two things the property must keep: it is `$layoutMode` and **not `$layout`**, be
 
 **A location card is drawn in one place.** `resources/views/filament/tenant/partials/location-card.blade.php` is its markup — name, kind, code, capacity, state badge, outstanding and open-order count — and `location-card-styles.blade.php` is its look, the `lc-` classes. The board wraps it in a section with actions; the counter's picker wraps it in a `<button>`. Both draw the same card because it would otherwise drift, and the styles partial is included **once per page** while the markup partial is included once per card. Anything a card gains goes in the partial, never in one page's copy.
 
+**Phone first, then tablet, then desk.** Staff take orders standing up, so the counter is laid out for one narrow column and gains a second from `lg`; the floor's cards are one per row below `30rem`. On a phone the basket is a **sticky bar at the foot** holding the count, the total and the one button that matters, so an order can be placed without scrolling to it — the guest app's answer, for the guest app's reason. It is hidden from `lg`, where the basket sits beside the card and the bar would say it twice. Tap targets are thumb-sized and the repeated controls (add, step, change location, back) are icon buttons with tooltips, never worded buttons competing with the primary one.
+
+**Back goes up one step, and the URL says where you are.** `TakeOrder::backUrl()` is one rule — changing an order came from the orders page, a room came from the picker, the picker came from the orders page — and it is a header icon button. The state it reads lives in the query string (`#[Url]` on `$locationId`, `$orderId`, and on `ListOrders::$layoutMode` and `$kind`), so the browser's own back button agrees with it instead of dropping you on a page that has forgotten which layout you were reading.
+
 **Styling.** Everything else is a `<style>` block plus Filament's own Blade components (`x-filament::section`, `badge`, `button`, `icon-button`, `link`, `input.wrapper`, `tabs`, `empty-state`) — a panel is served Filament's compiled CSS and no general Tailwind utilities (`.ai/rules/filament.md`), so layout is written by hand and anything with a theme is borrowed. Colours are Filament's palette variables through `color-mix`, the way the menu arrangement page does it, so they read correctly in both themes; `:is(.dark)` is the dark selector, which is what Filament puts on `<html>`.
 
 **An order is read in a modal, and there is no order page.** `OrdersTable::viewAction()` is the one definition of it — a wide, read-only `ViewAction` rendering `OrderInfolist` — used from a list row and from the counter's "already running here" list. `ViewOrder` was deleted with it, and so was the route-binding query that eager-loaded the record: `mountUsing()` calls `OrderResource::loadForView()` instead, which **`loadMissing`s** rather than `load`s, because the list already eager-loads each row's menu and loading it twice is the duplicate the query guard throws on. Anything that hands an order to that modal must have selected the whole row — `TakeOrder::openOrdersHere()` deliberately selects no column list for exactly that reason.
 
-Tests: `tests/Feature/Tenant/TakeOrderTest.php`, `tests/Feature/Tenant/OrderFloorTest.php`, `tests/Feature/Tenant/OrderManagementTest.php`.
+Tests: `tests/Feature/Tenant/TakeOrderTest.php`, `tests/Feature/Tenant/OrderFloorTest.php`, `tests/Feature/Tenant/OrderChangeTest.php`, `tests/Feature/Tenant/OrderManagementTest.php`.

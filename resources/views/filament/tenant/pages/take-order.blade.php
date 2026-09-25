@@ -2,11 +2,19 @@
     {{--
         The counter: the card on one side, the basket on the other.
 
+        **Designed at phone width first**, because staff take orders standing
+        up. One column on a phone, two from `lg` on a tablet held landscape or
+        on a desk. The basket is a bar at the foot of a phone screen and a
+        sticky column beside the card on anything wider — the same answer the
+        guest app reaches for, and for the same reason: the running total has
+        to be readable without scrolling to it.
+
         Inline styling, because a panel is served Filament's own compiled CSS
         and none of ours (.ai/rules/filament.md). Anything with a theme —
         buttons, badges, inputs, sections, the details form — is a Filament
-        component; what is written here is layout, the tile grid and the diet
-        mark, which have no component to borrow.
+        component; what is written here is layout, the tile grid, the diet mark
+        and the bottom bar, which have no component to borrow. Tap targets are
+        thumb-sized, corners are rounded and everything pressable says so.
 
         Every figure drawn below comes from PriceBasket. Nothing in this file
         adds up money.
@@ -19,15 +27,18 @@
             grid-template-columns: 1fr;
         }
 
-        /* The basket moves beside the card once there is room for both. */
+        /* Two columns once there is room; one, stacked, on a phone. */
         @media (min-width: 64rem) {
             .to-layout {
-                grid-template-columns: minmax(0, 1fr) 22rem;
+                grid-template-columns: minmax(0, 1fr) 23rem;
             }
 
-            .to-basket {
+            .to-side {
                 position: sticky;
                 top: 1rem;
+                max-height: calc(100vh - 2rem);
+                overflow-y: auto;
+                overscroll-behavior: contain;
             }
         }
 
@@ -41,23 +52,27 @@
         .to-tiles {
             display: grid;
             gap: 0.5rem;
-            grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
         }
 
         .to-tile {
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
-            padding: 0.625rem;
-            border-radius: 0.5rem;
-            border: 1px solid color-mix(in oklab, var(--gray-500) 25%, transparent);
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            border: 1px solid color-mix(in oklab, var(--gray-500) 22%, transparent);
             background-color: color-mix(in oklab, var(--gray-500) 4%, transparent);
-            transition: border-color 120ms ease, background-color 120ms ease;
+            transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
         }
 
         .to-tile:hover {
             border-color: color-mix(in oklab, var(--primary-500) 55%, transparent);
             background-color: color-mix(in oklab, var(--primary-500) 7%, transparent);
+        }
+
+        .to-tile:active {
+            transform: scale(0.99);
         }
 
         .to-tile--held {
@@ -80,7 +95,8 @@
             justify-content: space-between;
             gap: 0.5rem;
             margin-top: auto;
-            padding-top: 0.375rem;
+            padding-top: 0.5rem;
+            min-height: 2.25rem;
         }
 
         .to-price {
@@ -130,7 +146,7 @@
             justify-content: space-between;
             gap: 0.5rem;
             padding-block: 0.625rem;
-            border-top: 1px solid color-mix(in oklab, var(--gray-500) 20%, transparent);
+            border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
         }
 
         .to-line:first-child {
@@ -155,11 +171,14 @@
         .to-stepper {
             display: inline-flex;
             align-items: center;
-            gap: 0.375rem;
+            gap: 0.125rem;
+            border-radius: 9999px;
+            padding: 0.125rem;
+            background-color: color-mix(in oklab, var(--gray-500) 12%, transparent);
         }
 
         .to-quantity {
-            min-width: 1.5rem;
+            min-width: 1.75rem;
             text-align: center;
             font-variant-numeric: tabular-nums;
             font-weight: 600;
@@ -177,7 +196,7 @@
             flex-direction: column;
             gap: 0.375rem;
             padding-top: 0.75rem;
-            border-top: 1px solid color-mix(in oklab, var(--gray-500) 20%, transparent);
+            border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
         }
 
         .to-total-row {
@@ -193,18 +212,20 @@
             font-size: 1.125rem;
             font-weight: 700;
             padding-top: 0.375rem;
-            border-top: 1px solid color-mix(in oklab, var(--gray-500) 20%, transparent);
+            border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
         }
 
         .to-place {
             margin-top: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: stretch;
         }
 
-        .to-sticky-search {
-            position: sticky;
-            top: 0;
-            z-index: 5;
-            padding-block: 0.25rem;
+        .to-block-btn {
+            width: 100%;
+            justify-content: center;
         }
 
         /* A location in the picker: the shared card, made pressable. */
@@ -212,16 +233,20 @@
             display: block;
             width: 100%;
             text-align: start;
-            padding: 0.75rem 0.75rem 0.75rem 1rem;
+            padding: 0.875rem 0.875rem 0.875rem 1.125rem;
             border-radius: 0.75rem;
-            border: 1px solid color-mix(in oklab, var(--gray-500) 25%, transparent);
+            border: 1px solid color-mix(in oklab, var(--gray-500) 22%, transparent);
             background-color: color-mix(in oklab, var(--gray-500) 4%, transparent);
             cursor: pointer;
-            transition: border-color 120ms ease, background-color 120ms ease;
+            transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
         }
 
         .to-pick:hover {
             border-color: color-mix(in oklab, var(--primary-500) 60%, transparent);
+        }
+
+        .to-pick:active {
+            transform: scale(0.99);
         }
 
         .to-pick:focus-visible {
@@ -236,10 +261,10 @@
             gap: 0.5rem;
             border-style: dashed;
             font-weight: 500;
-            min-height: 6rem;
+            min-height: 6.5rem;
         }
 
-        /* What is already running where this order is going. */
+        /* Where this one is going, at the head of the side column. */
         .to-here {
             display: flex;
             align-items: center;
@@ -250,26 +275,79 @@
 
         .to-open-order {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             justify-content: space-between;
-            gap: 0.75rem;
+            gap: 0.5rem;
             padding-block: 0.5rem;
-            border-top: 1px solid color-mix(in oklab, var(--gray-500) 20%, transparent);
+            border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
             font-size: 0.875rem;
             font-variant-numeric: tabular-nums;
+        }
+
+        .to-open-order-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            flex: none;
+        }
+
+        /*
+            The bar at the foot of a phone screen. It holds the total and the
+            one button that matters, so nothing has to be scrolled to before an
+            order can be placed. Above `lg` the basket sits beside the card and
+            the bar would be saying it twice, so it goes.
+        */
+        .to-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background-color: var(--gray-50);
+            border: 1px solid color-mix(in oklab, var(--gray-500) 22%, transparent);
+            box-shadow: 0 -4px 16px -8px rgb(0 0 0 / 0.35);
+        }
+
+        :is(.dark) .to-bar {
+            background-color: var(--gray-900);
+        }
+
+        .to-bar-figures {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .to-bar-total {
+            font-size: 1.125rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+        }
+
+        @media (min-width: 64rem) {
+            .to-bar {
+                display: none;
+            }
         }
     </style>
 
     @php $currency = $this->currency(); @endphp
 
-    @if ($this->isPickingLocation())
-        @include('filament.tenant.partials.location-card-styles')
+    @include('filament.tenant.partials.location-card-styles')
 
+    @if ($this->isPickingLocation())
         {{--
             The first question, and the reason this is a grid rather than the
             select it used to be: a tenant with fifty rooms is a fifty-row
             dropdown, and staff need to see what is already open at a room
-            before they add another order to it.
+            before they add another order to it. The busiest are first
+            (ReadFloor), so the likeliest tap is nearest the search box.
         --}}
         <x-filament::section
             :heading="__('panel.take_order.where_heading')"
@@ -318,113 +396,52 @@
             @endif
         </x-filament::section>
     @else
-    @php
-        // Read only once the page is past its first question: reading the card
-        // and pricing the basket are several queries the picker has no use for.
-        $priced = $this->priced();
-        $pricedLines = $this->pricedLines();
-        $sections = $this->visibleSections();
-        $outsideHours = $this->outsideHours();
-        $taxParts = $priced['taxParts'];
-        $stateHalf = $priced['isUnionTerritory'] ? 'UTGST' : 'SGST';
-    @endphp
-
-    @if ($outsideHours !== [])
-        {{--
-            Said, not enforced. PlaceOrder is passed allowOutsideHours from this
-            page on purpose; every other refusal it makes still stands.
-        --}}
-        <x-filament::section compact>
-            <x-filament::badge color="warning" icon="heroicon-o-clock">
-                {{ __('panel.take_order.outside_hours') }}
-            </x-filament::badge>
-
-            <div class="to-muted" style="margin-top: 0.375rem;">
-                {{ implode(' ', $outsideHours) }}
-            </div>
-        </x-filament::section>
-    @endif
-
-    @if ($this->location() !== null || $this->isElsewhere)
-        @include('filament.tenant.partials.location-card-styles')
-
         @php
+            // Read only once the page is past its first question: the card and
+            // the pricing are several queries the picker has no use for.
+            $priced = $this->priced();
+            $pricedLines = $this->pricedLines();
+            $sections = $this->visibleSections();
+            $outsideHours = $this->outsideHours();
+            $taxParts = $priced['taxParts'];
+            $stateHalf = $priced['isUnionTerritory'] ? 'UTGST' : 'SGST';
             $here = $this->location();
             $activityHere = $this->activityHere();
             $openHere = $this->openOrdersHere();
+            $isChanging = $this->isChangingAnOrder();
         @endphp
 
-        {{--
-            Where this one is going, and what is already running there —
-            the answer to "what is going on at 204" that the grid card only
-            summarises. Placed and still owing, the same pair the board counts.
-        --}}
-        <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
-            <div class="to-here">
-                <div>
-                    <div class="lc-name">
-                        {{ $here?->name ?? __('panel.take_order.elsewhere') }}
-                    </div>
+        @if ($isChanging)
+            {{-- Changing an order that already stands, and saying so. --}}
+            <x-filament::section compact>
+                <x-filament::badge color="warning" icon="heroicon-o-pencil-square">
+                    {{ __('panel.take_order.changing', ['number' => $this->orderId]) }}
+                </x-filament::badge>
 
-                    @if ($here !== null)
-                        <div class="lc-muted">
-                            {{ $here->kind->label() }}@if (filled($here->code)) · {{ $here->code }}@endif
-                        </div>
-                    @endif
+                <div class="to-muted" style="margin-top: 0.375rem;">
+                    {{ __('panel.take_order.changing_hint') }}
                 </div>
+            </x-filament::section>
+        @endif
 
-                <div class="to-here">
-                    @if ($here !== null)
-                        <x-filament::badge :color="$activityHere['state']->color()">
-                            {{ $activityHere['state']->label() }}
-                        </x-filament::badge>
+        @if ($outsideHours !== [])
+            {{--
+                Said, not enforced. PlaceOrder is passed allowOutsideHours from
+                this page on purpose; every other refusal it makes still stands.
+            --}}
+            <x-filament::section compact>
+                <x-filament::badge color="warning" icon="heroicon-o-clock">
+                    {{ __('panel.take_order.outside_hours') }}
+                </x-filament::badge>
 
-                        @if ($activityHere['outstanding'] > 0)
-                            <span class="lc-owing">{{ $currency->format($activityHere['outstanding']) }}</span>
-                        @endif
-                    @endif
-
-                    @if ($this->hasAnyLocation())
-                        <x-filament::button
-                            size="sm"
-                            color="gray"
-                            icon="heroicon-o-arrows-right-left"
-                            wire:click="changeLocation"
-                        >
-                            {{ __('panel.take_order.change_location') }}
-                        </x-filament::button>
-                    @endif
+                <div class="to-muted" style="margin-top: 0.375rem;">
+                    {{ implode(' ', $outsideHours) }}
                 </div>
-            </div>
+            </x-filament::section>
+        @endif
 
-            @if ($openHere->isNotEmpty())
-                <div style="margin-top: 0.5rem;">
-                    <div class="lc-muted">{{ __('panel.take_order.already_here') }}</div>
-
-                    @foreach ($openHere as $open)
-                        <div class="to-open-order" wire:key="open-{{ $open->getKey() }}">
-                            <span>
-                                {{-- The orders list's own modal, so reading one never leaves the counter. --}}
-                                {{ ($this->viewOrderAction)(['order' => $open->getKey()]) }}
-                                <span class="lc-muted">{{ $open->created_at?->diffForHumans(short: true) }}</span>
-                            </span>
-
-                            <span>
-                                {{ $currency->format($open->total) }}
-                                <span class="lc-muted">
-                                    {{ __('panel.take_order.owing', ['amount' => $currency->format($open->amountOutstanding())]) }}
-                                </span>
-                            </span>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </x-filament::section>
-    @endif
-
-    <div class="to-layout">
-        <div class="to-column">
-            <div class="to-sticky-search">
+        <div class="to-layout">
+            <div class="to-column">
                 <x-filament::input.wrapper prefix-icon="heroicon-o-magnifying-glass">
                     <x-filament::input
                         type="search"
@@ -432,228 +449,321 @@
                         :placeholder="__('panel.take_order.search')"
                     />
                 </x-filament::input.wrapper>
+
+                @forelse ($sections as $section)
+                    <x-filament::section :heading="$section['name']" compact>
+                        <div class="to-tiles">
+                            @foreach ($section['tiles'] as $tile)
+                                @php
+                                    $thing = $tile['model'];
+                                    $held = $this->heldCount($tile['type'], $thing->getKey());
+                                    $atLimit = $this->isAtLimit($thing, $tile['type']);
+                                    $diet = $this->isItem($tile) ? $thing->dietMark() : null;
+                                @endphp
+
+                                <div @class(['to-tile', 'to-tile--held' => $held > 0]) wire:key="tile-{{ $tile['key'] }}">
+                                    <div class="to-tile-name">
+                                        @if ($diet !== null)
+                                            <span
+                                                class="to-diet"
+                                                style="--to-diet: var(--{{ $diet->color() }}-500)"
+                                                role="img"
+                                                aria-label="{{ $diet->label() }}"
+                                                title="{{ $diet->label() }}"
+                                            ></span>
+                                        @endif
+
+                                        <span>{{ $thing->name }}</span>
+
+                                        @if ($held > 0)
+                                            <x-filament::badge size="xs">{{ $held }}</x-filament::badge>
+                                        @endif
+                                    </div>
+
+                                    @if (filled($thing->description))
+                                        <div class="to-muted">{{ \Illuminate\Support\Str::limit($thing->description, 52) }}</div>
+                                    @endif
+
+                                    <div class="to-tile-foot">
+                                        <span class="to-price">
+                                            @if ($thing->price === 0)
+                                                <span class="to-muted">{{ __('panel.take_order.complimentary') }}</span>
+                                            @else
+                                                {{ $currency->format($thing->price) }}
+                                            @endif
+
+                                            @if ($thing->original_price !== null)
+                                                <span class="to-muted to-was">{{ $currency->format($thing->original_price) }}</span>
+                                            @endif
+                                        </span>
+
+                                        @if ($atLimit)
+                                            {{-- Greyed rather than hidden: a missing button reads as sold out. --}}
+                                            <x-filament::badge color="gray" size="xs">
+                                                {{ __('panel.take_order.limit_reached') }}
+                                            </x-filament::badge>
+                                        @elseif ($tile['groupLinks'] !== [])
+                                            {{ ($this->customiseAction)(['item' => $thing->getKey()]) }}
+                                        @else
+                                            <x-filament::icon-button
+                                                size="md"
+                                                icon="heroicon-o-plus"
+                                                wire:click="addTile('{{ $tile['type'] }}', {{ $thing->getKey() }})"
+                                                wire:loading.attr="disabled"
+                                                :label="__('panel.take_order.add')"
+                                                :tooltip="__('panel.take_order.add')"
+                                            />
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </x-filament::section>
+                @empty
+                    <x-filament::section>
+                        <x-filament::empty-state
+                            :heading="__('panel.take_order.nothing_heading')"
+                            :description="__('panel.take_order.nothing_description')"
+                            icon="heroicon-o-book-open"
+                            :contained="false"
+                        />
+                    </x-filament::section>
+                @endforelse
             </div>
 
-            @forelse ($sections as $section)
-                <x-filament::section :heading="$section['name']" compact>
-                    <div class="to-tiles">
-                        @foreach ($section['tiles'] as $tile)
-                            @php
-                                $thing = $tile['model'];
-                                $held = $this->heldCount($tile['type'], $thing->getKey());
-                                $atLimit = $this->isAtLimit($thing, $tile['type']);
-                                $diet = $this->isItem($tile) ? $thing->dietMark() : null;
-                            @endphp
-
-                            <div @class(['to-tile', 'to-tile--held' => $held > 0])>
-                                <div class="to-tile-name">
-                                    @if ($diet !== null)
-                                        <span
-                                            class="to-diet"
-                                            style="--to-diet: var(--{{ $diet->color() }}-500)"
-                                            role="img"
-                                            aria-label="{{ $diet->label() }}"
-                                            title="{{ $diet->label() }}"
-                                        ></span>
-                                    @endif
-
-                                    <span>{{ $thing->name }}</span>
-                                </div>
-
-                                @if (filled($thing->description))
-                                    <div class="to-muted">{{ \Illuminate\Support\Str::limit($thing->description, 60) }}</div>
-                                @endif
-
-                                <div class="to-tile-foot">
-                                    <span class="to-price">
-                                        @if ($thing->price === 0)
-                                            <span class="to-muted">{{ __('panel.take_order.complimentary') }}</span>
-                                        @else
-                                            {{ $currency->format($thing->price) }}
-                                        @endif
-
-                                        @if ($thing->original_price !== null)
-                                            <span class="to-muted to-was">{{ $currency->format($thing->original_price) }}</span>
-                                        @endif
-                                    </span>
-
-                                    @if ($atLimit)
-                                        {{-- Greyed rather than hidden: a missing button reads as sold out. --}}
-                                        <x-filament::badge color="gray" size="xs">
-                                            {{ __('panel.take_order.limit_reached') }}
-                                        </x-filament::badge>
-                                    @elseif ($tile['groupLinks'] !== [])
-                                        {{ ($this->customiseAction)(['item' => $thing->getKey()]) }}
-                                    @else
-                                        <x-filament::button
-                                            size="xs"
-                                            icon="heroicon-o-plus"
-                                            wire:click="addTile('{{ $tile['type'] }}', {{ $thing->getKey() }})"
-                                            wire:loading.attr="disabled"
-                                        >
-                                            {{ __('panel.take_order.add') }}
-                                        </x-filament::button>
-                                    @endif
-                                </div>
-
-                                @if ($held > 0)
-                                    <div class="to-muted">{{ __('panel.take_order.in_basket', ['count' => $held]) }}</div>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-                </x-filament::section>
-            @empty
-                <x-filament::section>
-                    <x-filament::empty-state
-                        :heading="__('panel.take_order.nothing_heading')"
-                        :description="__('panel.take_order.nothing_description')"
-                        icon="heroicon-o-book-open"
-                        :contained="false"
-                    />
-                </x-filament::section>
-            @endforelse
-        </div>
-
-        <aside class="to-column to-basket">
-            {{ $this->form }}
-
-            <x-filament::section
-                :heading="__('panel.take_order.basket')"
-                :description="$this->basketCount() > 0 ? trans_choice('panel.take_order.basket_count', $this->basketCount(), ['count' => $this->basketCount()]) : null"
-                icon="heroicon-o-shopping-cart"
-                compact
-            >
-                @if ($this->lines === [])
-                    <div class="to-muted">{{ __('panel.take_order.basket_empty') }}</div>
-                @else
-                    @foreach ($this->lines as $line)
-                        @php $pricedLine = $pricedLines[$line['key']] ?? null; @endphp
-
-                        <div class="to-line" wire:key="line-{{ $line['key'] }}">
+            <aside class="to-column to-side">
+                {{--
+                    Where this one is going, and what is already running there.
+                    In the side column on the project owner's instruction: it
+                    was a full-width strip above the card and pushed the whole
+                    counter down a screen for something that is context rather
+                    than the work.
+                --}}
+                @if ($here !== null || $this->isElsewhere)
+                    <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
+                        <div class="to-here">
                             <div style="min-width: 0;">
-                                <div class="to-line-name">{{ $line['name'] }}</div>
+                                <div class="lc-name">{{ $here?->name ?? __('panel.take_order.elsewhere') }}</div>
 
-                                @if ($line['choiceNames'] !== [])
-                                    <div class="to-muted">{{ implode(' · ', $line['choiceNames']) }}</div>
-                                @endif
-
-                                @php $problem = $this->lineProblem($pricedLine); @endphp
-
-                                @if ($problem !== null)
-                                    <x-filament::badge color="danger" size="xs">{{ $problem }}</x-filament::badge>
-                                @elseif ($pricedLine !== null && $pricedLine['tax'] > 0)
-                                    {{-- Per line, because one basket holds a 5% item beside an 18% one. --}}
-                                    <div class="to-muted">
-                                        {{ __($priced['pricesIncludeTax'] ? 'panel.take_order.tax_included_line' : 'panel.take_order.tax_line', [
-                                            'rate' => $this->rate($pricedLine['taxParts']->rate()),
-                                            'amount' => $currency->format($pricedLine['tax']),
-                                        ]) }}
+                                @if ($here !== null)
+                                    <div class="lc-muted">
+                                        {{ $here->kind->label() }}@if (filled($here->code)) · {{ $here->code }}@endif
+                                        @if ($activityHere['outstanding'] > 0)
+                                            · {{ __('panel.take_order.owing', ['amount' => $currency->format($activityHere['outstanding'])]) }}
+                                        @endif
                                     </div>
                                 @endif
                             </div>
 
-                            <div class="to-line-right">
-                                <div class="to-stepper">
-                                    <x-filament::icon-button
-                                        size="xs"
-                                        color="gray"
-                                        :icon="$line['quantity'] > 1 ? 'heroicon-o-minus' : 'heroicon-o-trash'"
-                                        wire:click="decrement('{{ $line['key'] }}')"
-                                        :label="__('panel.take_order.fewer')"
-                                    />
+                            @if ($this->hasAnyLocation() && ! $isChanging)
+                                <x-filament::icon-button
+                                    size="md"
+                                    color="gray"
+                                    icon="heroicon-o-arrows-right-left"
+                                    wire:click="changeLocation"
+                                    :label="__('panel.take_order.change_location')"
+                                    :tooltip="__('panel.take_order.change_location')"
+                                />
+                            @endif
+                        </div>
 
-                                    <span class="to-quantity">{{ $line['quantity'] }}</span>
+                        @if ($openHere->isNotEmpty())
+                            <div style="margin-top: 0.5rem;">
+                                <div class="lc-muted">{{ __('panel.take_order.already_here') }}</div>
 
-                                    <x-filament::icon-button
-                                        size="xs"
-                                        color="gray"
-                                        icon="heroicon-o-plus"
-                                        wire:click="increment('{{ $line['key'] }}')"
-                                        :label="__('panel.take_order.more')"
-                                    />
+                                @foreach ($openHere as $open)
+                                    <div class="to-open-order" wire:key="open-{{ $open->getKey() }}">
+                                        <span style="min-width: 0;">
+                                            {{ ($this->viewOrderAction)(['order' => $open->getKey()]) }}
+                                            <span class="lc-muted">{{ $open->created_at?->diffForHumans(short: true) }}</span>
+                                        </span>
+
+                                        <span class="to-open-order-actions">
+                                            <x-filament::badge :color="$open->status->color()" size="xs">
+                                                {{ $open->status->label() }}
+                                            </x-filament::badge>
+
+                                            <span class="to-line-total">{{ $currency->format($open->amountOutstanding()) }}</span>
+
+                                            {{-- Icon buttons: staff at the room work it here rather than going to find it in a list. --}}
+                                            {{ ($this->acceptOrderAction)(['order' => $open->getKey()]) }}
+                                            {{ ($this->changeOrderAction)(['order' => $open->getKey()]) }}
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </x-filament::section>
+                @endif
+
+                {{ $this->form }}
+
+                <x-filament::section
+                    :heading="__('panel.take_order.basket')"
+                    :description="$this->basketCount() > 0 ? trans_choice('panel.take_order.basket_count', $this->basketCount(), ['count' => $this->basketCount()]) : null"
+                    icon="heroicon-o-shopping-cart"
+                    compact
+                >
+                    @if ($this->lines === [])
+                        <div class="to-muted">{{ __('panel.take_order.basket_empty') }}</div>
+                    @else
+                        @foreach ($this->lines as $line)
+                            @php
+                                $pricedLine = $pricedLines[$line['key']] ?? null;
+                                $problem = $this->lineProblem($pricedLine);
+                            @endphp
+
+                            <div class="to-line" wire:key="line-{{ $line['key'] }}">
+                                <div style="min-width: 0;">
+                                    <div class="to-line-name">{{ $line['name'] }}</div>
+
+                                    @if ($line['choiceNames'] !== [])
+                                        <div class="to-muted">{{ implode(' · ', $line['choiceNames']) }}</div>
+                                    @endif
+
+                                    @if ($problem !== null)
+                                        <x-filament::badge color="danger" size="xs">{{ $problem }}</x-filament::badge>
+                                    @elseif ($pricedLine !== null && $pricedLine['tax'] > 0)
+                                        {{-- Per line, because one basket holds a 5% item beside an 18% one. --}}
+                                        <div class="to-muted">
+                                            {{ __($priced['pricesIncludeTax'] ? 'panel.take_order.tax_included_line' : 'panel.take_order.tax_line', [
+                                                'rate' => $this->rate($pricedLine['taxParts']->rate()),
+                                                'amount' => $currency->format($pricedLine['tax']),
+                                            ]) }}
+                                        </div>
+                                    @endif
                                 </div>
 
-                                <span class="to-line-total">
-                                    {{ $currency->format($pricedLine['total'] ?? 0) }}
-                                </span>
-                            </div>
-                        </div>
-                    @endforeach
+                                <div class="to-line-right">
+                                    <div class="to-stepper">
+                                        <x-filament::icon-button
+                                            size="sm"
+                                            color="gray"
+                                            :icon="$line['quantity'] > 1 ? 'heroicon-o-minus' : 'heroicon-o-trash'"
+                                            wire:click="decrement('{{ $line['key'] }}')"
+                                            :label="__('panel.take_order.fewer')"
+                                        />
 
-                    <div class="to-totals">
-                        <div class="to-total-row">
-                            <span>{{ __('panel.orders.subtotal') }}</span>
-                            <span>{{ $currency->format($priced['subtotal']) }}</span>
-                        </div>
+                                        <span class="to-quantity">{{ $line['quantity'] }}</span>
 
-                        @foreach ($priced['charges'] as $charge)
-                            <div class="to-total-row">
-                                <span>
-                                    {{ $charge['name'] }}
-                                    @if ($charge['tax'] > 0)
-                                        <span class="to-muted">
-                                            {{ $this->rate($charge['taxParts']->rate()) }}
-                                            {{ __('panel.orders.tax') }}
-                                            {{ $currency->format($charge['tax']) }}
-                                        </span>
-                                    @endif
-                                </span>
-                                <span>{{ $currency->format($charge['amount']) }}</span>
+                                        <x-filament::icon-button
+                                            size="sm"
+                                            color="gray"
+                                            icon="heroicon-o-plus"
+                                            wire:click="increment('{{ $line['key'] }}')"
+                                            :label="__('panel.take_order.more')"
+                                        />
+                                    </div>
+
+                                    <span class="to-line-total">
+                                        {{ $currency->format($pricedLine['total'] ?? 0) }}
+                                    </span>
+                                </div>
                             </div>
                         @endforeach
 
-                        @if (! $priced['pricesIncludeTax'] && $priced['tax'] > 0)
+                        <div class="to-totals">
                             <div class="to-total-row">
-                                <span>{{ __('panel.orders.tax') }}</span>
-                                <span>{{ $currency->format($priced['tax']) }}</span>
+                                <span>{{ __('panel.orders.subtotal') }}</span>
+                                <span>{{ $currency->format($priced['subtotal']) }}</span>
                             </div>
-                        @endif
 
-                        <div class="to-total-row to-total-row--grand">
-                            <span>{{ __('panel.orders.total') }}</span>
-                            <span>{{ $currency->format($priced['total']) }}</span>
+                            @foreach ($priced['charges'] as $charge)
+                                <div class="to-total-row">
+                                    <span>
+                                        {{ $charge['name'] }}
+                                        @if ($charge['tax'] > 0)
+                                            <span class="to-muted">
+                                                {{ $this->rate($charge['taxParts']->rate()) }}
+                                                {{ __('panel.orders.tax') }}
+                                                {{ $currency->format($charge['tax']) }}
+                                            </span>
+                                        @endif
+                                    </span>
+                                    <span>{{ $currency->format($charge['amount']) }}</span>
+                                </div>
+                            @endforeach
+
+                            @if (! $priced['pricesIncludeTax'] && $priced['tax'] > 0)
+                                <div class="to-total-row">
+                                    <span>{{ __('panel.orders.tax') }}</span>
+                                    <span>{{ $currency->format($priced['tax']) }}</span>
+                                </div>
+                            @endif
+
+                            <div class="to-total-row to-total-row--grand">
+                                <span>{{ __('panel.orders.total') }}</span>
+                                <span>{{ $currency->format($priced['total']) }}</span>
+                            </div>
+
+                            @if ($taxParts !== null && $priced['tax'] > 0)
+                                {{--
+                                    The split is drawn here and deliberately not
+                                    in the guest app: this is the record a tax
+                                    invoice is raised from (.ai/rules/js.md).
+                                --}}
+                                <div class="to-muted">
+                                    @if ($priced['pricesIncludeTax'])
+                                        {{ __('panel.take_order.tax_included_total', ['amount' => $currency->format($priced['tax'])]) }} ·
+                                    @endif
+                                    CGST {{ $currency->format($taxParts->cgst) }} · {{ $stateHalf }} {{ $currency->format($taxParts->sgst) }}
+                                </div>
+                            @endif
                         </div>
 
-                        @if ($taxParts !== null && $priced['tax'] > 0)
-                            {{--
-                                The split is drawn here and deliberately not in
-                                the guest app: this is the record a tax invoice
-                                is raised from (.ai/rules/js.md).
-                            --}}
-                            <div class="to-muted">
-                                @if ($priced['pricesIncludeTax'])
-                                    {{ __('panel.take_order.tax_included_total', ['amount' => $currency->format($priced['tax'])]) }} ·
-                                @endif
-                                CGST {{ $currency->format($taxParts->cgst) }} · {{ $stateHalf }} {{ $currency->format($taxParts->sgst) }}
-                            </div>
-                        @endif
-                    </div>
+                        <div class="to-place">
+                            <x-filament::button
+                                wire:click="placeOrder"
+                                wire:loading.attr="disabled"
+                                wire:target="placeOrder"
+                                :icon="$isChanging ? 'heroicon-o-check' : 'heroicon-o-check-circle'"
+                                size="lg"
+                                class="to-block-btn"
+                            >
+                                {{ $isChanging
+                                    ? __('panel.take_order.save', ['amount' => $currency->format($priced['total'])])
+                                    : __('panel.take_order.place', ['amount' => $currency->format($priced['total'])]) }}
+                            </x-filament::button>
 
-                    <div class="to-place">
-                        <x-filament::button
-                            wire:click="placeOrder"
-                            wire:loading.attr="disabled"
-                            wire:target="placeOrder"
-                            icon="heroicon-o-check-circle"
-                            size="lg"
-                            style="width: 100%; justify-content: center;"
-                        >
-                            {{ __('panel.take_order.place', ['amount' => $currency->format($priced['total'])]) }}
-                        </x-filament::button>
+                            <x-filament::button
+                                color="gray"
+                                size="sm"
+                                icon="heroicon-o-trash"
+                                wire:click="emptyBasket"
+                                class="to-block-btn"
+                            >
+                                {{ __('panel.take_order.empty') }}
+                            </x-filament::button>
+                        </div>
+                    @endif
+                </x-filament::section>
+            </aside>
+        </div>
 
-                        <x-filament::link
-                            tag="button"
-                            color="danger"
-                            wire:click="emptyBasket"
-                            style="margin-top: 0.5rem;"
-                        >
-                            {{ __('panel.take_order.empty') }}
-                        </x-filament::link>
-                    </div>
-                @endif
-            </x-filament::section>
-        </aside>
-    </div>
+        {{--
+            Phone only: the total and the one button that matters, always
+            within a thumb's reach. Hidden from `lg`, where the basket beside
+            the card already says both.
+        --}}
+        @if ($this->lines !== [])
+            <div class="to-bar">
+                <div class="to-bar-figures">
+                    <span class="to-muted">
+                        {{ trans_choice('panel.take_order.basket_count', $this->basketCount(), ['count' => $this->basketCount()]) }}
+                    </span>
+                    <span class="to-bar-total">{{ $currency->format($priced['total']) }}</span>
+                </div>
+
+                <x-filament::button
+                    wire:click="placeOrder"
+                    wire:loading.attr="disabled"
+                    wire:target="placeOrder"
+                    :icon="$isChanging ? 'heroicon-o-check' : 'heroicon-o-check-circle'"
+                    size="lg"
+                >
+                    {{ $isChanging ? __('panel.take_order.save_short') : __('panel.take_order.place_short') }}
+                </x-filament::button>
+            </div>
+        @endif
     @endif
 </x-filament-panels::page>

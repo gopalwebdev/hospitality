@@ -23,6 +23,15 @@ enum StockMovementReason: string
     /** Put back because that order was cancelled. */
     case OrderCancelled = 'order-cancelled';
 
+    /**
+     * Put back because the order was changed before it was accepted.
+     *
+     * ReviseOrder hands back everything the order was holding and then takes
+     * what it now asks for, as a fresh OrderPlaced. Both rows stay, so the
+     * history reads as what happened rather than as a count that jumped.
+     */
+    case OrderRevised = 'order-revised';
+
     public function label(): string
     {
         return match ($this) {
@@ -30,7 +39,24 @@ enum StockMovementReason: string
             self::Count => 'Counted',
             self::OrderPlaced => 'Ordered',
             self::OrderCancelled => 'Order cancelled',
+            self::OrderRevised => 'Order changed',
         };
+    }
+
+    /**
+     * The reasons that together say what an order is holding right now.
+     *
+     * An order takes stock as OrderPlaced and hands it back as OrderRevised,
+     * and it may do both several times before it is accepted. The **net** of
+     * those rows is what is still out against it, which is exactly what
+     * CancelOrder has to put back — summing OrderPlaced alone would give back
+     * every take including the ones already reversed.
+     *
+     * @return list<string>
+     */
+    public static function heldByOrderValues(): array
+    {
+        return [self::OrderPlaced->value, self::OrderRevised->value];
     }
 
     /**
@@ -43,6 +69,7 @@ enum StockMovementReason: string
             self::Count => 'info',
             self::OrderPlaced => 'warning',
             self::OrderCancelled => 'gray',
+            self::OrderRevised => 'info',
         };
     }
 }

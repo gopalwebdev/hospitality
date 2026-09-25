@@ -7,12 +7,13 @@ use App\Actions\Menus\ReadOrderableMenu;
 use App\Actions\Orders\PlaceOrder;
 use App\Actions\Orders\ReadFloor;
 use App\Actions\Orders\ReadLocationActivity;
+use App\Actions\Orders\ReviseOrder;
 use App\Enums\Currency;
 use App\Enums\OrderSettlement;
-use App\Enums\OrderStatus;
 use App\Exceptions\InsufficientStock;
 use App\Exceptions\OrderRefused;
 use App\Filament\Schemas\PricingFields;
+use App\Filament\Tenant\Resources\Orders\OrderResource;
 use App\Filament\Tenant\Resources\Orders\Tables\OrdersTable;
 use App\Models\Location;
 use App\Models\Menu;
@@ -39,6 +40,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Livewire\Attributes\Url;
 use LogicException;
 
 /**
@@ -100,8 +102,22 @@ class TakeOrder extends Page
      * Where the order goes. Picked from the grid rather than typed into a
      * select: a tenant with fifty rooms is a fifty-row dropdown, and staff
      * need to see what is already open at a room before they add to it.
+     *
+     * In the query string, so the picker and the counter are two addresses
+     * rather than two states of one: the browser's own back button takes a
+     * member of staff from a room back to the grid, which is what they press.
      */
+    #[Url(as: 'location')]
     public ?int $locationId = null;
+
+    /**
+     * The order being changed, when this is a change rather than a new order.
+     *
+     * Also in the query string, because the Change button on the orders page
+     * is a link to it and going back from here has to land where it came from.
+     */
+    #[Url(as: 'order')]
+    public ?int $orderId = null;
 
     /** Staff chose to name where it goes by hand instead of picking. */
     public bool $isElsewhere = false;
@@ -122,6 +138,8 @@ class TakeOrder extends Page
 
     /** @var EloquentCollection<int, Order>|null */
     private ?EloquentCollection $openOrdersHere = null;
+
+    private ?Order $changing = null;
 
     /**
      * Ordering is order.create, which staff hold as well as an owner. The
@@ -145,30 +163,89 @@ class TakeOrder extends Page
 
     public function mount(): void
     {
-        $menu = $this->menus()[0] ?? null;
+        $order = $this->orderBeingChanged();
 
-        // A floor card hands the location over in the query string; arriving
-        // without one puts the page on its picker instead.
-        $this->locationId = $this->requestedLocationId();
+        if ($order instanceof Order) {
+            $this->fillFromOrder($order);
+
+            return;
+        }
+
+        // Not changing anything: a new order. A floor card hands the location
+        // over in the query string; arriving without one puts the page on its
+        // picker instead.
+        $this->orderId = null;
+        $this->locationId = $this->locationNamed((int) $this->locationId) instanceof Location ? $this->locationId : null;
 
         $this->form->fill([
-            'menu_id' => $menu?->getKey(),
+            'menu_id' => ($this->menus()[0] ?? null)?->getKey(),
             'settlement' => OrderSettlement::AddToBill->value,
         ]);
     }
 
     public function getTitle(): string
     {
-        return (string) __('panel.take_order.title');
+        return (string) ($this->isChangingAnOrder()
+            ? __('panel.take_order.change_title', ['number' => $this->orderId])
+            : __('panel.take_order.title'));
     }
 
     public function getHeading(): string
     {
         $location = $this->location();
 
+        if ($this->isChangingAnOrder()) {
+            return (string) __('panel.take_order.change_title', ['number' => $this->orderId]);
+        }
+
         return $location instanceof Location
             ? (string) __('panel.take_order.heading_at', ['name' => $location->name])
             : (string) __('panel.take_order.title');
+    }
+
+    /**
+     * Whether this is a change to an order that already exists.
+     */
+    public function isChangingAnOrder(): bool
+    {
+        return $this->orderId !== null;
+    }
+
+    /**
+     * Where Back goes, which is wherever this was reached from.
+     *
+     * Three cases and they are all one rule — go up one step: changing an
+     * order came from the orders page, a room came from the picker, and the
+     * picker itself came from the orders page. The location lives in the
+     * query string too, so the browser's own back button agrees with this
+     * button rather than fighting it.
+     */
+    public function backUrl(): string
+    {
+        if ($this->isChangingAnOrder()) {
+            return OrderResource::getUrl('index');
+        }
+
+        return $this->isPickingLocation() || ! $this->hasAnyLocation()
+            ? OrderResource::getUrl('index')
+            : TakeOrder::getUrl();
+    }
+
+    /**
+     * One icon button back, in the page's own header.
+     */
+    #[\Override]
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('back')
+                ->label(__('panel.take_order.back'))
+                ->icon(Heroicon::OutlinedArrowLeft)
+                ->color('gray')
+                ->iconButton()
+                ->tooltip(__('panel.take_order.back'))
+                ->url(fn (): string => $this->backUrl()),
+        ];
     }
 
     /**
@@ -238,6 +315,7 @@ class TakeOrder extends Page
     public function isPickingLocation(): bool
     {
         return $this->hasAnyLocation()
+            && ! $this->isChangingAnOrder()
             && $this->locationId === null
             && ! $this->isElsewhere;
     }
@@ -351,7 +429,7 @@ class TakeOrder extends Page
         // list is capped at OPEN_ORDERS_SHOWN, so this is a handful of rows.
         return $this->openOrdersHere = Order::query()
             ->where('location_id', $location->getKey())
-            ->where('status', OrderStatus::Placed->value)
+            ->live()
             ->unsettled()
             // Aliased exactly amount_paid and constrained to live payments,
             // the contract Order::amountPaid() reads it back under.
@@ -360,6 +438,35 @@ class TakeOrder extends Page
             ->latest('id')
             ->limit(self::OPEN_ORDERS_SHOWN)
             ->get();
+    }
+
+    /**
+     * Pick one of the orders already running here up, without leaving the counter.
+     *
+     * The orders page's own action, handed the order through the arguments it
+     * was invoked with. Staff standing at the room can see that #13 is still
+     * waiting and accept it there rather than going to find it in a list.
+     */
+    public function acceptOrderAction(): Action
+    {
+        return OrdersTable::acceptAction()
+            ->iconButton()
+            ->size(Size::Small)
+            ->tooltip(__('panel.orders.accept'))
+            ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments))
+            ->after(fn () => $this->openOrdersHere = null);
+    }
+
+    /**
+     * Change one of them, for as long as it may be changed.
+     */
+    public function changeOrderAction(): Action
+    {
+        return OrdersTable::changeAction()
+            ->iconButton()
+            ->size(Size::Small)
+            ->tooltip(__('panel.orders.change'))
+            ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments));
     }
 
     /**
@@ -376,8 +483,7 @@ class TakeOrder extends Page
             // line of text naming the order, not in a row of controls.
             ->link()
             ->label(fn (array $arguments): string => '#'.(int) ($arguments['order'] ?? 0))
-            ->record(fn (array $arguments): ?Order => $this->openOrdersHere()
-                ->firstWhere('id', (int) ($arguments['order'] ?? 0)));
+            ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments));
     }
 
     /**
@@ -476,19 +582,44 @@ class TakeOrder extends Page
         }
 
         $location = $this->location();
+        $changing = $this->orderBeingChanged();
+        $settlement = OrderSettlement::from((string) $state['settlement']);
+        $label = filled($state['location_label'] ?? null) ? (string) $state['location_label'] : null;
+        $note = filled($state['note'] ?? null) ? (string) $state['note'] : null;
 
         try {
-            $order = app(PlaceOrder::class)(
-                tenant: $this->tenant(),
-                menu: $menu,
-                lines: $this->basketLines(),
-                location: $location,
-                settlement: OrderSettlement::from((string) $state['settlement']),
-                locationLabel: filled($state['location_label'] ?? null) ? (string) $state['location_label'] : null,
-                note: filled($state['note'] ?? null) ? (string) $state['note'] : null,
-                // Staff standing in the kitchen are trusted with the clock.
-                allowOutsideHours: true,
-            );
+            $order = $changing instanceof Order
+                ? app(ReviseOrder::class)(
+                    tenant: $this->tenant(),
+                    order: $changing,
+                    menu: $menu,
+                    lines: $this->basketLines(),
+                    location: $location,
+                    settlement: $settlement,
+                    locationLabel: $label,
+                    note: $note,
+                )
+                : app(PlaceOrder::class)(
+                    tenant: $this->tenant(),
+                    menu: $menu,
+                    lines: $this->basketLines(),
+                    location: $location,
+                    settlement: $settlement,
+                    locationLabel: $label,
+                    note: $note,
+                    // Staff standing in the kitchen are trusted with the clock.
+                    allowOutsideHours: true,
+                );
+        } catch (LogicException $exception) {
+            // ReviseOrder refusing: accepted since, or a payment now stands
+            // against it. Both are a race this page cannot prevent, only report.
+            Notification::make()
+                ->title(__('panel.take_order.cannot_change'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
         } catch (OrderRefused $exception) {
             Notification::make()
                 ->title(__('panel.take_order.refused'))
@@ -503,6 +634,18 @@ class TakeOrder extends Page
                 ->body($this->shortagesRead($exception))
                 ->danger()
                 ->send();
+
+            return;
+        }
+
+        if ($changing instanceof Order) {
+            Notification::make()
+                ->title(__('panel.take_order.changed', ['number' => $order->getKey()]))
+                ->success()
+                ->send();
+
+            // Back where the Change button was pressed, which is the orders page.
+            $this->redirect(OrderResource::getUrl('index'), navigate: true);
 
             return;
         }
@@ -746,6 +889,114 @@ class TakeOrder extends Page
         }
 
         return null;
+    }
+
+    /**
+     * One of the orders running here, by the id an action was invoked with.
+     *
+     * Off the collection already loaded for the side column, so a row of
+     * icon buttons costs no query of its own.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    private function openOrderNamed(array $arguments): ?Order
+    {
+        return $this->openOrdersHere()->firstWhere('id', (int) ($arguments['order'] ?? 0));
+    }
+
+    /**
+     * The order this page was opened to change, if it may still be changed.
+     *
+     * Read once per request. Null for a new order, and null too for one that
+     * has been accepted or paid since the link was followed — the page then
+     * behaves as a new order rather than silently editing something fixed.
+     */
+    private function orderBeingChanged(): ?Order
+    {
+        if ($this->orderId === null) {
+            return null;
+        }
+
+        if ($this->changing instanceof Order) {
+            return $this->changing;
+        }
+
+        $order = Order::query()
+            ->where('tenant_id', $this->tenant()->getKey())
+            ->whereKey($this->orderId)
+            ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
+                ->whereHas('payment', fn ($payment) => $payment->live())], 'amount')
+            ->with(['lines' => fn ($lines) => $lines->orderBy('position')->orderBy('id'), 'lines.choices'])
+            ->first();
+
+        return $this->changing = ($order instanceof Order && $order->canBeChanged()) ? $order : null;
+    }
+
+    /**
+     * Open the counter on an order that already exists, as its basket.
+     *
+     * The lines come back from the order's own copies — its names, not the
+     * menu's — because that is what it was taken under and what staff are
+     * looking at. A line whose item or combo has been deleted since cannot be
+     * re-priced and is dropped, with a count of how many, rather than quietly
+     * changing what the guest asked for.
+     */
+    private function fillFromOrder(Order $order): void
+    {
+        $this->locationId = $order->location_id;
+        $this->isElsewhere = $order->location_id === null && filled($order->location_name);
+
+        $dropped = 0;
+        $lines = [];
+
+        foreach ($order->lines as $line) {
+            $type = $line->menu_combo_id !== null ? PriceBasket::COMBO : PriceBasket::ITEM;
+            $id = $line->menu_combo_id ?? $line->menu_item_id;
+
+            if ($id === null) {
+                $dropped++;
+
+                continue;
+            }
+
+            $choices = [];
+            $choiceNames = [];
+
+            foreach ($line->choices as $choice) {
+                if ($choice->menu_add_on_option_id === null) {
+                    continue;
+                }
+
+                $choices[] = ['optionId' => $choice->menu_add_on_option_id, 'quantity' => $choice->quantity];
+                $choiceNames[] = $choice->quantity > 1 ? $choice->quantity.' × '.$choice->name : $choice->name;
+            }
+
+            $lines[] = [
+                'key' => $this->keyFor($type, $id, $choices),
+                'type' => $type,
+                'id' => $id,
+                'quantity' => $line->quantity,
+                'choices' => $choices,
+                'name' => $line->name,
+                'choiceNames' => $choiceNames,
+            ];
+        }
+
+        $this->lines = $lines;
+
+        $this->form->fill([
+            'menu_id' => $order->menu_id ?? ($this->menus()[0] ?? null)?->getKey(),
+            'settlement' => $order->settlement->value,
+            'note' => $order->note,
+            'location_label' => $order->location_id === null ? $order->location_name : null,
+        ]);
+
+        if ($dropped > 0) {
+            Notification::make()
+                ->title(trans_choice('panel.take_order.lines_dropped', $dropped, ['count' => $dropped]))
+                ->warning()
+                ->send();
+        }
     }
 
     /**
@@ -1121,16 +1372,6 @@ class TakeOrder extends Page
         }
 
         return $options;
-    }
-
-    /**
-     * The location a floor card sent us to, if it is one of this tenant's own.
-     */
-    private function requestedLocationId(): ?int
-    {
-        $requested = (int) request()->query('location', 0);
-
-        return $this->locationNamed($requested) instanceof Location ? $requested : null;
     }
 
     private function tenant(): Tenant

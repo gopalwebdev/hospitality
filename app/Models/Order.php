@@ -160,6 +160,39 @@ class Order extends Model
     }
 
     /**
+     * Still owed for, still on the floor, still cancellable.
+     *
+     * What almost everything actually means when it used to ask isPlaced():
+     * an accepted order counts exactly as much as one nobody has picked up.
+     */
+    public function isLive(): bool
+    {
+        return $this->status->isLive();
+    }
+
+    /**
+     * Whether staff may still change what is on this order.
+     *
+     * Two conditions, and both are the point: the kitchen has not accepted it
+     * (OrderStatus::isOpenToChanges()), and no money has been taken against it
+     * — changing the total under a payment already recorded would leave the
+     * two disagreeing. ReviseOrder checks both again under its own lock; this
+     * is what the panel hides the button on.
+     */
+    public function canBeChanged(): bool
+    {
+        return $this->status->isOpenToChanges() && $this->amountPaid() <= 0;
+    }
+
+    /**
+     * @param  Builder<$this>  $query
+     */
+    public function scopeLive(Builder $query): void
+    {
+        $query->whereIn('status', OrderStatus::liveValues());
+    }
+
+    /**
      * How much of this order's total has been paid, ignoring a voided payment.
      *
      * Prefers a withSum(['paymentAllocations as amount_paid' => ...], 'amount')

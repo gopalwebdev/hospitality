@@ -21,6 +21,7 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
+use Livewire\Attributes\Url;
 use LogicException;
 
 /**
@@ -62,13 +63,19 @@ class ListOrders extends ListRecords
     /**
      * Which of the two ways this page is being read.
      *
+     * In the query string, so the two are two addresses rather than two
+     * states of one: opening an order from the floor and coming back lands
+     * on the floor, and the browser's own back button agrees with the tabs.
+     *
      * Not `$layout`: `Filament\Pages\Page` already declares a **static**
      * `$layout` (the Blade layout a page renders into), and a non-static
      * property of that name is a fatal error, not a shadowing.
      */
+    #[Url(as: 'view')]
     public string $layoutMode = self::LIST;
 
     /** The floor's own filters; the list has the table's. */
+    #[Url(as: 'kind')]
     public ?string $kind = null;
 
     public string $floorSearch = '';

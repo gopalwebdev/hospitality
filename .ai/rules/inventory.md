@@ -76,9 +76,18 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
 
 The reads of placing an order do not grow with its lines (`PlaceOrderTest`); the writes do, one per line and choice.
 
+## Changing an order before the kitchen has it
+`App\Actions\Orders\ReviseOrder` replaces what is on a placed order — its lines, its charges, its totals — **keeping its number**. `App\Actions\Orders\AcceptOrder` is what closes that window: once an order is `OrderStatus::Accepted` somebody is cooking to its lines and it refuses.
+
+- Refused, under the lock, unless it is still open to changes **and** no live payment stands against it — changing a total under money already recorded would leave the two disagreeing, the same rule and the same reason as cancelling's.
+- Priced first by the same `PriceBasket`, and refused whole if a line no longer stands.
+- **Everything it was holding goes back** as `StockMovementReason::OrderRevised`, read from its own movements, and then the new basket takes what it needs as a fresh `OrderPlaced`. Both rows stay, so the history reads as what happened — and `CancelOrder` nets them (`StockMovementReason::heldByOrderValues()`) rather than summing the takes alone.
+- Running short rolls the whole thing back: an order is never left half-changed.
+- `App\Actions\Orders\CopyBasketOntoOrder` writes the lines, choices and charges for **both** PlaceOrder and ReviseOrder. It lived inside PlaceOrder until the second caller arrived; an order is a copy however it came to be one.
+
 ## Cancelling reverses the order's own movements
 `CancelOrder`:
-- locks the order, and refuses one that is not placed (`LogicException`)
+- locks the order, and refuses one already cancelled (`LogicException`); an **accepted** order is still cancellable, because accepting is not finishing
 - **refuses one a live payment still stands against**, naming it: staff void the payment first, which stops stock coming back while money sits recorded against an order that no longer exists (`.ai/rules/payments.md`)
 - adds back, per row, the sum of that order's `order-placed` movements — never a recomputation from its lines, because a combo's contents or an option may have changed since
 - gives nothing back to a row nobody counts any more
