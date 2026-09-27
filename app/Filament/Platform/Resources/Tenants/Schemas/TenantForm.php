@@ -10,6 +10,8 @@ use Closure;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -36,17 +38,11 @@ class TenantForm
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255)
-                            ->prefixIcon(Heroicon::OutlinedBuildingStorefront)
+                            ->prefixIcon(Heroicon::OutlinedIdentification)
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (?string $state, Set $set): void {
                                 $set('slug', Str::slug((string) $state));
                             }),
-
-                        // No default, so onboarding has to choose; editable afterwards.
-                        Select::make('type')
-                            ->options(TenantType::options())
-                            ->enum(TenantType::class)
-                            ->required(),
 
                         // The slug is the tenant's subdomain, so it has to stay a valid
                         // DNS label: lowercase alphanumerics and inner hyphens only.
@@ -63,11 +59,28 @@ class TenantForm
                                 'regex' => 'Use lowercase letters, numbers and hyphens only.',
                             ]),
 
+                        // Three buttons, each drawn with its own icon, rather than a
+                        // dropdown: with three choices, seeing them all is one tap
+                        // fewer than opening a list. No default, so onboarding has to
+                        // choose; editable afterwards.
+                        ToggleButtons::make('type')
+                            ->options(TenantType::options())
+                            ->icons(self::typeIcons())
+                            ->enum(TenantType::class)
+                            ->inline()
+                            ->grouped()
+                            ->required()
+                            ->columnSpanFull(),
+
                         Toggle::make('is_active')
                             ->label('Open for business')
                             ->default(true)
-                            ->inline(false)
-                            ->helperText('Turning this off takes the storefront offline.'),
+                            ->onIcon(Heroicon::Check)
+                            ->offIcon(Heroicon::XMark)
+                            ->onColor('success')
+                            ->offColor('gray')
+                            ->helperText('Turning this off takes the storefront offline.')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
 
@@ -77,6 +90,8 @@ class TenantForm
                     ->schema([
                         TextInput::make('max_owners')
                             ->label('Max owners')
+                            ->prefixIcon(Heroicon::OutlinedShieldCheck)
+                            ->suffix('accounts')
                             ->numeric()
                             ->integer()
                             ->minValue(1)
@@ -87,6 +102,8 @@ class TenantForm
 
                         TextInput::make('max_staff')
                             ->label('Max staff')
+                            ->prefixIcon(Heroicon::OutlinedUsers)
+                            ->suffix('accounts')
                             ->numeric()
                             ->integer()
                             ->minValue(1)
@@ -110,7 +127,9 @@ class TenantForm
                         TextInput::make('pincode')
                             ->label('Pincode')
                             ->required()
-                            ->maxLength(16),
+                            ->maxLength(16)
+                            ->prefixIcon(Heroicon::OutlinedHashtag)
+                            ->inputMode('numeric'),
                     ])
                     ->columns(3),
 
@@ -124,43 +143,82 @@ class TenantForm
                         TextInput::make('email')
                             ->label('Email')
                             ->email()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->prefixIcon(Heroicon::OutlinedEnvelope)
+                            ->columnSpanFull(),
 
                         // Stored as two columns: the calling code, and the
                         // national number on its own. Only India is served for
                         // now, so the code is a one-option select rather than
-                        // something to type wrongly.
-                        Select::make('phone_country_code')
-                            ->label('Country code')
-                            ->options(CountryCallingCode::options())
-                            ->default(CountryCallingCode::India->value)
-                            ->selectablePlaceholder(false)
-                            ->required(),
+                        // something to type wrongly. Each pair sits on one line
+                        // where there is room for it and stacks where there is
+                        // not: a phone is too narrow to give the code and the
+                        // number a box apiece.
+                        Grid::make(['default' => 1, '@sm' => 5])
+                            ->gridContainer()
+                            ->schema([
+                                Select::make('phone_country_code')
+                                    ->label('Country code')
+                                    ->options(CountryCallingCode::options())
+                                    ->default(CountryCallingCode::India->value)
+                                    ->selectablePlaceholder(false)
+                                    ->prefixIcon(Heroicon::OutlinedFlag)
+                                    ->required()
+                                    ->columnSpan(['@sm' => 2]),
 
-                        TextInput::make('phone')
-                            ->label('Mobile number')
-                            ->tel()
-                            ->required()
-                            ->rule('digits:'.CountryCallingCode::India->mobileNumberLength())
-                            ->maxLength(CountryCallingCode::longestMobileNumberLength())
-                            ->helperText(sprintf('%d digits, without the country code.', CountryCallingCode::India->mobileNumberLength())),
+                                TextInput::make('phone')
+                                    ->label('Mobile number')
+                                    ->tel()
+                                    ->required()
+                                    ->prefixIcon(Heroicon::OutlinedDevicePhoneMobile)
+                                    ->rule('digits:'.CountryCallingCode::India->mobileNumberLength())
+                                    ->maxLength(CountryCallingCode::longestMobileNumberLength())
+                                    ->helperText(sprintf('%d digits, without the country code.', CountryCallingCode::India->mobileNumberLength()))
+                                    ->columnSpan(['@sm' => 3]),
+                            ]),
 
-                        Select::make('secondary_phone_country_code')
-                            ->label('Secondary country code')
-                            ->options(CountryCallingCode::options())
-                            ->requiredWith('secondary_phone')
-                            // A code with no number behind it says nothing, so
-                            // it is stored only while there is one.
-                            ->dehydrateStateUsing(fn (?string $state, Get $get): ?string => filled($get('secondary_phone')) ? $state : null),
+                        Grid::make(['default' => 1, '@sm' => 5])
+                            ->gridContainer()
+                            ->schema([
+                                Select::make('secondary_phone_country_code')
+                                    ->label('Secondary country code')
+                                    ->options(CountryCallingCode::options())
+                                    ->prefixIcon(Heroicon::OutlinedFlag)
+                                    ->requiredWith('secondary_phone')
+                                    // A code with no number behind it says nothing, so
+                                    // it is stored only while there is one.
+                                    ->dehydrateStateUsing(fn (?string $state, Get $get): ?string => filled($get('secondary_phone')) ? $state : null)
+                                    ->columnSpan(['@sm' => 2]),
 
-                        TextInput::make('secondary_phone')
-                            ->label('Secondary mobile number')
-                            ->tel()
-                            ->rule('digits:'.CountryCallingCode::India->mobileNumberLength())
-                            ->maxLength(CountryCallingCode::longestMobileNumberLength()),
+                                TextInput::make('secondary_phone')
+                                    ->label('Secondary mobile number')
+                                    ->tel()
+                                    ->prefixIcon(Heroicon::OutlinedDevicePhoneMobile)
+                                    ->rule('digits:'.CountryCallingCode::India->mobileNumberLength())
+                                    ->maxLength(CountryCallingCode::longestMobileNumberLength())
+                                    ->columnSpan(['@sm' => 3]),
+                            ]),
                     ])
                     ->columns(2),
             ]);
+    }
+
+    /**
+     * Each type's icon, keyed by stored value, for the type buttons.
+     *
+     * @return array<string, Heroicon>
+     */
+    private static function typeIcons(): array
+    {
+        return array_reduce(
+            TenantType::cases(),
+            static function (array $icons, TenantType $type): array {
+                $icons[$type->value] = $type->icon();
+
+                return $icons;
+            },
+            [],
+        );
     }
 
     /**

@@ -40,16 +40,14 @@ class UsersRelationManager extends RelationManager
             ->heading('Users')
             ->description('Every account on this tenant’s roster.')
             ->columns([
+                // The email sits under the name rather than in a column of its
+                // own, so a row is two short lines instead of a wide one and the
+                // roster reads on a phone without scrolling sideways.
                 TextColumn::make('name')
                     ->icon(Heroicon::OutlinedUser)
-                    ->searchable()
+                    ->description(fn (User $record): string => $record->email)
+                    ->searchable(['name', 'email'])
                     ->sortable(),
-
-                TextColumn::make('email')
-                    ->label('Email address')
-                    ->icon(Heroicon::OutlinedEnvelope)
-                    ->searchable()
-                    ->copyable(),
 
                 TextColumn::make('roles.name')
                     ->label('Roles')
@@ -61,6 +59,7 @@ class UsersRelationManager extends RelationManager
                 // to one of them. Saying so beats quietly showing them twice.
                 IconColumn::make('tenant_id')
                     ->label('Belongs here')
+                    ->visibleFrom('md')
                     ->boolean()
                     ->state(fn (User $record): bool => $record->tenant_id === $this->getOwnerRecord()->getKey())
                     ->tooltip('Off means they staff this tenant but belong to another.'),
@@ -89,11 +88,15 @@ class UsersRelationManager extends RelationManager
                         'tenant_id' => $this->getOwnerRecord()->getKey(),
                     ])),
             ])
+            // The whole row opens the account, so a fingertip has more to hit
+            // than the pencil.
+            ->recordUrl(fn (User $record): string => UserResource::getUrl('edit', ['record' => $record]))
             ->recordActions([
                 Action::make('edit')
                     ->label('Edit')
                     ->iconButton()
                     ->icon(Heroicon::OutlinedPencilSquare)
+                    ->tooltip('Edit account')
                     ->url(fn (User $record): string => UserResource::getUrl('edit', ['record' => $record])),
             ])
             ->emptyStateHeading('Nobody works here yet')

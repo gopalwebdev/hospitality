@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use Filament\Support\Icons\Heroicon;
+
 /**
  * What kind of business a tenant is. Stored on tenants.type, whose CHECK
  * constraint is built from these cases.
@@ -20,6 +22,18 @@ enum TenantType: string
             self::Hotel => 'Hotel',
             self::Restaurant => 'Restaurant',
             self::Hospital => 'Hospital',
+        };
+    }
+
+    /**
+     * The icon beside this type on the tenant form and the tenant's page.
+     */
+    public function icon(): Heroicon
+    {
+        return match ($this) {
+            self::Hotel => Heroicon::OutlinedBuildingOffice2,
+            self::Restaurant => Heroicon::OutlinedCake,
+            self::Hospital => Heroicon::OutlinedHeart,
         };
     }
 

@@ -6,8 +6,11 @@ use App\Enums\Role;
 use App\Filament\Platform\Resources\Tenants\TenantResource;
 use App\Filament\Platform\Resources\Users\UserResource;
 use App\Models\Tenant;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Icons\Heroicon;
 
 /**
  * Onboarding a tenant, and then the one account that runs it.
@@ -30,9 +33,29 @@ class CreateTenant extends CreateRecord
     #[\Override]
     protected static bool $canCreateAnother = false;
 
+    /**
+     * Create and Cancel ride at the foot of the screen while the form is
+     * longer than it, so a phone never has to scroll back down to find them.
+     */
+    #[\Override]
+    public static bool $formActionsAreSticky = true;
+
+    #[\Override]
+    public static string|Alignment $formActionsAlignment = Alignment::End;
+
     protected function getCreatedNotificationTitle(): ?string
     {
         return 'Tenant created';
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()->icon(Heroicon::OutlinedPlus);
+    }
+
+    protected function getCancelFormAction(): Action
+    {
+        return parent::getCancelFormAction()->icon(Heroicon::OutlinedXMark);
     }
 
     /**

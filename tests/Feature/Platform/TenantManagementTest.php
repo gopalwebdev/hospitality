@@ -13,6 +13,7 @@ use App\Filament\Platform\Resources\Users\UserResource;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Support\Icons\Heroicon;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -530,4 +531,75 @@ it('allows lowering a limit down to exactly the current roster', function (): vo
         ->assertHasNoFormErrors();
 
     expect($tenant->refresh()->max_staff)->toBe(3);
+});
+
+/*
+|--------------------------------------------------------------------------
+| The tenant's own page
+|--------------------------------------------------------------------------
+|
+| The edit page says whose it is, offers the two things an admin does from
+| it as icon buttons, and shows the roster in a form that reads on a phone.
+|
+*/
+
+it('names the tenant it is editing, with where it is served and what state it is in', function (bool $isActive, string $state): void {
+    $tenant = Tenant::factory()->create([
+        'name' => 'Seaview Residency',
+        'slug' => 'seaview',
+        'type' => TenantType::Hotel,
+        'is_active' => $isActive,
+    ]);
+    enterProductTeamPanel();
+
+    $page = Livewire::test(EditTenant::class, ['record' => $tenant->getRouteKey()])->instance();
+
+    expect($page->getHeading())->toBe('Seaview Residency')
+        ->and($page->getSubheading())->toBe('seaview.'.config('app.domain').' · Hotel · '.$state);
+})->with([
+    'open' => [true, 'Open for business'],
+    'switched off' => [false, 'Storefront offline'],
+]);
+
+it('offers opening the dashboard and deleting as icon buttons on the tenant page', function (): void {
+    $tenant = Tenant::factory()->create();
+    enterProductTeamPanel();
+
+    // An icon button with no icon draws nothing at all: DeleteAction carries
+    // none of its own, so this pins the one given here.
+    Livewire::test(EditTenant::class, ['record' => $tenant->getRouteKey()])
+        ->assertActionHasIcon('delete', Heroicon::OutlinedTrash)
+        ->assertActionHasIcon('openDashboard', Heroicon::OutlinedArrowTopRightOnSquare)
+        ->assertActionHasUrl('openDashboard', $tenant->signInUrl());
+});
+
+it('shows a roster member\'s email under their name and finds them by it', function (): void {
+    $tenant = Tenant::factory()->create();
+    $member = User::factory()->ofTenant($tenant)->create(['name' => 'Asha Menon', 'email' => 'asha@seaview.example.com']);
+    $colleague = User::factory()->ofTenant($tenant)->create(['name' => 'Ravi Kumar', 'email' => 'ravi@seaview.example.com']);
+
+    enterProductTeamPanel();
+
+    Livewire::test(UsersRelationManager::class, [
+        'ownerRecord' => $tenant,
+        'pageClass' => EditTenant::class,
+    ])
+        ->assertSee('asha@seaview.example.com')
+        ->searchTable('asha@seaview')
+        ->assertCanSeeTableRecords([$member])
+        ->assertCanNotSeeTableRecords([$colleague]);
+});
+
+it('opens a roster member\'s account from anywhere on their row', function (): void {
+    $tenant = Tenant::factory()->create();
+    $member = User::factory()->ofTenant($tenant)->create();
+
+    enterProductTeamPanel();
+
+    $table = Livewire::test(UsersRelationManager::class, [
+        'ownerRecord' => $tenant,
+        'pageClass' => EditTenant::class,
+    ])->instance()->getTable();
+
+    expect($table->getRecordUrl($member))->toBe(UserResource::getUrl('edit', ['record' => $member]));
 });

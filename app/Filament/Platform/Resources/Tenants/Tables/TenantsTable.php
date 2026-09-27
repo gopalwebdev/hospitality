@@ -82,6 +82,7 @@ class TenantsTable
                     ->label('Open dashboard')
                     ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->iconButton()
+                    ->tooltip('Open dashboard')
                     ->url(fn (Tenant $record): string => $record->signInUrl())
                     ->openUrlInNewTab(),
                 EditAction::make(),
