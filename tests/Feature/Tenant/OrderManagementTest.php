@@ -203,3 +203,74 @@ it('lists orders in the same number of queries however many there are', function
 
     expect($queriesToRender())->toBe($one);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Reading one order
+|--------------------------------------------------------------------------
+*/
+
+it('reads an order as a receipt, with the money down the right', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 1800);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $item = MenuItem::factory()
+        ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
+        ->stocked(10)
+        ->create(['name' => ['en' => 'Masala Dosa'], 'price' => 12000]);
+
+    $order = app(PlaceOrder::class)($tenant, $menu, [[
+        'key' => 'item:'.$item->getKey(),
+        'type' => PriceBasket::ITEM,
+        'id' => $item->getKey(),
+        'quantity' => 2,
+        'choices' => [],
+    ]]);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    $html = mountedModalHtml(
+        Livewire::test(ListOrders::class)->mountAction(TestAction::make('view')->table($order)),
+    );
+
+    // The lines take two columns of three and the totals the third, so the
+    // money reads down the right the way it does on a bill rather than
+    // spread across four columns underneath. The project owner asked for it.
+    expect($html)->toContain('--col-span-clg: span 2 / span 2')
+        // Inline labels are what make the totals read as a receipt foot
+        // rather than as four more fields.
+        ->and($html)->toContain('fi-in-entry-has-inline-label')
+        ->and($html)->toContain('Masala Dosa')
+        ->and($html)->toContain('Subtotal')
+        // What is still owed sits with the money, and is no longer said a
+        // second time under the payments.
+        ->and(substr_count($html, 'Outstanding'))->toBe(1);
+});
+
+it('names an order by the tenant\'s own count, not by its row id', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 0);
+    $menu = Menu::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $item = MenuItem::factory()
+        ->inCategory(MenuCategory::factory()->inMenu($menu)->create())
+        ->stocked(10)
+        ->create(['price' => 10000]);
+
+    $order = app(PlaceOrder::class)($tenant, $menu, [[
+        'key' => 'item:'.$item->getKey(),
+        'type' => PriceBasket::ITEM,
+        'id' => $item->getKey(),
+        'quantity' => 1,
+        'choices' => [],
+    ]]);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    expect($order->reference())->toBe('#001');
+
+    Livewire::test(ListOrders::class)
+        ->assertSee('#001')
+        // Searched on the number staff are told over the phone.
+        ->searchTable('1')
+        ->assertCanSeeTableRecords([$order]);
+});

@@ -50,9 +50,9 @@ class ListOrders extends ListRecords
 
     public const string LIST = 'list';
 
-    public const string FLOOR = 'floor';
+    public const string PLACES = 'places';
 
-    /** How often the floor asks again, in seconds. */
+    /** How often the places layout asks again, in seconds. */
     private const int POLL_SECONDS = 10;
 
     /**
@@ -78,7 +78,7 @@ class ListOrders extends ListRecords
     public bool $onlyOpen = false;
 
     /** @var list<array{location: Location, activity: array<string, mixed>}>|null */
-    private ?array $floor = null;
+    private ?array $places = null;
 
     /**
      * The switcher, then whichever way the page is being read.
@@ -89,8 +89,8 @@ class ListOrders extends ListRecords
         return $schema->components([
             View::make('filament.tenant.resources.orders.pages.layout-switcher'),
 
-            $this->isFloor()
-                ? View::make('filament.tenant.resources.orders.pages.floor')
+            $this->isPlaces()
+                ? View::make('filament.tenant.resources.orders.pages.places')
                 : EmbeddedTable::make(),
         ]);
     }
@@ -116,14 +116,14 @@ class ListOrders extends ListRecords
         ];
     }
 
-    public function isFloor(): bool
+    public function isPlaces(): bool
     {
-        return $this->layoutMode === self::FLOOR;
+        return $this->layoutMode === self::PLACES;
     }
 
     public function showLayout(string $layout): void
     {
-        $this->layoutMode = $layout === self::FLOOR ? self::FLOOR : self::LIST;
+        $this->layoutMode = $layout === self::PLACES ? self::PLACES : self::LIST;
     }
 
     /**
@@ -146,7 +146,7 @@ class ListOrders extends ListRecords
     {
         $search = trim($this->floorSearch);
 
-        return array_values(array_filter($this->floor(), function (array $card) use ($search): bool {
+        return array_values(array_filter($this->places(), function (array $card) use ($search): bool {
             if ($this->kind !== null && $card['location']->kind->value !== $this->kind) {
                 return false;
             }
@@ -170,7 +170,7 @@ class ListOrders extends ListRecords
      */
     public function summary(): array
     {
-        $open = array_filter($this->floor(), static fn (array $card): bool => $card['activity']['state']->isOpen());
+        $open = array_filter($this->places(), static fn (array $card): bool => $card['activity']['state']->isOpen());
 
         $sum = static fn (string $key): int => array_sum(array_map(
             static fn (array $card): int => $card['activity'][$key],
@@ -199,7 +199,7 @@ class ListOrders extends ListRecords
 
     public function hasAnyLocation(): bool
     {
-        return $this->floor() !== [];
+        return $this->places() !== [];
     }
 
     public function locationsUrl(): string
@@ -208,27 +208,19 @@ class ListOrders extends ListRecords
     }
 
     /**
-     * The counter, with this location already chosen.
+     * Where a card goes when it is pressed: the counter, at that place.
+     *
+     * The whole card is the link. It used to carry a "Take order" button and
+     * an icon button crossing to the list with that location filtered, and
+     * the project owner had both taken off — so this is now the one thing
+     * pressing a card does. Nothing is lost by it: the counter lists what is
+     * already running there, moves each of those orders along, changes one
+     * the kitchen has not accepted, and links on to the full list
+     * (`TakeOrder::ordersHereUrl()`).
      */
-    public function takeOrderUrl(Location $location): string
+    public function locationUrl(Location $location): string
     {
         return TakeOrder::getUrl().'?location='.$location->getKey();
-    }
-
-    /**
-     * Swap to the list, showing only this location's orders.
-     *
-     * The two ways of reading the page are joined here: a card is a question
-     * ("what is going on at 204?") and the list is the answer, so the filter
-     * is set on the way across rather than left for staff to find.
-     */
-    public function showOrdersAt(int $locationId): void
-    {
-        $this->layoutMode = self::LIST;
-        $this->tableFilters ??= [];
-        $this->tableFilters['location_id']['value'] = (string) $locationId;
-
-        $this->resetPage();
     }
 
     /**
@@ -236,9 +228,9 @@ class ListOrders extends ListRecords
      *
      * @return list<array{location: Location, activity: array<string, mixed>}>
      */
-    private function floor(): array
+    private function places(): array
     {
-        return $this->floor ??= app(ReadFloor::class)($this->tenant());
+        return $this->places ??= app(ReadFloor::class)($this->tenant());
     }
 
     /**

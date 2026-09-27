@@ -5,7 +5,7 @@
 --}}
 <x-filament::tabs contained>
     <x-filament::tabs.item
-        :active="! $this->isFloor()"
+        :active="! $this->isPlaces()"
         icon="heroicon-o-list-bullet"
         wire:click="showLayout('{{ \App\Filament\Tenant\Resources\Orders\Pages\ListOrders::LIST }}')"
     >
@@ -13,10 +13,10 @@
     </x-filament::tabs.item>
 
     <x-filament::tabs.item
-        :active="$this->isFloor()"
-        icon="heroicon-o-squares-2x2"
-        wire:click="showLayout('{{ \App\Filament\Tenant\Resources\Orders\Pages\ListOrders::FLOOR }}')"
+        :active="$this->isPlaces()"
+        icon="heroicon-o-map-pin"
+        wire:click="showLayout('{{ \App\Filament\Tenant\Resources\Orders\Pages\ListOrders::PLACES }}')"
     >
-        {{ __('panel.orders.layout_floor') }}
+        {{ __('panel.orders.layout_places') }}
     </x-filament::tabs.item>
 </x-filament::tabs>

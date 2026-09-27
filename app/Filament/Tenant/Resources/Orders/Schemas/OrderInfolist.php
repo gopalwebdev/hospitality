@@ -15,10 +15,12 @@ use App\Models\OrderPayment;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 
 /**
@@ -81,69 +83,99 @@ class OrderInfolist
                             ->columnSpanFull(),
                     ]),
 
-                Section::make(__('panel.orders.lines'))
-                    ->icon(Heroicon::OutlinedListBullet)
-                    ->compact()
+                // The lines and what they came to, side by side: the money
+                // reads down the right of the page the way it does on every
+                // bill a guest has ever been handed, rather than spread
+                // across four columns under the lines. The project owner
+                // asked for the pricing on the right. Below `lg` the two
+                // stack, lines first, which is the same reading order.
+                Grid::make(['default' => 1, '@lg' => 3])
+                    ->gridContainer()
                     ->schema([
-                        RepeatableEntry::make('lines')
-                            ->hiddenLabel()
-                            ->table([
-                                TableColumn::make(__('panel.orders.item')),
-                                TableColumn::make(__('panel.orders.choices')),
-                                TableColumn::make(__('panel.orders.quantity'))->alignment(Alignment::End),
-                                TableColumn::make(__('panel.orders.unit_price'))->alignment(Alignment::End),
-                                TableColumn::make(__('panel.orders.total'))->alignment(Alignment::End),
-                            ])
+                        Section::make(__('panel.orders.lines'))
+                            ->icon(Heroicon::OutlinedListBullet)
+                            ->compact()
+                            ->columnSpan(['@lg' => 2])
                             ->schema([
-                                TextEntry::make('name'),
+                                RepeatableEntry::make('lines')
+                                    ->hiddenLabel()
+                                    ->table([
+                                        TableColumn::make(__('panel.orders.item')),
+                                        TableColumn::make(__('panel.orders.choices')),
+                                        TableColumn::make(__('panel.orders.quantity'))->alignment(Alignment::End),
+                                        TableColumn::make(__('panel.orders.unit_price'))->alignment(Alignment::End),
+                                        TableColumn::make(__('panel.orders.total'))->alignment(Alignment::End),
+                                    ])
+                                    ->schema([
+                                        TextEntry::make('name'),
 
-                                TextEntry::make('choices_summary')
-                                    ->state(fn (OrderLine $record): string => self::choicesOf($record))
+                                        TextEntry::make('choices_summary')
+                                            ->state(fn (OrderLine $record): string => self::choicesOf($record))
+                                            ->placeholder('—'),
+
+                                        TextEntry::make('quantity'),
+
+                                        TextEntry::make('unit_price')
+                                            ->formatStateUsing($money),
+
+                                        TextEntry::make('total')
+                                            ->formatStateUsing($money),
+                                    ]),
+                            ]),
+
+                        // One column of label-and-amount rows, like a receipt
+                        // foot. Inline labels put each label beside its figure
+                        // rather than above it, which is what makes it read as
+                        // a total rather than as four more fields.
+                        Section::make(__('panel.orders.totals'))
+                            ->icon(Heroicon::OutlinedBanknotes)
+                            ->compact()
+                            ->columnSpan(1)
+                            ->inlineLabel()
+                            ->schema([
+                                TextEntry::make('subtotal')
+                                    ->label(__('panel.orders.subtotal'))
+                                    ->formatStateUsing($money)
+                                    ->alignEnd(),
+
+                                TextEntry::make('charges_list')
+                                    ->label(__('panel.orders.charges'))
+                                    ->state(fn (Order $record): array => $record->charges
+                                        ->map(fn (OrderCharge $charge): string => $charge->name.' '.$currency->format($charge->amount))
+                                        ->all())
+                                    ->listWithLineBreaks()
+                                    ->alignEnd()
                                     ->placeholder('—'),
 
-                                TextEntry::make('quantity'),
-
-                                TextEntry::make('unit_price')
-                                    ->formatStateUsing($money),
+                                // CGST and SGST read separately, because that is how
+                                // GST is levied and how a tax invoice has to show it.
+                                // The amounts are the order's own copies, not a sum
+                                // worked out again from the rate.
+                                TextEntry::make('tax_parts')
+                                    ->label(fn (Order $record): string => (string) ($record->prices_include_tax
+                                        ? __('panel.orders.tax_included')
+                                        : __('panel.orders.tax')))
+                                    ->state(fn (Order $record): array => self::taxPartsOf($record, $currency))
+                                    ->listWithLineBreaks()
+                                    ->alignEnd()
+                                    ->placeholder($currency->format(0)),
 
                                 TextEntry::make('total')
-                                    ->formatStateUsing($money),
+                                    ->label(__('panel.orders.total'))
+                                    ->formatStateUsing($money)
+                                    ->weight(FontWeight::Bold)
+                                    ->size(TextSize::Large)
+                                    ->alignEnd(),
+
+                                TextEntry::make('amount_outstanding_foot')
+                                    ->label(__('panel.orders.outstanding'))
+                                    ->state(fn (Order $record): int => $record->amountOutstanding())
+                                    ->formatStateUsing($money)
+                                    ->color(fn (Order $record): string => $record->amountOutstanding() > 0 ? 'danger' : 'success')
+                                    ->weight(FontWeight::SemiBold)
+                                    ->alignEnd()
+                                    ->visible(fn (Order $record): bool => $record->isLive()),
                             ]),
-                    ]),
-
-                Section::make(__('panel.orders.totals'))
-                    ->icon(Heroicon::OutlinedBanknotes)
-                    ->compact()
-                    ->columns(4)
-                    ->schema([
-                        TextEntry::make('subtotal')
-                            ->label(__('panel.orders.subtotal'))
-                            ->formatStateUsing($money),
-
-                        // CGST and SGST read separately, because that is how
-                        // GST is levied and how a tax invoice has to show it.
-                        // The amounts are the order's own copies, not a sum
-                        // worked out again from the rate.
-                        TextEntry::make('tax_parts')
-                            ->label(fn (Order $record): string => (string) ($record->prices_include_tax
-                                ? __('panel.orders.tax_included')
-                                : __('panel.orders.tax')))
-                            ->state(fn (Order $record): array => self::taxPartsOf($record, $currency))
-                            ->listWithLineBreaks()
-                            ->placeholder($currency->format(0)),
-
-                        TextEntry::make('charges_list')
-                            ->label(__('panel.orders.charges'))
-                            ->state(fn (Order $record): array => $record->charges
-                                ->map(fn (OrderCharge $charge): string => $charge->name.' '.$currency->format($charge->amount))
-                                ->all())
-                            ->listWithLineBreaks()
-                            ->placeholder('—'),
-
-                        TextEntry::make('total')
-                            ->label(__('panel.orders.total'))
-                            ->formatStateUsing($money)
-                            ->weight(FontWeight::Bold),
                     ]),
 
                 Section::make(__('panel.orders.payments_section'))
@@ -189,12 +221,6 @@ class OrderInfolist
                                     ->badge()
                                     ->color(fn (bool $state): string => $state ? 'danger' : 'success'),
                             ]),
-
-                        TextEntry::make('amount_outstanding')
-                            ->label(__('panel.orders.outstanding'))
-                            ->state(fn (Order $record): int => $record->amountOutstanding())
-                            ->formatStateUsing($money)
-                            ->weight(FontWeight::Bold),
                     ]),
             ]);
     }

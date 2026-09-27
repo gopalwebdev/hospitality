@@ -58,7 +58,7 @@ A new row's count is stored with the row — `stock_quantity` is fillable for ex
    - the menu is outside its service window
    - **both of those are waived by `allowOutsideHours`**, and only those two: a staff order past closing is still refused a sold-out line, a broken group or a stock shortage
    - any line is not `ok` in `PriceBasket` — every priced line comes back as `lines`
-2. **One transaction:** the order row, then `ApplyStockChanges` with the lines' `StockDemand`, then the lines, their choices and the charges copied in.
+2. **One transaction:** the order row — numbered by `NextOrderNumber` under a lock on the tenant — then `ApplyStockChanges` with the lines' `StockDemand`, then the lines, their choices and the charges copied in.
 3. **Short under the lock:** `InsufficientStock` rolls the order back with it and renders 422 as `{message, reason: "insufficient-stock", shortages: [{type, id, requested, available, lineKeys}]}`.
    - "3 asked for, 1 left" is a shortage with `requested: 3, available: 1`.
    - The server's count needs no correcting. `available` is what the phone brings those lines down to, which is the PWA's job when it arrives.
@@ -111,11 +111,11 @@ Filament saves every field a form holds, and the options repeater saves every ro
     - **Stock history:** the 50 newest movements, the order number or the person beside each. Needs `view`.
 - **Add-on group options table:** an In stock column.
 - **Orders** (`OrderResource`): the list, one order's page, **Cancel order** (`OrderPolicy::cancel()`, which is `order.manage`) and a **New order** header action linking to the counter. Nothing is **edited or deleted** — `OrderPolicy` answers false to both, because what was ordered is a record rather than a draft — but `OrderPolicy::create()` is `order.create` now that staff take orders themselves. It answered false while ordering was the guest app's alone. See `.ai/rules/order-taking.md`.
-- The same page's **floor** layout, switched to from a tab above the table: a card per location with what is open at it. And **Take order** (`App\Filament\Tenant\Pages\TakeOrder`, reached from a floor card rather than from the sidebar): the counter.
+- The same page's **Places** layout, switched to from a tab above the table: a card per location with what is open at it. And **Take order** (`App\Filament\Tenant\Pages\TakeOrder`, reached from a floor card rather than from the sidebar): the counter.
 
 ## Not built yet
 - The guest app placing orders and reading `shortages`. The API takes `locationId` and `settlement`; nothing on the phone sends them yet. **The panel does** — `TakeOrder` sends both.
-- Order statuses between placed and cancelled, and order numbers.
+- Order statuses between placed and cancelled. **Order numbers are built** — `orders.number` / `numbered_on`, a per-tenant daily count assigned by `NextOrderNumber` (`.ai/rules/order-taking.md`).
 - Assigning a guest to a room or table (`.ai/rules/locations.md`).
 - Low-stock alerts and a daily reset of counts.
 - **Idempotency.** A phone retrying the POST would place a second order. This has to be solved before the app places orders.
@@ -125,7 +125,8 @@ Filament saves every field a form holds, and the options repeater saves every ro
 Tests:
 - `tests/Feature/Tenant/PlaceOrderTest.php`
 - `tests/Feature/Tenant/TakeOrderTest.php`
-- `tests/Feature/Tenant/OrderFloorTest.php`
+- `tests/Feature/Tenant/OrderPlacesTest.php`
+- `tests/Feature/Tenant/OrderNumberTest.php`
 - `tests/Feature/Tenant/StockManagementTest.php`
 - `tests/Feature/Tenant/OrderManagementTest.php`
 - `tests/Feature/Tenant/BasketPriceTest.php`

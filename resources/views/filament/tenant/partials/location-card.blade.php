@@ -1,67 +1,60 @@
 {{--
-    What one location reads as: what kind of place it is, and what is being
-    worked there right now.
+    What one location reads as on the floor and in the counter's picker: its
+    name, its kind as an icon, and a colour saying whether anything is being
+    worked there.
 
     Takes $location and $activity (one entry of
     App\Actions\Orders\ReadLocationActivity). The wrapper is the including
-    page's business — the orders page's floor layout wraps it in a section with
-    actions, the counter's picker in a button — so that only what would
-    otherwise drift lives here.
+    page's business — the orders page's floor layout wraps it in a link to the
+    counter, the counter's picker in a button, and both put the `lc--<state>`
+    class that colours it on that wrapper — so only what would otherwise drift
+    lives here.
 
-    **No money.** The project owner's instruction: a card says where the work
-    is. What a room owes is the list layout's business and the Locations page's
-    Settle, and a card carrying a ₹0.00 said nothing three times over.
+    **Every card is one line, so every card is the same size.** The project
+    owner's instruction. It drew a state badge, a chip per step ("1 pending")
+    and how long ago the newest order landed, which made a busy card twice the
+    height of a quiet one and a floor of them read as rubble. What is
+    happening is the **colour**; pressing the card opens the counter, which
+    says it in full.
 
-    **A quiet card says one thing and no more.** It carried a "Clear" badge as
-    well, and that went for the same reason: a badge on every card says nothing.
+    **No money**, for the same reason it never carried any: a card says where
+    the work is, and what a room owes is the list layout's business and the
+    Locations page's Settle.
+
+    **The kind is the icon and nothing else.** "Room" under "Room 101" was the
+    same word twice, and "Area" under "Poolside" was a label nobody reads
+    second.
+
+    The one thing still written out is read aloud rather than drawn: colour on
+    its own is no use to a screen reader, and green beside amber is no use to
+    a good share of the people working a floor.
 --}}
 <div class="lc-head">
-    <div style="min-width: 0;">
-        <div class="lc-name">
-            {{-- The kind at a glance: a bed for a room, a table for a table. --}}
-            <x-filament::icon
-                :icon="$location->kind->icon()"
-                class="lc-kind-icon"
-            />
-            <span>{{ $location->name }}</span>
-        </div>
+    <div class="lc-name">
+        {{-- The kind at a glance: a bed for a room, a table for a table. --}}
+        <x-filament::icon
+            :icon="$location->kind->icon()"
+            class="lc-kind-icon"
+        />
 
-        <div class="lc-muted">
-            {{ $location->kind->label() }}@if (filled($location->code)) · {{ $location->code }}@endif
-            @if ($location->capacity !== null)
-                · {{ trans_choice('panel.board.capacity', $location->capacity, ['count' => $location->capacity]) }}
-            @endif
-        </div>
+        <span class="lc-name-text">{{ $location->name }}</span>
     </div>
 
     @if ($activity['state']->isOpen())
-        <x-filament::badge :color="$activity['state']->color()" :icon="$activity['state']->icon()">
-            {{ $activity['state']->label() }}
-        </x-filament::badge>
-    @endif
-</div>
+        {{--
+            How many orders are open here, in the one place every card keeps
+            for it. A number and a colour, because those are the two things
+            that may differ between two cards — everything else is the same
+            on all of them, which is what keeps a wall of them readable.
+        --}}
+        <span class="lc-count lc-count--{{ $activity['state']->value }}">{{ $activity['orders'] }}</span>
 
-<div class="lc-figures">
-    @if ($activity['state']->isOpen())
-        {{-- What is actually waiting, step by step, rather than one total. --}}
-        <span class="lc-counts">
-            @if ($activity['ready'] > 0)
-                <span class="lc-count lc-count--ready">{{ __('panel.board.n_ready', ['count' => $activity['ready']]) }}</span>
-            @endif
-
-            @if ($activity['pending'] > 0)
-                <span class="lc-count lc-count--pending">{{ __('panel.board.n_pending', ['count' => $activity['pending']]) }}</span>
-            @endif
-
-            @if ($activity['preparing'] > 0)
-                <span class="lc-count lc-count--preparing">{{ __('panel.board.n_preparing', ['count' => $activity['preparing']]) }}</span>
-            @endif
+        <span class="fi-sr-only">
+            {{ implode(', ', array_filter([
+                $activity['ready'] > 0 ? __('panel.board.n_ready', ['count' => $activity['ready']]) : null,
+                $activity['pending'] > 0 ? __('panel.board.n_pending', ['count' => $activity['pending']]) : null,
+                $activity['preparing'] > 0 ? __('panel.board.n_preparing', ['count' => $activity['preparing']]) : null,
+            ])) }}
         </span>
-
-        @if ($activity['lastOrderedAt'] !== null)
-            <span class="lc-muted">{{ $activity['lastOrderedAt']->diffForHumans(short: true) }}</span>
-        @endif
-    @else
-        <span class="lc-muted">{{ __('panel.board.nothing_open') }}</span>
     @endif
 </div>

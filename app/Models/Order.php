@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property int $id
  * @property int $tenant_id
+ * @property int $number the tenant's own count for the day, not unique on its own
+ * @property CarbonImmutable $numbered_on the day that count belongs to
  * @property int|null $menu_id
  * @property-read Menu|null $menu
  * @property int|null $location_id
@@ -152,6 +154,19 @@ class Order extends Model
     public function payments(): BelongsToMany
     {
         return $this->belongsToMany(Payment::class, 'order_payments')->withPivot('amount')->withTimestamps();
+    }
+
+    /**
+     * What this order is called: "#012", the tenant's own count for the day.
+     *
+     * Padded to three digits so a column of them lines up and so the shortest
+     * reads as a number rather than as a quantity. It is **not unique on its
+     * own** — tomorrow has its own #012 — and nothing looks an order up by it;
+     * the id is still the key. This is for reading and for saying out loud.
+     */
+    public function reference(): string
+    {
+        return '#'.str_pad((string) $this->number, 3, '0', STR_PAD_LEFT);
     }
 
     public function isPlaced(): bool
@@ -303,6 +318,8 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'number' => 'integer',
+            'numbered_on' => 'date',
             'menu_id' => 'integer',
             'location_id' => 'integer',
             'status' => OrderStatus::class,

@@ -162,7 +162,11 @@ final class StockActions
             ->where('menu_item_id', $itemId)
             // A member of the product team who changed a count is on no roster,
             // so the panel's tenancy scope on users would lose their name.
-            ->with(['user' => fn ($user) => $user->withoutGlobalScopes()->select(['id', 'name'])])
+            ->with([
+                'user' => fn ($user) => $user->withoutGlobalScopes()->select(['id', 'name']),
+                // Named by what the tenant calls it, not by the row's id.
+                'order' => fn ($order) => $order->select(['id', 'number']),
+            ])
             ->latest('id')
             ->limit(50)
             ->get(['id', 'reason', 'quantity_change', 'quantity_after', 'order_id', 'user_id', 'note', 'created_at'])
@@ -171,8 +175,8 @@ final class StockActions
                 'reason' => $movement->reason,
                 'change' => ($movement->quantity_change > 0 ? '+' : '').$movement->quantity_change,
                 'after' => $movement->quantity_after,
-                'by' => $movement->order_id !== null
-                    ? (string) __('panel.stock.order_reference', ['number' => $movement->order_id])
+                'by' => $movement->order !== null
+                    ? (string) __('panel.stock.order_reference', ['number' => $movement->order->reference()])
                     : $movement->user?->name,
                 'note' => $movement->note,
             ])

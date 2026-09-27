@@ -11,6 +11,7 @@ use App\Models\Menu;
 use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Date;
 
 /**
  * An order as it is stored — its totals, not its lines.
@@ -41,6 +42,11 @@ class OrderFactory extends Factory
             'tenant_id' => fn (array $attributes): int => (int) Menu::query()
                 ->whereKey($attributes['menu_id'])
                 ->value('tenant_id'),
+            // The tenant's own count for the day. PlaceOrder takes this under
+            // a lock; a factory-made order only needs a plausible one, and a
+            // sequence keeps two orders in one test apart.
+            'number' => fake()->unique()->numberBetween(1, 9999),
+            'numbered_on' => Date::now()->startOfDay(),
             'status' => OrderStatus::Placed,
             'location_id' => null,
             // Free text under the default locale, the shape PlaceOrder stores

@@ -26,6 +26,7 @@ use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -46,37 +47,46 @@ class OrdersTable
 
         return $table
             ->columns([
-                TextColumn::make('id')
-                    ->label(__('panel.orders.number'))
-                    ->formatStateUsing(fn (int $state): string => '#'.$state)
-                    ->sortable(),
+                // Nine columns scrolled sideways on anything but a desk, so
+                // what a row answers is stacked into five: which order and
+                // when, where it went and off which menu, what it came to,
+                // what state it is in, and whether it has been paid for.
+                // Everything else is still here, off by default, behind the
+                // table's own column toggle.
 
+                // The tenant's own count for the day, never the row's id: the
+                // id is global to the platform and says nothing to the
+                // business reading it. Searched on the number, because that
+                // is what staff are told over the phone; sorted on the id,
+                // because that is the order they actually arrived in.
+                TextColumn::make('number')
+                    ->label(__('panel.orders.number'))
+                    ->formatStateUsing(fn (Order $record): string => $record->reference())
+                    ->weight(FontWeight::Bold)
+                    ->searchable()
+                    ->sortable(['id']),
+
+                // Kept on screen rather than behind the column toggle: it is
+                // what a day's orders are reconciled by, and it is where
+                // PanelDateTimeFormatTest pins the house clock.
                 TextColumn::make('created_at')
                     ->label(__('panel.orders.placed_at'))
                     ->dateTime()
-                    ->description(fn (Order $record): ?string => $record->created_at?->diffForHumans())
+                    ->description(fn (Order $record): ?string => $record->created_at?->diffForHumans(short: true))
                     ->sortable(),
 
                 TextColumn::make('location_name')
                     ->label(__('panel.orders.location'))
+                    ->icon(Heroicon::OutlinedMapPin)
+                    ->description(fn (Order $record): ?string => $record->menu?->name)
                     ->placeholder('—')
+                    ->wrap()
                     ->searchable(query: fn (Builder $query, string $search): Builder => TranslatedFields::search($query, 'location_name', $search)),
-
-                TextColumn::make('menu.name')
-                    ->label(__('panel.categories.menu'))
-                    ->icon(Heroicon::OutlinedBookOpen)
-                    ->badge()
-                    ->color('gray')
-                    ->placeholder('—'),
-
-                TextColumn::make('lines_count')
-                    ->label(__('panel.orders.lines'))
-                    ->counts('lines')
-                    ->alignEnd(),
 
                 TextColumn::make('total')
                     ->label(__('panel.orders.total'))
                     ->formatStateUsing(fn (int $state): string => $currency->format($state))
+                    ->weight(FontWeight::SemiBold)
                     ->sortable()
                     ->alignEnd(),
 
@@ -87,18 +97,33 @@ class OrdersTable
                     ->formatStateUsing(fn (OrderStatus $state): string => $state->label())
                     ->color(fn (OrderStatus $state): string => $state->color()),
 
-                TextColumn::make('settlement')
-                    ->label(__('panel.orders.settlement'))
-                    ->badge()
-                    ->formatStateUsing(fn (OrderSettlement $state): string => $state->label())
-                    ->color(fn (OrderSettlement $state): string => $state->color()),
-
                 TextColumn::make('payment_state')
                     ->label(__('panel.orders.payment'))
                     ->state(fn (Order $record): PaymentState => $record->paymentState())
                     ->badge()
                     ->formatStateUsing(fn (PaymentState $state): string => $state->label())
                     ->color(fn (PaymentState $state): string => $state->color()),
+
+                TextColumn::make('menu.name')
+                    ->label(__('panel.categories.menu'))
+                    ->icon(Heroicon::OutlinedBookOpen)
+                    ->badge()
+                    ->color('gray')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('lines_count')
+                    ->label(__('panel.orders.lines'))
+                    ->counts('lines')
+                    ->alignEnd()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('settlement')
+                    ->label(__('panel.orders.settlement'))
+                    ->badge()
+                    ->formatStateUsing(fn (OrderSettlement $state): string => $state->label())
+                    ->color(fn (OrderSettlement $state): string => $state->color())
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -173,7 +198,7 @@ class OrdersTable
     {
         return ViewAction::make()
             ->icon(Heroicon::OutlinedEye)
-            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.view_heading', ['number' => $record->getKey()]))
+            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.view_heading', ['number' => $record->reference()]))
             ->modalWidth(Width::FiveExtraLarge)
             ->mountUsing(fn (Order $record) => OrderResource::loadForView($record))
             ->schema(fn (Schema $schema): Schema => OrderInfolist::configure($schema));
@@ -201,7 +226,7 @@ class OrdersTable
             ->authorize('advance')
             ->visible(fn (Order $record): bool => $record->status->next() !== null)
             ->requiresConfirmation(fn (Order $record): bool => $record->isPlaced())
-            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.accept_heading', ['number' => $record->getKey()]))
+            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.accept_heading', ['number' => $record->reference()]))
             ->modalDescription(__('panel.orders.accept_warning'))
             ->modalSubmitActionLabel(__('panel.orders.accept'))
             ->action(function (Order $record): void {
@@ -251,7 +276,7 @@ class OrdersTable
             // it, so there is nothing to call off — CancelOrder refuses too.
             ->visible(fn (Order $record): bool => $record->isUnderway())
             ->requiresConfirmation()
-            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.cancel_heading', ['number' => $record->getKey()]))
+            ->modalHeading(fn (Order $record): string => (string) __('panel.orders.cancel_heading', ['number' => $record->reference()]))
             ->modalDescription(__('panel.orders.cancel_warning'))
             ->modalSubmitActionLabel(__('panel.orders.cancel'))
             ->action(function (Order $record): void {

@@ -245,7 +245,7 @@ class LocationsTable
         return self::outstandingOrders($location)
             ->mapWithKeys(fn (Order $order): array => [
                 $order->getKey() => (string) __('panel.orders.settle_order_option', [
-                    'number' => $order->getKey(),
+                    'number' => $order->reference(),
                     'amount' => $currency->format($order->amountOutstanding()),
                 ]),
             ])

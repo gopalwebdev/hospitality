@@ -42,6 +42,7 @@ final readonly class PlaceOrder
         private StockDemand $stockDemand,
         private ApplyStockChanges $applyStockChanges,
         private CopyBasketOntoOrder $copyBasketOntoOrder,
+        private NextOrderNumber $nextOrderNumber,
     ) {}
 
     /**
@@ -110,10 +111,18 @@ final readonly class PlaceOrder
                 'prices_include_tax' => $priced['pricesIncludeTax'],
             ]);
 
+            // The tenant's own count for today, taken under a lock on the
+            // tenant row so two members of staff pressing Place at the same
+            // moment cannot be handed the same number — nothing in the
+            // database would refuse it (`.ai/rules/migrations.md`).
+            $numbering = ($this->nextOrderNumber)($tenant);
+
             $order->forceFill([
                 'tenant_id' => $tenant->getKey(),
                 'menu_id' => $menu->getKey(),
                 'location_id' => $location?->getKey(),
+                'number' => $numbering['number'],
+                'numbered_on' => $numbering['numberedOn'],
             ])->save();
 
             ($this->applyStockChanges)(($this->stockDemand)($lines), StockMovementReason::OrderPlaced, $order);

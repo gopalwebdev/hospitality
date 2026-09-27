@@ -20,6 +20,19 @@
         adds up money.
     --}}
     <style>
+        /*
+            One column on a phone, in this order: where it is going and what
+            is already running there, then the card, then the basket. The
+            place comes first because that is the question a member of staff
+            arrived with — they pressed a room on the floor to see what is
+            happening at it — and on a phone the side column is otherwise a
+            screen and a half below the menu.
+
+            From `lg` it is two columns and the place moves back beside the
+            work, which is where the project owner put it: above the card it
+            was a full-width strip that pushed the whole counter down a
+            screen.
+        */
         .to-layout {
             display: grid;
             gap: 1rem;
@@ -27,13 +40,29 @@
             grid-template-columns: 1fr;
         }
 
-        /* Two columns once there is room; one, stacked, on a phone. */
         @media (min-width: 64rem) {
             .to-layout {
                 grid-template-columns: minmax(0, 1fr) 23rem;
+                grid-template-areas: 'menu side';
+            }
+
+            /* The place only has an area when there is a place to name. */
+            .to-layout--here {
+                grid-template-areas:
+                    'menu here'
+                    'menu side';
+            }
+
+            .to-here-panel {
+                grid-area: here;
+            }
+
+            .to-menu {
+                grid-area: menu;
             }
 
             .to-side {
+                grid-area: side;
                 position: sticky;
                 top: 1rem;
                 max-height: calc(100vh - 2rem);
@@ -254,6 +283,7 @@
             outline-offset: 2px;
         }
 
+        /* The same height as the cards beside it, which are one line each. */
         .to-pick--elsewhere {
             display: flex;
             align-items: center;
@@ -261,10 +291,9 @@
             gap: 0.5rem;
             border-style: dashed;
             font-weight: 500;
-            min-height: 6.5rem;
         }
 
-        /* Where this one is going, at the head of the side column. */
+        /* Where this one is going, and the two ways on from it. */
         .to-here {
             display: flex;
             align-items: center;
@@ -273,18 +302,59 @@
             flex-wrap: wrap;
         }
 
-        .to-open-order {
+        .to-here-actions {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
+            gap: 0.375rem;
+            flex: none;
+        }
+
+        /*
+            What this place has taken today. Two lines per order rather than
+            one: a number, a status badge, a time, a total and two controls
+            do not fit across a 23rem column, and squeezing them truncated
+            the badge to "Pendi...".
+        */
+        .to-orders {
+            margin-top: 0.625rem;
+        }
+
+        .to-orders-head {
+            padding-bottom: 0.25rem;
+        }
+
+        .to-order {
             padding-block: 0.5rem;
             border-top: 1px solid color-mix(in oklab, var(--gray-500) 18%, transparent);
             font-size: 0.875rem;
             font-variant-numeric: tabular-nums;
         }
 
-        .to-open-order-actions {
+        .to-order-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+
+        .to-order-line + .to-order-line {
+            margin-top: 0.25rem;
+        }
+
+        .to-order-when {
+            margin-inline-start: auto;
+            white-space: nowrap;
+        }
+
+        .to-order-money {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+
+        .to-order-actions {
             display: flex;
             align-items: center;
             gap: 0.375rem;
@@ -407,7 +477,8 @@
             $stateHalf = $priced['isUnionTerritory'] ? 'UTGST' : 'SGST';
             $here = $this->location();
             $activityHere = $this->activityHere();
-            $openHere = $this->openOrdersHere();
+            $ordersHere = $this->ordersHere();
+            $openHereCount = $this->openOrdersHereCount();
             $isChanging = $this->isChangingAnOrder();
         @endphp
 
@@ -415,7 +486,7 @@
             {{-- Changing an order that already stands, and saying so. --}}
             <x-filament::section compact>
                 <x-filament::badge color="warning" icon="heroicon-o-pencil-square">
-                    {{ __('panel.take_order.changing', ['number' => $this->orderId]) }}
+                    {{ __('panel.take_order.changing', ['number' => $this->changingReference()]) }}
                 </x-filament::badge>
 
                 <div class="to-muted" style="margin-top: 0.375rem;">
@@ -440,8 +511,130 @@
             </x-filament::section>
         @endif
 
-        <div class="to-layout">
-            <div class="to-column">
+        <div @class(['to-layout', 'to-layout--here' => $here !== null || $this->isElsewhere])>
+            {{--
+                Where this one is going, and what is already running there.
+                First on a phone, beside the work from `lg` — see the layout's
+                own note above.
+            --}}
+            @if ($here !== null || $this->isElsewhere)
+                <div class="to-here-panel">
+                    <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
+                        <div class="to-here">
+                            <div style="min-width: 0;">
+                                <div class="lc-name">
+                                    @if ($here !== null)
+                                        <x-filament::icon :icon="$here->kind->icon()" class="lc-kind-icon" />
+                                    @endif
+                                    <span>{{ $here?->name ?? __('panel.take_order.elsewhere') }}</span>
+                                </div>
+
+                                @if ($openHereCount > 0)
+                                    <div class="lc-muted">
+                                        {{ trans_choice('panel.board.orders_open', $openHereCount, ['count' => $openHereCount]) }}
+                                    </div>
+                                @endif
+                            </div>
+
+                            <span class="to-here-actions">
+                                @if ($here !== null)
+                                    {{-- Everything this place has taken, not only what is still open. --}}
+                                    <x-filament::icon-button
+                                        tag="a"
+                                        size="md"
+                                        color="gray"
+                                        icon="heroicon-o-list-bullet"
+                                        :href="$this->ordersHereUrl($here)"
+                                        :label="__('panel.orders.show_orders_here')"
+                                        :tooltip="__('panel.orders.show_orders_here')"
+                                    />
+                                @endif
+
+                                @if ($this->hasAnyLocation() && ! $isChanging)
+                                    <x-filament::icon-button
+                                        size="md"
+                                        color="gray"
+                                        icon="heroicon-o-arrows-right-left"
+                                        wire:click="changeLocation"
+                                        :label="__('panel.take_order.change_location')"
+                                        :tooltip="__('panel.take_order.change_location')"
+                                    />
+                                @endif
+                            </span>
+                        </div>
+
+                        {{--
+                            What this place has taken today, each with the
+                            state it is in — this is what was pressed for. A
+                            row is its number and status on one line and its
+                            money and controls on the next, so it reads the
+                            same in a phone's full width as in a 23rem column
+                            and never squeezes the status badge to "Pendi…".
+                        --}}
+                        <div class="to-orders">
+                            <div class="to-orders-head">
+                                <span class="lc-muted">{{ __('panel.take_order.orders_today') }}</span>
+                            </div>
+
+                            @forelse ($ordersHere as $open)
+                                <div class="to-order" wire:key="order-{{ $open->getKey() }}">
+                                    <div class="to-order-line">
+                                        {{ ($this->viewOrderAction)(['order' => $open->getKey()]) }}
+
+                                        <x-filament::badge :color="$open->status->color()" :icon="$open->status->icon()" size="xs">
+                                            {{ $open->status->label() }}
+                                        </x-filament::badge>
+
+                                        <span class="lc-muted to-order-when">{{ $open->created_at?->diffForHumans(short: true) }}</span>
+                                    </div>
+
+                                    <div class="to-order-line">
+                                        <span class="to-order-money">
+                                            <span class="to-line-total">{{ $currency->format($open->total) }}</span>
+
+                                            @if ($open->isLive() && $open->amountOutstanding() > 0)
+                                                <span class="lc-muted">
+                                                    {{ __('panel.take_order.outstanding', ['amount' => $currency->format($open->amountOutstanding())]) }}
+                                                </span>
+                                            @endif
+                                        </span>
+
+                                        {{--
+                                            Worked here rather than found again in a list.
+
+                                            Asked whether they apply before they are drawn: an
+                                            action echoed straight into Blade renders **disabled**
+                                            when its visible() is false rather than rendering
+                                            nothing (Filament leaves that filtering to whatever
+                                            holds the action, and here that is this loop). A
+                                            served order was drawing a dead Move along and a dead
+                                            Change beside it.
+                                        --}}
+                                        @php
+                                            $advance = ($this->advanceOrderAction)(['order' => $open->getKey()]);
+                                            $change = ($this->changeOrderAction)(['order' => $open->getKey()]);
+                                        @endphp
+
+                                        <span class="to-order-actions">
+                                            @if ($advance->isVisible())
+                                                {{ $advance }}
+                                            @endif
+
+                                            @if ($change->isVisible())
+                                                {{ $change }}
+                                            @endif
+                                        </span>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="to-muted">{{ __('panel.take_order.no_orders_today') }}</div>
+                            @endforelse
+                        </div>
+                    </x-filament::section>
+                </div>
+            @endif
+
+            <div class="to-column to-menu">
                 <x-filament::input.wrapper prefix-icon="heroicon-o-magnifying-glass">
                     <x-filament::input
                         type="search"
@@ -532,75 +725,6 @@
             </div>
 
             <aside class="to-column to-side">
-                {{--
-                    Where this one is going, and what is already running there.
-                    In the side column on the project owner's instruction: it
-                    was a full-width strip above the card and pushed the whole
-                    counter down a screen for something that is context rather
-                    than the work.
-                --}}
-                @if ($here !== null || $this->isElsewhere)
-                    <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
-                        <div class="to-here">
-                            <div style="min-width: 0;">
-                                <div class="lc-name">
-                                    @if ($here !== null)
-                                        <x-filament::icon :icon="$here->kind->icon()" class="lc-kind-icon" />
-                                    @endif
-                                    <span>{{ $here?->name ?? __('panel.take_order.elsewhere') }}</span>
-                                </div>
-
-                                @if ($here !== null)
-                                    <div class="lc-muted">
-                                        {{ $here->kind->label() }}@if (filled($here->code)) · {{ $here->code }}@endif
-                                        @if ($activityHere['state']->isOpen())
-                                            · {{ trans_choice('panel.board.orders_open', $activityHere['orders'], ['count' => $activityHere['orders']]) }}
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-
-                            @if ($this->hasAnyLocation() && ! $isChanging)
-                                <x-filament::icon-button
-                                    size="md"
-                                    color="gray"
-                                    icon="heroicon-o-arrows-right-left"
-                                    wire:click="changeLocation"
-                                    :label="__('panel.take_order.change_location')"
-                                    :tooltip="__('panel.take_order.change_location')"
-                                />
-                            @endif
-                        </div>
-
-                        @if ($openHere->isNotEmpty())
-                            <div style="margin-top: 0.5rem;">
-                                <div class="lc-muted">{{ __('panel.take_order.already_here') }}</div>
-
-                                @foreach ($openHere as $open)
-                                    <div class="to-open-order" wire:key="open-{{ $open->getKey() }}">
-                                        <span style="min-width: 0;">
-                                            {{ ($this->viewOrderAction)(['order' => $open->getKey()]) }}
-                                            <span class="lc-muted">{{ $open->created_at?->diffForHumans(short: true) }}</span>
-                                        </span>
-
-                                        <span class="to-open-order-actions">
-                                            <x-filament::badge :color="$open->status->color()" :icon="$open->status->icon()" size="xs">
-                                                {{ $open->status->label() }}
-                                            </x-filament::badge>
-
-                                            <span class="to-line-total">{{ $currency->format($open->amountOutstanding()) }}</span>
-
-                                            {{-- Icon buttons: staff at the room work it here rather than going to find it in a list. --}}
-                                            {{ ($this->advanceOrderAction)(['order' => $open->getKey()]) }}
-                                            {{ ($this->changeOrderAction)(['order' => $open->getKey()]) }}
-                                        </span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </x-filament::section>
-                @endif
-
                 {{ $this->form }}
 
                 <x-filament::section

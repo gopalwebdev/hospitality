@@ -13,6 +13,15 @@ return new class extends Migration
         Schema::create('orders', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            // What staff call this order out loud, and what a guest is told to
+            // quote: the tenant's own count, starting again at 1 each day. The
+            // id is global to the platform, so two tenants' first ever orders
+            // are #1 and #4,062 — a number nobody can read back over a phone.
+            // The pair is what identifies an order to a tenant, because the
+            // count resets: App\Actions\Orders\NextOrderNumber assigns it and
+            // Order::reference() reads it.
+            $table->integer('number');
+            $table->date('numbered_on');
             // The menu it was ordered from. An order outlives a deleted menu; its lines keep the names.
             $table->foreignId('menu_id')->nullable()->constrained()->nullOnDelete();
             // Where it's going, when the guest picked one of this tenant's listed

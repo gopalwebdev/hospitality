@@ -40,6 +40,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\Url;
 use LogicException;
 
@@ -95,8 +96,8 @@ class TakeOrder extends Page
 
     public string $search = '';
 
-    /** The most of a location's running orders the page lists before it stops. */
-    private const int OPEN_ORDERS_SHOWN = 8;
+    /** The most of a place's orders the panel lists before it stops. */
+    private const int ORDERS_SHOWN = 8;
 
     /**
      * Where the order goes. Picked from the grid rather than typed into a
@@ -137,7 +138,7 @@ class TakeOrder extends Page
     private ?array $floor = null;
 
     /** @var EloquentCollection<int, Order>|null */
-    private ?EloquentCollection $openOrdersHere = null;
+    private ?EloquentCollection $ordersHere = null;
 
     private ?Order $changing = null;
 
@@ -186,7 +187,7 @@ class TakeOrder extends Page
     public function getTitle(): string
     {
         return (string) ($this->isChangingAnOrder()
-            ? __('panel.take_order.change_title', ['number' => $this->orderId])
+            ? __('panel.take_order.change_title', ['number' => $this->changingReference()])
             : __('panel.take_order.title'));
     }
 
@@ -195,12 +196,21 @@ class TakeOrder extends Page
         $location = $this->location();
 
         if ($this->isChangingAnOrder()) {
-            return (string) __('panel.take_order.change_title', ['number' => $this->orderId]);
+            return (string) __('panel.take_order.change_title', ['number' => $this->changingReference()]);
         }
 
         return $location instanceof Location
             ? (string) __('panel.take_order.heading_at', ['name' => $location->name])
             : (string) __('panel.take_order.title');
+    }
+
+    /**
+     * What the order being changed is called — "#012", the tenant's own count
+     * for the day rather than the row's id (`Order::reference()`).
+     */
+    public function changingReference(): ?string
+    {
+        return $this->orderBeingChanged()?->reference();
     }
 
     /**
@@ -229,6 +239,26 @@ class TakeOrder extends Page
         return $this->isPickingLocation() || ! $this->hasAnyLocation()
             ? OrderResource::getUrl('index')
             : TakeOrder::getUrl();
+    }
+
+    /**
+     * Every order this place has ever taken, on the orders list.
+     *
+     * The floor's cards used to carry a button crossing to the list with this
+     * filter already set, and the project owner had the cards stripped to one
+     * tap target. The question it answered — "show me everything at 204, not
+     * only what is still open" — is a real one, so it is asked from here
+     * instead, beside the handful of open orders this page lists.
+     *
+     * The key is `filters`, not `tableFilters`: that is what ListRecords binds
+     * the property to, and the wrong one is not an error but an unread query
+     * parameter and a list showing every order (`.ai/rules/tables.md`).
+     */
+    public function ordersHereUrl(Location $location): string
+    {
+        return OrderResource::getUrl('index', [
+            'filters' => ['location_id' => ['value' => (string) $location->getKey()]],
+        ]);
     }
 
     /**
@@ -332,7 +362,7 @@ class TakeOrder extends Page
         $this->locationId = $locationId;
         $this->isElsewhere = false;
         $this->data['location_label'] = null;
-        $this->openOrdersHere = null;
+        $this->ordersHere = null;
     }
 
     /**
@@ -342,7 +372,7 @@ class TakeOrder extends Page
     {
         $this->locationId = null;
         $this->isElsewhere = true;
-        $this->openOrdersHere = null;
+        $this->ordersHere = null;
     }
 
     /**
@@ -354,7 +384,7 @@ class TakeOrder extends Page
         $this->locationId = null;
         $this->isElsewhere = false;
         $this->locationSearch = '';
-        $this->openOrdersHere = null;
+        $this->ordersHere = null;
     }
 
     /**
@@ -401,43 +431,56 @@ class TakeOrder extends Page
     }
 
     /**
-     * The orders already running at this location, newest first — what staff
-     * are looking at when they ask "what is going on at 204".
+     * Every order this place has taken today, newest first, whatever state
+     * each is in.
      *
-     * Placed and still owing, the same pair the board counts and the Settle
-     * action offers. Read once per request, and not at all while the picker
-     * is up.
+     * This is what a member of staff came for: they pressed the place on the
+     * Places layout to find out what is going on at it. So a **served** order
+     * is listed too, with its status beside it — leaving it out answered
+     * "what still needs work" rather than "what is happening here", and staff
+     * reading a bill back to a guest need the ones already handed over.
+     *
+     * Today's only, and capped at ORDERS_SHOWN: a room on a long stay would
+     * otherwise grow a list nobody scrolls. Everything a place has ever taken
+     * is one press further on (`ordersHereUrl()`).
      *
      * @return EloquentCollection<int, Order>
      */
-    public function openOrdersHere(): EloquentCollection
+    public function ordersHere(): EloquentCollection
     {
-        if ($this->openOrdersHere instanceof EloquentCollection) {
-            return $this->openOrdersHere;
+        if ($this->ordersHere instanceof EloquentCollection) {
+            return $this->ordersHere;
         }
 
         $location = $this->location();
 
         if (! $location instanceof Location) {
-            return $this->openOrdersHere = new EloquentCollection;
+            return $this->ordersHere = new EloquentCollection;
         }
 
         // Every column, unusually: any of these rows can be opened in the
         // order modal, which reads the whole record — its totals, its GST
         // split, its note — and a row selected down to five columns throws on
         // the first one the infolist asks for (Model::shouldBeStrict()). The
-        // list is capped at OPEN_ORDERS_SHOWN, so this is a handful of rows.
-        return $this->openOrdersHere = Order::query()
+        // list is capped, so this is a handful of rows.
+        return $this->ordersHere = Order::query()
             ->where('location_id', $location->getKey())
-            ->live()
-            ->unsettled()
+            ->whereDate('created_at', Date::now()->startOfDay())
             // Aliased exactly amount_paid and constrained to live payments,
             // the contract Order::amountPaid() reads it back under.
             ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
                 ->whereHas('payment', fn ($payment) => $payment->live())], 'amount')
             ->latest('id')
-            ->limit(self::OPEN_ORDERS_SHOWN)
+            ->limit(self::ORDERS_SHOWN)
             ->get();
+    }
+
+    /**
+     * How many of those are still being worked, for the panel's own heading.
+     */
+    public function openOrdersHereCount(): int
+    {
+        return $this->ordersHere()->filter(static fn (Order $order): bool => $order->isUnderway())->count();
     }
 
     /**
@@ -453,7 +496,7 @@ class TakeOrder extends Page
             ->iconButton()
             ->size(Size::Small)
             ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments))
-            ->after(fn () => $this->openOrdersHere = null);
+            ->after(fn () => $this->ordersHere = null);
     }
 
     /**
@@ -481,7 +524,7 @@ class TakeOrder extends Page
             // A link rather than the list's icon button: this sits inline in a
             // line of text naming the order, not in a row of controls.
             ->link()
-            ->label(fn (array $arguments): string => '#'.(int) ($arguments['order'] ?? 0))
+            ->label(fn (array $arguments): string => $this->openOrderNamed($arguments)?->reference() ?? '')
             ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments));
     }
 
@@ -508,7 +551,14 @@ class TakeOrder extends Page
         return Action::make('customise')
             ->label(__('panel.take_order.customise'))
             ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
-            ->size(Size::ExtraSmall)
+            // An icon button, the same size and shape as the plain Add beside
+            // it on a tile with nothing to choose. It was a worded "Choose"
+            // button, which made two tiles side by side end in controls of
+            // different widths and drew the eye to whichever item happened to
+            // offer add-ons. The tooltip is what names it.
+            ->iconButton()
+            ->tooltip(__('panel.take_order.customise'))
+            ->size(Size::Medium)
             ->modalHeading(fn (array $arguments): string => $this->itemNamed($arguments)->name ?? (string) __('panel.take_order.customise'))
             ->modalSubmitActionLabel(__('panel.take_order.add'))
             ->modalWidth(Width::Large)
@@ -639,7 +689,7 @@ class TakeOrder extends Page
 
         if ($changing instanceof Order) {
             Notification::make()
-                ->title(__('panel.take_order.changed', ['number' => $order->getKey()]))
+                ->title(__('panel.take_order.changed', ['number' => $order->reference()]))
                 ->success()
                 ->send();
 
@@ -650,7 +700,7 @@ class TakeOrder extends Page
         }
 
         Notification::make()
-            ->title(__('panel.take_order.placed', ['number' => $order->getKey()]))
+            ->title(__('panel.take_order.placed', ['number' => $order->reference()]))
             ->success()
             ->send();
 
@@ -661,7 +711,7 @@ class TakeOrder extends Page
         // that an order is read in a modal (OrdersTable::viewAction()).
         $this->emptyBasket();
         $this->data['note'] = null;
-        $this->openOrdersHere = null;
+        $this->ordersHere = null;
         $this->floor = null;
     }
 
@@ -900,7 +950,7 @@ class TakeOrder extends Page
      */
     private function openOrderNamed(array $arguments): ?Order
     {
-        return $this->openOrdersHere()->firstWhere('id', (int) ($arguments['order'] ?? 0));
+        return $this->ordersHere()->firstWhere('id', (int) ($arguments['order'] ?? 0));
     }
 
     /**

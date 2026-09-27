@@ -24,14 +24,6 @@ the top, and everywhere quiet last.
         gap: 1rem;
     }
 
-    .floor-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        margin-top: 0.75rem;
-        flex-wrap: wrap;
-    }
-
     .floor-toolbar {
         display: flex;
         align-items: center;
@@ -51,15 +43,25 @@ the top, and everywhere quiet last.
         }
     }
 
-    /* The summary tiles read two-up on a phone rather than one per row. */
+    /*
+        One strip of figures rather than four tiles. Four sections stacked a
+        card's worth of height above the floor on a phone, for four numbers;
+        as one wrapping row they cost a line and the cards start higher up.
+    */
     .floor-summary {
-        display: grid;
-        gap: 0.75rem;
-        grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.75rem;
+    }
+
+    .floor-stat {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
     }
 
     .floor-stat-value {
-        font-size: 1.5rem;
+        font-size: 1.375rem;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         line-height: 1.2;
@@ -129,27 +131,29 @@ the top, and everywhere quiet last.
         No money here either: a bill is the list layout's business.
     --}}
     @if ($summary['ready'] + $summary['pending'] + $summary['preparing'] > 0)
-    <div class="floor-summary">
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.board.ready') }}</div>
-            <div class="floor-stat-value floor-stat-value--ready">{{ $summary['ready'] }}</div>
-        </x-filament::section>
+    <x-filament::section compact>
+        <div class="floor-summary">
+            <span class="floor-stat">
+                <span class="floor-stat-value floor-stat-value--ready">{{ $summary['ready'] }}</span>
+                <span class="lc-muted">{{ __('panel.board.ready') }}</span>
+            </span>
 
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.board.pending') }}</div>
-            <div class="floor-stat-value floor-stat-value--pending">{{ $summary['pending'] }}</div>
-        </x-filament::section>
+            <span class="floor-stat">
+                <span class="floor-stat-value floor-stat-value--pending">{{ $summary['pending'] }}</span>
+                <span class="lc-muted">{{ __('panel.board.pending') }}</span>
+            </span>
 
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.board.preparing') }}</div>
-            <div class="floor-stat-value floor-stat-value--preparing">{{ $summary['preparing'] }}</div>
-        </x-filament::section>
+            <span class="floor-stat">
+                <span class="floor-stat-value floor-stat-value--preparing">{{ $summary['preparing'] }}</span>
+                <span class="lc-muted">{{ __('panel.board.preparing') }}</span>
+            </span>
 
-        <x-filament::section compact>
-            <div class="lc-muted">{{ __('panel.board.active_locations') }}</div>
-            <div class="floor-stat-value">{{ $summary['locations'] }}</div>
-        </x-filament::section>
-    </div>
+            <span class="floor-stat">
+                <span class="floor-stat-value">{{ $summary['locations'] }}</span>
+                <span class="lc-muted">{{ __('panel.board.active_locations') }}</span>
+            </span>
+        </div>
+    </x-filament::section>
     @endif
 
     <div class="floor-toolbar">
@@ -209,36 +213,26 @@ the top, and everywhere quiet last.
                 $state = $card['activity']['state'];
             @endphp
 
-            <x-filament::section compact class="lc lc--{{ $state->value }}">
-                @include('filament.tenant.partials.location-card', [
-                    'location' => $location,
-                    'activity' => $card['activity'],
-                ])
-
-                <div class="floor-actions">
-                    <x-filament::button
-                        tag="a"
-                        size="sm"
-                        icon="heroicon-o-plus"
-                        :href="$this->takeOrderUrl($location)"
-                    >
-                        {{ __('panel.board.take_order') }}
-                    </x-filament::button>
-
-
-                    @if ($card['activity']['orders'] > 0)
-                        {{-- A card is the question; the list is the answer, so the filter is set on the way across. --}}
-                        <x-filament::icon-button
-                            size="sm"
-                            color="gray"
-                            icon="heroicon-o-list-bullet"
-                            wire:click="showOrdersAt({{ $location->getKey() }})"
-                            :label="__('panel.orders.show_orders_here')"
-                            :tooltip="__('panel.orders.show_orders_here')"
-                        />
-                    @endif
-                </div>
-            </x-filament::section>
+            {{--
+                The card itself opens the counter at that place, where what is
+                running there is listed and the next order is taken. It carried
+                a "Take order" button and an icon button beside it, and the
+                project owner had both off: the card was the obvious thing to
+                press and pressing it did nothing.
+            --}}
+            <a
+                href="{{ $this->locationUrl($location) }}"
+                wire:navigate.hover
+                class="lc-link"
+                wire:key="card-{{ $location->getKey() }}"
+            >
+                <x-filament::section compact class="lc lc--{{ $state->value }}">
+                    @include('filament.tenant.partials.location-card', [
+                        'location' => $location,
+                        'activity' => $card['activity'],
+                    ])
+                </x-filament::section>
+            </a>
         @empty
             <div style="grid-column: 1 / -1;">
                 <x-filament::section>

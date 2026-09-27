@@ -237,7 +237,7 @@ it('opens the counter with the order already in its basket, and saves the change
         // Never the picker: this one already knows where it is going.
         ->and($page->instance()->isPickingLocation())->toBeFalse();
 
-    $page->assertSee('Changing order #'.$order->getKey())
+    $page->assertSee('Changing order '.$order->reference())
         ->call('increment', 'item:'.$item->getKey())
         ->call('placeOrder')
         ->assertRedirect();
@@ -269,7 +269,7 @@ it('moves one of the orders running at a room along from the counter itself', fu
 
     Livewire::withQueryParams(['location' => $room->getKey()])
         ->test(TakeOrder::class)
-        ->assertSee('Already running here')
+        ->assertSee('Orders here today')
         ->callAction(TestAction::make('advanceOrderAction')->arguments(['order' => $order->getKey()]))
         ->assertHasNoActionErrors();
 
