@@ -259,7 +259,7 @@ class TakeOrder extends Page
                 'location_id' => ['values' => [(string) $location->getKey()]],
                 // Cleared, because the question this link asks is "everything
                 // this place has taken", and the list opens on today alone.
-                'placed_between' => ['from' => null, 'until' => null],
+                'placed_between' => ['period' => null, 'from' => null, 'until' => null],
             ],
         ]);
     }

@@ -99,3 +99,8 @@ See `.ai/rules/payments.md`.
 Nothing here names a date. A tenant says "closed on Mondays", and a calendar of dated holidays would be a different feature (`.ai/rules/app.md`).
 
 See `.ai/rules/inventory.md`.
+
+## A filter's periods are an enum, and each says what days it covers
+`App\Enums\OrderPeriod` (Today, Yesterday, LastSevenDays, ThisMonth, Custom) is what the orders list is read over. It is an enum rather than five strings in a select because the label and the days each one means belong together, and because `range()` is a `match`: a case added later has to say what it covers rather than silently filtering nothing.
+
+`Custom` returns `[null, null]` on purpose — its days are the two date pickers' and not the enum's to know. Days come from `Date::now()` in `config('app.timezone')`, the only timezone there is. "Last 7 days" **includes today**, so it reaches back six.

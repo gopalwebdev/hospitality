@@ -5,6 +5,7 @@ namespace App\Filament\Tenant\Resources\Orders\Tables;
 use App\Actions\Orders\AdvanceOrder;
 use App\Actions\Orders\CancelOrder;
 use App\Actions\Payments\RecordPayment;
+use App\Enums\OrderPeriod;
 use App\Enums\OrderSettlement;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -27,6 +28,7 @@ use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -228,27 +230,69 @@ class OrdersTable
      */
     private static function placedBetweenFilter(): Filter
     {
-        $today = Date::now()->startOfDay();
-
         return Filter::make('placed_between')
             ->label(__('panel.orders.placed_at'))
             ->schema([
+                // Today is what the list opens on; the rest are the cuts
+                // staff reach for next, and "Between two dates" hands over
+                // to the pair below. Left empty it filters nothing, which is
+                // how the whole history is read — a preset that opens filtered
+                // needs a way out of it.
+                Select::make('period')
+                    ->label(__('panel.orders.placed_at'))
+                    ->options(OrderPeriod::options())
+                    ->default(OrderPeriod::Today->value)
+                    ->placeholder(__('panel.orders.placed_any_time'))
+                    ->native(false)
+                    ->live(),
+
                 DatePicker::make('from')
                     ->label(__('panel.orders.placed_from'))
-                    ->default($today)
-                    ->maxDate(fn (Get $get): ?string => $get('until'))
-                    ->native(false),
+                    ->maxDate(fn (Get $get): mixed => $get('until'))
+                    ->native(false)
+                    ->visible(fn (Get $get): bool => $get('period') === OrderPeriod::Custom->value),
 
                 DatePicker::make('until')
                     ->label(__('panel.orders.placed_until'))
-                    ->default($today)
-                    ->minDate(fn (Get $get): ?string => $get('from'))
-                    ->native(false),
+                    ->minDate(fn (Get $get): mixed => $get('from'))
+                    ->native(false)
+                    ->visible(fn (Get $get): bool => $get('period') === OrderPeriod::Custom->value),
             ])
-            ->query(fn (Builder $query, array $data): Builder => $query
-                ->when($data['from'] ?? null, fn (Builder $query, string $from): Builder => $query->whereDate('orders.created_at', '>=', $from))
-                ->when($data['until'] ?? null, fn (Builder $query, string $until): Builder => $query->whereDate('orders.created_at', '<=', $until)))
+            ->query(function (Builder $query, array $data): Builder {
+                [$from, $until] = self::placedBetweenRange($data);
+
+                return $query
+                    ->when($from, fn (Builder $query, CarbonInterface $day): Builder => $query->whereDate('orders.created_at', '>=', $day))
+                    ->when($until, fn (Builder $query, CarbonInterface $day): Builder => $query->whereDate('orders.created_at', '<=', $day));
+            })
             ->indicateUsing(fn (array $data): ?string => self::placedBetweenIndicator($data));
+    }
+
+    /**
+     * The two days a filter's answer covers, whichever way it was given.
+     *
+     * A preset resolves to its own range; "Between two dates" reads the
+     * pickers, either of which may be left empty for an open end.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: CarbonInterface|null, 1: CarbonInterface|null}
+     */
+    private static function placedBetweenRange(array $data): array
+    {
+        $period = OrderPeriod::tryFrom((string) ($data['period'] ?? ''));
+
+        if (! $period instanceof OrderPeriod) {
+            return [null, null];
+        }
+
+        if ($period !== OrderPeriod::Custom) {
+            return $period->range();
+        }
+
+        return [
+            filled($data['from'] ?? null) ? Date::parse((string) $data['from'])->startOfDay() : null,
+            filled($data['until'] ?? null) ? Date::parse((string) $data['until'])->startOfDay() : null,
+        ];
     }
 
     /**
@@ -262,24 +306,28 @@ class OrdersTable
      */
     private static function placedBetweenIndicator(array $data): ?string
     {
-        $from = filled($data['from'] ?? null) ? Date::parse((string) $data['from'])->startOfDay() : null;
-        $until = filled($data['until'] ?? null) ? Date::parse((string) $data['until'])->startOfDay() : null;
+        $period = OrderPeriod::tryFrom((string) ($data['period'] ?? ''));
+
+        if (! $period instanceof OrderPeriod) {
+            return null;
+        }
+
+        if ($period !== OrderPeriod::Custom) {
+            return $period->label();
+        }
+
+        [$from, $until] = self::placedBetweenRange($data);
 
         if ($from === null && $until === null) {
-            return null;
+            return $period->label();
         }
 
         $read = static fn (CarbonInterface $day): string => $day->translatedFormat(AppServiceProvider::DATE_FORMAT);
 
-        if ($from !== null && $until !== null && $from->equalTo($until)) {
-            return $from->isToday()
-                ? (string) __('panel.orders.placed_today')
-                : $read($from);
-        }
-
         return match (true) {
             $from === null => (string) __('panel.orders.placed_until_only', ['date' => $read($until)]),
             $until === null => (string) __('panel.orders.placed_from_only', ['date' => $read($from)]),
+            $from->equalTo($until) => $read($from),
             default => $read($from).' – '.$read($until),
         };
     }

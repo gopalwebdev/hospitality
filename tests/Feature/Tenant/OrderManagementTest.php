@@ -4,6 +4,7 @@ use App\Actions\Baskets\PriceBasket;
 use App\Actions\Orders\PlaceOrder;
 use App\Enums\ItemAvailability;
 use App\Enums\Locale;
+use App\Enums\OrderPeriod;
 use App\Enums\OrderStatus;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\Orders\Pages\ListOrders;
@@ -289,7 +290,7 @@ it('names an order by the tenant\'s own count, not by its row id', function (): 
 |
 */
 
-it('opens showing today, and shows everything once the dates are cleared', function (): void {
+it('opens showing today, and shows everything once the period is cleared', function (): void {
     $tenant = Tenant::factory()->create();
     taxTenantAt($tenant, 0);
 
@@ -302,11 +303,10 @@ it('opens showing today, and shows everything once the dates are cleared', funct
     Livewire::test(ListOrders::class)
         ->assertCanSeeTableRecords([$today])
         ->assertCanNotSeeTableRecords([$lastWeek])
-        // Defaulted rather than written into the query, so clearing the two
-        // dates really does show everything — a default in the query would
-        // be a floor nobody could get under.
-        ->set('tableFilters.placed_between.from', null)
-        ->set('tableFilters.placed_between.until', null)
+        // Defaulted rather than written into the query, so clearing the
+        // period really does show everything — a preset that opens filtered
+        // needs a way out of it.
+        ->set('tableFilters.placed_between.period', null)
         ->assertCanSeeTableRecords([$today, $lastWeek]);
 });
 
@@ -339,8 +339,9 @@ it('filters by a range of days, by status and by place', function (): void {
     enterTenantPanel($tenant, RoleEnum::Owner);
 
     Livewire::test(ListOrders::class)
-        // A range, not just one day.
-        ->set('tableFilters.placed_between.from', Date::now()->subDays(4)->toDateString())
+        // Today by default; the presets and a custom range are how you look
+        // further back.
+        ->set('tableFilters.placed_between.period', OrderPeriod::LastSevenDays->value)
         ->assertCanSeeTableRecords([$inRoom, $atPool, $older])
         // Where: several places at once, so the key is `values`.
         ->set('tableFilters.location_id.values', [(string) $room->getKey()])
@@ -349,4 +350,57 @@ it('filters by a range of days, by status and by place', function (): void {
         // What state: several at once too.
         ->set('tableFilters.status.values', [OrderStatus::Placed->value])
         ->assertCanNotSeeTableRecords([$inRoom, $older]);
+});
+
+it('reads a period as itself, and two dates only when asked to', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 0);
+
+    $today = Order::factory()->create(['tenant_id' => $tenant->getKey()]);
+
+    $yesterday = Order::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $yesterday->forceFill(['created_at' => Date::now()->subDay()])->save();
+
+    $longAgo = Order::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $longAgo->forceFill(['created_at' => Date::now()->subMonths(2)])->save();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    $page = Livewire::test(ListOrders::class);
+
+    // A preset resolves to its own days, so nothing has to be typed for the
+    // question staff ask most.
+    $page->set('tableFilters.placed_between.period', OrderPeriod::Yesterday->value)
+        ->assertCanSeeTableRecords([$yesterday])
+        ->assertCanNotSeeTableRecords([$today, $longAgo]);
+
+    // And anything else is two dates behind "Between two dates" — the
+    // pickers are hidden until that is chosen, so the common case never
+    // sees them.
+    $page->set('tableFilters.placed_between.period', OrderPeriod::Custom->value)
+        ->set('tableFilters.placed_between.from', Date::now()->subMonths(3)->toDateString())
+        ->set('tableFilters.placed_between.until', Date::now()->subMonth()->toDateString())
+        ->assertCanSeeTableRecords([$longAgo])
+        ->assertCanNotSeeTableRecords([$today, $yesterday]);
+});
+
+it('covers seven days including today, and the month so far', function (): void {
+    // The ranges are the enum's own, so they are checked there rather than
+    // through a table: "last 7 days" on a Monday reaches back to the Tuesday
+    // before, not the Monday.
+    Date::setTestNow(Date::parse('2026-09-29 14:00:00'));
+
+    [$from, $until] = OrderPeriod::LastSevenDays->range();
+
+    expect($from->toDateString())->toBe('2026-09-23')
+        ->and($until->toDateString())->toBe('2026-09-29');
+
+    [$from, $until] = OrderPeriod::ThisMonth->range();
+
+    expect($from->toDateString())->toBe('2026-09-01')
+        ->and($until->toDateString())->toBe('2026-09-29');
+
+    expect(OrderPeriod::Custom->range())->toBe([null, null]);
+
+    Date::setTestNow();
 });

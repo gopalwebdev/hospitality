@@ -212,6 +212,7 @@ return [
         'section' => 'Order',
         'number' => 'Order',
         'all_tab' => 'All',
+        'placed_any_time' => 'Any time',
         'placed_from' => 'Placed from',
         'placed_until' => 'Placed until',
         'placed_today' => 'Today',
