@@ -199,16 +199,22 @@ it('shows the panel switcher on English until a language is chosen', function ()
     $tenant = Tenant::factory()->create();
     enterTenantPanel($tenant, Role::Owner);
 
-    // A picker showing nothing selected is worse than one showing the language
+    // A picker showing nothing chosen is worse than one showing the language
     // in use, so the current locale is normalised rather than compared raw.
     $html = (string) $this->get('http://'.$tenant->slug.'.hospitality.test/dashboard')
         ->assertOk()
         ->getContent();
 
-    $selected = str($html)->after('id="panel-locale"')->before('</select>')->toString();
+    // The trigger names the language in use, and each language is a button
+    // that submits the form it sits in — no JavaScript, no <select>.
+    $trigger = str($html)->after('fi-dropdown-trigger')->before('fi-dropdown-panel')->toString();
 
-    expect($selected)->toContain('value="'.Locale::English->value.'" selected')
-        ->and($selected)->not->toContain('value="'.Locale::Tamil->value.'" selected');
+    expect($trigger)->toContain(Locale::English->label())
+        ->and($trigger)->not->toContain(Locale::Tamil->label());
+
+    foreach (Locale::cases() as $locale) {
+        expect($html)->toContain('name="locale" value="'.$locale->value.'"');
+    }
 });
 
 it('offers a language switcher in the product team panel', function (): void {
@@ -296,21 +302,24 @@ it('sorts a table by the name it is showing', function (): void {
         ->assertCanSeeTableRecords([$beta, $charlie, $alpha], inOrder: true);
 });
 
-it('finds records from the top bar in the language the panel is showing', function (): void {
+it('serves no global search bar in either panel', function (): void {
+    // The project owner had the topbar's search box removed outright. It
+    // searched a handful of resources by name, every one of them two clicks
+    // away in the sidebar, and cost a permanent field across the top of
+    // every page. The resources' own getGloballySearchableAttributes() went
+    // with it rather than sitting dead — which is why this replaced a test
+    // about searching menus in Tamil from the top bar.
     $tenant = Tenant::factory()->create();
-    $dinner = Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Dinner', 'ta' => 'இரவு உணவு']]);
-    Menu::factory()->create(['tenant_id' => $tenant->getKey(), 'name' => ['en' => 'Lunch']]);
     enterTenantPanel($tenant, Role::Owner);
 
-    App::setLocale(Locale::Tamil->value);
+    $this->get('http://'.$tenant->slug.'.hospitality.test/dashboard')
+        ->assertOk()
+        ->assertDontSee('fi-global-search');
 
-    $titles = fn (string $search): array => MenuResource::getGlobalSearchResults($search)
-        ->map(fn ($result): string => (string) $result->title)
-        ->all();
-
-    expect($titles('இரவு'))->toBe([$dinner->getTranslation('name', 'ta')])
-        // It used to match the raw document, where every menu has an "en" key.
-        ->and($titles('en'))->toBe([]);
+    $this->actingAs(User::factory()->admin()->create())
+        ->get('http://hospitality.test/dashboard')
+        ->assertOk()
+        ->assertDontSee('fi-global-search');
 });
 
 it('leaves roles and permissions in English', function (): void {

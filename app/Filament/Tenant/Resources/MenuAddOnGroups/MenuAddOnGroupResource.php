@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\MenuAddOnGroups;
 
-use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\MenuAddOnGroups\Pages\ManageMenuAddOnGroups;
 use App\Filament\Tenant\Resources\MenuAddOnGroups\Schemas\MenuAddOnGroupForm;
 use App\Filament\Tenant\Resources\MenuAddOnGroups\Tables\MenuAddOnGroupsTable;
@@ -60,16 +59,6 @@ class MenuAddOnGroupResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('panel.add_on_groups.plural');
-    }
-
-    /**
-     * The top bar's search looks in the language the panel is showing.
-     *
-     * @return list<string>
-     */
-    public static function getGloballySearchableAttributes(): array
-    {
-        return TranslatedFields::searchableAttributes('name');
     }
 
     public static function form(Schema $schema): Schema

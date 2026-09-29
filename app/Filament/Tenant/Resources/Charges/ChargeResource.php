@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\Charges;
 
-use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Charges\Pages\ListCharges;
 use App\Filament\Tenant\Resources\Charges\Schemas\ChargeForm;
 use App\Filament\Tenant\Resources\Charges\Tables\ChargesTable;
@@ -56,16 +55,6 @@ class ChargeResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('panel.charges.plural');
-    }
-
-    /**
-     * The top bar's search looks in the language the panel is showing.
-     *
-     * @return list<string>
-     */
-    public static function getGloballySearchableAttributes(): array
-    {
-        return TranslatedFields::searchableAttributes('name');
     }
 
     public static function form(Schema $schema): Schema

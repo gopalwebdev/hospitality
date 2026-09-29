@@ -50,6 +50,16 @@ class PlatformPanelProvider extends PanelProvider
                 'primary' => Color::Indigo,
             ])
             // The sidebar folds down to its icons, handing its width to the page.
+            // No global search. The project owner had the topbar's search
+            // box removed outright: it searched a handful of resources by
+            // name and every one of them is two clicks away in the sidebar,
+            // so it cost a permanent field across the top of every page to
+            // save nothing. Turning it off here is what removes the field —
+            // Filament shows it whenever any resource is globally
+            // searchable, so the resources' own
+            // getGloballySearchableAttributes() went with it rather than
+            // sitting dead.
+            ->globalSearch(false)
             ->sidebarCollapsibleOnDesktop()
             // The page takes all of that width. Filament centres it at 80rem
             // otherwise, between two empty bands. See .ai/rules/providers-filament.md.

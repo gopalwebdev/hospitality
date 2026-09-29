@@ -5,9 +5,16 @@
     page has to be re-rendered by the server anyway because the menu names it
     shows come out of translated columns.
 
-    Styled inline. Panels are served Filament's own compiled CSS, which carries
-    its fi- classes and no general Tailwind utilities — see
-    .ai/rules/filament.md.
+    **A dropdown of Filament's own, not a bare `<select>`.** It was a select
+    styled with a hand-written border, chevron and padding, which read as a
+    form field parked in the topbar beside controls that were not. The project
+    owner asked for a better one. Each language is a `dropdown.list.item`
+    submitting the form it sits inside — `name="locale"` and a `value` on the
+    button, so the choice posts with no JavaScript and the current one is
+    ticked.
+
+    The dropdown must **not** be teleported: the panel stays inside the form,
+    which is the only thing making those buttons submit it.
 
     The action is worked out per panel because a form must post to the host it
     was rendered on: the tenant panel lives on a tenant's subdomain, the
@@ -21,7 +28,7 @@
         : route('panel.language.update');
 
     // Normalised rather than compared raw: an application locale that is not one
-    // of these cases would leave every option unselected, and a language picker
+    // of these cases would leave every option unticked, and a language picker
     // showing nothing is worse than one showing the language in use. English is
     // what anything unrecognised means here.
     $current = \App\Enums\Locale::fromRequestValue(app()->getLocale());
@@ -31,21 +38,36 @@
     @csrf
     @method('PUT')
 
-    <label for="panel-locale" class="fi-sr-only">
-        {{ __('panel.language.label') }}
-    </label>
+    <x-filament::dropdown placement="bottom-end" width="xs">
+        <x-slot name="trigger">
+            <x-filament::button
+                type="button"
+                color="gray"
+                size="sm"
+                icon="heroicon-m-language"
+                icon-position="before"
+                :tooltip="__('panel.language.label')"
+            >
+                {{ $current->label() }}
+            </x-filament::button>
+        </x-slot>
 
-    <select
-        id="panel-locale"
-        name="locale"
-        onchange="this.form.requestSubmit()"
-        style="appearance:none;border:1px solid rgba(0,0,0,.12);border-radius:.5rem;background:transparent;color:inherit;font-size:.875rem;line-height:1.25rem;padding:.375rem 1.75rem .375rem .625rem;cursor:pointer;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22currentColor%22><path d=%22M5.5 7.5 10 12l4.5-4.5%22 stroke=%22currentColor%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>');background-repeat:no-repeat;background-position:right .375rem center;background-size:1rem"
-        title="{{ __('panel.language.label') }}"
-    >
-        @foreach (\App\Enums\Locale::cases() as $locale)
-            <option value="{{ $locale->value }}" @selected($locale === $current)>
-                {{ $locale->label() }}
-            </option>
-        @endforeach
-    </select>
+        <x-filament::dropdown.header icon="heroicon-m-language">
+            {{ __('panel.language.label') }}
+        </x-filament::dropdown.header>
+
+        <x-filament::dropdown.list>
+            @foreach (\App\Enums\Locale::cases() as $locale)
+                <x-filament::dropdown.list.item
+                    type="submit"
+                    name="locale"
+                    value="{{ $locale->value }}"
+                    :icon="$locale === $current ? 'heroicon-m-check' : null"
+                    :color="$locale === $current ? 'primary' : 'gray'"
+                >
+                    {{ $locale->label() }}
+                </x-filament::dropdown.list.item>
+            @endforeach
+        </x-filament::dropdown.list>
+    </x-filament::dropdown>
 </form>

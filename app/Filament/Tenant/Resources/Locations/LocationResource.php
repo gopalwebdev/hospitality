@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\Locations;
 
-use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Locations\Pages\ListLocations;
 use App\Filament\Tenant\Resources\Locations\Schemas\LocationForm;
 use App\Filament\Tenant\Resources\Locations\Tables\LocationsTable;
@@ -53,16 +52,6 @@ class LocationResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('panel.locations.plural');
-    }
-
-    /**
-     * The top bar's search looks in the language the panel is showing.
-     *
-     * @return list<string>
-     */
-    public static function getGloballySearchableAttributes(): array
-    {
-        return TranslatedFields::searchableAttributes('name');
     }
 
     public static function form(Schema $schema): Schema

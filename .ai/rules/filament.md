@@ -93,11 +93,20 @@ One trap in the uniqueness rule, which cost an afternoon. It ignores the record 
 ## The panel is worked in a language too, and its labels are methods
 Both panels carry a language switcher in the top bar (`resources/views/filament/language-switcher.blade.php`, hung on `USER_MENU_BEFORE`) and both list `SetLocale` in their own middleware stack — a panel does not run the `web` group, so the middleware that reads the language cookie has to be named there as well.
 
+**It is a Filament dropdown, not a `<select>`.** It was a select with a hand-written border, chevron and padding, which read as a form field parked among controls that were not; the project owner asked for a better one. The trigger names the language in use, each language is a `dropdown.list.item` with `type="submit" name="locale" value="…"`, and the current one carries a check — so the choice posts with no JavaScript. Two things it must keep: the dropdown is **not** teleported, because the panel has to stay inside the `<form>` for those buttons to submit it; and the current locale is normalised through `Locale::fromRequestValue()` before it is compared, so an unrecognised application locale still shows a language rather than nothing.
+
 The form posts to the host it was rendered on, because a cross-host post loses the session: the tenant panel uses `preferences.language.update` with the tenant's slug, and the product team's panel uses the root-domain `panel.language.update`. Both hit the same controller.
 
 **Labels must be methods, not static properties.** A `protected static ?string $modelLabel = 'menu'` is evaluated when the class loads, before the request has been served, so it cannot read anything request-scoped. Use `getModelLabel()`, `getPluralModelLabel()` and `getNavigationGroup()` returning `__('panel....')`.
 
 The panel's own labels are English and stay English: `lang/en/panel.php` is the only file, and a `lang/ta/panel.php` was deleted deliberately (`.ai/rules/lang.md`). What the switcher still changes is the **tenant's** words — a menu, item or charge name comes out of a translated column and follows the chosen language, so a Tamil-reading manager reads their own menu in Tamil with the panel's labels in English around it. **Roles, permissions, accounts and tenants** are English for a second reason: code refers to those names.
+
+## Neither panel has a global search bar
+`->globalSearch(false)` on both providers. The project owner had the topbar's search box removed outright: it searched a handful of resources by name, every one of them two clicks away in the sidebar, and cost a permanent field across the top of every page to save nothing.
+
+Turning it off on the panel is what removes the field — Filament draws it whenever **any** resource is globally searchable — so the six tenant resources' `getGloballySearchableAttributes()` went with it rather than sitting dead. `TranslatedFields::searchableAttributes()` stays: `TranslatedFields::search()` uses it for ordinary table search, which is untouched. `LocalizationTest` asserts neither panel serves a `fi-global-search`, and it replaced a test about searching menus in Tamil from the top bar.
+
+Putting it back means re-adding both the panel call and the per-resource attributes — and the attributes are not optional, because Filament otherwise matches the raw `jsonb` document, where every row has an `en` key and the search term "en" matches everything.
 
 ## Both panels navigate as a SPA, and prefetch on hover
 `->spa(hasPrefetching: true)` on both providers, so moving between pages is a Livewire visit with a progress bar across the top rather than a browser load, and hovering a link fetches its page before the click. Links inside a panel carry `wire:navigate.hover`; a form post — the language switcher, for one — is unaffected, and so is anything pointing off the panel's host (Filament compares hosts, so the product team's link into a tenant's subdomain stays a real browser visit).

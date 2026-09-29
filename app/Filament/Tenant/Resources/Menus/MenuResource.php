@@ -2,7 +2,6 @@
 
 namespace App\Filament\Tenant\Resources\Menus;
 
-use App\Filament\Schemas\TranslatedFields;
 use App\Filament\Tenant\Resources\Menus\Pages\ArrangeMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\EditMenu;
 use App\Filament\Tenant\Resources\Menus\Pages\ListMenus;
@@ -67,19 +66,6 @@ class MenuResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return __('panel.menus.plural');
-    }
-
-    /**
-     * The top bar's search looks in the language the panel is showing.
-     *
-     * Left to the title attribute, it matched `name` as raw JSON text — Tamil
-     * never matched and "en" matched every menu.
-     *
-     * @return list<string>
-     */
-    public static function getGloballySearchableAttributes(): array
-    {
-        return TranslatedFields::searchableAttributes('name');
     }
 
     public static function form(Schema $schema): Schema
