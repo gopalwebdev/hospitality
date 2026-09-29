@@ -5,8 +5,6 @@ namespace App\Filament\Tenant\Pages;
 use App\Actions\Baskets\PriceBasket;
 use App\Actions\Menus\ReadOrderableMenu;
 use App\Actions\Orders\PlaceOrder;
-use App\Actions\Orders\ReadFloor;
-use App\Actions\Orders\ReadLocationActivity;
 use App\Actions\Orders\ReviseOrder;
 use App\Enums\Currency;
 use App\Enums\OrderSettlement;
@@ -100,18 +98,6 @@ class TakeOrder extends Page
     private const int ORDERS_SHOWN = 8;
 
     /**
-     * Where the order goes. Picked from the grid rather than typed into a
-     * select: a tenant with fifty rooms is a fifty-row dropdown, and staff
-     * need to see what is already open at a room before they add to it.
-     *
-     * In the query string, so the picker and the counter are two addresses
-     * rather than two states of one: the browser's own back button takes a
-     * member of staff from a room back to the grid, which is what they press.
-     */
-    #[Url(as: 'location')]
-    public ?int $locationId = null;
-
-    /**
      * The order being changed, when this is a change rather than a new order.
      *
      * Also in the query string, because the Change button on the orders page
@@ -120,10 +106,8 @@ class TakeOrder extends Page
     #[Url(as: 'order')]
     public ?int $orderId = null;
 
-    /** Staff chose to name where it goes by hand instead of picking. */
-    public bool $isElsewhere = false;
-
-    public string $locationSearch = '';
+    /** @var list<Location>|null */
+    private ?array $locations = null;
 
     /** @var list<Menu>|null */
     private ?array $menus = null;
@@ -134,11 +118,10 @@ class TakeOrder extends Page
     /** @var array<string, mixed>|null */
     private ?array $priced = null;
 
-    /** @var list<array{location: Location, activity: array<string, mixed>}>|null */
-    private ?array $floor = null;
-
     /** @var EloquentCollection<int, Order>|null */
     private ?EloquentCollection $ordersHere = null;
+
+    private bool $ordersHereTruncated = false;
 
     private ?Order $changing = null;
 
@@ -172,14 +155,17 @@ class TakeOrder extends Page
             return;
         }
 
-        // Not changing anything: a new order. A floor card hands the location
-        // over in the query string; arriving without one puts the page on its
-        // picker instead.
+        // Not changing anything: a new order. `?location=` still opens the
+        // page on a place — the Places cards that used to send it are gone,
+        // but the orders list links this way and so does anything bookmarked.
+        // An id belonging to another tenant is simply not filled.
         $this->orderId = null;
-        $this->locationId = $this->locationNamed((int) $this->locationId) instanceof Location ? $this->locationId : null;
+
+        $asked = (int) request()->integer('location');
 
         $this->form->fill([
             'menu_id' => ($this->menus()[0] ?? null)?->getKey(),
+            'location_id' => $this->isOwnLocation($asked) ? $asked : null,
             'settlement' => OrderSettlement::AddToBill->value,
         ]);
     }
@@ -191,17 +177,19 @@ class TakeOrder extends Page
             : __('panel.take_order.title'));
     }
 
+    /**
+     * No page heading at all.
+     *
+     * It read "Take order · Room 101" and the project owner had it off: the
+     * place is named in the panel on the right, the browser tab still carries
+     * getTitle(), and a heading repeating it cost a line of screen on a phone
+     * for nothing. With no heading and no header actions Filament draws no
+     * header, which is why Back is rendered by the page's own view instead
+     * (top left, where it was asked for).
+     */
     public function getHeading(): string
     {
-        $location = $this->location();
-
-        if ($this->isChangingAnOrder()) {
-            return (string) __('panel.take_order.change_title', ['number' => $this->changingReference()]);
-        }
-
-        return $location instanceof Location
-            ? (string) __('panel.take_order.heading_at', ['name' => $location->name])
-            : (string) __('panel.take_order.title');
+        return '';
     }
 
     /**
@@ -222,23 +210,29 @@ class TakeOrder extends Page
     }
 
     /**
-     * Where Back goes, which is wherever this was reached from.
+     * Where Back goes: the orders list, which is the only way in now.
      *
-     * Three cases and they are all one rule — go up one step: changing an
-     * order came from the orders page, a room came from the picker, and the
-     * picker itself came from the orders page. The location lives in the
-     * query string too, so the browser's own back button agrees with this
-     * button rather than fighting it.
+     * It had three cases while taking an order was two screens — the picker
+     * and then the counter — and going back from the second meant the first.
+     * Taking an order is one page, so there is one step up.
      */
     public function backUrl(): string
     {
-        if ($this->isChangingAnOrder()) {
-            return OrderResource::getUrl('index');
+        return OrderResource::getUrl('index');
+    }
+
+    /**
+     * Whether this id names one of this tenant's own places.
+     */
+    private function isOwnLocation(int $locationId): bool
+    {
+        foreach ($this->locations() as $location) {
+            if ($location->getKey() === $locationId) {
+                return true;
+            }
         }
 
-        return $this->isPickingLocation() || ! $this->hasAnyLocation()
-            ? OrderResource::getUrl('index')
-            : TakeOrder::getUrl();
+        return false;
     }
 
     /**
@@ -257,25 +251,17 @@ class TakeOrder extends Page
     public function ordersHereUrl(Location $location): string
     {
         return OrderResource::getUrl('index', [
-            'filters' => ['location_id' => ['value' => (string) $location->getKey()]],
+            'filters' => [
+                // `values`, plural: the location filter takes several, and a
+                // multiple SelectFilter reads a different key from a single
+                // one. Sending `value` is not an error — it is an unread
+                // parameter and a list showing every place's orders.
+                'location_id' => ['values' => [(string) $location->getKey()]],
+                // Cleared, because the question this link asks is "everything
+                // this place has taken", and the list opens on today alone.
+                'placed_between' => ['from' => null, 'until' => null],
+            ],
         ]);
-    }
-
-    /**
-     * One icon button back, in the page's own header.
-     */
-    #[\Override]
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('back')
-                ->label(__('panel.take_order.back'))
-                ->icon(Heroicon::OutlinedArrowLeft)
-                ->color('gray')
-                ->iconButton()
-                ->tooltip(__('panel.take_order.back'))
-                ->url(fn (): string => $this->backUrl()),
-        ];
     }
 
     /**
@@ -302,16 +288,37 @@ class TakeOrder extends Page
                             ->live()
                             ->afterStateUpdated(fn (): null => $this->emptyBasket()),
 
-                        // Where it goes is picked from the grid above, not
-                        // here. This is the other path: a tenant that has set
-                        // up no locations at all, and an order going somewhere
-                        // that is not a row. A picked location wins over it,
-                        // exactly as it does for a guest who typed rather than
-                        // picked (PlaceOrder).
+                        // **A select again.** It was one, then a full-screen
+                        // grid of cards for a while — a dropdown could not
+                        // show what was already open at a room, which was the
+                        // Places module's whole argument. The project owner
+                        // has since had Places removed, so that argument went
+                        // with it: taking an order is one page now, and the
+                        // orders already at the chosen place are listed beside
+                        // the card rather than on the way to it. Grouped by
+                        // kind and searchable, so fifty rooms is a type-ahead
+                        // rather than a scroll.
+                        Select::make('location_id')
+                            ->label(__('panel.take_order.location'))
+                            ->options(fn (): array => $this->locationOptions())
+                            ->searchable()
+                            ->native(false)
+                            ->placeholder(__('panel.take_order.elsewhere'))
+                            ->prefixIcon(Heroicon::OutlinedMapPin)
+                            ->visible(fn (): bool => $this->hasAnyLocation())
+                            // The side column follows the answer, and so does
+                            // what counts as "already here".
+                            ->live()
+                            ->afterStateUpdated(fn (): null => $this->forgetOrdersHere()),
+
+                        // The other path, and the only one for a tenant that
+                        // has set up no locations at all: name it by hand. A
+                        // picked location wins over it, exactly as it does for
+                        // a guest who typed rather than picked (PlaceOrder).
                         TextInput::make('location_label')
                             ->label(__('panel.take_order.location_label'))
                             ->maxLength(120)
-                            ->visible(fn (): bool => $this->isElsewhere || ! $this->hasAnyLocation()),
+                            ->visible(fn (Get $get): bool => ! $this->hasAnyLocation() || blank($get('location_id'))),
 
                         Select::make('settlement')
                             ->label(__('panel.orders.settlement'))
@@ -333,101 +340,46 @@ class TakeOrder extends Page
      */
     public function hasAnyLocation(): bool
     {
-        return $this->floor() !== [];
+        return $this->locations() !== [];
     }
 
     /**
-     * Whether the page is still on its first question: where does this go?
+     * Where an order may go, grouped by what kind of place each is.
      *
-     * A tenant with no locations at all never asks it — there is nothing to
-     * pick from, so where it goes is typed beside the order instead.
-     */
-    public function isPickingLocation(): bool
-    {
-        return $this->hasAnyLocation()
-            && ! $this->isChangingAnOrder()
-            && $this->locationId === null
-            && ! $this->isElsewhere;
-    }
-
-    /**
-     * Take the order to this room, table or delivery point.
-     */
-    public function chooseLocation(int $locationId): void
-    {
-        if ($this->locationNamed($locationId) === null) {
-            return;
-        }
-
-        $this->locationId = $locationId;
-        $this->isElsewhere = false;
-        $this->data['location_label'] = null;
-        $this->ordersHere = null;
-    }
-
-    /**
-     * Somewhere that is not one of the tenant's rows: named by hand instead.
-     */
-    public function chooseElsewhere(): void
-    {
-        $this->locationId = null;
-        $this->isElsewhere = true;
-        $this->ordersHere = null;
-    }
-
-    /**
-     * Back to the grid. The basket survives: a guest changing their mind about
-     * the table has not changed their mind about the order.
-     */
-    public function changeLocation(): void
-    {
-        $this->locationId = null;
-        $this->isElsewhere = false;
-        $this->locationSearch = '';
-        $this->ordersHere = null;
-    }
-
-    /**
-     * Every location to pick from, each with what is open at it, narrowed to
-     * whatever has been typed into the picker's search.
+     * Grouped rather than one flat list, because a hotel's fifty rooms and
+     * its three delivery points read as two different questions, and the
+     * select is searchable so the groups cost nothing to scroll past. The
+     * code rides on the label — "204" is what staff type — where it is not
+     * already part of the name.
      *
-     * The order is ReadFloor's, the same the orders page's floor layout uses:
-     * rooms with something owing first, newest order at the top, everywhere
-     * quiet last — so the one staff are most likely to be adding to is nearest
-     * the search box. Matched on the name a guest reads and on the shorthand
-     * staff type, so "204" finds Room 204.
-     *
-     * @return list<array{location: Location, activity: array<string, mixed>}>
+     * @return array<string, array<int, string>>
      */
-    public function locationCards(): array
+    public function locationOptions(): array
     {
-        $search = trim($this->locationSearch);
+        $options = [];
 
-        if ($search === '') {
-            return $this->floor();
-        }
+        foreach ($this->locations() as $location) {
+            $label = $location->name;
 
-        return array_values(array_filter(
-            $this->floor(),
-            static fn (array $card): bool => mb_stripos($card['location']->name, $search) !== false
-                || (filled($card['location']->code) && mb_stripos((string) $card['location']->code, $search) !== false),
-        ));
-    }
-
-    /**
-     * What is open at the location this order is going to.
-     *
-     * @return array<string, mixed>
-     */
-    public function activityHere(): array
-    {
-        foreach ($this->floor() as $card) {
-            if ($card['location']->getKey() === $this->locationId) {
-                return $card['activity'];
+            if (filled($location->code) && mb_stripos($location->name, (string) $location->code) === false) {
+                $label .= ' · '.$location->code;
             }
+
+            $options[$location->kind->label()][$location->getKey()] = $label;
         }
 
-        return ReadLocationActivity::clear();
+        return $options;
+    }
+
+    /**
+     * Forget what was read for the last place, so the side column follows the
+     * select rather than the answer it was first given.
+     */
+    public function forgetOrdersHere(): null
+    {
+        $this->ordersHere = null;
+
+        return null;
     }
 
     /**
@@ -440,9 +392,11 @@ class TakeOrder extends Page
      * "what still needs work" rather than "what is happening here", and staff
      * reading a bill back to a guest need the ones already handed over.
      *
-     * Today's only, and capped at ORDERS_SHOWN: a room on a long stay would
-     * otherwise grow a list nobody scrolls. Everything a place has ever taken
-     * is one press further on (`ordersHereUrl()`).
+     * **Today's only**, which is the day the whole page works in. Capped at
+     * ORDERS_SHOWN because a busy room would otherwise grow a list nobody
+     * scrolls — and ordered **still-being-worked first**, so the cap can only
+     * ever cut off orders that are already finished. Everything a place has
+     * ever taken is one press further on (`ordersHereUrl()`).
      *
      * @return EloquentCollection<int, Order>
      */
@@ -463,7 +417,13 @@ class TakeOrder extends Page
         // split, its note — and a row selected down to five columns throws on
         // the first one the infolist asks for (Model::shouldBeStrict()). The
         // list is capped, so this is a handful of rows.
-        return $this->ordersHere = Order::query()
+        // Today's orders for this one place: a bounded handful, so they are
+        // sorted and cut in PHP rather than in SQL. Every column, unusually:
+        // any of these rows can be opened in the order modal, which reads the
+        // whole record — its totals, its GST split, its note — and a row
+        // selected down to five columns throws on the first one the infolist
+        // asks for (Model::shouldBeStrict()).
+        $found = Order::query()
             ->where('location_id', $location->getKey())
             ->whereDate('created_at', Date::now()->startOfDay())
             // Aliased exactly amount_paid and constrained to live payments,
@@ -471,12 +431,35 @@ class TakeOrder extends Page
             ->withSum(['paymentAllocations as amount_paid' => fn ($allocations) => $allocations
                 ->whereHas('payment', fn ($payment) => $payment->live())], 'amount')
             ->latest('id')
-            ->limit(self::ORDERS_SHOWN)
             ->get();
+
+        $this->ordersHereTruncated = $found->count() > self::ORDERS_SHOWN;
+
+        // Still being worked first, then newest. The cap is what makes this
+        // matter: without it a busy room could push the one order somebody is
+        // standing there asking about off the end of the list.
+        return $this->ordersHere = $found
+            ->sortBy(static fn (Order $order): int => $order->isUnderway() ? 0 : 1)
+            ->take(self::ORDERS_SHOWN)
+            ->values();
     }
 
     /**
-     * How many of those are still being worked, for the panel's own heading.
+     * Whether this place has taken more today than the panel is showing.
+     */
+    public function hasMoreOrdersHere(): bool
+    {
+        $this->ordersHere();
+
+        return $this->ordersHereTruncated;
+    }
+
+    /**
+     * How many orders are still being worked here, for the panel's heading.
+     *
+     * Read off the very figure the card on Places draws, rather than counted
+     * again from the list — the two disagreeing is the bug this pair was
+     * built to close, and one source cannot disagree with itself.
      */
     public function openOrdersHereCount(): int
     {
@@ -489,10 +472,20 @@ class TakeOrder extends Page
      * The orders page's own action, handed the order through the arguments it
      * was invoked with. Staff standing at the room can see that #13 is ready
      * and hand it over there rather than going to find it in a list.
+     *
+     * **Renamed to match the method.** The action borrowed from `OrdersTable`
+     * is called `advance`, and a page resolves a mounted action by looking
+     * for a method of that name plus `Action` — `advanceAction()`, which this
+     * page does not have. So the button rendered `mountAction('advance')`,
+     * Filament resolved nothing, and **pressing Accept did nothing at all**.
+     * Tests did not catch it because `TestAction` is usually given the
+     * *method* name, which resolves down a different branch; they now use the
+     * action's own name, which is the one the browser sends.
      */
     public function advanceOrderAction(): Action
     {
         return OrdersTable::advanceAction()
+            ->name('advanceOrder')
             ->iconButton()
             ->size(Size::Small)
             ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments))
@@ -505,6 +498,7 @@ class TakeOrder extends Page
     public function changeOrderAction(): Action
     {
         return OrdersTable::changeAction()
+            ->name('changeOrder')
             ->iconButton()
             ->size(Size::Small)
             ->tooltip(__('panel.orders.change'))
@@ -521,6 +515,9 @@ class TakeOrder extends Page
     public function viewOrderAction(): ViewAction
     {
         return OrdersTable::viewAction()
+            // Named for the method that defines it, or nothing resolves when
+            // the rendered button mounts it — see advanceOrderAction().
+            ->name('viewOrder')
             // A link rather than the list's icon button: this sits inline in a
             // line of text naming the order, not in a row of controls.
             ->link()
@@ -704,15 +701,14 @@ class TakeOrder extends Page
             ->success()
             ->send();
 
-        // Staff stay at the counter. The order that was just placed appears in
-        // "already running here" a line below, and the next one is taken
-        // without navigating back — which is what a counter is for. This used
-        // to redirect to the order's own page, and there is no such page now
+        // Staff stay on the page. The order that was just placed appears in
+        // the list beside the card, and the next one is taken without
+        // navigating back — which is what a counter is for. This used to
+        // redirect to the order's own page, and there is no such page now
         // that an order is read in a modal (OrdersTable::viewAction()).
         $this->emptyBasket();
         $this->data['note'] = null;
-        $this->ordersHere = null;
-        $this->floor = null;
+        $this->forgetOrdersHere();
     }
 
     /**
@@ -908,36 +904,31 @@ class TakeOrder extends Page
      */
     public function location(): ?Location
     {
-        return $this->locationId === null ? null : $this->locationNamed($this->locationId);
-    }
+        $locationId = (int) ($this->data['location_id'] ?? 0);
 
-    /**
-     * Every location with what is open at it, in the order staff want them,
-     * read once per request however many times the page asks.
-     *
-     * Two queries for the whole picker — the same ReadFloor the orders page's
-     * floor layout draws, so a room reads the same on both screens and is
-     * sorted the same way.
-     *
-     * @return list<array{location: Location, activity: array<string, mixed>}>
-     */
-    private function floor(): array
-    {
-        return $this->floor ??= app(ReadFloor::class)($this->tenant());
-    }
-
-    /**
-     * One of this tenant's own locations, by id.
-     */
-    private function locationNamed(int $locationId): ?Location
-    {
-        foreach ($this->floor() as $card) {
-            if ($card['location']->getKey() === $locationId) {
-                return $card['location'];
+        foreach ($this->locations() as $location) {
+            if ($location->getKey() === $locationId) {
+                return $location;
             }
         }
 
         return null;
+    }
+
+    /**
+     * This tenant's places an order may go to, read once per request.
+     *
+     * @return list<Location>
+     */
+    private function locations(): array
+    {
+        return $this->locations ??= array_values(Location::query()
+            ->select(['id', 'name', 'kind', 'code'])
+            ->where('tenant_id', $this->tenant()->getKey())
+            ->active()
+            ->inReadingOrder()
+            ->get()
+            ->all());
     }
 
     /**
@@ -992,9 +983,6 @@ class TakeOrder extends Page
      */
     private function fillFromOrder(Order $order): void
     {
-        $this->locationId = $order->location_id;
-        $this->isElsewhere = $order->location_id === null && filled($order->location_name);
-
         $dropped = 0;
         $lines = [];
 
@@ -1035,6 +1023,9 @@ class TakeOrder extends Page
 
         $this->form->fill([
             'menu_id' => $order->menu_id ?? ($this->menus()[0] ?? null)?->getKey(),
+            // The place it was taken for, so changing an order opens on the
+            // same page as taking one and nothing has to be re-picked.
+            'location_id' => $order->location_id,
             'settlement' => $order->settlement->value,
             'note' => $order->note,
             'location_label' => $order->location_id === null ? $order->location_name : null,

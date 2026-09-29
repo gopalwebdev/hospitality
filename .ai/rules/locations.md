@@ -38,14 +38,16 @@ Free text still works: a tenant that has set up no locations at all, or a guest 
 
 The orders table's location filter is deliberately **not** narrowed to the active locations: it filters orders already placed, and one may name a location switched off since.
 
-## A location's state is read from its orders, never stored on it
-The orders page's **Places** layout (`App\Filament\Tenant\Resources\Orders\Pages\ListOrders`) draws every location as a card coloured by how many orders are pending there, how many are being made and how many are ready to carry over. **None of that is a column.** `App\Actions\Orders\ReadLocationActivity` works it out in one grouped query over `orders`, and `App\Enums\LocationActivity` (`Ready`, `Pending`, `Preparing`, `Clear`) is the derived answer — an enum with no cast behind it, deliberately named for activity rather than status so nobody reaches for a `locations.status` column to back it. It carries **no money**: what a room owes is the list layout's business and this page's own Settle action.
+## A location's state was read from its orders, and that board is gone
+The orders page had a **Places** layout drawing a card per location, coloured by how many of today's orders were pending, being made and ready there — worked out on every read by `ReadLocationActivity` into a `LocationActivity` enum, never stored. **The project owner had the whole thing removed**, and with it `ReadFloor`, `ReadLocationActivity`, `LocationActivity` and the two card partials.
 
-This is the rule below honoured, not an exception to it: what is live at Room 204 is a fact about the orders placed there, so it is read from them. See `.ai/rules/order-taking.md`.
+The rule it existed to honour still stands and is now trivially kept: `locations` carries **nothing** about what is happening at a place. What is open at Room 204 is a question the orders list answers with its place filter, and the counter answers for the place an order is being taken for (`TakeOrder::ordersHere()`).
+
+Do not put a `status` column on `locations` to bring the board back cheaply. If a live board is ever wanted again it is derived from `orders`, the way that one was.
 
 ## Adding many at once, and what is not built
 `App\Actions\Locations\CreateLocationRange` makes "Room 101" through "Room 120" in one transaction, skipping names the tenant already has (matched on the English name, like every uniqueness check here) and refusing a blank prefix, a backwards range or more than 500 rows. It drives the **Add several** header action, which catches its `LogicException` and shows a danger notification rather than a 500.
 
-**Assigning a guest to a room or table is a later feature.** It is not built, and `locations` carries nothing about occupancy — that is a fact about a stay, not about a room. `code` ("204", "T5") and `capacity` (beds, seats) are here for it — the Places layout **searches** the code, which is what staff type, though it no longer prints either on a card (`.ai/rules/order-taking.md`) — and `locations.id` is the intended anchor for whatever table holds an assignment. Do not put a `status` or an `occupied_by` column on `locations` when it arrives.
+**Assigning a guest to a room or table is a later feature.** It is not built, and `locations` carries nothing about occupancy — that is a fact about a stay, not about a room. `code` ("204", "T5") and `capacity` (beds, seats) are here for it — the counter's place select **searches** the code, which is what staff type — and `locations.id` is the intended anchor for whatever table holds an assignment. Do not put a `status` or an `occupied_by` column on `locations` when it arrives.
 
-Tests: `tests/Feature/Tenant/LocationManagementTest.php`, Places in `tests/Feature/Tenant/OrderPlacesTest.php`, and the checkout flow in `tests/Feature/Tenant/CheckoutTest.php`.
+Tests: `tests/Feature/Tenant/LocationManagementTest.php`, and the checkout flow in `tests/Feature/Tenant/CheckoutTest.php`.

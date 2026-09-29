@@ -21,17 +21,15 @@
     --}}
     <style>
         /*
-            One column on a phone, in this order: where it is going and what
-            is already running there, then the card, then the basket. The
-            place comes first because that is the question a member of staff
-            arrived with — they pressed a room on the floor to see what is
-            happening at it — and on a phone the side column is otherwise a
-            screen and a half below the menu.
+            Two columns from `lg`: **taking the order on the left**, from
+            picking items to pressing Place, and **what this place already
+            has on the right**. The project owner's arrangement, and it is
+            the one that matches how the page is used — the left is the work
+            and the right is the context, read but rarely touched.
 
-            From `lg` it is two columns and the place moves back beside the
-            work, which is where the project owner put it: above the card it
-            was a full-width strip that pushed the whole counter down a
-            screen.
+            One column on a phone, in this order: the place and its orders
+            first, because pressing a place on Places is a question about
+            them, then the card, then the details and the basket.
         */
         .to-layout {
             display: grid;
@@ -43,32 +41,35 @@
         @media (min-width: 64rem) {
             .to-layout {
                 grid-template-columns: minmax(0, 1fr) 23rem;
-                grid-template-areas: 'menu side';
-            }
-
-            /* The place only has an area when there is a place to name. */
-            .to-layout--here {
-                grid-template-areas:
-                    'menu here'
-                    'menu side';
+                grid-template-areas: 'work here';
             }
 
             .to-here-panel {
                 grid-area: here;
-            }
-
-            .to-menu {
-                grid-area: menu;
-            }
-
-            .to-side {
-                grid-area: side;
                 position: sticky;
                 top: 1rem;
                 max-height: calc(100vh - 2rem);
                 overflow-y: auto;
                 overscroll-behavior: contain;
             }
+
+            .to-work {
+                grid-area: work;
+                min-width: 0;
+            }
+        }
+
+        /*
+            The page's own top line, standing in for a header Filament no
+            longer draws: Back on the left, then only what is unusual about
+            this order.
+        */
+        .to-top {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
         }
 
         .to-column {
@@ -257,43 +258,28 @@
             justify-content: center;
         }
 
-        /* A location in the picker: the shared card, made pressable. */
-        .to-pick {
-            display: block;
-            width: 100%;
-            text-align: start;
-            padding: 0.875rem 0.875rem 0.875rem 1.125rem;
-            border-radius: 0.75rem;
-            border: 1px solid color-mix(in oklab, var(--gray-500) 22%, transparent);
-            background-color: color-mix(in oklab, var(--gray-500) 4%, transparent);
-            cursor: pointer;
-            transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
-        }
-
-        .to-pick:hover {
-            border-color: color-mix(in oklab, var(--primary-500) 60%, transparent);
-        }
-
-        .to-pick:active {
-            transform: scale(0.99);
-        }
-
-        .to-pick:focus-visible {
-            outline: 2px solid var(--primary-500);
-            outline-offset: 2px;
-        }
-
-        /* The same height as the cards beside it, which are one line each. */
-        .to-pick--elsewhere {
+        /* Where this one is going, and the two ways on from it. */
+        .to-here-name {
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 0.5rem;
-            border-style: dashed;
-            font-weight: 500;
+            min-width: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.4;
         }
 
-        /* Where this one is going, and the two ways on from it. */
+        .to-here-icon {
+            width: 1.125rem;
+            height: 1.125rem;
+            flex: none;
+            color: var(--gray-500);
+        }
+
+        :is(.dark) .to-here-icon {
+            color: var(--gray-400);
+        }
+
         .to-here {
             display: flex;
             align-items: center;
@@ -400,137 +386,98 @@
             line-height: 1.2;
         }
 
-        @media (min-width: 64rem) {
-            .to-bar {
-                display: none;
-            }
-        }
+        /*
+            The bar stays at every width now that the basket is under the
+            card rather than beside it: on a desk a long menu puts Place a
+            scroll away, and the one control that finishes the job should
+            never be scrolled to. It said the total twice while the basket
+            was a column of its own, which is why it used to be hidden here.
+        */
     </style>
 
     @php $currency = $this->currency(); @endphp
 
-    @include('filament.tenant.partials.location-card-styles')
+    {{--
+        The page's own top line, standing in for a header Filament no longer
+        draws: Back on the left, where the project owner asked for it, and
+        beside it only what is genuinely unusual about this order — that it
+        is a change rather than a new one, and that the doors are shut.
+    --}}
+    <div class="to-top">
+        <x-filament::icon-button
+            tag="a"
+            size="lg"
+            color="gray"
+            icon="heroicon-o-arrow-left"
+            :href="$this->backUrl()"
+            :label="__('panel.take_order.back')"
+            :tooltip="__('panel.take_order.back')"
+        />
 
-    @if ($this->isPickingLocation())
-        {{--
-            The first question, and the reason this is a grid rather than the
-            select it used to be: a tenant with fifty rooms is a fifty-row
-            dropdown, and staff need to see what is already open at a room
-            before they add another order to it. The busiest are first
-            (ReadFloor), so the likeliest tap is nearest the search box.
-        --}}
-        <x-filament::section
-            :heading="__('panel.take_order.where_heading')"
-            icon="heroicon-o-map-pin"
-        >
-            <div style="margin-bottom: 0.75rem;">
-                <x-filament::input.wrapper prefix-icon="heroicon-o-magnifying-glass">
-                    <x-filament::input
-                        type="search"
-                        wire:model.live.debounce.300ms="locationSearch"
-                        :placeholder="__('panel.board.search')"
-                    />
-                </x-filament::input.wrapper>
-            </div>
+        @if ($this->isChangingAnOrder())
+            <x-filament::badge color="warning" icon="heroicon-o-pencil-square">
+                {{ __('panel.take_order.changing', ['number' => $this->changingReference()]) }}
+            </x-filament::badge>
+        @endif
 
-            <div class="lc-grid">
-                @foreach ($this->locationCards() as $card)
-                    <button
-                        type="button"
-                        wire:key="pick-{{ $card['location']->getKey() }}"
-                        wire:click="chooseLocation({{ $card['location']->getKey() }})"
-                        class="lc to-pick lc--{{ $card['activity']['state']->value }}"
-                    >
-                        @include('filament.tenant.partials.location-card', [
-                            'location' => $card['location'],
-                            'activity' => $card['activity'],
-                            'currency' => $currency,
-                        ])
-                    </button>
-                @endforeach
+        @php $outsideHoursNow = $this->outsideHours(); @endphp
 
-                {{-- The other path: somewhere that is not one of the rows. --}}
-                <button
-                    type="button"
-                    wire:click="chooseElsewhere"
-                    class="to-pick to-pick--elsewhere to-muted"
-                >
-                    {{ __('panel.take_order.elsewhere') }}
-                </button>
-            </div>
+        @if ($outsideHoursNow !== [])
+            {{--
+                A badge rather than the full-width section this used to be:
+                the project owner had that bar off, and it was three lines of
+                chrome above the work for something that changes nothing about
+                what the button does. It is still said, because PlaceOrder is
+                passed allowOutsideHours from this page on purpose and staff
+                should know they are using it — the reason it reads rather
+                than refuses.
+            --}}
+            <x-filament::badge
+                color="warning"
+                icon="heroicon-o-clock"
+                :tooltip="implode(' ', $outsideHoursNow)"
+            >
+                {{ __('panel.take_order.outside_hours') }}
+            </x-filament::badge>
+        @endif
+    </div>
 
-            @if ($this->locationCards() === [])
-                <div class="to-muted" style="margin-top: 0.75rem;">
-                    {{ __('panel.board.none_description') }}
-                </div>
-            @endif
-        </x-filament::section>
-    @else
-        @php
-            // Read only once the page is past its first question: the card and
-            // the pricing are several queries the picker has no use for.
-            $priced = $this->priced();
-            $pricedLines = $this->pricedLines();
-            $sections = $this->visibleSections();
-            $outsideHours = $this->outsideHours();
-            $taxParts = $priced['taxParts'];
-            $stateHalf = $priced['isUnionTerritory'] ? 'UTGST' : 'SGST';
-            $here = $this->location();
-            $activityHere = $this->activityHere();
-            $ordersHere = $this->ordersHere();
-            $openHereCount = $this->openOrdersHereCount();
-            $isChanging = $this->isChangingAnOrder();
-        @endphp
+    @php
+        $priced = $this->priced();
+        $pricedLines = $this->pricedLines();
+        $sections = $this->visibleSections();
+        $taxParts = $priced['taxParts'];
+        $stateHalf = $priced['isUnionTerritory'] ? 'UTGST' : 'SGST';
+        $here = $this->location();
+        $ordersHere = $this->ordersHere();
+        $openHereCount = $this->openOrdersHereCount();
+        $isChanging = $this->isChangingAnOrder();
+    @endphp
 
         @if ($isChanging)
-            {{-- Changing an order that already stands, and saying so. --}}
-            <x-filament::section compact>
-                <x-filament::badge color="warning" icon="heroicon-o-pencil-square">
-                    {{ __('panel.take_order.changing', ['number' => $this->changingReference()]) }}
-                </x-filament::badge>
-
-                <div class="to-muted" style="margin-top: 0.375rem;">
-                    {{ __('panel.take_order.changing_hint') }}
-                </div>
-            </x-filament::section>
+            <div class="to-muted" style="margin-bottom: 0.75rem;">{{ __('panel.take_order.changing_hint') }}</div>
         @endif
 
-        @if ($outsideHours !== [])
-            {{--
-                Said, not enforced. PlaceOrder is passed allowOutsideHours from
-                this page on purpose; every other refusal it makes still stands.
-            --}}
-            <x-filament::section compact>
-                <x-filament::badge color="warning" icon="heroicon-o-clock">
-                    {{ __('panel.take_order.outside_hours') }}
-                </x-filament::badge>
-
-                <div class="to-muted" style="margin-top: 0.375rem;">
-                    {{ implode(' ', $outsideHours) }}
-                </div>
-            </x-filament::section>
-        @endif
-
-        <div @class(['to-layout', 'to-layout--here' => $here !== null || $this->isElsewhere])>
+        <div class="to-layout">
             {{--
                 Where this one is going, and what is already running there.
                 First on a phone, beside the work from `lg` — see the layout's
                 own note above.
             --}}
-            @if ($here !== null || $this->isElsewhere)
+            @if ($here !== null)
                 <div class="to-here-panel">
-                    <x-filament::section compact class="lc lc--{{ $activityHere['state']->value }}">
+                    <x-filament::section compact>
                         <div class="to-here">
                             <div style="min-width: 0;">
-                                <div class="lc-name">
+                                <div class="to-here-name">
                                     @if ($here !== null)
-                                        <x-filament::icon :icon="$here->kind->icon()" class="lc-kind-icon" />
+                                        <x-filament::icon :icon="$here->kind->icon()" class="to-here-icon" />
                                     @endif
                                     <span>{{ $here?->name ?? __('panel.take_order.elsewhere') }}</span>
                                 </div>
 
                                 @if ($openHereCount > 0)
-                                    <div class="lc-muted">
+                                    <div class="to-muted">
                                         {{ trans_choice('panel.board.orders_open', $openHereCount, ['count' => $openHereCount]) }}
                                     </div>
                                 @endif
@@ -573,7 +520,7 @@
                         --}}
                         <div class="to-orders">
                             <div class="to-orders-head">
-                                <span class="lc-muted">{{ __('panel.take_order.orders_today') }}</span>
+                                <span class="to-muted">{{ __('panel.take_order.orders_today') }}</span>
                             </div>
 
                             @forelse ($ordersHere as $open)
@@ -585,7 +532,7 @@
                                             {{ $open->status->label() }}
                                         </x-filament::badge>
 
-                                        <span class="lc-muted to-order-when">{{ $open->created_at?->diffForHumans(short: true) }}</span>
+                                        <span class="to-muted to-order-when">{{ $open->created_at?->diffForHumans(short: true) }}</span>
                                     </div>
 
                                     <div class="to-order-line">
@@ -593,7 +540,7 @@
                                             <span class="to-line-total">{{ $currency->format($open->total) }}</span>
 
                                             @if ($open->isLive() && $open->amountOutstanding() > 0)
-                                                <span class="lc-muted">
+                                                <span class="to-muted">
                                                     {{ __('panel.take_order.outstanding', ['amount' => $currency->format($open->amountOutstanding())]) }}
                                                 </span>
                                             @endif
@@ -629,12 +576,21 @@
                             @empty
                                 <div class="to-muted">{{ __('panel.take_order.no_orders_today') }}</div>
                             @endforelse
+
+                            @if ($here !== null && $this->hasMoreOrdersHere())
+                                {{-- The cap only ever cuts finished orders; the rest are one press away. --}}
+                                <div class="to-order">
+                                    <x-filament::link :href="$this->ordersHereUrl($here)" size="sm">
+                                        {{ __('panel.take_order.more_orders_here') }}
+                                    </x-filament::link>
+                                </div>
+                            @endif
                         </div>
                     </x-filament::section>
                 </div>
             @endif
 
-            <div class="to-column to-menu">
+            <div class="to-work to-column">
                 <x-filament::input.wrapper prefix-icon="heroicon-o-magnifying-glass">
                     <x-filament::input
                         type="search"
@@ -722,9 +678,15 @@
                         />
                     </x-filament::section>
                 @endforelse
-            </div>
 
-            <aside class="to-column to-side">
+                {{--
+                    The order's own details and the basket sit under the
+                    card, in the same column: the project owner asked for
+                    picking and placing to both be on the left. The bar at
+                    the foot carries the total and Place at every width, so
+                    a long card never puts the one button that finishes the
+                    job out of reach.
+                --}}
                 {{ $this->form }}
 
                 <x-filament::section
@@ -866,7 +828,7 @@
                         </div>
                     @endif
                 </x-filament::section>
-            </aside>
+            </div>
         </div>
 
         {{--
@@ -894,5 +856,4 @@
                 </x-filament::button>
             </div>
         @endif
-    @endif
 </x-filament-panels::page>

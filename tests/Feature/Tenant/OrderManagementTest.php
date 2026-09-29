@@ -7,6 +7,7 @@ use App\Enums\Locale;
 use App\Enums\OrderStatus;
 use App\Enums\Role as RoleEnum;
 use App\Filament\Tenant\Resources\Orders\Pages\ListOrders;
+use App\Models\Location;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
@@ -15,6 +16,7 @@ use App\Models\OrderLine;
 use App\Models\Tenant;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -273,4 +275,78 @@ it('names an order by the tenant\'s own count, not by its row id', function (): 
         // Searched on the number staff are told over the phone.
         ->searchTable('1')
         ->assertCanSeeTableRecords([$order]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Filtering the list
+|--------------------------------------------------------------------------
+|
+| Three controls staff reach for — when, what state, and where — above the
+| rows rather than behind the filter button, because the list opens already
+| filtered to today and a default nobody can see is a list quietly missing
+| rows.
+|
+*/
+
+it('opens showing today, and shows everything once the dates are cleared', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 0);
+
+    $today = Order::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $lastWeek = Order::factory()->create(['tenant_id' => $tenant->getKey()]);
+    $lastWeek->forceFill(['created_at' => Date::now()->subWeek()])->save();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListOrders::class)
+        ->assertCanSeeTableRecords([$today])
+        ->assertCanNotSeeTableRecords([$lastWeek])
+        // Defaulted rather than written into the query, so clearing the two
+        // dates really does show everything — a default in the query would
+        // be a floor nobody could get under.
+        ->set('tableFilters.placed_between.from', null)
+        ->set('tableFilters.placed_between.until', null)
+        ->assertCanSeeTableRecords([$today, $lastWeek]);
+});
+
+it('filters by a range of days, by status and by place', function (): void {
+    $tenant = Tenant::factory()->create();
+    taxTenantAt($tenant, 0);
+
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    $pool = Location::factory()->ofTenant($tenant)->area()->create(['name' => 'Poolside']);
+
+    $inRoom = Order::factory()->create([
+        'tenant_id' => $tenant->getKey(),
+        'location_id' => $room->getKey(),
+        'status' => OrderStatus::Ready,
+    ]);
+
+    $atPool = Order::factory()->create([
+        'tenant_id' => $tenant->getKey(),
+        'location_id' => $pool->getKey(),
+        'status' => OrderStatus::Placed,
+    ]);
+
+    $older = Order::factory()->create([
+        'tenant_id' => $tenant->getKey(),
+        'location_id' => $room->getKey(),
+        'status' => OrderStatus::Ready,
+    ]);
+    $older->forceFill(['created_at' => Date::now()->subDays(3)])->save();
+
+    enterTenantPanel($tenant, RoleEnum::Owner);
+
+    Livewire::test(ListOrders::class)
+        // A range, not just one day.
+        ->set('tableFilters.placed_between.from', Date::now()->subDays(4)->toDateString())
+        ->assertCanSeeTableRecords([$inRoom, $atPool, $older])
+        // Where: several places at once, so the key is `values`.
+        ->set('tableFilters.location_id.values', [(string) $room->getKey()])
+        ->assertCanSeeTableRecords([$inRoom, $older])
+        ->assertCanNotSeeTableRecords([$atPool])
+        // What state: several at once too.
+        ->set('tableFilters.status.values', [OrderStatus::Placed->value])
+        ->assertCanNotSeeTableRecords([$inRoom, $older]);
 });

@@ -185,7 +185,7 @@ it('places the order where it was told to, and takes what it needs from stock', 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->set('data.settlement', OrderSettlement::PayNow->value)
         ->set('data.note', 'No onions')
         ->call('addTile', 'item', $item->getKey())
@@ -299,7 +299,7 @@ it('empties the basket when the menu is switched', function (): void {
     expect($page->get('lines'))->toBe([]);
 });
 
-it('opens with the location a floor card sent it to', function (): void {
+it('opens on the place a link named', function (): void {
     [$tenant] = counterFor();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 310']);
 
@@ -307,8 +307,9 @@ it('opens with the location a floor card sent it to', function (): void {
 
     $page = Livewire::withQueryParams(['location' => $room->getKey()])->test(TakeOrder::class);
 
-    expect($page->get('locationId'))->toBe($room->getKey())
-        ->and($page->instance()->isPickingLocation())->toBeFalse();
+    // Taking an order is one page now, so the place is a field on it rather
+    // than a screen in front of it — but `?location=` still opens on one.
+    expect((int) $page->get('data.location_id'))->toBe($room->getKey());
 });
 
 it('ignores a location belonging to somebody else', function (): void {
@@ -319,7 +320,7 @@ it('ignores a location belonging to somebody else', function (): void {
 
     $page = Livewire::withQueryParams(['location' => $theirs->getKey()])->test(TakeOrder::class);
 
-    expect($page->get('locationId'))->toBeNull();
+    expect($page->get('data.location_id'))->toBeNull();
 });
 
 it('offers New order on the orders page to staff', function (): void {
@@ -360,24 +361,27 @@ it('withholds New order from someone who may only read orders', function (): voi
 |
 */
 
-it('asks where the order goes first, as a grid of every location', function (): void {
+it('offers every place as one grouped, searchable field', function (): void {
     [$tenant, , $category] = counterFor();
-    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101']);
-    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 102']);
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101', 'code' => '101']);
+    Location::factory()->ofTenant($tenant)->area()->create(['name' => 'Poolside']);
     MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Masala Dosa']]);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
-    Livewire::test(TakeOrder::class)
-        ->assertOk()
-        ->assertSee('Where is this order going?')
-        ->assertSee('Room 101')
-        ->assertSee('Room 102')
-        ->assertSee('Somewhere else')
-        // The card is not offered until there is somewhere to send it.
-        ->assertDontSee('Masala Dosa');
-});
+    $page = Livewire::test(TakeOrder::class);
 
+    // It was a full-screen grid of cards asked before the menu appeared;
+    // with Places gone the argument for it went too, so taking an order is
+    // one page and the place is a field on it. Grouped by kind, and the
+    // card is on screen from the start.
+    expect($page->instance()->locationOptions())->toHaveKeys(['Room', 'Area'])
+        // The code is on the label only where the name does not already
+        // carry it, so this one reads "Room 101" rather than "Room 101 · 101".
+        ->and($page->instance()->locationOptions()['Room'])->toBe([$room->getKey() => 'Room 101']);
+
+    $page->assertSee('Masala Dosa');
+});
 it('shows what is already running at a location once it is picked', function (): void {
     [$tenant, , $category] = counterFor();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
@@ -398,7 +402,7 @@ it('shows what is already running at a location once it is picked', function ():
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->assertSee('Room 204')
         ->assertSee('Orders here today')
         ->assertSee($running->reference())
@@ -425,7 +429,7 @@ it('lists everything a place has taken today, whatever state each is in', functi
     // listed too, with its status beside it. Leaving it out answered "what
     // still needs work", which is a different question.
     Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->assertSee('Orders here today')
         ->assertSee($waiting->reference())
         ->assertSee($cooking->reference())
@@ -447,7 +451,7 @@ it('offers no dead controls on an order there is nothing left to do to', functio
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     $html = (string) Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->assertSee($done->reference())
         ->html();
 
@@ -468,7 +472,7 @@ it('says so plainly when a place has taken nothing today', function (): void {
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->assertSee('Nothing ordered here today.');
 });
 
@@ -479,8 +483,10 @@ it('lets staff name somewhere that is not one of the rows', function (): void {
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
+    // Somewhere that is not one of the rows: the select is left empty and
+    // the name is typed beside it.
     Livewire::test(TakeOrder::class)
-        ->call('chooseElsewhere')
+        ->set('data.location_id', null)
         ->set('data.location_label', 'Terrace, far table')
         ->call('addTile', 'item', $item->getKey())
         ->call('placeOrder');
@@ -491,36 +497,37 @@ it('lets staff name somewhere that is not one of the rows', function (): void {
         ->and($order->location_name)->toBe('Terrace, far table');
 });
 
-it('goes back to the grid without losing the basket', function (): void {
+it('keeps the basket when the place is changed', function (): void {
     [$tenant, , $category] = counterFor();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101']);
+    $other = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 102']);
     $item = MenuItem::factory()->inCategory($category)->create(['price' => 20000]);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     $page = Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->call('addTile', 'item', $item->getKey())
-        ->call('changeLocation');
+        ->set('data.location_id', $other->getKey());
 
     // Changing their mind about the table is not changing their mind about
     // the order.
-    expect($page->get('lines'))->toHaveCount(1)
-        ->and($page->instance()->isPickingLocation())->toBeTrue();
+    expect($page->get('lines'))->toHaveCount(1);
 });
-
-it('refuses a location belonging to another tenant', function (): void {
+it("never offers another tenant's place", function (): void {
     [$tenant] = counterFor();
-    Location::factory()->ofTenant($tenant)->room()->create();
-    $theirs = Location::factory()->ofTenant(Tenant::factory()->create())->room()->create();
+    $ours = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Ours 1']);
+    $theirs = Location::factory()->ofTenant(Tenant::factory()->create())->room()->create(['name' => 'Theirs 1']);
 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
-    $page = Livewire::test(TakeOrder::class)->call('chooseLocation', $theirs->getKey());
+    $offered = collect(Livewire::test(TakeOrder::class)->instance()->locationOptions())
+        ->flatMap(static fn (array $group): array => array_keys($group))
+        ->all();
 
-    expect($page->get('locationId'))->toBeNull();
+    expect($offered)->toContain($ours->getKey())
+        ->and($offered)->not->toContain($theirs->getKey());
 });
-
 it('skips the question for a tenant with no locations at all', function (): void {
     [$tenant, , $category] = counterFor();
     MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Masala Dosa']]);
@@ -532,35 +539,6 @@ it('skips the question for a tenant with no locations at all', function (): void
         ->assertSee('Masala Dosa')
         // Nothing to pick from, so where it goes is typed beside the order.
         ->assertSee('Where it goes');
-});
-
-it('offers the picker in the same order the floor uses, busy first', function (): void {
-    [$tenant] = counterFor();
-    Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 101', 'position' => 1]);
-    $busy = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 109', 'position' => 9]);
-
-    Order::factory()->create([
-        'tenant_id' => $tenant->getKey(),
-        'location_id' => $busy->getKey(),
-        'status' => OrderStatus::Placed,
-        'subtotal' => 10000,
-        'tax' => 0,
-        'cgst' => 0,
-        'sgst' => 0,
-        'charges_total' => 0,
-        'total' => 10000,
-    ]);
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    $names = array_map(
-        static fn (array $card): string => $card['location']->name,
-        Livewire::test(TakeOrder::class)->instance()->locationCards(),
-    );
-
-    // Room 109 sorts last by position and first here, because something is
-    // running there — which is the room staff are most likely adding to.
-    expect($names)->toBe(['Room 109', 'Room 101']);
 });
 
 it('reads one of the running orders in a modal, without leaving the counter', function (): void {
@@ -586,8 +564,8 @@ it('reads one of the running orders in a modal, without leaving the counter', fu
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     $page = Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
-        ->mountAction(TestAction::make('viewOrderAction')->arguments(['order' => $running->getKey()]));
+        ->set('data.location_id', $room->getKey())
+        ->mountAction(TestAction::make('viewOrder')->arguments(['order' => $running->getKey()]));
 
     $html = (string) collect($page->effects['partials'] ?? [])
         ->first(fn (mixed $partial, string $key): bool => str_starts_with($key, 'action-modals'));
@@ -608,34 +586,6 @@ it('reads one of the running orders in a modal, without leaving the counter', fu
 |
 */
 
-it('carries a place from the floor straight into the counter', function (): void {
-    [$tenant, , $category] = counterFor();
-    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
-    MenuItem::factory()->inCategory($category)->create(['name' => ['en' => 'Masala Dosa']]);
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    // The query parameter a card's href carries (ListOrders::locationUrl()).
-    Livewire::withQueryParams(['location' => $room->getKey()])
-        ->test(TakeOrder::class)
-        ->assertSee('Room 204')
-        ->assertSee('Masala Dosa')
-        ->assertSet('locationId', $room->getKey());
-});
-
-it('names a place in the picker without repeating its kind', function (): void {
-    [$tenant] = counterFor();
-    Location::factory()->ofTenant($tenant)->area()->create(['name' => 'Poolside']);
-
-    enterTenantPanel($tenant, RoleEnum::Staff);
-
-    // The picker draws the same partial as the floor and has no kind tabs of
-    // its own, so this is where "Area" under "Poolside" can be pinned gone.
-    Livewire::test(TakeOrder::class)
-        ->assertSee('Poolside')
-        ->assertDontSee('Area');
-});
-
 it('links on to every order a place has taken, with the list already filtered', function (): void {
     [$tenant] = counterFor();
     $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
@@ -647,7 +597,7 @@ it('links on to every order a place has taken, with the list already filtered', 
     enterTenantPanel($tenant, RoleEnum::Staff);
 
     $url = Livewire::test(TakeOrder::class)
-        ->call('chooseLocation', $room->getKey())
+        ->set('data.location_id', $room->getKey())
         ->instance()
         ->ordersHereUrl($room);
 
@@ -729,4 +679,102 @@ it('offers every tile the same icon button, whether or not it has add-ons', func
 
     expect($customise->isIconButton())->toBeTrue()
         ->and($plain->exists)->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| The counter's own chrome
+|--------------------------------------------------------------------------
+*/
+
+it('keeps Orders lit in the sidebar while an order is being taken', function (): void {
+    [$tenant, , $category] = counterFor();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    MenuItem::factory()->inCategory($category)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    $html = (string) $this->get(TakeOrder::getUrl().'?location='.$room->getKey())
+        ->assertOk()
+        ->getContent();
+
+    // The counter registers no navigation item of its own, so nothing at all
+    // was highlighted for the whole time an order was being taken — and
+    // pressing a place on Places opens the counter, so that is most of a
+    // shift. OrderResource::getNavigationItemActiveRoutePattern() names this
+    // route as well as its own.
+    expect($html)->toMatch('/fi-sidebar-item fi-active[^>]*>\s*<a\s+href="[^"]*\/dashboard\/orders"/');
+});
+
+it('draws no page heading, and puts Back at the top left of the page itself', function (): void {
+    [$tenant, , $category] = counterFor();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    MenuItem::factory()->inCategory($category)->create();
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    $html = (string) $this->get(TakeOrder::getUrl().'?location='.$room->getKey())
+        ->assertOk()
+        ->getContent();
+
+    // "Take order · Room 101" cost a line of screen to repeat what the panel
+    // on the right already says. With no heading and no header actions
+    // Filament draws no header at all, so Back is the page's own — top left,
+    // where the project owner asked for it.
+    expect($html)->not->toContain('Take order ·')
+        ->and($html)->not->toContain('fi-header-heading')
+        ->and($html)->toContain('to-top');
+});
+
+it('counts and lists the same orders: today\'s, and no others', function (): void {
+    [$tenant, , $category] = counterFor();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    MenuItem::factory()->inCategory($category)->create();
+
+    $today = runningOrderAt($tenant, $room, OrderStatus::Placed);
+
+    // Still underway, but taken yesterday. It used to be counted on the card
+    // and then missing from the list you opened to find it, because the card
+    // counted every underway order and the panel listed only today's.
+    $yesterday = runningOrderAt($tenant, $room, OrderStatus::Placed);
+    $yesterday->forceFill(['created_at' => Date::now()->subDay()])->save();
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    $page = Livewire::test(TakeOrder::class)->set('data.location_id', $room->getKey());
+
+    expect($page->instance()->ordersHere()->pluck('id')->all())->toBe([$today->getKey()])
+        // The heading reads the very figure the card draws, so the two
+        // cannot disagree again.
+        ->and($page->instance()->openOrdersHereCount())->toBe(1);
+
+    $page->assertSee($today->reference())
+        ->assertDontSee($yesterday->reference())
+        ->assertSee('1 order');
+});
+
+it('puts the still-open orders first, so the cap only ever cuts finished ones', function (): void {
+    [$tenant, , $category] = counterFor();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    MenuItem::factory()->inCategory($category)->create();
+
+    // Ten served orders, then one still waiting — the oldest row of the day.
+    foreach (range(1, 10) as $ignored) {
+        runningOrderAt($tenant, $room, OrderStatus::Served);
+    }
+
+    $waiting = runningOrderAt($tenant, $room, OrderStatus::Placed);
+    $waiting->forceFill(['created_at' => Date::now()->subHours(6)])->save();
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    $page = Livewire::test(TakeOrder::class)->set('data.location_id', $room->getKey());
+
+    // Newest-first alone would have pushed the one order somebody is standing
+    // there asking about off the end of a capped list.
+    expect($page->instance()->ordersHere()->first()?->getKey())->toBe($waiting->getKey())
+        ->and($page->instance()->hasMoreOrdersHere())->toBeTrue();
+
+    $page->assertSee($waiting->reference())
+        ->assertSee('See every order here');
 });

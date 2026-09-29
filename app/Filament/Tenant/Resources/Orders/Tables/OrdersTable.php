@@ -21,20 +21,26 @@ use App\Models\Order;
 use App\Models\PaymentDevice;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Providers\AppServiceProvider;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use LogicException;
 
 class OrdersTable
@@ -126,13 +132,21 @@ class OrdersTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                // Three filters staff actually reach for, each its own
+                // control rather than one combined box: when, what state,
+                // and where. The project owner asked for them separately.
+                self::placedBetweenFilter(),
+
                 SelectFilter::make('status')
                     ->label(__('panel.orders.status'))
-                    ->options(OrderStatus::options()),
+                    ->options(OrderStatus::options())
+                    ->multiple(),
 
                 SelectFilter::make('location_id')
                     ->label(__('panel.orders.location'))
-                    ->options(fn (): array => self::locationOptions()),
+                    ->options(fn (): array => self::locationOptions())
+                    ->searchable()
+                    ->multiple(),
 
                 SelectFilter::make('settlement')
                     ->label(__('panel.orders.settlement'))
@@ -145,6 +159,24 @@ class OrdersTable
                     ->label(__('panel.orders.unsettled_only'))
                     ->query(self::unsettledQuery(...)),
             ])
+            // Above the rows rather than behind the filter button, and this
+            // is the one table where that is right: it **opens filtered**, to
+            // today, and a default nobody can see is a list quietly missing
+            // rows. The items page keeps its filters out of the way for the
+            // opposite reason — it opens showing everything
+            // (`.ai/rules/tables.md`).
+            ->filtersLayout(FiltersLayout::AboveContentCollapsible)
+            ->filtersFormColumns(['default' => 1, 'sm' => 2, 'lg' => 4])
+            // The house default hides these because elsewhere they repeat
+            // what the controls beside them already say. Here they are what
+            // tells staff the list is showing one day rather than everything.
+            ->hiddenFilterIndicators(false)
+            // Pressing the row reads the order. Staff were hunting for a
+            // small eye among five icon buttons to answer "what did they
+            // actually order?", which is the commonest question asked of
+            // this list — so the whole row answers it, and the modal it
+            // opens carries Change and Cancel in its footer.
+            ->recordAction('view')
             ->recordActions([
                 self::viewAction()
                     ->iconButton()
@@ -181,6 +213,78 @@ class OrdersTable
     }
 
     /**
+     * When it was placed: a range, opening on today.
+     *
+     * **It opens filtered, and that is the point.** A tenant's orders grow by
+     * a few hundred a week and almost every question staff ask of this list
+     * is about the shift they are working, so the day is where it starts. The
+     * two dates are `default()`ed rather than applied in the query, so
+     * clearing them really does show everything — a default written into the
+     * query would be a floor nobody could get under.
+     *
+     * The filters sit above the rows and their indicators are back on for
+     * this table alone, because a list that opens holding back rows has to
+     * say so (see `configure()`).
+     */
+    private static function placedBetweenFilter(): Filter
+    {
+        $today = Date::now()->startOfDay();
+
+        return Filter::make('placed_between')
+            ->label(__('panel.orders.placed_at'))
+            ->schema([
+                DatePicker::make('from')
+                    ->label(__('panel.orders.placed_from'))
+                    ->default($today)
+                    ->maxDate(fn (Get $get): ?string => $get('until'))
+                    ->native(false),
+
+                DatePicker::make('until')
+                    ->label(__('panel.orders.placed_until'))
+                    ->default($today)
+                    ->minDate(fn (Get $get): ?string => $get('from'))
+                    ->native(false),
+            ])
+            ->query(fn (Builder $query, array $data): Builder => $query
+                ->when($data['from'] ?? null, fn (Builder $query, string $from): Builder => $query->whereDate('orders.created_at', '>=', $from))
+                ->when($data['until'] ?? null, fn (Builder $query, string $until): Builder => $query->whereDate('orders.created_at', '<=', $until)))
+            ->indicateUsing(fn (array $data): ?string => self::placedBetweenIndicator($data));
+    }
+
+    /**
+     * That range as one chip: "Today", a single date, or the span.
+     *
+     * Formatted from `AppServiceProvider`'s own constant rather than a format
+     * written here — the house reads one date format and it is declared once
+     * (`.ai/rules/general.md`).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function placedBetweenIndicator(array $data): ?string
+    {
+        $from = filled($data['from'] ?? null) ? Date::parse((string) $data['from'])->startOfDay() : null;
+        $until = filled($data['until'] ?? null) ? Date::parse((string) $data['until'])->startOfDay() : null;
+
+        if ($from === null && $until === null) {
+            return null;
+        }
+
+        $read = static fn (CarbonInterface $day): string => $day->translatedFormat(AppServiceProvider::DATE_FORMAT);
+
+        if ($from !== null && $until !== null && $from->equalTo($until)) {
+            return $from->isToday()
+                ? (string) __('panel.orders.placed_today')
+                : $read($from);
+        }
+
+        return match (true) {
+            $from === null => (string) __('panel.orders.placed_until_only', ['date' => $read($until)]),
+            $until === null => (string) __('panel.orders.placed_from_only', ['date' => $read($from)]),
+            default => $read($from).' – '.$read($until),
+        };
+    }
+
+    /**
      * Read one order — in a modal, from anywhere that can name it.
      *
      * There is no order page any more: the project owner asked for the whole
@@ -201,7 +305,15 @@ class OrdersTable
             ->modalHeading(fn (Order $record): string => (string) __('panel.orders.view_heading', ['number' => $record->reference()]))
             ->modalWidth(Width::FiveExtraLarge)
             ->mountUsing(fn (Order $record) => OrderResource::loadForView($record))
-            ->schema(fn (Schema $schema): Schema => OrderInfolist::configure($schema));
+            ->schema(fn (Schema $schema): Schema => OrderInfolist::configure($schema))
+            // Read it, then act on it without closing it and hunting the row
+            // down again. Each hides itself the moment it no longer applies:
+            // Change while the kitchen has not accepted it and no payment
+            // stands against it, Cancel while it is still underway.
+            ->extraModalFooterActions([
+                self::changeAction(),
+                self::cancelAction(),
+            ]);
     }
 
     /**

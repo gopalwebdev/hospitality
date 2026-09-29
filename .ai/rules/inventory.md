@@ -111,7 +111,7 @@ Filament saves every field a form holds, and the options repeater saves every ro
     - **Stock history:** the 50 newest movements, the order number or the person beside each. Needs `view`.
 - **Add-on group options table:** an In stock column.
 - **Orders** (`OrderResource`): the list, one order's page, **Cancel order** (`OrderPolicy::cancel()`, which is `order.manage`) and a **New order** header action linking to the counter. Nothing is **edited or deleted** — `OrderPolicy` answers false to both, because what was ordered is a record rather than a draft — but `OrderPolicy::create()` is `order.create` now that staff take orders themselves. It answered false while ordering was the guest app's alone. See `.ai/rules/order-taking.md`.
-- The same page's **Places** layout, switched to from a tab above the table: a card per location with what is open at it. And **Take order** (`App\Filament\Tenant\Pages\TakeOrder`, reached from a floor card rather than from the sidebar): the counter.
+- The same page's **status tabs**, and **Take order** (`App\Filament\Tenant\Pages\TakeOrder`, reached from the list's New order button rather than from the sidebar): one page that takes an order and changes one.
 
 ## Not built yet
 - The guest app placing orders and reading `shortages`. The API takes `locationId` and `settlement`; nothing on the phone sends them yet. **The panel does** — `TakeOrder` sends both.
@@ -125,7 +125,6 @@ Filament saves every field a form holds, and the options repeater saves every ro
 Tests:
 - `tests/Feature/Tenant/PlaceOrderTest.php`
 - `tests/Feature/Tenant/TakeOrderTest.php`
-- `tests/Feature/Tenant/OrderPlacesTest.php`
 - `tests/Feature/Tenant/OrderNumberTest.php`
 - `tests/Feature/Tenant/StockManagementTest.php`
 - `tests/Feature/Tenant/OrderManagementTest.php`

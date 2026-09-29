@@ -234,8 +234,9 @@ it('opens the counter with the order already in its basket, and saves the change
     expect($page->get('lines'))->toHaveCount(1)
         ->and($page->get('lines')[0]['quantity'])->toBe(2)
         ->and($page->instance()->isChangingAnOrder())->toBeTrue()
-        // Never the picker: this one already knows where it is going.
-        ->and($page->instance()->isPickingLocation())->toBeFalse();
+        // Changing an order opens the same one page as taking one, with the
+        // place it was taken for already filled in rather than re-picked.
+        ->and($page->get('data.location_id'))->toBe($order->location_id);
 
     $page->assertSee('Changing order '.$order->reference())
         ->call('increment', 'item:'.$item->getKey())
@@ -270,8 +271,45 @@ it('moves one of the orders running at a room along from the counter itself', fu
     Livewire::withQueryParams(['location' => $room->getKey()])
         ->test(TakeOrder::class)
         ->assertSee('Orders here today')
-        ->callAction(TestAction::make('advanceOrderAction')->arguments(['order' => $order->getKey()]))
+        ->callAction(TestAction::make('advanceOrder')->arguments(['order' => $order->getKey()]))
         ->assertHasNoActionErrors();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Accepted);
+});
+
+it('mounts the counter\'s own actions by the name the browser sends', function (): void {
+    [$tenant, $menu, $item] = orderableSetup();
+    $room = Location::factory()->ofTenant($tenant)->room()->create(['name' => 'Room 204']);
+    $order = app(PlaceOrder::class)($tenant, $menu, basketOf($item, 1), location: $room);
+
+    enterTenantPanel($tenant, RoleEnum::Staff);
+
+    // The invariant: **the name a button renders with has to resolve.**
+    //
+    // A page resolves a mounted action by its name plus `Action` —
+    // `advanceAction()` — and these are defined as `advanceOrderAction()`
+    // and `viewOrderAction()`. Borrowing the table's actions unrenamed left
+    // buttons rendering `mountAction('advance')` that resolved to nothing,
+    // so pressing Accept did nothing at all.
+    //
+    // Checked against Filament's resolution rule rather than by calling
+    // getAction(), because rendering the page caches each action under its
+    // own name and that cache hides the bug: in the browser the mount
+    // arrives on a **fresh** request, before anything has rendered, with an
+    // empty cache. Asking by the method name hides it too — that resolves
+    // down another branch, which is exactly why the tests missed this.
+    $counter = app(TakeOrder::class);
+
+    foreach ([$counter->advanceOrderAction(), $counter->viewOrderAction(), $counter->changeOrderAction()] as $action) {
+        $rendered = $action->getName();
+
+        expect(method_exists($counter, $rendered.'Action') || method_exists($counter, $rendered))
+            ->toBeTrue("[{$rendered}] renders but no method of that name resolves it");
+    }
+
+    Livewire::test(TakeOrder::class)
+        ->set('data.location_id', $room->getKey())
+        ->callAction(TestAction::make('advanceOrder')->arguments(['order' => $order->getKey()]));
 
     expect($order->refresh()->status)->toBe(OrderStatus::Accepted);
 });

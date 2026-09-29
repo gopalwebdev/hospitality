@@ -2,6 +2,7 @@
 
 namespace App\Filament\Tenant\Resources\Orders;
 
+use App\Filament\Tenant\Pages\TakeOrder;
 use App\Filament\Tenant\Resources\Orders\Pages\ListOrders;
 use App\Filament\Tenant\Resources\Orders\Schemas\OrderInfolist;
 use App\Filament\Tenant\Resources\Orders\Tables\OrdersTable;
@@ -12,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Arr;
 
 /**
  * Every order placed, newest first, to read and — when one has to be called off — cancel.
@@ -38,6 +40,35 @@ class OrderResource extends Resource
      */
     #[\Override]
     protected static ?int $navigationSort = 2;
+
+    /**
+     * Orders stays lit while staff are at the counter.
+     *
+     * `TakeOrder` registers no navigation item of its own, and deliberately so
+     * — an order is taken *about* somewhere, so it is reached from a Places
+     * card or from this page rather than started cold from the sidebar. What
+     * that cost was a sidebar with **nothing** highlighted for the whole time
+     * an order is being taken or changed, which is most of a shift now that
+     * pressing a place opens the counter: the panel reads as though you have
+     * left the orders module when you are in the middle of it.
+     *
+     * Filament takes a list here and hands it straight to `routeIs()`, so this
+     * is the supported way to say it. The route name is asked for rather than
+     * written out, because a panel's id is `App\Enums\FilamentPanel`'s alone
+     * (`.ai/rules/filament.md`).
+     *
+     * @return string|array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): string|array
+    {
+        // Wrapped rather than nested: the parent may hand back a list as
+        // well as a single pattern, and an array inside the array is not
+        // what routeIs() reads.
+        return [
+            ...Arr::wrap(parent::getNavigationItemActiveRoutePattern()),
+            TakeOrder::getRouteName(),
+        ];
+    }
 
     /**
      * Labels are methods rather than static properties because a property is
