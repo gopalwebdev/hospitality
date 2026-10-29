@@ -14,12 +14,12 @@ Queued work needs `php artisan horizon` running; nothing is delivered without it
 phpunit.xml pins tests to array cache/session and the sync queue, so tests never touch Valkey. If tests start behaving as though they share state, check for a stale `bootstrap/cache/config.php` — a cached config silently overrides every phpunit.xml env var. `php artisan optimize:clear` fixes it, and nothing in local development should leave those caches in place.
 
 ## Postgres is the only database, tests included
-`config/database.php` has one connection, `pgsql`, and it is the default. `phpunit.xml` pins only the connection and a `hospitality_testing` database; host, port and user come from `.env`, so the suite runs against the same local server as development. CI runs a `postgres:18` service with the same database name. Create it once locally against Herd's Postgres (`createdb hospitality_testing`, or `create database hospitality_testing` in psql).
+`config/database.php` has one connection, `pgsql`, and it is the default. `phpunit.xml` pins only the connection, a `hospitality_testing` database and `DB_TIMEZONE`; host, port and user come from `.env`, so the suite runs against the same local server as development. CI runs a `postgres:18` service with the same database name. Create it once locally against Herd's Postgres (`createdb hospitality_testing`, or `create database hospitality_testing` in psql).
 
 There is no SQLite anywhere — no connection, no `database/database.sqlite`, no driver branching in migrations, no `pdo_sqlite` in CI — so write Postgres: `jsonb`, CHECK constraints, `ilike`. The suite running on the production engine is also what finally catches the Postgres-only failures that used to surface first in production.
 
 ## DB_TIMEZONE must be a named zone, never an offset
-The application runs in Asia/Kolkata, set from `APP_TIMEZONE` in .env, and the pgsql connection is given the same zone through `DB_TIMEZONE` so `now()` in PHP and `now()` in SQL agree. phpunit.xml pins APP_TIMEZONE too, so tests behave as production does.
+The application runs in Asia/Kolkata, set from `APP_TIMEZONE` in .env, and the pgsql connection is given the same zone through `DB_TIMEZONE` so `now()` in PHP and `now()` in SQL agree. phpunit.xml pins both of them, so a run without a .env — CI, a fresh checkout — keeps the two clocks together rather than falling back on the config defaults.
 
 The trap: it has to be the named zone, not an offset. Laravel issues `SET TIME ZONE '<value>'`, and Postgres reads a bare `+05:30` with POSIX sign conventions — positive means *west* of Greenwich — so it silently lands on UTC-5:30, eleven hours out, with no error. Verified: `+05:30` gives `00:50:05-05:30` where `Asia/Kolkata` gives `11:50:05+05:30`.
 

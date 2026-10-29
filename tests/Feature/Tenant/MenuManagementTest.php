@@ -25,7 +25,6 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
-use LogicException;
 
 beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);

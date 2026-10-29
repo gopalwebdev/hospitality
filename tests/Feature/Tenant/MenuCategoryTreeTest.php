@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Js;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
-use LogicException;
 
 beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);

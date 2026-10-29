@@ -16,7 +16,6 @@ use Filament\Actions\Testing\TestAction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-use LogicException;
 
 beforeEach(function (): void {
     $this->seed(RolesAndPermissionsSeeder::class);

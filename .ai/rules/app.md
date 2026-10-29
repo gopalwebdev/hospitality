@@ -32,6 +32,13 @@ The fixes, in order of preference: read the answer once and hand it down; eager 
 
 `Tenant::resolvedSettings()` is the pattern for a per-request lookup on a model: loaded once and kept as the `settings` relation, never a lazy load. `currency()`, `taxRate()` and `overridesItemTaxRates()` all read it, as do the guest menu's tax line and the Settings page. `Tenant::resolvedOpeningHours()` does the same for the week, keyed by weekday, so `isOpenAt()` and `hoursToday()` cost one read however many days they ask about.
 
+## A deprecation, notice or warning out of app/ fails the suite
+`phpunit.xml` sets `failOnDeprecation`, `failOnNotice`, `failOnWarning`, `failOnRisky` and `failOnEmptyTestSuite`, and its `<source>` element carries `ignoreIndirectDeprecations`, `restrictNotices` and `restrictWarnings`. Together those mean the suite breaks on an issue this code raises and stays quiet about one a vendor package raises inside itself — so calling something deprecated is caught on the change that does it rather than on the next framework upgrade.
+
+Two more land on the tests themselves: `beStrictAboutOutputDuringTests` with `failOnRisky` turns a forgotten `dump()` or `dd()` into a failure, and `failOnEmptyTestSuite` turns a `--filter` that matches nothing into one instead of a green run of zero tests.
+
+A `use SomeGlobalClass;` line in a Pest test file is a warning under PHP 8.5, because those files have no namespace and the import does nothing. Delete the import; the class resolves anyway. Inside `app/`, where every file is namespaced, the same import is meaningful and Pint keeps it.
+
 ## India is the only market for now
 Defaults are Indian: CountryCallingCode has one case (+91) and mobile numbers validate as ten digits, and addresses take a pincode. This is a "for now", not a permanent assumption, so keep this shape multi-country: values that vary by country belong in an enum with a case per country rather than hardcoded in a form or a rule. Add the country to the enum rather than branching on it at the call site.
 
