@@ -16,6 +16,8 @@ paths:
 
 **That transitivity is the trap.** A new job added to stage 1 must be added to the `tests` `needs` list, or it guards nothing — the deploy sails past it and nothing fails to tell you. If a new job belongs after the suite instead, `deploy-staging` has to name it too.
 
+The one job deliberately outside the chain is `report` (below), which gates nothing.
+
 The cost of the chain is wall-clock on the happy path: the stages run back to back rather than overlapping, so time-to-deploy is roughly stage 1's slowest job plus the suite. `static-analysis` is about as slow as `tests`, so this is close to double what a flat fan-out would take. That was accepted knowingly — runner minutes on red branches matter more here than minutes to staging.
 
 `deploy-staging` POSTs to a Laravel Cloud deploy hook. It is the only way staging is deployed — there is no push-to-deploy wired on the Cloud side.
@@ -24,7 +26,24 @@ The hook URL is an *environment* secret, `LARAVEL_CLOUD_STAGING_DEPLOY_HOOK`, on
 
 The request is `curl -X POST "$DEPLOY_HOOK?commit_hash=$GITHUB_SHA"`. The `commit_hash` pins the deploy to the commit CI just proved green rather than the branch tip at pull time; the commit must belong to the environment's configured branch. No `--location`: the URL is a credential and must not be re-sent to a redirect target. No checkout step — the job needs the SHA and nothing from the tree.
 
-Job-level `concurrency: {group: deploy-staging, cancel-in-progress: false}` serialises deploys. The workflow-level group deliberately does not cancel runs on main, so two close commits both run CI to the end and would otherwise race; queueing lets the newer of two waiting commits supersede the older.
+## Only the newest commit on a ref is ever checked, main included
+Workflow-level `concurrency: {group: ci-${{ github.ref }}, cancel-in-progress: true}`. Pushing again to a branch cancels the run already in flight.
+
+This applies to main too, and that is a deliberate trade: a superseded commit on main is recorded as **cancelled rather than green or red**, so main's history does not carry a result for every commit. What it buys is that the commit on staging is the one at the tip of main, not whichever run happened to finish last. Do not re-exempt main without understanding that it reintroduces that race.
+
+Job-level `concurrency: {group: deploy-staging, cancel-in-progress: false}` stays on top of this because cancellation is not instantaneous: a deploy that has already fired keeps going for a moment while the next run catches up. The job-level group serialises that window so the two hooks fire one after another and the newer commit lands last.
+
+## The `report` job is the one shared summary
+`vite-plus` writes its own "Vitest Test Report" into the frontend job's summary, which covered only that job. The `report` job exists so a run has one TL;DR: a table of every job's result, the two suites' counts, and whether staging deployed.
+
+It `needs` every job and is `if: always()`, so it describes a red or cancelled run as well as a green one. It gates nothing and must stay out of the deploy chain — it runs *after* the deploy has been decided, so making anything depend on it would deadlock.
+
+The counts reach it through job outputs: `frontend` and `tests` each tee their suite's output to `$RUNNER_TEMP`, then a `Collect the ... totals` step with `if: always()` greps it and writes `$GITHUB_OUTPUT`. Notes on that, learned the hard way:
+
+- The tee'd command runs under `set -o pipefail`, or a failing suite would be masked by `tee` succeeding.
+- The collect step is `always()` so a *failing* suite still reports its counts rather than leaving a blank cell.
+- Output is stripped of ANSI escapes first, or they land in the markdown table verbatim.
+- The greps target Pest's `Tests:    3 passed (11 assertions)` / `Duration: 0.51s` and Vitest's `Test Files  9 passed (9)` / `Tests  64 passed (64)`. **Verify against real output before changing them.** Running Pest inside an AI coding agent is misleading: Claude Code's environment variables switch Pest 5 to a single-line JSON reporter, which CI never sees. Reproduce CI's output with a cleared environment (`env -i PATH=... HOME=...`).
 
 Action SHAs in this directory are Dependabot's job (weekly, grouped). Do not bump them by hand, with one exception noted below.
 

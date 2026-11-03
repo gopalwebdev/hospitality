@@ -9,11 +9,15 @@ on:
 permissions:
   contents: read
 
-# A branch that is pushed again makes the run already in flight redundant.
-# Runs on main are left alone so every commit there keeps its own result.
+# A branch that is pushed again makes the run already in flight redundant, so
+# only the newest commit on a ref is ever being checked. main included: a
+# superseded commit there is recorded as cancelled rather than keeping its own
+# result, and only the newest commit reaches staging. That is the point — the
+# deployed commit is the one at the tip, not whichever run happened to finish
+# last.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 # The runner image is pinned rather than left on `ubuntu-latest`, which is
 # migrating to Ubuntu 26 between 19 October and 19 November 2026 and so hands
@@ -64,6 +68,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
+    # Read by the `report` job to put the counts in the one shared summary.
+    outputs:
+      totals: ${{ steps.totals.outputs.totals }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,15 +92,44 @@ jobs:
 
       # Vitest starts Vite in dev-server mode, which laravel-vite-plugin refuses
       # to do whenever CI is set. This is the escape hatch the plugin documents.
+      # `pipefail` keeps the job red when the suite fails despite the tee.
       - name: Run frontend tests
         env:
           LARAVEL_BYPASS_ENV_CHECK: '1'
-        run: npm run test
+        run: |
+          set -o pipefail
+          npm run test 2>&1 | tee "$RUNNER_TEMP/frontend.log"
+
+      # `always()`, so a failing suite still reports its counts rather than
+      # leaving a blank cell in the summary.
+      - name: Collect the frontend totals
+        id: totals
+        if: always()
+        run: |
+          log="$RUNNER_TEMP/frontend.log"
+          [ -f "$log" ] || exit 0
+
+          # vite-plus paints its output, and the escapes would land in the
+          # markdown table verbatim.
+          plain=$(sed -E $'s/\033\[[0-9;]*[A-Za-z]//g' "$log")
+
+          files=$(printf '%s\n' "$plain" | grep -oE 'Test Files[[:space:]]+.*' | tail -1 | sed -E 's/Test Files[[:space:]]+//')
+          tests=$(printf '%s\n' "$plain" | grep -oE '(^|[[:space:]])Tests[[:space:]]+[0-9].*' | tail -1 | sed -E 's/^[[:space:]]*Tests[[:space:]]+//')
+
+          summary=""
+          [ -n "$files" ] && summary="Files ${files}"
+          [ -n "$tests" ] && summary="${summary:+$summary · }Tests ${tests}"
+
+          echo "totals=${summary}" >> "$GITHUB_OUTPUT"
 
   tests:
     name: Tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+
+    # Read by the `report` job to put the counts in the one shared summary.
+    outputs:
+      totals: ${{ steps.totals.outputs.totals }}
 
     # The suite is the slowest job and the only one that needs a database, so
     # it waits for the three cheap checks. A branch that fails formatting or a
@@ -152,7 +189,28 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: php artisan test
+        run: |
+          set -o pipefail
+          php artisan test 2>&1 | tee "$RUNNER_TEMP/tests.log"
+
+      # `always()`, so a failing suite still reports its counts rather than
+      # leaving a blank cell in the summary.
+      - name: Collect the suite totals
+        id: totals
+        if: always()
+        run: |
+          log="$RUNNER_TEMP/tests.log"
+          [ -f "$log" ] || exit 0
+
+          plain=$(sed -E $'s/\033\[[0-9;]*[A-Za-z]//g' "$log")
+
+          tests=$(printf '%s\n' "$plain" | grep -oE '^[[:space:]]*Tests:[[:space:]]+.*' | tail -1 | sed -E 's/^[[:space:]]*Tests:[[:space:]]+//')
+          duration=$(printf '%s\n' "$plain" | grep -oE '^[[:space:]]*Duration:[[:space:]]+.*' | tail -1 | sed -E 's/^[[:space:]]*Duration:[[:space:]]+//')
+
+          summary="$tests"
+          [ -n "$duration" ] && summary="${summary:+$summary, }${duration}"
+
+          echo "totals=${summary}" >> "$GITHUB_OUTPUT"
 
   deploy-staging:
     name: Deploy to staging
@@ -173,9 +231,10 @@ jobs:
     # the job has to name it to be handed the secret at all.
     environment: staging
 
-    # Two commits landing on main close together each run CI to the end, and
-    # the deploys would otherwise race. One at a time, and a newer commit
-    # waiting behind a running deploy supersedes an older one still waiting.
+    # Cancelling a superseded run is not instant, so a deploy that has already
+    # started keeps going for a moment while the next run catches up. This
+    # serialises that window: the two hooks fire one after another rather than
+    # together, and the newer commit lands last.
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
@@ -203,3 +262,78 @@ jobs:
             --show-error \
             --max-time 30 \
             "${DEPLOY_HOOK}?commit_hash=${GITHUB_SHA}"
+
+  report:
+    name: CI report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    # Every job, and `always()`, because the point of this one is to describe
+    # a red run as well as a green one. It gates nothing and is deliberately
+    # left out of the deploy chain — it runs after the deploy has been decided.
+    needs:
+      - code-style
+      - static-analysis
+      - frontend
+      - tests
+      - deploy-staging
+    if: always()
+
+    steps:
+      - name: Write the run summary
+        env:
+          CODE_STYLE: ${{ needs.code-style.result }}
+          STATIC_ANALYSIS: ${{ needs.static-analysis.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          TESTS: ${{ needs.tests.result }}
+          DEPLOY: ${{ needs.deploy-staging.result }}
+          FRONTEND_TOTALS: ${{ needs.frontend.outputs.totals }}
+          TESTS_TOTALS: ${{ needs.tests.outputs.totals }}
+        run: |
+          mark() {
+            case "$1" in
+              success)   echo "✅ passed" ;;
+              failure)   echo "❌ failed" ;;
+              cancelled) echo "⛔ cancelled" ;;
+              skipped)   echo "⏭️ skipped" ;;
+              *)         echo "❔ $1" ;;
+            esac
+          }
+
+          # A dash renders better than an empty cell when a job never got far
+          # enough to report its counts.
+          detail() {
+            if [ -n "$1" ]; then echo "$1"; else echo "—"; fi
+          }
+
+          if [ "$CODE_STYLE" = success ] && [ "$STATIC_ANALYSIS" = success ] \
+            && [ "$FRONTEND" = success ] && [ "$TESTS" = success ]; then
+            headline="✅ **All checks passed.**"
+          else
+            headline="❌ **CI failed.** See the table below for which stage."
+          fi
+
+          case "$DEPLOY" in
+            success) deployed="🚀 Staging deployed from \`${GITHUB_SHA:0:7}\`." ;;
+            failure) deployed="❌ Staging deploy failed — CI was green but the hook did not fire." ;;
+            skipped) deployed="⏭️ No staging deploy (not a push to \`main\`, or CI was not green)." ;;
+            *)       deployed="❔ Staging deploy: $DEPLOY." ;;
+          esac
+
+          {
+            echo "## CI summary"
+            echo
+            echo "$headline"
+            echo
+            echo "| Stage | Job | Result | Detail |"
+            echo "| --- | --- | --- | --- |"
+            echo "| Checks | Code style | $(mark "$CODE_STYLE") | \`pint\` + \`rector\` |"
+            echo "| Checks | Static analysis | $(mark "$STATIC_ANALYSIS") | \`phpstan\` |"
+            echo "| Checks | Frontend | $(mark "$FRONTEND") | $(detail "$FRONTEND_TOTALS") |"
+            echo "| Suite | Tests | $(mark "$TESTS") | $(detail "$TESTS_TOTALS") |"
+            echo "| Deploy | Staging | $(mark "$DEPLOY") | Laravel Cloud |"
+            echo
+            echo "$deployed"
+            echo
+            echo "Commit \`${GITHUB_SHA:0:7}\` on \`${GITHUB_REF_NAME}\`, pushed by \`${GITHUB_ACTOR}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

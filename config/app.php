@@ -63,9 +63,16 @@ return [
     | Tenants are tenants on subdomains of it (t1.hospitality.com),
     | while the root host serves the platform panel.
     |
+    | It falls back to APP_URL's host rather than a literal, because a
+    | deployment that sets APP_URL and forgets APP_DOMAIN would otherwise
+    | serve a hardcoded development domain: the platform panel is bound to
+    | this value, so every link and post-sign-in redirect pointed at it.
+    |
     */
 
-    'domain' => env('APP_DOMAIN', 'hospitality.test'),
+    'domain' => env('APP_DOMAIN')
+        ?: parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)
+        ?: 'localhost',
 
     /*
     |--------------------------------------------------------------------------
