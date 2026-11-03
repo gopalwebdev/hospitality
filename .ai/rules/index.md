@@ -23,6 +23,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/User.php, app/Models/**, app/Models/MenuItem.php, app/Models/HomeTile.php | .ai/rules/models.md |
 | app/Filament/Tenant/Resources/Orders/Pages/ListOrders.php, app/Filament/Tenant/Pages/TakeOrder.php, app/Actions/Orders/AdvanceOrder.php, app/Actions/Orders/ReviseOrder.php, app/Actions/Orders/NextOrderNumber.php, app/Actions/Menus/ReadOrderableMenu.php, resources/views/filament/tenant/resources/orders/pages/**, resources/views/filament/tenant/pages/take-order.blade.php | .ai/rules/order-taking.md |
 | app/Actions/OneTimePasswords/** | .ai/rules/otp.md |
+| package.json | .ai/rules/package-json.md |
 | app/Models/Payment.php, app/Models/OrderPayment.php, app/Models/PaymentDevice.php, app/Actions/Payments/**, app/Filament/Tenant/Resources/Payments/**, app/Filament/Tenant/Resources/PaymentDevices/**, app/Enums/PaymentMethod.php, app/Enums/PaymentState.php, app/Enums/OrderSettlement.php | .ai/rules/payments.md |
 | app/Policies/** | .ai/rules/policies.md |
 | app/Providers/Filament/*.php, app/Providers/Filament/TenantPanelProvider.php | .ai/rules/providers-filament.md |
