@@ -40,4 +40,4 @@ Two consequences worth knowing:
 - The value is baked into the **frontend bundle** too. Wayfinder writes `APP_DOMAIN` into every tenant route URL at generate time, so changing the domain means rebuilding, not just clearing config (`.ai/rules/js.md`).
 - It is read at config-cache time. A deploy runs `php artisan optimize` (`composer deploy`), so a change to either variable needs a redeploy to take effect.
 
-Pinned by `tests/Feature/AppDomainTest.php`, which evaluates `config/app.php` off disk under each environment combination — `config('app.domain')` alone cannot test this, since the container resolved it once at boot from `phpunit.xml`, which pins both variables.
+**Nothing pins this.** A test existed and was removed at the project owner's request, so a regression here is silent — the suite cannot catch it, because `phpunit.xml` pins both variables and `config('app.domain')` is resolved once at boot from them. Testing it means evaluating `config/app.php` off disk under a changed environment. Check the fallback by hand after touching this entry.

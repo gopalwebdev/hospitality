@@ -14,7 +14,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | ** | .ai/rules/general.md |
 | app/Filament/Tenant/Resources/HomeRows/** | .ai/rules/home-rows.md |
 | app/Actions/Inventory/**, app/Actions/Orders/**, app/Filament/Tenant/Resources/Orders/**, app/Filament/Schemas/StockFields.php, app/Filament/Tables/StockActions.php, app/Models/Order.php, app/Models/OrderLine.php, app/Models/OrderLineChoice.php, app/Models/OrderCharge.php, app/Models/StockMovement.php | .ai/rules/inventory.md |
-| resources/js/** | .ai/rules/js.md |
+| resources/js/**, vite.config.ts | .ai/rules/js.md |
 | lang/** | .ai/rules/lang.md |
 | app/Models/Location.php, app/Filament/Tenant/Resources/Locations/**, app/Actions/Locations/**, app/Enums/LocationKind.php | .ai/rules/locations.md |
 | app/Filament/Tenant/Resources/Menus/** | .ai/rules/menus.md |
@@ -35,4 +35,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Tenants/** | .ai/rules/tenants.md |
 | app/Filament/Platform/Resources/Users/** | .ai/rules/users.md |
 | resources/views/** | .ai/rules/views.md |
+| vite.config.ts | .ai/rules/vite-config-ts.md |
 | .github/workflows/** | .ai/rules/workflows.md |

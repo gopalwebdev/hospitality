@@ -1,6 +1,7 @@
 ---
 paths:
   - 'resources/js/**'
+  - vite.config.ts
 ---
 
 # Js

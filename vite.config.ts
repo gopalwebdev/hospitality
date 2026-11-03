@@ -109,6 +109,24 @@ export default defineConfig({
         }),
         precompress(),
     ]),
+    build: {
+        rollupOptions: {
+            checks: {
+                // Rolldown warns when plugin hooks dominate a build, and here
+                // they always will: the bundling itself is Rust and takes
+                // well under a second, so the honest split is ~98% plugins on
+                // any machine. The time is real work nothing can skip —
+                // wayfinder's buildStart shells out to `php artisan
+                // wayfinder:generate`, and babel runs the React Compiler over
+                // every component — and the figure is a share rather than a
+                // budget, so it cannot fall as the build gets faster. A check
+                // that can only ever fire is noise: it turned every Laravel
+                // Cloud deploy into "Finished with warnings" and would have
+                // hidden a warning worth reading.
+                pluginTimings: false,
+            },
+        },
+    },
     server: {
         watch: {
             ignored: [
