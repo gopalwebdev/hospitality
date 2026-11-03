@@ -41,3 +41,18 @@ Two consequences worth knowing:
 - It is read at config-cache time. A deploy runs `php artisan optimize` (`composer deploy`), so a change to either variable needs a redeploy to take effect.
 
 **Nothing pins this.** A test existed and was removed at the project owner's request, so a regression here is silent — the suite cannot catch it, because `phpunit.xml` pins both variables and `config('app.domain')` is resolved once at boot from them. Testing it means evaluating `config/app.php` off disk under a changed environment. Check the fallback by hand after touching this entry.
+
+## Nightwatch needs an agent process; it is off everywhere except Cloud
+`laravel/nightwatch` v1 is installed. It does **not** send telemetry anywhere on its own: the app writes events to a local agent over TCP (`NIGHTWATCH_INGEST_URI`, default `127.0.0.1:2407`), and that agent — `php artisan nightwatch:agent` — is what ships them. No agent, no data.
+
+Where it is on, and where it is not:
+
+- **Local**: off. `.env.example` sets `NIGHTWATCH_ENABLED=false` because nothing in `php artisan dev` starts an agent. Left on, every request would attempt a connection that is refused.
+- **Tests**: off. `phpunit.xml` carries `<env name="NIGHTWATCH_ENABLED" value="false"/>`, which the Laravel skeleton ships alongside `PULSE_ENABLED` and `TELESCOPE_ENABLED`. Do not remove it.
+- **Laravel Cloud**: on, and configured from the dashboard rather than from this repo. "Connect Nightwatch" on the environment injects `NIGHTWATCH_TOKEN`, `NIGHTWATCH_REQUEST_SAMPLE_RATE=0.1`, `LOG_CHANNEL=stack` and `LOG_STACK=laravel-cloud-socket,nightwatch`, and runs the agent on every App and Worker cluster. Do not also add a manual background process for the agent — the docs warn to remove any manual ones first, or the environment runs two.
+
+There is no `config/nightwatch.php`; the package is driven entirely by environment variables, so publishing one is not needed.
+
+`php artisan nightwatch:status` is the health check and exits non-zero on error. Locally it reports `Unable to connect to tcp://127.0.0.1:2407 (Connection refused)`, which is expected, not a fault.
+
+On Octane: the Nightwatch docs say nothing about Octane, FrankenPHP, Swoole or RoadRunner — there is no page for it. Verified by hand that the app boots and serves under `octane:start --server=frankenphp` with the package installed. Treat deeper Octane interaction as unverified rather than supported.
