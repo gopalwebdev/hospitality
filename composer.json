@@ -11,6 +11,7 @@
         "inertiajs/inertia-laravel": "^3.3.4",
         "laravel/framework": "^13.31",
         "laravel/horizon": "^5.49",
+        "laravel/octane": "^2.22",
         "laravel/tinker": "^3.0.2",
         "laravel/wayfinder": "^0.1.21",
         "spatie/laravel-permission": "^8.3",

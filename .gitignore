@@ -33,3 +33,7 @@ yarn-error.log
 /public/css/filament
 /public/js/filament
 /public/fonts/filament
+
+**/caddy
+frankenphp
+frankenphp-worker.php

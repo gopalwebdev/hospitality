@@ -140,3 +140,19 @@ Two modules added together, because an order needs both: `locations` says where 
 Like the India assumption above, the pair of languages is a "for now". The one thing that does not scale for free is uniqueness, which every form checks on the English name — see `.ai/rules/models.md`.
 
 All three surfaces switch language: the guest app through its toggle, and both Filament panels through a switcher in the top bar. What that switch reaches is the tenant's own words — menu, category, item, add-on, charge and tile names. Roles and permissions stay English too, and for a second reason: code refers to those names.
+
+## Code must be safe under Octane: the app stays in memory between requests
+`laravel/octane` is installed (v2, FrankenPHP server, `config/octane.php`). The application boots **once** and serves many requests from the same process, so anything you leave behind outlives the request that created it. Write for that, whether or not you are running Octane locally.
+
+The rules that follow from it:
+
+- **No mutable static state.** A `static $cache = []` that grows per request is a memory leak and a cross-request data leak — one guest's basket answering another guest's request. Filament's `protected static ?string $model` and friends are fine: they are constant declarations, never written to.
+- **No singleton that captures per-request state.** A binding resolved once holds the first request's `Request`, user, tenant or locale for every request after it. There are deliberately **no** `singleton()`, `scoped()` or `instance()` bindings in `app/Providers/` — keep it that way unless the thing really is stateless, and never inject `Request`, the authenticated user or `Filament::getTenant()` into one.
+- **Reset per-request state on `RouteMatched`.** That is the hook this app already uses, and the reason it does. `AppServiceProvider::configureRequestMemoization()` calls `Once::flush()` there, because Laravel only flushes `once()` between *tests* — without it a long-lived worker answers every later request from the first one's memoized value. `preventDuplicateQueries()` resets `$this->queriesThisRequest` the same way; the provider instance itself is long-lived, so the closure's `$this` is too.
+- **Config and env are read at boot.** `config()` is cached in memory, so a value derived from a request (host, locale, tenant) must never be written back with `config()->set()` outside a test.
+
+Tenancy is the sharpest edge here: a tenant is resolved per request from the subdomain, so anything that caches a tenant, its settings, its currency or its opening hours beyond the request will serve one tenant's data to another. `Tenant::resolvedSettings()` and `resolvedOpeningHours()` are per-request reads held on the model instance, which is correct — do not promote either to a static or a container singleton.
+
+Verified at install: the app boots clean under `octane:start --server=frankenphp` and serves the platform panel, warm requests at ~5ms against ~98ms cold.
+
+Octane is not used by the test suite or by `php artisan dev`, so a leak will not show up locally. Review against these rules rather than relying on the suite to catch it.
