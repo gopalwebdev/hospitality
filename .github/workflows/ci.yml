@@ -15,10 +15,16 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The runner image is pinned rather than left on `ubuntu-latest`, which is
+# migrating to Ubuntu 26 between 19 October and 19 November 2026 and so hands
+# out either image while that runs. Two reasons to stay on 24.04 for now: a
+# green run should mean the same thing every time, and the pinned
+# shivammathur/setup-php is 2.37.2, which predates the Ubuntu 26.04 support
+# added in 2.40.0. Moving to `ubuntu-26.04` means bumping that action first.
 jobs:
   code-style:
     name: Code style
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -38,7 +44,7 @@ jobs:
 
   static-analysis:
     name: Static analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -55,7 +61,7 @@ jobs:
 
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -85,8 +91,16 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
+
+    # The suite is the slowest job and the only one that needs a database, so
+    # it waits for the three cheap checks. A branch that fails formatting or a
+    # type check never spins up Postgres or builds the bundle.
+    needs:
+      - code-style
+      - static-analysis
+      - frontend
 
     # The application runs on Postgres and nothing else, so the suite does too:
     # jsonb, CHECK constraints and expression indexes are part of what it tests.
@@ -142,17 +156,14 @@ jobs:
 
   deploy-staging:
     name: Deploy to staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
-    # Every other job has to be green first: `needs` defaults to running only
-    # when all of them succeed, so a red lint, type check or test never
-    # reaches Laravel Cloud.
-    needs:
-      - code-style
-      - static-analysis
-      - frontend
-      - tests
+    # The last link in lint/check/format -> tests -> deploy. `needs` defaults
+    # to running only when what it waits on succeeded, and `tests` already
+    # waits on the other three, so naming it here gates the deploy on all
+    # four. Anything red anywhere up the chain means no deploy.
+    needs: tests
 
     # Pushes to main only. `on.push.branches` already narrows pushes to main,
     # and this keeps a pull request — which has no deploy of its own — out.
