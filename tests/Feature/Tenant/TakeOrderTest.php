@@ -461,7 +461,15 @@ it('offers no dead controls on an order there is nothing left to do to', functio
     // foreach. A served order was drawing a dead Move along and a dead
     // Change beside it, which is exactly the clutter this panel is for
     // avoiding.
-    expect($html)->not->toContain('fi-disabled');
+    //
+    // Asked as aria-disabled rather than as the fi-disabled class: every
+    // Filament button carries `wire:loading.class="fi-disabled"` to grey
+    // itself out while its own request is in flight, so the class name
+    // alone says nothing about whether a control is dead. A disabled action
+    // is the one that renders aria-disabled="true" — whether or not it also
+    // renders the disabled attribute, which Filament drops when the button
+    // has a tooltip, as these do.
+    expect($html)->not->toContain('aria-disabled="true"');
 });
 
 it('says so plainly when a place has taken nothing today', function (): void {
@@ -486,7 +494,7 @@ it('lets staff name somewhere that is not one of the rows', function (): void {
     // Somewhere that is not one of the rows: the select is left empty and
     // the name is typed beside it.
     Livewire::test(TakeOrder::class)
-        ->set('data.location_id', null)
+        ->set('data.location_id')
         ->set('data.location_label', 'Terrace, far table')
         ->call('addTile', 'item', $item->getKey())
         ->call('placeOrder');

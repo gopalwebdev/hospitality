@@ -10,6 +10,7 @@ use App\Models\MenuCombo;
 use App\Models\MenuItem;
 use App\Models\MenuItemAddOnGroup;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Everything on one menu that can be ordered right now, laid out for the panel's Take order page.
@@ -161,26 +162,46 @@ final readonly class ReadOrderableMenu
      */
     private function categories(Menu $menu): EloquentCollection
     {
-        $orderableItems = fn ($items) => $items
-            ->select($this->itemColumns())
-            ->orderable()
-            ->inMenuOrder();
-
         return MenuCategory::query()
             ->select(['id', 'parent_id', 'name'])
             ->where('menu_id', $menu->getKey())
             ->topLevel()
             ->active()
             ->with([
-                'menuItems' => $orderableItems,
-                'children' => fn ($children) => $children
-                    ->select(['id', 'parent_id', 'name'])
-                    ->active()
-                    ->with(['menuItems' => $orderableItems])
-                    ->inMenuOrder(),
+                'menuItems' => $this->orderableItems(...),
+                'children' => $this->activeSubdivisions(...),
             ])
             ->inMenuOrder()
             ->get();
+    }
+
+    /**
+     * The items of one section, as the page reads them.
+     *
+     * @param  HasMany<MenuItem, MenuCategory>  $items
+     * @return HasMany<MenuItem, MenuCategory>
+     */
+    private function orderableItems(HasMany $items): HasMany
+    {
+        return $items
+            ->select($this->itemColumns())
+            ->orderable()
+            ->inMenuOrder();
+    }
+
+    /**
+     * A section's subdivisions, each with the items filed under it.
+     *
+     * @param  HasMany<MenuCategory, MenuCategory>  $children
+     * @return HasMany<MenuCategory, MenuCategory>
+     */
+    private function activeSubdivisions(HasMany $children): HasMany
+    {
+        return $children
+            ->select(['id', 'parent_id', 'name'])
+            ->active()
+            ->with(['menuItems' => $this->orderableItems(...)])
+            ->inMenuOrder();
     }
 
     /**

@@ -16,14 +16,6 @@ use Illuminate\Validation\Rule;
 class PriceBasketRequest extends FormRequest
 {
     /**
-     * Anyone reading a menu may price a basket from it; there is no account to check.
-     */
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array

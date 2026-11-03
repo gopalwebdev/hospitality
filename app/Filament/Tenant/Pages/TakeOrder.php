@@ -226,13 +226,7 @@ class TakeOrder extends Page
      */
     private function isOwnLocation(int $locationId): bool
     {
-        foreach ($this->locations() as $location) {
-            if ($location->getKey() === $locationId) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->locations(), fn (Location $location): bool => $location->getKey() === $locationId);
     }
 
     /**
@@ -489,7 +483,7 @@ class TakeOrder extends Page
             ->iconButton()
             ->size(Size::Small)
             ->record(fn (array $arguments): ?Order => $this->openOrderNamed($arguments))
-            ->after(fn () => $this->ordersHere = null);
+            ->after(fn (): null => $this->ordersHere = null);
     }
 
     /**
@@ -1286,7 +1280,7 @@ class TakeOrder extends Page
 
             $picked = $data['group_'.$group->getKey()] ?? null;
 
-            foreach (is_array($picked) ? $picked : array_filter([$picked], fn (mixed $value): bool => filled($value)) as $optionId) {
+            foreach (is_array($picked) ? $picked : array_filter([$picked], filled(...)) as $optionId) {
                 $optionId = (int) $optionId;
                 $option = $group->options->firstWhere('id', $optionId);
 

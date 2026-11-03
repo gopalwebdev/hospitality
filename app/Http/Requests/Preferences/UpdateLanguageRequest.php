@@ -15,11 +15,6 @@ use Illuminate\Validation\Rules\Enum;
  */
 class UpdateLanguageRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
     /**
      * @return array<string, list<string|Enum>>
      */
