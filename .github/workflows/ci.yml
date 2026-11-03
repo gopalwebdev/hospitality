@@ -139,3 +139,56 @@ jobs:
 
       - name: Run tests
         run: php artisan test
+
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Every other job has to be green first: `needs` defaults to running only
+    # when all of them succeed, so a red lint, type check or test never
+    # reaches Laravel Cloud.
+    needs:
+      - code-style
+      - static-analysis
+      - frontend
+      - tests
+
+    # Pushes to main only. `on.push.branches` already narrows pushes to main,
+    # and this keeps a pull request — which has no deploy of its own — out.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # The hook URL is an environment secret on the `staging` environment, so
+    # the job has to name it to be handed the secret at all.
+    environment: staging
+
+    # Two commits landing on main close together each run CI to the end, and
+    # the deploys would otherwise race. One at a time, and a newer commit
+    # waiting behind a running deploy supersedes an older one still waiting.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+
+    steps:
+      # No checkout: the hook needs nothing from the tree, only the SHA, and
+      # the URL stays in the environment rather than on the command line.
+      - name: Trigger the Laravel Cloud deployment
+        env:
+          DEPLOY_HOOK: ${{ secrets.LARAVEL_CLOUD_STAGING_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::LARAVEL_CLOUD_STAGING_DEPLOY_HOOK is not set on the staging environment." >&2
+            exit 1
+          fi
+
+          # `commit_hash` pins the deployment to the commit CI just proved
+          # green, rather than whatever the branch tip happens to be by the
+          # time Laravel Cloud pulls. No --location: the URL is a secret and
+          # must not be re-sent to a redirect target.
+          curl \
+            --request POST \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --max-time 30 \
+            "${DEPLOY_HOOK}?commit_hash=${GITHUB_SHA}"
