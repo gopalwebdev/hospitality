@@ -143,7 +143,7 @@ abstract class OtpLogin extends BaseLogin
         }
 
         $this->hasRequestedCode = true;
-        $this->codeSentAt = $outstanding->created_at->getTimestamp();
+        $this->codeSentAt = ($outstanding->created_at ?? now())->getTimestamp();
 
         Notification::make()
             ->title('Check your email')
