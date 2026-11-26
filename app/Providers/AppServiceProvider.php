@@ -16,10 +16,14 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Once;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -60,6 +64,17 @@ class AppServiceProvider extends ServiceProvider
         $this->configureQueryGuards();
         $this->configureAuthorization();
         $this->configureDevProcesses();
+        $this->configureMailTransports();
+    }
+
+    /**
+     * Register Brevo's HTTP API as the `brevo` mail transport, used outside local.
+     */
+    protected function configureMailTransports(): void
+    {
+        Mail::extend('brevo', fn (): TransportInterface => (new BrevoTransportFactory)->create(
+            new Dsn('brevo+api', 'default', (string) config('services.brevo.key')),
+        ));
     }
 
     /**

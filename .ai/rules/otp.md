@@ -8,6 +8,8 @@ paths:
 ## Sign-in codes are emailed inline
 SendOneTimePassword sends `SignInCodeNotification` **inline**: it is a plain `Notification`, not a `ShouldQueue` one, so the mail goes out on the request that asked for the code. The project owner had the queue taken out altogether (`.ai/rules/config.md`) — a code waiting on a worker nobody is running is a sign-in that never happens, which is exactly how it failed. A code that arrives after it expires is useless, so do not put this back behind a queue without a worker running in every environment.
 
+All mail, not only sign-in codes: local sends to Herd's mail server over SMTP (read it with `herd mail:latest`), and because sending is inline, asking for a code fails outright when that server is not running; staging and production set `MAIL_MAILER=brevo`, Brevo's HTTP API (`symfony/brevo-mailer`, registered in `AppServiceProvider::configureMailTransports()`, key in `BREVO_API_KEY`) — the key is never committed, and `MAIL_FROM_ADDRESS` must be a sender verified in Brevo. Brevo refuses calls from IPs not authorised on the account (`Unauthorized IP address`), so a new server needs its IP allowed there, or the restriction turned off.
+
 `otp.log_codes` additionally writes the code in the clear to the `otp` log channel. It defaults to **off** and is off in `.env` too, at the project owner's instruction: codes are not to be written to a log. Enabling it anywhere real is a credential leak. Tests turn it on through the `captureIssuedCodes()` helper in tests/Pest.php, which reads the codes out of a file of its own.
 
 Only a bcrypt hash of the code is stored. Issuing a new code retires any outstanding one for that user, and each code tolerates `otp.max_attempts` wrong guesses before it burns.

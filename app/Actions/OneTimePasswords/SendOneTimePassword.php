@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * Issues a fresh sign-in code for a user and delivers it.
  *
- * Delivery is a queued email. While developing, otp.log_codes also writes the
- * code to its own log channel so it can be read straight out of
+ * Delivery is an inline (non-queued) email, sent on the same request that
+ * asked for the code. While developing, otp.log_codes also writes the code
+ * to its own log channel so it can be read straight out of
  * storage/logs/otp.log without waiting on a mailbox.
  */
 class SendOneTimePassword
