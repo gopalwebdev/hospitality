@@ -34,6 +34,20 @@ class ThrottleOneTimePasswordRequests
     }
 
     /**
+     * How many seconds remain before the address may ask again.
+     */
+    public function secondsUntilNextRequest(string $email): int
+    {
+        $cooldownKey = $this->keyFor($email).':cooldown';
+
+        if (! RateLimiter::tooManyAttempts($cooldownKey, maxAttempts: 1)) {
+            return 0;
+        }
+
+        return max(1, RateLimiter::availableIn($cooldownKey));
+    }
+
+    /**
      * Hash the address so the cache never holds one in the clear.
      */
     private function keyFor(string $email): string

@@ -6,6 +6,7 @@ use App\Actions\OneTimePasswords\SendOneTimePassword;
 use App\Actions\OneTimePasswords\ThrottleOneTimePasswordRequests;
 use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Enums\FilamentPanel;
+use App\Enums\OtpRequestOutcome;
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
@@ -93,12 +94,19 @@ abstract class OtpLogin extends BaseLogin
             ]);
         }
 
-        $outcome = app(ThrottleOneTimePasswordRequests::class)($email);
+        $throttle = app(ThrottleOneTimePasswordRequests::class);
+        $outcome = $throttle($email);
+
+        if ($outcome === OtpRequestOutcome::Cooldown && $this->resumeOutstandingCode($user)) {
+            return;
+        }
 
         if (! $outcome->mayIssueCode()) {
             Notification::make()
                 ->title('Hold on')
-                ->body($outcome->message())
+                ->body($outcome->message(
+                    $outcome === OtpRequestOutcome::Cooldown ? $throttle->secondsUntilNextRequest($email) : null,
+                ))
                 ->warning()
                 ->send();
 
@@ -115,6 +123,35 @@ abstract class OtpLogin extends BaseLogin
             ->body($outcome->message())
             ->success()
             ->send();
+    }
+
+    /**
+     * Return to the code step for a code that is still usable.
+     *
+     * Asking again inside the cooldown would otherwise leave someone who
+     * already holds a good code stuck on step one until the wait runs out.
+     */
+    protected function resumeOutstandingCode(User $user): bool
+    {
+        $outstanding = $user->oneTimePasswords()
+            ->live()
+            ->latest('id')
+            ->first(['id', 'attempts', 'created_at']);
+
+        if ($outstanding === null || $outstanding->hasExhaustedAttempts()) {
+            return false;
+        }
+
+        $this->hasRequestedCode = true;
+        $this->codeSentAt = $outstanding->created_at->getTimestamp();
+
+        Notification::make()
+            ->title('Check your email')
+            ->body('We already sent you a code. Enter it below.')
+            ->info()
+            ->send();
+
+        return true;
     }
 
     /**
@@ -213,7 +250,9 @@ abstract class OtpLogin extends BaseLogin
                 // swallows every click on a button marked that way.
                 Actions::make($this->getPrimaryFormActions())
                     ->fullWidth()
-                    ->key(fn (): string => 'form-actions-'.($this->hasCompleteCode() ? 'ready' : 'waiting')),
+                    ->key(fn (): string => 'form-actions-'
+                        .($this->hasRequestedCode ? 'code-' : 'email-')
+                        .($this->hasCompleteCode() ? 'ready' : 'waiting')),
                 $this->getResendCountdownComponent(),
                 Actions::make($this->getSecondaryFormActions())
                     ->alignment(Alignment::Center)

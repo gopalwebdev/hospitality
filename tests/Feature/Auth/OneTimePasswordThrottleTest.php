@@ -84,3 +84,15 @@ it('says nothing about whether an account exists', function (): void {
 
     expect(requestCodeFor('nobody@example.com'))->toBe(OtpRequestOutcome::Cooldown);
 });
+
+it('says how long is left before the address may ask again', function (): void {
+    $throttle = app(ThrottleOneTimePasswordRequests::class);
+
+    expect($throttle->secondsUntilNextRequest('someone@example.com'))->toBe(0);
+
+    requestCodeFor('someone@example.com');
+    $this->travel(30)->seconds();
+
+    expect($throttle->secondsUntilNextRequest('someone@example.com'))
+        ->toBe((int) config('otp.resend_cooldown') - 30);
+});

@@ -28,14 +28,16 @@ enum OtpRequestOutcome: string
 
     /**
      * The message to show for this outcome.
+     *
+     * A cooldown names the seconds actually left when it is given them.
      */
-    public function message(): string
+    public function message(?int $secondsLeft = null): string
     {
         return match ($this) {
             self::Sent => 'If that address has an account, a sign-in code is on its way.',
             self::Cooldown => sprintf(
                 'Wait %d seconds before asking for another code.',
-                (int) config('otp.resend_cooldown'),
+                $secondsLeft ?? (int) config('otp.resend_cooldown'),
             ),
             self::LimitReached => sprintf(
                 'That is %d codes for one address. Try again later.',

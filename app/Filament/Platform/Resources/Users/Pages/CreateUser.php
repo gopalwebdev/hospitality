@@ -346,7 +346,9 @@ class CreateUser extends CreateRecord
     public function getFormActionsContentComponent(): Component
     {
         return parent::getFormActionsContentComponent()
-            ->key(fn (): string => 'form-actions-'.($this->hasCompleteCode() ? 'ready' : 'waiting'));
+            ->key(fn (): string => 'form-actions-'
+                .($this->hasRequestedCode ? 'code-' : 'details-')
+                .($this->hasCompleteCode() ? 'ready' : 'waiting'));
     }
 
     /**

@@ -316,13 +316,18 @@ it('redraws the sign-in button rather than patching it once the code is complete
 
     // Patched in place, the button kept the aria-disabled="true" it was first
     // drawn with, and Filament's click guard swallowed every click on it.
+    // Each step gets a row of its own too: going back to the address step
+    // used to patch the disabled sign-in button into "Email me a code".
     Livewire::test(PlatformLogin::class)
+        ->assertSeeHtml('.form-actions-email-waiting"')
         ->fillForm(['email' => $user->email])
         ->call('requestCode')
-        ->assertSeeHtml('.form-actions-waiting"')
+        ->assertSeeHtml('.form-actions-code-waiting"')
         ->fillForm(['email' => $user->email, 'code' => '123456'])
-        ->assertSeeHtml('.form-actions-ready"')
-        ->assertDontSeeHtml('.form-actions-waiting"');
+        ->assertSeeHtml('.form-actions-code-ready"')
+        ->assertDontSeeHtml('.form-actions-code-waiting"')
+        ->call('startOver')
+        ->assertSeeHtml('.form-actions-email-waiting"');
 });
 
 it('says how many digits the code has', function (): void {
@@ -591,4 +596,49 @@ it('will not accept a code against a swapped-in address', function (): void {
         ->assertHasFormErrors(['code']);
 
     $this->assertGuest();
+});
+
+it('takes someone back to the code they already hold when they ask again too soon', function (): void {
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    $component = Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode');
+
+    $sentAt = $component->get('codeSentAt');
+    $this->travel(30)->seconds();
+
+    $component
+        ->call('startOver')
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode')
+        ->assertSet('hasRequestedCode', true)
+        ->assertSet('codeSentAt', $sentAt)
+        ->fillForm(['code' => ($this->readCodes)()[0]])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(($this->readCodes)())->toHaveCount(1);
+    $this->assertAuthenticatedAs($user);
+});
+
+it('holds someone on the first step when the code they hold is no longer usable', function (): void {
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    $component = Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode');
+
+    $user->oneTimePasswords()->update(['consumed_at' => now()]);
+
+    $component
+        ->call('startOver')
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode')
+        ->assertSet('hasRequestedCode', false)
+        ->assertNotified('Hold on');
+
+    expect(($this->readCodes)())->toHaveCount(1);
 });
