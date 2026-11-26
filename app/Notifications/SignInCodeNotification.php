@@ -2,27 +2,22 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
  * Emails a user the one-time code that signs them in.
  *
- * It goes onto the mail queue, which Horizon works ahead of everything else: a
- * code that arrives after it has expired is no use to anyone.
+ * It is sent inline rather than queued, on the project owner's instruction:
+ * nothing in this application uses a queue at the moment, and a code that
+ * waits on a worker that is not running never arrives at all.
  */
-class SignInCodeNotification extends Notification implements ShouldQueue
+class SignInCodeNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         private readonly string $code,
         private readonly int $expiresInMinutes,
-    ) {
-        $this->onQueue('mail');
-    }
+    ) {}
 
     /**
      * @return list<string>

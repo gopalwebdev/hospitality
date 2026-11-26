@@ -3,8 +3,6 @@
 namespace App\Notifications;
 
 use App\Enums\FilamentPanel;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -15,19 +13,15 @@ use Illuminate\Notifications\Notification;
  * only thing to say is where to sign in; the code that lets them in is issued
  * by the sign-in page when they ask for it.
  *
- * It rides the mail queue alongside the sign-in codes, which Horizon works
- * ahead of everything else.
+ * It is sent inline alongside the sign-in codes: nothing in this application
+ * uses a queue at the moment.
  */
-class AccountCreatedNotification extends Notification implements ShouldQueue
+class AccountCreatedNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         private readonly string $signInUrl,
         private readonly ?string $tenantName = null,
-    ) {
-        $this->onQueue('mail');
-    }
+    ) {}
 
     /**
      * @return list<string>

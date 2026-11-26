@@ -30,8 +30,10 @@ runs:
     # The runner has no Redis, and nothing in CI needs one: phpunit.xml already
     # pins the suite to the array and sync drivers. The artisan commands run
     # outside the suite (migrate, wayfinder:generate) read .env instead, where
-    # the defaults are Redis, so they would try to connect and fail. Real
-    # environment variables win over .env, which is what these exports rely on.
+    # cache and session default to Redis, so they would try to connect and
+    # fail. The queue is already sync everywhere and is restated here so the
+    # three drivers are set in one place. Real environment variables win over
+    # .env, which is what these exports rely on.
     # They match phpunit.xml, because a PHPUnit <env> does not overwrite a
     # variable that is already set — the suite must not see anything else here.
     - name: Select drivers that need no services

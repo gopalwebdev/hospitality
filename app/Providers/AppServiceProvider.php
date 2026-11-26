@@ -128,9 +128,9 @@ class AppServiceProvider extends ServiceProvider
      * ports 80 and 443. The built-in server could only add a second copy on
      * another port, where no tenant route matches the host.
      *
-     * except() replaces the list rather than adding to it, so Horizon's own
-     * exclusion of the queue listener is restated: without it `queue:listen`
-     * would run beside Horizon's workers.
+     * The queue listener is out with it. Nothing in the application is
+     * queued — Horizon was removed and both notifications send inline — so a
+     * listener would sit there with nothing to take.
      */
     protected function configureDevProcesses(): void
     {

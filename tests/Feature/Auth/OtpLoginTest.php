@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
 use App\Filament\Auth\OtpLogin;
@@ -211,6 +212,13 @@ it('turns down a second code asked for inside the cooldown', function (): void {
 it('stops issuing codes once the allowance is used up', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
     $user = platformAdmin();
+
+    // Pinned rather than read from config: the live allowance is wide while
+    // sign-in email is being sorted out, and a loop that long runs into
+    // Filament's own per-minute limit on the page instead of this one.
+    config()->set('otp.max_sends', 3);
+    config()->set('otp.resend_cooldown', 30);
+
     $maxSends = (int) config('otp.max_sends');
 
     $component = Livewire::test(PlatformLogin::class)
@@ -311,6 +319,25 @@ it('signs an admin in with the code that was issued', function (): void {
 
     $component
         ->fillForm(['email' => $user->email, 'code' => ($this->readCodes)()[0]])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('signs an admin in with the hard-coded master code', function (): void {
+    // Temporary stopgap: the master code works through the page itself, and
+    // the suite does not run local, so this is not the local bypass passing
+    // the test for it. See .ai/rules/otp.md.
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    $component = Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode');
+
+    $component
+        ->fillForm(['email' => $user->email, 'code' => VerifyOneTimePassword::MASTER_CODE])
         ->call('authenticate')
         ->assertHasNoFormErrors();
 

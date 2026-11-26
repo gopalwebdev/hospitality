@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\FilamentPanel;
 use App\Models\Tenant;
 use Filament\Facades\Filament;
-use Filament\Panel;
 use Illuminate\Http\RedirectResponse;
+use RuntimeException;
 
 /**
  * /login, on the root domain and on every tenant's subdomain.
@@ -24,7 +24,7 @@ class PanelSignInController extends Controller
      */
     public function platform(): RedirectResponse
     {
-        return $this->enter(Filament::getPanel(FilamentPanel::Platform->value));
+        return $this->enter(FilamentPanel::Platform);
     }
 
     /**
@@ -32,14 +32,21 @@ class PanelSignInController extends Controller
      */
     public function tenant(Tenant $tenant): RedirectResponse
     {
-        return $this->enter(Filament::getPanel(FilamentPanel::Tenant->value), ['tenant' => $tenant]);
+        return $this->enter(FilamentPanel::Tenant, ['tenant' => $tenant]);
     }
 
     /**
+     * Filament types getPanel() as nullable even though it throws on an
+     * unknown id, so a panel this application registers itself is asserted
+     * by failing loudly rather than by widening what enter() accepts.
+     *
      * @param  array<string, mixed>  $dashboardParameters
      */
-    private function enter(Panel $panel, array $dashboardParameters = []): RedirectResponse
+    private function enter(FilamentPanel $filamentPanel, array $dashboardParameters = []): RedirectResponse
     {
+        $panel = Filament::getPanel($filamentPanel->value)
+            ?? throw new RuntimeException("The {$filamentPanel->value} panel is not registered.");
+
         if ($panel->auth()->check()) {
             return redirect()->to(route($panel->generateRouteName('pages.dashboard'), $dashboardParameters));
         }

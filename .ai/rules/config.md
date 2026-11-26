@@ -6,10 +6,12 @@ paths:
 
 # Config
 
-## Valkey backs cache, session and queue; Horizon runs the workers
-Valkey is Redis wire-compatible, so `CACHE_STORE`, `SESSION_DRIVER` and `QUEUE_CONNECTION` are all `redis` against 127.0.0.1:6379 via phpredis. There is no separate Valkey driver — do not go looking for one.
+## Valkey backs cache and session; nothing is queued
+Valkey is Redis wire-compatible, so `CACHE_STORE` and `SESSION_DRIVER` are both `redis` via phpredis — against Herd's own Valkey instance, which listens on **6666**, not the 6379 in `.env.example`. There is no separate Valkey driver — do not go looking for one. `QUEUE_CONNECTION` is no longer among them; see below.
 
-Queued work needs `php artisan horizon` running; nothing is delivered without it. Supervisor queues are `['mail', 'default']` in that order, and `/horizon` is gated on the product team flag (`User::isAdmin()`) in HorizonServiceProvider.
+**There is no queue, on the project owner's instruction.** `QUEUE_CONNECTION` is `sync` everywhere, including `.env.example` and `phpunit.xml`, so everything runs inline on the request that caused it. **Horizon was removed with it** — no `laravel/horizon`, no `config/horizon.php`, no `/horizon` dashboard, no supervisor configuration, and no worker process to run anywhere. Neither notification implements `ShouldQueue` any more (`.ai/rules/otp.md`), and `php artisan dev` starts no queue listener (`.ai/rules/providers.md`).
+
+Before queueing anything again: a job on `sync` is a job that runs in the web request, so it has to stay short. Bringing a queue back means a connection, a worker process in every environment and a dashboard to watch it — do not add `ShouldQueue` to a class and assume something is working the queue.
 
 phpunit.xml pins tests to array cache/session and the sync queue, so tests never touch Valkey. If tests start behaving as though they share state, check for a stale `bootstrap/cache/config.php` — a cached config silently overrides every phpunit.xml env var. `php artisan optimize:clear` fixes it, and nothing in local development should leave those caches in place.
 

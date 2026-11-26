@@ -3,7 +3,6 @@
 use App\Providers\AppServiceProvider;
 use App\Providers\Filament\PlatformPanelProvider;
 use App\Providers\Filament\TenantPanelProvider;
-use App\Providers\HorizonServiceProvider;
 
 return [
     AppServiceProvider::class,
@@ -13,5 +12,4 @@ return [
     // domain matches. PanelRoutingTest pins this.
     PlatformPanelProvider::class,
     TenantPanelProvider::class,
-    HorizonServiceProvider::class,
 ];

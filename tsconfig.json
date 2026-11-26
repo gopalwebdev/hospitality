@@ -108,7 +108,15 @@
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */,
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            /* @testing-library/jest-dom augments module 'vitest', which npm
+               keeps nested inside vite-plus. Without this the augmentation
+               lands on an unresolved module and every jest-dom matcher
+               disappears from expect(). See .ai/rules/js.md. */
+            "vitest": [
+                "./node_modules/vite-plus/node_modules/vitest",
+                "./node_modules/vitest"
+            ]
         },
         "jsx": "react-jsx"
     },

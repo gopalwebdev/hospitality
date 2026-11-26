@@ -10,7 +10,6 @@
         "filament/filament": "^5.8.1",
         "inertiajs/inertia-laravel": "^3.3.4",
         "laravel/framework": "^13.31",
-        "laravel/horizon": "^5.49",
         "laravel/nightwatch": "^1.30",
         "laravel/octane": "^2.22",
         "laravel/tinker": "^3.0.2",

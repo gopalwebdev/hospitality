@@ -55,7 +55,7 @@ SSR is off **twice over**, and both switches are necessary — this is the one p
 
 Set only the first one, a dev boot still prints "Inertia SSR dev endpoint" and "Warming up Inertia SSR module graph" — which is exactly what shipped, and exactly what alerted the project owner that this was still costing something. Both have to be off together.
 
-No Inertia page is pre-rendered either way: the server sends props and React paints from them, in development exactly as in production. It was on, and being on was worse than either answer chosen deliberately: a deployed page has never been pre-rendered — there is no bundle under `bootstrap/ssr`, and `php artisan dev` starts Horizon, Pail and Vite and nothing else (`DevProcessesTest`) — so every page was server rendered on the machine it was written on and client rendered once it shipped. That is the one arrangement where a hydration mismatch, or a render that reaches for `window`, breaks nowhere it would be seen.
+No Inertia page is pre-rendered either way: the server sends props and React paints from them, in development exactly as in production. It was on, and being on was worse than either answer chosen deliberately: a deployed page has never been pre-rendered — there is no bundle under `bootstrap/ssr`, and `php artisan dev` starts Pail and Vite and nothing else (`DevProcessesTest`) — so every page was server rendered on the machine it was written on and client rendered once it shipped. That is the one arrangement where a hydration mismatch, or a render that reaches for `window`, breaks nowhere it would be seen.
 
 What follows from it:
 - **The boot loader is the first paint**, on every load rather than only a deployed one. `#app` is empty until React mounts, which is what the section below is about.
