@@ -51,7 +51,7 @@ return [
 
     'max_sends' => (int) env('OTP_MAX_SENDS', 20),
 
-    'resend_cooldown' => (int) env('OTP_RESEND_COOLDOWN', 5),
+    'resend_cooldown' => (int) env('OTP_RESEND_COOLDOWN', 120),
 
     'send_window' => (int) env('OTP_SEND_WINDOW', 600),
 

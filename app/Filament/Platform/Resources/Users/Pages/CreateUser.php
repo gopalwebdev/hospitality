@@ -14,6 +14,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -333,6 +334,19 @@ class CreateUser extends CreateRecord
     protected function validateAccountDetails(): void
     {
         $this->form->validate();
+    }
+
+    /**
+     * The form's buttons, keyed by whether the code is complete.
+     *
+     * See OtpLogin::getFormContentComponent(): patched in place, the confirm
+     * button keeps the aria-disabled="true" it was first drawn with, and
+     * Filament swallows every click on it.
+     */
+    public function getFormActionsContentComponent(): Component
+    {
+        return parent::getFormActionsContentComponent()
+            ->key(fn (): string => 'form-actions-'.($this->hasCompleteCode() ? 'ready' : 'waiting'));
     }
 
     /**

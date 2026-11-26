@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\OneTimePasswords\VerifyOneTimePassword;
 use App\Enums\FilamentPanel;
 use App\Enums\Role;
 use App\Filament\Auth\OtpLogin;
@@ -85,10 +84,44 @@ it('offers to sign in, not to send another first code, once a code is out', func
         ->call('requestCode')
         ->assertSee('Enter your code')
         ->assertSee('Sign in')
-        ->assertSee('Send a new code')
+        ->assertSee('You can ask for a new code in')
+        ->assertDontSee('Send a new code')
         ->assertSee('Use a different email')
         ->assertDontSee('Email me a code');
 })->with('sign-in pages');
+
+it('offers a new code only once the resend cooldown has passed', function (): void {
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    $component = Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode')
+        ->assertDontSee('Send a new code');
+
+    $this->travel((int) config('otp.resend_cooldown') - 1)->seconds();
+    $component->call('$refresh')->assertDontSee('Send a new code');
+
+    $this->travel(1)->seconds();
+    $component->call('$refresh')
+        ->assertSee('Send a new code')
+        ->assertDontSee('You can ask for a new code in');
+});
+
+it('disables the address once a code is out and still signs in with it', function (): void {
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode')
+        ->assertFormFieldDisabled('email')
+        ->fillForm(['code' => ($this->readCodes)()[0]])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(Filament::auth()->id())->toBe($user->id);
+});
 
 it('submits the code rather than asking for another one', function (Closure $setUp): void {
     [$page, $user] = $setUp();
@@ -277,6 +310,21 @@ it('keeps the sign-in button disabled until every digit is typed', function (str
     'every digit' => ['123456', true],
 ]);
 
+it('redraws the sign-in button rather than patching it once the code is complete', function (): void {
+    Filament::setCurrentPanel(FilamentPanel::Platform->value);
+    $user = platformAdmin();
+
+    // Patched in place, the button kept the aria-disabled="true" it was first
+    // drawn with, and Filament's click guard swallowed every click on it.
+    Livewire::test(PlatformLogin::class)
+        ->fillForm(['email' => $user->email])
+        ->call('requestCode')
+        ->assertSeeHtml('.form-actions-waiting"')
+        ->fillForm(['email' => $user->email, 'code' => '123456'])
+        ->assertSeeHtml('.form-actions-ready"')
+        ->assertDontSeeHtml('.form-actions-waiting"');
+});
+
 it('says how many digits the code has', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
     $user = platformAdmin();
@@ -325,10 +373,7 @@ it('signs an admin in with the code that was issued', function (): void {
     $this->assertAuthenticatedAs($user);
 });
 
-it('signs an admin in with the hard-coded master code', function (): void {
-    // Temporary stopgap: the master code works through the page itself, and
-    // the suite does not run local, so this is not the local bypass passing
-    // the test for it. See .ai/rules/otp.md.
+it('refuses the retired master code', function (): void {
     Filament::setCurrentPanel(FilamentPanel::Platform->value);
     $user = platformAdmin();
 
@@ -336,12 +381,17 @@ it('signs an admin in with the hard-coded master code', function (): void {
         ->fillForm(['email' => $user->email])
         ->call('requestCode');
 
-    $component
-        ->fillForm(['email' => $user->email, 'code' => VerifyOneTimePassword::MASTER_CODE])
-        ->call('authenticate')
-        ->assertHasNoFormErrors();
+    // In the one-in-a-million case the real code is 020198, it should work.
+    if (($this->readCodes)()[0] === '020198') {
+        $this->markTestSkipped('The issued code happens to be 020198.');
+    }
 
-    $this->assertAuthenticatedAs($user);
+    $component
+        ->fillForm(['email' => $user->email, 'code' => '020198'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['code']);
+
+    $this->assertGuest();
 });
 
 it('signs a tenant owner into their own tenant panel', function (): void {

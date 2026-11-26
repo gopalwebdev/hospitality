@@ -14,28 +14,8 @@ use Illuminate\Support\Facades\Hash;
  */
 class VerifyOneTimePassword
 {
-    /**
-     * The one code that signs anybody in, whatever was issued to them.
-     *
-     * Hard-coded on the project owner's instruction while sign-in email is
-     * being sorted out. It is a back door by design: it works in every
-     * environment, for every account, whether or not a code was ever asked
-     * for. Delete it the moment codes can be relied on to arrive.
-     */
-    public const MASTER_CODE = '020198';
-
     public function __invoke(User $user, string $code): OtpVerificationResult
     {
-        // Temporary, on the project owner's instruction: the master code
-        // signs anybody in, and on a local machine so does any code at all.
-        // Both retire whatever was outstanding, so nothing already issued
-        // stays usable afterwards.
-        if ($code === self::MASTER_CODE || app()->isLocal()) {
-            $user->oneTimePasswords()->whereNull('consumed_at')->update(['consumed_at' => now()]);
-
-            return OtpVerificationResult::Verified;
-        }
-
         $oneTimePassword = $user->oneTimePasswords()
             ->whereNull('consumed_at')
             ->latest('id')

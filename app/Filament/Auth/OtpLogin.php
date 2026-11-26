@@ -19,12 +19,14 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
@@ -47,6 +49,12 @@ abstract class OtpLogin extends BaseLogin
      */
     #[Locked]
     public bool $hasRequestedCode = false;
+
+    /**
+     * When the last code was sent, as a Unix timestamp.
+     */
+    #[Locked]
+    public ?int $codeSentAt = null;
 
     /**
      * The panel this page signs people into.
@@ -100,6 +108,7 @@ abstract class OtpLogin extends BaseLogin
         app(SendOneTimePassword::class)($user);
 
         $this->hasRequestedCode = true;
+        $this->codeSentAt = now()->getTimestamp();
 
         Notification::make()
             ->title('Check your email')
@@ -198,9 +207,14 @@ abstract class OtpLogin extends BaseLogin
                 // Two groups rather than one row: the button that submits the
                 // form runs the full width, and the ways out sit under it as
                 // links. In one row the third label wrapped onto two lines.
+                // The key changes with the button's state so Livewire swaps the
+                // row in fresh. Patched in place, the button kept the
+                // aria-disabled="true" it was first drawn with, and Filament
+                // swallows every click on a button marked that way.
                 Actions::make($this->getPrimaryFormActions())
                     ->fullWidth()
-                    ->key('form-actions'),
+                    ->key(fn (): string => 'form-actions-'.($this->hasCompleteCode() ? 'ready' : 'waiting')),
+                $this->getResendCountdownComponent(),
                 Actions::make($this->getSecondaryFormActions())
                     ->alignment(Alignment::Center)
                     ->key('form-secondary-actions'),
@@ -236,7 +250,49 @@ abstract class OtpLogin extends BaseLogin
             ->placeholder('you@example.com')
             ->autocomplete('username')
             ->autofocus(fn (): bool => ! $this->hasRequestedCode)
-            ->readOnly(fn (): bool => $this->hasRequestedCode);
+            // Disabled once a code is out, so the address the code went to is
+            // the one signed in with. Still dehydrated: authenticate() reads it.
+            ->disabled(fn (): bool => $this->hasRequestedCode)
+            ->dehydrated();
+    }
+
+    /**
+     * How long until another code may be asked for, in seconds.
+     *
+     * Matches the cooldown ThrottleOneTimePasswordRequests enforces, so the
+     * link appears exactly when a request through it would be accepted.
+     */
+    protected function secondsUntilResend(): int
+    {
+        if ($this->codeSentAt === null) {
+            return 0;
+        }
+
+        return max(0, $this->codeSentAt + (int) config('otp.resend_cooldown') - now()->getTimestamp());
+    }
+
+    /**
+     * A countdown to the resend link, ticked in the browser.
+     *
+     * At zero it refreshes the component once, which draws the link.
+     */
+    protected function getResendCountdownComponent(): Component
+    {
+        return Html::make(fn (): HtmlString => new HtmlString(sprintf(
+            <<<'HTML'
+                <p
+                    x-data="{ secondsLeft: %d }"
+                    x-init="const timer = setInterval(() => { if (--secondsLeft <= 0) { clearInterval(timer); $wire.$refresh() } }, 1000)"
+                    style="text-align: center; font-size: 0.875rem; color: var(--gray-500);"
+                >
+                    You can ask for a new code in
+                    <span x-text="Math.floor(secondsLeft / 60) + ':' + String(secondsLeft %% 60).padStart(2, '0')" style="font-variant-numeric: tabular-nums;"></span>
+                </p>
+                HTML,
+            $this->secondsUntilResend(),
+        )))
+            ->key(fn (): string => 'resend-countdown-'.$this->codeSentAt)
+            ->visible(fn (): bool => $this->hasRequestedCode && $this->secondsUntilResend() > 0);
     }
 
     protected function getCodeFormComponent(): Component
@@ -353,7 +409,7 @@ abstract class OtpLogin extends BaseLogin
             ->icon(Heroicon::OutlinedArrowPath)
             ->link()
             ->action('requestCode')
-            ->visible(fn (): bool => $this->hasRequestedCode);
+            ->visible(fn (): bool => $this->hasRequestedCode && $this->secondsUntilResend() === 0);
     }
 
     protected function getStartOverFormAction(): Action

@@ -67,34 +67,21 @@ it('leaves other users codes alone', function (): void {
     expect($theirs->fresh()->hasBeenConsumed())->toBeFalse();
 });
 
-it('takes any code on a local machine while sign-in codes are set aside', function (): void {
-    // Temporary, for development: no code has been issued and this one is
-    // wrong, and on a local machine it still signs in. Every other
-    // environment, this suite's included, checks the code.
+it('checks the code on a local machine too', function (): void {
+    $readCodes = captureIssuedCodes();
     app()->detectEnvironment(fn (): string => 'local');
-
-    expect(app(VerifyOneTimePassword::class)(User::factory()->create(), '000000'))
-        ->toBe(OtpVerificationResult::Verified);
-});
-
-it('takes the hard-coded master code in any environment', function (): void {
-    // Temporary, on the project owner's instruction: no code has been issued
-    // and the environment is not local, and the master code still signs in.
-    app()->detectEnvironment(fn (): string => 'production');
-
-    expect(app(VerifyOneTimePassword::class)(User::factory()->create(), VerifyOneTimePassword::MASTER_CODE))
-        ->toBe(OtpVerificationResult::Verified);
-});
-
-it('retires an outstanding code once the master code has been used', function (): void {
-    captureIssuedCodes();
-    app()->detectEnvironment(fn (): string => 'production');
     $user = User::factory()->create();
-    $issued = app(SendOneTimePassword::class)($user);
+    app(SendOneTimePassword::class)($user);
 
-    app(VerifyOneTimePassword::class)($user, VerifyOneTimePassword::MASTER_CODE);
+    $wrongCode = $readCodes()[0] === '000000' ? '111111' : '000000';
 
-    expect($issued->fresh()->hasBeenConsumed())->toBeTrue();
+    expect(app(VerifyOneTimePassword::class)($user, $wrongCode))
+        ->toBe(OtpVerificationResult::Incorrect);
+});
+
+it('signs nobody in without an issued code, the retired master code included', function (): void {
+    expect(app(VerifyOneTimePassword::class)(User::factory()->create(), '020198'))
+        ->toBe(OtpVerificationResult::NotFound);
 });
 
 /*
